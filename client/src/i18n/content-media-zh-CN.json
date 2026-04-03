@@ -1,0 +1,42 @@
+{
+  "studyPackV2": {
+    "teacher": {
+      "imageSectionTitle": "题目配图",
+      "imageSectionDesc": "当前模块如果只有一道任务，这里的图片会作为该题的配图显示给学生。",
+      "imageUrlLabel": "图片地址",
+      "imageUrlPlaceholder": "可粘贴图片 URL，也可使用右侧上传。",
+      "imageCaptionLabel": "图片说明",
+      "imageCaptionPlaceholder": "补充图片说明或观察提示。",
+      "imageUploadHint": "支持本地图片上传，图片大小不超过 500KB。",
+      "imageSizeError": "图片大小超过 500KB，请压缩后重新上传。",
+      "imageUploadError": "图片上传失败，请重试。",
+      "imageReplaceHint": "重新上传会替换当前图片",
+      "imageRemoveAction": "删除图片",
+      "imagePreviewAlt": "题目配图",
+      "imageSizeError": "图片大小超过 500KB，请压缩后重新上传。",
+      "imageUploadError": "图片上传失败，请重试。",
+      "itemImageSectionTitle": "题目配图",
+      "itemImageSectionDesc": "每个词条或句型都可以单独设置配图。",
+      "mediaSectionTitle": "音视频素材",
+      "mediaSectionDesc": "上传音频或视频文件，作为听力或口语练习的素材，文件大小不超过 10MB。",
+      "mediaUrlLabel": "音视频地址",
+      "mediaUrlPlaceholder": "可粘贴音视频 URL，也可使用右侧上传。",
+      "mediaUploadHint": "支持上传音频和视频文件，大小不超过 10MB。",
+      "mediaSizeError": "文件大小超过 10MB，请压缩后重新上传。",
+      "mediaUploadError": "音视频上传失败，请重试。",
+      "mediaRemoveAction": "删除音视频"
+    }
+  },
+  "taskGroupV2": {
+    "questionImageSectionTitle": "题目配图",
+    "questionImageSectionDesc": "所有题型都支持题目配图，课堂模式和学生端会按题显示。",
+    "imageUrlLabel": "图片地址",
+    "imageUrlPlaceholder": "可粘贴图片 URL，也可使用右侧上传。",
+    "imageCaptionLabel": "图片说明",
+    "imageCaptionPlaceholder": "补充图片说明或观察提示。",
+    "imageUploadHint": "支持本地图片上传。",
+    "imageReplaceHint": "重新上传会替换当前图片",
+    "imageRemoveAction": "删除图片",
+    "imagePreviewAlt": "题目配图"
+  }
+}

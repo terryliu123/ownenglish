@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish 课前准备</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./prep.css" />
+  </head>
+  <body class="teacher-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Teacher Prep Studio</p>
+            <h1>课前准备中心</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./teacher.html">返回总览</a>
+          <a href="../docs/pre-class-preparation-prd.md">查看 PRD</a>
+          <a href="../docs/task-engine-architecture.md">查看能力架构</a>
+          <a href="./teacher-live.html">进入课堂模式</a>
+        </nav>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-class-card">
+            <span class="eyebrow">当前班级</span>
+            <strong>周二晚 20:00 直播口语班</strong>
+            <p>A2 - B1 · 32 名学生</p>
+          </div>
+          <nav class="sidebar-nav">
+            <a class="sidebar-link" href="./teacher.html">总览</a>
+            <a class="sidebar-link" href="./teacher-classes.html">班级</a>
+            <a class="sidebar-link is-active" href="./teacher-prep.html">课前准备</a>
+            <a class="sidebar-link" href="./teacher-live.html">课堂模式</a>
+            <a class="sidebar-link" href="./teacher-packs.html">学习包</a>
+            <a class="sidebar-link" href="./teacher-analytics.html">综合分析</a>
+          </nav>
+          <div class="sidebar-note">
+            <span class="eyebrow">本节课目标</span>
+            <p>围绕 “Would you mind... / Could you possibly...” 做礼貌表达检查与课堂小测，建议准备 5 题互动任务。</p>
+          </div>
+        </aside>
+
+        <main class="main-stage prep-shell">
+          <section class="prep-hero">
+            <article class="prep-hero-card">
+              <p class="eyebrow">Pre-class Workflow</p>
+              <h2>先把课堂任务备好，上课时只负责发布。</h2>
+              <p>在课前准备中心完成任务组设计、模板套用、预览与校验。进入课堂后，不再做复杂编辑，只做调度与发题。</p>
+              <div class="hero-metric-row">
+                <div class="hero-metric">
+                  <strong>12</strong>
+                  <span>全部任务组</span>
+                </div>
+                <div class="hero-metric">
+                  <strong>4</strong>
+                  <span>今天可待发布</span>
+                </div>
+                <div class="hero-metric">
+                  <strong>2</strong>
+                  <span>仍需补题</span>
+                </div>
+              </div>
+            </article>
+
+            <div class="prep-side-stack">
+              <article class="prep-note-card">
+                <div class="surface-head">
+                  <h3>推荐备课顺序</h3>
+                  <span>课前 10 分钟</span>
+                </div>
+                <ul>
+                  <li>先选一个任务模板，再改成本节课内容。</li>
+                  <li>至少准备 1 组热身题和 1 组检查题。</li>
+                  <li>标记为“待发布”后再进入课堂模式。</li>
+                </ul>
+              </article>
+
+              <article class="prep-template-card">
+                <div class="surface-head">
+                  <h3>快捷入口</h3>
+                  <span>高频动作</span>
+                </div>
+                <div class="inline-actions">
+                  <a class="solid-button" href="./teacher-prep-designer.html">新建任务组</a>
+                  <a class="ghost-button" href="./teacher-prep-ready.html">打开发布检查</a>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="prep-template-grid">
+            <article class="template-pill-card">
+              <strong>课堂热身 3 题</strong>
+              <p class="template-meta">单选 + 判断 + 填空，适合开场 3 分钟。</p>
+              <a class="action-link" href="./teacher-prep-designer.html">用此模板创建</a>
+            </article>
+            <article class="template-pill-card">
+              <strong>词汇辨析 5 题</strong>
+              <p class="template-meta">适合检查本节课重点词汇与搭配。</p>
+              <a class="action-link" href="./teacher-prep-designer.html">复制到新任务组</a>
+            </article>
+            <article class="template-pill-card">
+              <strong>句型配对练习</strong>
+              <p class="template-meta">配对题 + 多选题，适合句型巩固。</p>
+              <a class="action-link" href="./teacher-prep-designer.html">进入设计器</a>
+            </article>
+          </section>
+
+          <section class="prep-filter-bar">
+            <label class="search-shell">
+              <span>搜索</span>
+              <input type="text" value="礼貌表达" aria-label="搜索任务组名称" />
+            </label>
+            <div class="chip-row" data-chip-group>
+              <button class="filter-chip active" data-chip type="button">全部状态</button>
+              <button class="filter-chip" data-chip type="button">草稿</button>
+              <button class="filter-chip" data-chip type="button">可待发布</button>
+              <button class="filter-chip" data-chip type="button">已归档</button>
+            </div>
+            <a class="ghost-button" href="./teacher-prep-ready.html">查看待发布队列</a>
+            <a class="solid-button" href="./teacher-prep-designer.html">创建新任务组</a>
+          </section>
+
+          <section class="prep-kpi-grid">
+            <article class="kpi-card">
+              <strong>5</strong>
+              <span>今天计划用到的题型</span>
+            </article>
+            <article class="kpi-card">
+              <strong>37</strong>
+              <span>历史可复用题目</span>
+            </article>
+            <article class="kpi-card">
+              <strong>8</strong>
+              <span>近两周已上课使用</span>
+            </article>
+            <article class="kpi-card">
+              <strong>91%</strong>
+              <span>最近任务完整率</span>
+            </article>
+          </section>
+
+          <section class="prep-board">
+            <article class="prep-panel">
+              <div class="section-head-slim">
+                <div>
+                  <p class="eyebrow">Task Groups</p>
+                  <h3>任务组列表</h3>
+                </div>
+                <span class="info-muted">按最近更新时间排序</span>
+              </div>
+
+              <div class="task-list">
+                <article class="task-card">
+                  <div class="task-index">01</div>
+                  <div>
+                    <div class="inline-actions">
+                      <span class="status-chip ready">可待发布</span>
+                      <span class="outline-tag">5 题</span>
+                      <span class="outline-tag">礼貌表达</span>
+                    </div>
+                    <h4>Lesson 08 · 礼貌请求表达检查</h4>
+                    <p class="task-meta">包含单选、多选、填空、判断、配对各 1 题，预计课堂使用 6 分钟。</p>
+                    <p class="task-subcopy">最后更新：今天 18:42 · 创建人：Emily 老师</p>
+                  </div>
+                  <div class="task-actions">
+                    <a class="solid-button" href="./teacher-prep-designer.html">编辑</a>
+                    <a class="ghost-button" href="./teacher-prep-ready.html">发布检查</a>
+                  </div>
+                </article>
+
+                <article class="task-card">
+                  <div class="task-index">02</div>
+                  <div>
+                    <div class="inline-actions">
+                      <span class="status-chip">草稿</span>
+                      <span class="outline-tag">3 题</span>
+                      <span class="outline-tag">听前热身</span>
+                    </div>
+                    <h4>Lesson 08 · 听前热身与预测</h4>
+                    <p class="task-meta">已完成 2 / 3 题。还有 1 道填空题未设置正确答案，尚不能进入课堂待发布队列。</p>
+                    <p class="task-subcopy">最后更新：今天 18:20 · 缺少 1 项校验</p>
+                  </div>
+                  <div class="task-actions">
+                    <a class="ghost-button" href="./teacher-prep-designer.html">继续编辑</a>
+                    <a class="action-link" href="./teacher-prep.html">复制</a>
+                  </div>
+                </article>
+
+                <article class="task-card">
+                  <div class="task-index">03</div>
+                  <div>
+                    <div class="inline-actions">
+                      <span class="status-chip">已归档</span>
+                      <span class="outline-tag">4 题</span>
+                      <span class="outline-tag">历史复用</span>
+                    </div>
+                    <h4>Lesson 06 · 餐厅点餐场景速测</h4>
+                    <p class="task-meta">上一轮课堂平均答对率 74%，其中配对题表现最好，可直接复制作为新课起点。</p>
+                    <p class="task-subcopy">最后使用：2026-03-18</p>
+                  </div>
+                  <div class="task-actions">
+                    <a class="ghost-button" href="./teacher-prep-designer.html">复制并编辑</a>
+                    <a class="action-link" href="./teacher-prep.html">查看详情</a>
+                  </div>
+                </article>
+              </div>
+            </article>
+
+            <article class="queue-card">
+              <div class="surface-head">
+                <h3>待进入课堂的任务</h3>
+                <span>4 组</span>
+              </div>
+              <div class="queue-list">
+                <article class="queue-item">
+                  <div class="queue-item-head">
+                    <strong>Lesson 08 · 礼貌请求表达检查</strong>
+                    <span class="status-chip ready">已校验</span>
+                  </div>
+                  <p class="info-muted">5 题 · 默认每题 35 秒 · 课堂中按手动逐题发布</p>
+                  <div class="queue-actions">
+                    <a class="solid-button" href="./teacher-live.html">去课堂调用</a>
+                    <a class="ghost-button" href="./teacher-prep-ready.html">查看发布检查</a>
+                  </div>
+                </article>
+
+                <article class="queue-item">
+                  <div class="queue-item-head">
+                    <strong>Lesson 08 · 句型配对巩固</strong>
+                    <span class="status-chip ready">可待发布</span>
+                  </div>
+                  <p class="info-muted">2 题 · 配对题为主 · 适合讲解后立即检测</p>
+                  <div class="queue-actions">
+                    <a class="ghost-button" href="./teacher-prep-designer.html">重新编辑</a>
+                    <a class="action-link" href="./teacher-live.html">进入课堂</a>
+                  </div>
+                </article>
+              </div>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script src="./prep.js"></script>
+  </body>
+</html>

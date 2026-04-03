@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Teacher Live Results</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="teacher-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Teacher Studio</p>
+            <h1>课堂实时结果</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./teacher-live.html">返回上一题</a>
+          <a href="./student-live-submitted.html">查看学生提交态</a>
+        </nav>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-class-card">
+            <span class="eyebrow">当前班级</span>
+            <strong>周二晚 20:00 口语提升班</strong>
+            <p>29 / 32 已作答</p>
+          </div>
+          <nav class="sidebar-nav">
+            <a class="sidebar-link" href="./teacher.html">总览</a>
+            <a class="sidebar-link" href="./teacher-classes.html">班级</a>
+            <a class="sidebar-link is-active" href="./teacher-live.html">课堂模式</a>
+            <a class="sidebar-link" href="./teacher-packs.html">学习包</a>
+            <a class="sidebar-link" href="./teacher-analytics.html">综合分析</a>
+          </nav>
+        </aside>
+
+        <main class="main-stage">
+          <section class="panel-head">
+            <div>
+              <p class="eyebrow">Live Results</p>
+              <h2>整组实时任务已经开始，现在来到第 2 / 4 题</h2>
+            </div>
+            <div class="panel-actions">
+              <span class="status-badge cool">正确率 62%</span>
+            </div>
+          </section>
+
+          <section class="stats-grid compact">
+            <article class="stat-card compact">
+              <strong>2 / 4</strong>
+              <span>已发布题目</span>
+            </article>
+            <article class="stat-card compact">
+              <strong>29</strong>
+              <span>当前题已作答</span>
+            </article>
+            <article class="stat-card compact">
+              <strong>18s</strong>
+              <span>平均用时</span>
+            </article>
+          </section>
+
+          <section class="teacher-grid split-2">
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>当前题结果</h3>
+                <span>Q2 场景句型填空</span>
+              </div>
+              <div class="question-preview-card">
+                <label>当前题</label>
+                <strong>In the library, how do you politely ask someone to lower their voice?</strong>
+                <p>系统正在汇总第 2 题结果，这一题用于验证学生是否完成从规则理解到场景迁移。</p>
+              </div>
+              <div class="bar-group">
+                <div class="result-bar"><span>A</span><div><b style="width: 17%"></b></div><strong>5</strong></div>
+                <div class="result-bar success"><span>B</span><div><b style="width: 62%"></b></div><strong>18</strong></div>
+                <div class="result-bar"><span>C</span><div><b style="width: 10%"></b></div><strong>3</strong></div>
+                <div class="result-bar"><span>D</span><div><b style="width: 11%"></b></div><strong>3</strong></div>
+              </div>
+              <div class="callout-card muted">
+                <strong>第 2 题正确率仍未过 70%，建议先讲解，再决定是否进入 Q3 听力题。</strong>
+                <p>这组题的价值在于逐层确认学生是否真正掌握，而不是只发一题后就结束课堂判断。</p>
+              </div>
+            </article>
+
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>整组任务进度</h3>
+                <span>4 题发布链路</span>
+              </div>
+              <div class="sequence-strip">
+                <div class="sequence-step">
+                  <div>
+                    <strong>Q1 礼貌请求辨析</strong>
+                    <p>已完成 · 正确率 81%</p>
+                  </div>
+                  <span class="card-tag">完成</span>
+                </div>
+                <div class="sequence-step active">
+                  <div>
+                    <strong>Q2 场景句型填空</strong>
+                    <p>进行中 · 正确率 62%</p>
+                  </div>
+                  <span class="card-tag">当前题</span>
+                </div>
+                <div class="sequence-step">
+                  <div>
+                    <strong>Q3 听力快速判断</strong>
+                    <p>待发送 · 35 秒</p>
+                  </div>
+                  <span class="card-tag">下一题</span>
+                </div>
+                <div class="sequence-step">
+                  <div>
+                    <strong>Q4 Exit Ticket</strong>
+                    <p>待发送 · 收尾投票</p>
+                  </div>
+                  <span class="card-tag">未开始</span>
+                </div>
+              </div>
+
+              <div class="publish-card">
+                <div class="publish-card-head">
+                  <div>
+                    <strong>课堂判断与未作答名单</strong>
+                    <p>老师可以在整组任务里灵活讲解、重发、跳题或直接转入课后学习包。</p>
+                  </div>
+                </div>
+                <div class="roster-list">
+                  <div class="roster-row"><strong>Emma</strong><span>未提交</span></div>
+                  <div class="roster-row"><strong>Leo</strong><span>网络波动</span></div>
+                  <div class="roster-row"><strong>Anna</strong><span>已离开答题页</span></div>
+                </div>
+              </div>
+
+              <div class="action-stack horizontal">
+                <a class="ghost-button" href="./teacher-live.html">讲解并重发当前题</a>
+                <a class="solid-button" href="./teacher-packs.html">结束课堂并转学习包</a>
+              </div>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "adminUi": {
+    "layout": {
+      "membership": "会员与支付",
+      "subtitle": "胖鼠互动课堂系统"
+    }
+  },
+  "adminMembership": {
+    "title": "会员与支付设置",
+    "subtitle": "在管理端统一配置免费会员、付费会员权益，以及微信支付接入参数。",
+    "refresh": "刷新",
+    "loading": "正在加载会员与支付配置...",
+    "loadFailed": "加载会员与支付配置失败，请稍后重试。",
+    "planSection": "会员权益配置",
+    "planSectionHint": "所有老师的权益判断都从这里读取。修改后，对后续新增动作立即生效。",
+    "wechatSection": "微信支付配置",
+    "wechatSectionHint": "此处只保存微信支付所需参数，不在当前页面验证参数有效性。",
+    "planSaved": "会员权益已保存。",
+    "planSaveFailed": "会员权益保存失败。",
+    "wechatSaved": "微信支付配置已保存。",
+    "wechatSaveFailed": "微信支付配置保存失败。",
+    "savePlan": "保存权益",
+    "saveWechat": "保存支付配置",
+    "saving": "保存中...",
+    "active": "启用中",
+    "inactive": "已停用",
+    "unlimitedPlaceholder": "留空表示不限",
+    "secretPlaceholder": "已按密文保存",
+    "fields": {
+      "name": "套餐名称",
+      "description": "套餐说明",
+      "priceCents": "价格（分）",
+      "durationDays": "有效天数",
+      "maxClasses": "可创建班级数",
+      "maxStudentsPerClass": "每班学生上限",
+      "maxTaskGroups": "课前准备任务上限",
+      "maxStudyPacks": "学习包上限",
+      "sortOrder": "排序值",
+      "canUseAi": "允许 AI 创建 / 导入",
+      "isActive": "套餐启用"
+    }
+  }
+}

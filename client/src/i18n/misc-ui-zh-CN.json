@@ -1,0 +1,36 @@
+{
+  "miscUi": {
+    "notifications": {
+      "ariaLabel": "\u901a\u77e5",
+      "justNow": "\u521a\u521a",
+      "minutesAgo": "{{count}} \u5206\u949f\u524d",
+      "hoursAgo": "{{count}} \u5c0f\u65f6\u524d",
+      "daysAgo": "{{count}} \u5929\u524d"
+    },
+    "practice": {
+      "greetingsTitle": "\u65e5\u5e38\u95ee\u5019",
+      "introductionsTitle": "\u81ea\u6211\u4ecb\u7ecd",
+      "politeTitle": "\u793c\u8c8c\u8bf7\u6c42",
+      "directionsTitle": "\u95ee\u8def\u6307\u8def",
+      "moreComingSoon": "\u66f4\u591a\u5185\u5bb9\u9646\u7eed\u4e0a\u7ebf\u4e2d..."
+    },
+    "analytics": {
+      "studentsCount": "{{count}} \u540d\u5b66\u751f",
+      "activitySummary": "{{practice}} \u6b21\u7ec3\u4e60 \u00b7 {{live}} \u6b21\u7b54\u9898"
+    },
+    "freePractice": {
+      "countSuffix": "{{count}} \u9898",
+      "startWithCount": "{{label}} ({{count}} \u9898)",
+      "backWithArrow": "\u2190 {{label}}",
+      "exitWithArrow": "\u2190 {{label}}"
+    },
+    "layout": {
+      "studentCount": "{{count}} \u540d\u5b66\u751f"
+    },
+    "auth": {
+      "emailOrUsernameLabel": "\u90ae\u7bb1 / \u7528\u6237\u540d",
+      "emailOrUsernamePlaceholder": "\u90ae\u7bb1\u6216\u7528\u6237\u540d",
+      "passwordPlaceholder": "\u8bf7\u8f93\u5165\u5bc6\u7801"
+    }
+  }
+}

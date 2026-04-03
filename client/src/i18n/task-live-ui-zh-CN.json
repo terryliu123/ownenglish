@@ -1,0 +1,32 @@
+{
+  "taskLiveUI": {
+    "questionFallback": "题目",
+    "correct": "正确",
+    "incorrect": "错误",
+    "studentAnswer": "你的答案",
+    "correctAnswer": "正确答案",
+    "studentAnswerLabel": "学生答案",
+    "correctAnswerLabel": "正确答案",
+    "fillBlankAnswers": "填空答案：",
+    "matchingResult": "匹配结果：",
+    "correctPrefix": "正确: ",
+    "enterAnswer": "请输入答案",
+    "selected": "已选",
+    "leftSide": "左侧",
+    "rightSideMatch": "右侧（点击配对）",
+    "selectedLeftHint": "已选择左侧第 {{index}} 项，请点击右侧项进行配对",
+    "pairedLeftIndex": "配对 {{index}}",
+    "unselected": "未选择",
+    "waitingForResult": "已提交，等待结果...",
+    "timeUp": "时间到",
+    "submitAnswers": "提交答案 ({{answered}}/{{total}})",
+    "answeredProgress": "已回答 {{answered}} / {{total}} 题",
+    "blankLabel": "空 {{index}}",
+    "trueOption": "正确 (True)",
+    "falseOption": "错误 (False)",
+    "noAnswerDetail": "暂无答题详情",
+    "backToStudents": "←返回学生列表",
+    "waitTeacherDismiss": "任务已结束，请等待老师下课...",
+    "teacherDismissHint": "老师点击“下课”后将自动返回首页"
+  }
+}

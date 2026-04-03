@@ -1,0 +1,2 @@
+INSERT INTO "live_task_groups" ("id", "class_id", "title", "status", "created_at", "updated_at") VALUES ('3c5e11e9-7f51-45e7-bcfc-f7bc31df0709', 'd0b18231-bb66-4481-8ddd-e3088a1d25d6', '二维码伴我生活', 'active', '2026-03-26 18:24:42.01689+08', '2026-03-26 18:54:19.716324+08');
+INSERT INTO "live_task_groups" ("id", "class_id", "title", "status", "created_at", "updated_at") VALUES ('0095e431-3d21-48a8-b162-47dd326f0cea', 'd0b18231-bb66-4481-8ddd-e3088a1d25d6', '英语课堂训练', 'ready', '2026-03-26 20:38:00.394336+08', '2026-03-26 20:41:00.995809+08');

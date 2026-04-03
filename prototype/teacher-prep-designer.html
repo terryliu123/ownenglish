@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish 任务设计器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./prep.css" />
+  </head>
+  <body class="teacher-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Pre-class Designer</p>
+            <h1>课堂任务设计器</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./teacher-prep.html">返回任务组列表</a>
+          <a href="./teacher-prep-ready.html">发布检查</a>
+          <a href="./teacher-live.html">进入课堂模式</a>
+        </nav>
+      </header>
+
+      <main class="prep-shell" style="margin-top: 22px;">
+        <section class="surface-card">
+          <div class="editor-toolbar">
+            <div>
+              <p class="eyebrow">Task Group</p>
+              <h2>Lesson 08 · 礼貌请求表达检查</h2>
+              <p class="info-muted">目标班级：周二晚 20:00 直播口语班 · 当前状态：草稿 · 最近自动保存：18:46</p>
+            </div>
+            <div class="inline-actions">
+              <a class="ghost-button" href="./teacher-prep.html">保存草稿</a>
+              <a class="ghost-button" href="./teacher-prep.html">复制任务组</a>
+              <a class="solid-button" href="./teacher-prep-ready.html">完成并去检查</a>
+            </div>
+          </div>
+        </section>
+
+        <section class="designer-shell">
+          <aside class="outline-panel">
+            <article class="editor-panel">
+              <div class="surface-head">
+                <h3>题目结构</h3>
+                <span>5 题</span>
+              </div>
+              <div class="outline-list">
+                <button
+                  class="question-tile active"
+                  data-question-card="q1"
+                  data-preview-title="Which expression is the most polite?"
+                  data-preview-type="单选题"
+                  type="button"
+                >
+                  <div class="inline-actions">
+                    <span class="status-chip ready">已完成</span>
+                    <span class="outline-tag">单选</span>
+                  </div>
+                  <div class="question-outline">
+                    <strong>Q1. 礼貌表达快速检查</strong>
+                    <p class="info-muted">35 秒 · 4 个选项 · 已设置正确答案</p>
+                  </div>
+                </button>
+
+                <button
+                  class="question-tile"
+                  data-question-card="q2"
+                  data-preview-title="Choose all polite follow-up responses."
+                  data-preview-type="多选题"
+                  type="button"
+                >
+                  <div class="inline-actions">
+                    <span class="status-chip ready">已完成</span>
+                    <span class="outline-tag">多选</span>
+                  </div>
+                  <div class="question-outline">
+                    <strong>Q2. 选择合适回应</strong>
+                    <p class="info-muted">40 秒 · 5 个选项 · 允许部分得分</p>
+                  </div>
+                </button>
+
+                <button
+                  class="question-tile"
+                  data-question-card="q3"
+                  data-preview-title="Complete the sentence with the missing phrase."
+                  data-preview-type="填空题"
+                  type="button"
+                >
+                  <div class="inline-actions">
+                    <span class="status-chip">待补充</span>
+                    <span class="outline-tag">填空</span>
+                  </div>
+                  <div class="question-outline">
+                    <strong>Q3. 句型填空</strong>
+                    <p class="info-muted">30 秒 · 缺少近义答案配置</p>
+                  </div>
+                </button>
+
+                <button
+                  class="question-tile"
+                  data-question-card="q4"
+                  data-preview-title="True or false: this sentence sounds polite."
+                  data-preview-type="判断题"
+                  type="button"
+                >
+                  <div class="inline-actions">
+                    <span class="status-chip ready">已完成</span>
+                    <span class="outline-tag">判断</span>
+                  </div>
+                  <div class="question-outline">
+                    <strong>Q4. 语气判断</strong>
+                    <p class="info-muted">25 秒 · 正误判断 · 已带解析</p>
+                  </div>
+                </button>
+
+                <button
+                  class="question-tile"
+                  data-question-card="q5"
+                  data-preview-title="Match each request with the best response."
+                  data-preview-type="配对题"
+                  type="button"
+                >
+                  <div class="inline-actions">
+                    <span class="status-chip ready">已完成</span>
+                    <span class="outline-tag">配对</span>
+                  </div>
+                  <div class="question-outline">
+                    <strong>Q5. 请求与回应配对</strong>
+                    <p class="info-muted">45 秒 · 左右各 4 项 · 随机右列</p>
+                  </div>
+                </button>
+              </div>
+
+              <div class="inline-actions">
+                <a class="solid-button" href="./teacher-prep-designer.html">新增题目</a>
+                <a class="ghost-button" href="./teacher-prep-designer.html">统一倒计时</a>
+              </div>
+            </article>
+          </aside>
+
+          <section class="editor-panel">
+            <div class="surface-head">
+              <h3>当前题编辑</h3>
+              <span>支持多题连续设计</span>
+            </div>
+
+            <div class="question-kind-row" data-chip-group>
+              <button class="question-kind active" data-chip data-type-switch type="button">单选题</button>
+              <button class="question-kind" data-chip data-type-switch type="button">多选题</button>
+              <button class="question-kind" data-chip data-type-switch type="button">填空题</button>
+              <button class="question-kind" data-chip data-type-switch type="button">判断题</button>
+              <button class="question-kind" data-chip data-type-switch type="button">配对题</button>
+            </div>
+
+            <div class="editor-grid">
+              <article class="editor-panel" data-editor-panel="q1">
+                <div class="field-group">
+                  <label class="field-label">题目标题</label>
+                  <div class="field-shell"><input class="field-input" value="礼貌表达快速检查" /></div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">题干</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">Which expression is the most polite when asking your teacher for help?</textarea>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">选项与正确答案</label>
+                  <div class="option-stack">
+                    <div class="option-row">
+                      <div class="field-shell"><input class="field-input" value="A" /></div>
+                      <div class="field-shell"><input class="field-input" value="Help me with this." /></div>
+                      <span class="mini-flag">错误</span>
+                    </div>
+                    <div class="option-row">
+                      <div class="field-shell"><input class="field-input" value="B" /></div>
+                      <div class="field-shell"><input class="field-input" value="Can you help me now?" /></div>
+                      <span class="mini-flag">错误</span>
+                    </div>
+                    <div class="option-row">
+                      <div class="field-shell"><input class="field-input" value="C" /></div>
+                      <div class="field-shell"><input class="field-input" value="Could you possibly help me with this, please?" /></div>
+                      <span class="status-chip ready">正确</span>
+                    </div>
+                    <div class="option-row">
+                      <div class="field-shell"><input class="field-input" value="D" /></div>
+                      <div class="field-shell"><input class="field-input" value="I need help." /></div>
+                      <span class="mini-flag">错误</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="check-grid">
+                  <div class="field-group">
+                    <label class="field-label">倒计时</label>
+                    <div class="field-shell"><input class="field-input" value="35 秒" /></div>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">展示策略</label>
+                    <div class="field-shell">
+                      <select class="field-select">
+                        <option>结束后展示正确答案</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">解析</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">使用 could you possibly... please? 语气更完整、更有礼貌，适合课堂中强调语域差异。</textarea>
+                  </div>
+                </div>
+              </article>
+
+              <article class="editor-panel" data-editor-panel="q2" hidden>
+                <div class="field-group">
+                  <label class="field-label">题目标题</label>
+                  <div class="field-shell"><input class="field-input" value="选择合适回应" /></div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">题干</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">Choose all polite responses after your classmate says: “Could you help me carry these books?”</textarea>
+                  </div>
+                </div>
+                <div class="option-stack">
+                  <div class="option-row">
+                    <div class="field-shell"><input class="field-input" value="A" /></div>
+                    <div class="field-shell"><input class="field-input" value="Sure, I'd be happy to help." /></div>
+                    <span class="status-chip ready">正确</span>
+                  </div>
+                  <div class="option-row">
+                    <div class="field-shell"><input class="field-input" value="B" /></div>
+                    <div class="field-shell"><input class="field-input" value="No. Do it yourself." /></div>
+                    <span class="mini-flag">错误</span>
+                  </div>
+                  <div class="option-row">
+                    <div class="field-shell"><input class="field-input" value="C" /></div>
+                    <div class="field-shell"><input class="field-input" value="Of course. Let me take these." /></div>
+                    <span class="status-chip ready">正确</span>
+                  </div>
+                </div>
+                <div class="check-grid">
+                  <div class="field-group">
+                    <label class="field-label">部分得分</label>
+                    <div class="field-shell"><input class="field-input" value="开启" /></div>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">默认时间</label>
+                    <div class="field-shell"><input class="field-input" value="40 秒" /></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="editor-panel" data-editor-panel="q3" hidden>
+                <div class="field-group">
+                  <label class="field-label">题目标题</label>
+                  <div class="field-shell"><input class="field-input" value="句型填空" /></div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">题干</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">Complete the sentence: “Would you mind ______ the window for me?”</textarea>
+                  </div>
+                  <p class="field-help">支持单空或多空。当前任务建议补充近义答案与大小写规则。</p>
+                </div>
+                <div class="blank-stack">
+                  <div class="blank-row">
+                    <div class="field-shell"><input class="field-input" value="空 1" /></div>
+                    <div class="field-shell"><input class="field-input" value="opening" /></div>
+                    <span class="status-chip">主答案</span>
+                  </div>
+                  <div class="blank-row">
+                    <div class="field-shell"><input class="field-input" value="近义答案" /></div>
+                    <div class="field-shell"><input class="field-input" value="" placeholder="补充可接受答案" /></div>
+                    <span class="mini-flag">待补</span>
+                  </div>
+                </div>
+                <div class="check-grid">
+                  <div class="field-group">
+                    <label class="field-label">大小写敏感</label>
+                    <div class="field-shell"><input class="field-input" value="关闭" /></div>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">提示词</label>
+                    <div class="field-shell"><input class="field-input" value="动词 -ing 形式" /></div>
+                  </div>
+                </div>
+              </article>
+
+              <article class="editor-panel" data-editor-panel="q4" hidden>
+                <div class="field-group">
+                  <label class="field-label">题干</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">True or false: “Open the door.” sounds polite enough in class.</textarea>
+                  </div>
+                </div>
+                <div class="check-grid">
+                  <div class="field-group">
+                    <label class="field-label">正确答案</label>
+                    <div class="field-shell"><input class="field-input" value="False" /></div>
+                  </div>
+                  <div class="field-group">
+                    <label class="field-label">倒计时</label>
+                    <div class="field-shell"><input class="field-input" value="25 秒" /></div>
+                  </div>
+                </div>
+                <div class="field-group">
+                  <label class="field-label">解析</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">祈使句在课堂里太直接，建议引导学生改写成 Could you open the door, please?</textarea>
+                  </div>
+                </div>
+              </article>
+
+              <article class="editor-panel" data-editor-panel="q5" hidden>
+                <div class="field-group">
+                  <label class="field-label">题干</label>
+                  <div class="field-shell">
+                    <textarea class="field-textarea">Match each request with the best polite response.</textarea>
+                  </div>
+                </div>
+                <div class="matching-grid">
+                  <div class="matching-column">
+                    <div class="field-shell"><input class="field-input" value="A. Could you close the door?" /></div>
+                    <div class="field-shell"><input class="field-input" value="B. Would you mind waiting a minute?" /></div>
+                    <div class="field-shell"><input class="field-input" value="C. Could you speak more slowly?" /></div>
+                    <div class="field-shell"><input class="field-input" value="D. Would you mind repeating that?" /></div>
+                  </div>
+                  <div class="matching-column">
+                    <div class="field-shell"><input class="field-input" value="1. Sure, no problem." /></div>
+                    <div class="field-shell"><input class="field-input" value="2. Of course, take your time." /></div>
+                    <div class="field-shell"><input class="field-input" value="3. Certainly, let me say it again." /></div>
+                    <div class="field-shell"><input class="field-input" value="4. Yes, I'll slow down." /></div>
+                  </div>
+                </div>
+                <p class="field-help">系统会自动保存 A-1 / B-2 / C-4 / D-3 的配对关系，并支持课堂端随机右列。</p>
+              </article>
+            </div>
+          </section>
+
+          <aside class="preview-panel">
+            <div class="surface-head">
+              <h3>学生端预览</h3>
+              <span data-preview-type>单选题</span>
+            </div>
+
+            <div class="device-preview">
+              <div class="device-preview-inner">
+                <div class="inline-actions" style="justify-content: space-between;">
+                  <span class="status-chip ready">课堂实时任务</span>
+                  <span class="outline-tag">35 秒</span>
+                </div>
+                <div class="student-question-card">
+                  <strong data-preview-title>Which expression is the most polite?</strong>
+                </div>
+                <div class="student-option-card">A. Help me with this.</div>
+                <div class="student-option-card">B. Can you help me now?</div>
+                <div class="student-option-card selected">C. Could you possibly help me with this, please?</div>
+                <div class="student-option-card">D. I need help.</div>
+              </div>
+            </div>
+
+            <article class="preview-panel">
+              <div class="surface-head">
+                <h3>当前校验</h3>
+                <span>4 / 5 完整</span>
+              </div>
+              <div class="validator-stack">
+                <div class="validator-row good">
+                  <span>题干与正确答案已填写</span>
+                  <span class="mini-flag">通过</span>
+                </div>
+                <div class="validator-row good">
+                  <span>单选题选项数量符合要求</span>
+                  <span class="mini-flag">通过</span>
+                </div>
+                <div class="validator-row warn">
+                  <span>Q3 缺少近义答案配置</span>
+                  <span class="mini-flag">待补</span>
+                </div>
+              </div>
+            </article>
+
+            <article class="preview-panel">
+              <div class="surface-head">
+                <h3>发布设置</h3>
+                <span>任务组级</span>
+              </div>
+              <ul class="settings-list">
+                <li>默认发布方式：课堂手动逐题发布</li>
+                <li>正确答案显示：老师结束题目后显示</li>
+                <li>学生端结果页：允许显示解析</li>
+              </ul>
+            </article>
+          </aside>
+        </section>
+
+        <section class="sticky-bottom-actions">
+          <div>
+            <strong>当前任务组：5 题 · 1 项待补充</strong>
+            <p class="info-muted">建议先补完填空题答案，再进入发布检查。</p>
+          </div>
+          <div class="inline-actions">
+            <a class="ghost-button" href="./teacher-prep.html">保存草稿并返回</a>
+            <a class="ghost-button" href="./teacher-prep-designer.html">保存并新增下一题</a>
+            <a class="solid-button" href="./teacher-prep-ready.html">保存并去发布检查</a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./prep.js"></script>
+  </body>
+</html>

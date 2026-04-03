@@ -1,0 +1,53 @@
+{
+  "studyPackResults": {
+    "viewResult": "查看结果",
+    "studyAgain": "再次学习",
+    "resultTitle": "学习结果",
+    "resultMeta": "模块 {{current}} / {{total}}",
+    "statusLabel": "结果状态",
+    "scoreLabel": "得分",
+    "statusPending": "暂无结果",
+    "statusGraded": "已评分",
+    "statusSubmitted": "已提交",
+    "notAvailable": "暂无",
+    "empty": "当前模块还没有学习结果。",
+    "correctSummary": "答对 {{correct}} / {{total}}",
+    "submittedOnly": "当前模块已提交，系统已保存为学习记录。",
+    "itemLabel": "题目",
+    "correct": "正确",
+    "incorrect": "错误",
+    "submitted": "已提交",
+    "yourAnswer": "你的答案",
+    "expectedAnswer": "参考答案",
+    "emptyAnswer": "未作答",
+    "noReference": "暂无参考答案",
+    "nextModule": "下一模块",
+    "goPackSummary": "查看整包完成情况"
+  },
+  "studyPackV2": {
+    "student": {
+      "backToList": "返回任务列表",
+      "backToOverview": "返回任务详情",
+      "pauseAndReturn": "暂停并返回",
+      "viewDetail": "查看详情",
+      "returnToList": "返回任务列表"
+    }
+  },
+  "studyPackAnalytics": {
+    "title": "学习分析",
+    "loading": "正在加载分析数据...",
+    "empty": "当前学习包还没有学生提交记录。",
+    "started": "已开始",
+    "completed": "已完成",
+    "rate": "完成率",
+    "summaryRate": "平均主指标",
+    "moduleStats": "模块统计",
+    "moduleMetric": "主指标",
+    "moduleSubmissions": "提交人数",
+    "moduleCorrectCount": "答对数",
+    "moduleSampleAnswers": "示例回答",
+    "studentRecords": "学生记录",
+    "studentProgress": "已完成 {{done}} / {{total}} 个模块",
+    "noScore": "暂无评分"
+  }
+}

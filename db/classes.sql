@@ -1,0 +1,1 @@
+INSERT INTO "classes" ("id", "course_id", "teacher_id", "name", "invite_code", "status", "start_time", "created_at") VALUES ('d0b18231-bb66-4481-8ddd-e3088a1d25d6', NULL, '794482be-bd9c-43d2-9c66-91e7a6773472', '三年级一班', '69EF5D6D', 'active', NULL, '2026-03-26 18:24:28.609722+08');

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Student Pack</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="student-page student-device-phone" data-student-screen="pack">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Student Experience</p>
+            <h1>学生端高保真原型</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./teacher-published.html">查看老师发布状态</a>
+        </nav>
+      </header>
+
+      <section class="student-toolbar">
+        <div class="device-switcher">
+          <a class="device-toggle" data-device-toggle="phone" href="./student-pack.html">手机</a>
+          <a class="device-toggle" data-device-toggle="tablet" href="./student-pack.html?device=tablet">平板</a>
+        </div>
+        <div class="screen-shortcuts">
+          <a class="shortcut-pill" data-screen-link="join" href="./student.html">加入班级</a>
+          <a class="shortcut-pill" data-screen-link="live" href="./student-live.html">课堂任务</a>
+          <a class="shortcut-pill" data-screen-link="home" href="./student-home.html">今日任务</a>
+          <a class="shortcut-pill" data-screen-link="report" href="./student-report.html">学习报告</a>
+          <a class="shortcut-pill" data-screen-link="free" href="./student-free.html">免费内容</a>
+        </div>
+      </section>
+
+      <main class="student-stage">
+        <div class="device-frame">
+          <div class="device-camera"></div>
+          <div class="student-app">
+            <div class="student-app-top">
+              <div>
+                <strong>Lesson 12 课后学习包</strong>
+                <span class="small-status">系统会按顺序带你做完词汇、听力、句型和口语模块</span>
+              </div>
+              <span class="card-tag">进行中 25%</span>
+            </div>
+
+            <div class="student-screens">
+              <section class="student-screen is-active">
+                <div class="student-layout pack-layout">
+                  <article class="student-card hero-card soft">
+                    <p>Study Pack</p>
+                    <h2>今晚先把最重要的四个模块做完</h2>
+                    <p>老师已经根据直播内容帮你整理好重点，你只需要顺着任务做，不需要自己找资料。</p>
+                    <span class="countdown-pill">预计还需 10 分钟</span>
+                  </article>
+
+                  <div class="mobile-stack">
+                    <article class="student-card">
+                      <div class="progress-head">
+                        <h3>学习进度</h3>
+                        <span>1 / 4 已完成</span>
+                      </div>
+                      <div class="progress-bar"><b style="width: 25%"></b></div>
+                      <div class="module-stack">
+                        <div class="module-pill active">
+                          <strong>01 词汇热身</strong>
+                          <span>已完成</span>
+                        </div>
+                        <div class="module-pill accent">
+                          <strong>02 听力选择</strong>
+                          <span>当前推荐开始</span>
+                        </div>
+                        <div class="module-pill">
+                          <strong>03 句型替换</strong>
+                          <span>待完成</span>
+                        </div>
+                        <div class="module-pill">
+                          <strong>04 口语模仿</strong>
+                          <span>待完成</span>
+                        </div>
+                      </div>
+                    </article>
+
+                    <article class="student-card">
+                      <div class="surface-head">
+                        <h3>本包目标</h3>
+                        <span>课堂同款主题</span>
+                      </div>
+                      <div class="surface-list">
+                        <div class="surface-row">
+                          <strong>核心句型</strong>
+                          <span>Would you mind...?</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>能力重点</strong>
+                          <span>礼貌请求表达</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>老师提醒</strong>
+                          <span>注意语气自然，不要像命令</span>
+                        </div>
+                      </div>
+                      <div class="action-stack">
+                        <a class="solid-button wide-button" data-student-link="practice" href="./student-practice.html">开始当前练习</a>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <nav class="student-nav">
+              <a class="student-nav-item" data-screen-link="home" href="./student-home.html">首页</a>
+              <a class="student-nav-item" data-screen-link="live" href="./student-live.html">课堂</a>
+              <a class="student-nav-item" data-screen-link="pack" href="./student-pack.html">学习包</a>
+              <a class="student-nav-item" data-screen-link="report" href="./student-report.html">报告</a>
+              <a class="student-nav-item" data-screen-link="free" href="./student-free.html">免费区</a>
+            </nav>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Teacher Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="teacher-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Teacher Studio</p>
+            <h1>Emily 老师的教学工作台</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./student.html">打开学生端</a>
+        </nav>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-class-card">
+            <span class="eyebrow">当前班级</span>
+            <strong>周二晚 20:00 口语提升班</strong>
+            <p>A2 - B1 · 32 名学生</p>
+          </div>
+          <nav class="sidebar-nav">
+            <a class="sidebar-link is-active" href="./teacher.html">总览</a>
+            <a class="sidebar-link" href="./teacher-classes.html">班级</a>
+            <a class="sidebar-link" href="./teacher-prep.html">课前准备</a>
+            <a class="sidebar-link" href="./teacher-live.html">课堂模式</a>
+            <a class="sidebar-link" href="./teacher-packs.html">学习包</a>
+            <a class="sidebar-link" href="./teacher-analytics.html">综合分析</a>
+          </nav>
+          <div class="sidebar-note">
+            <span class="eyebrow">今日建议</span>
+            <p>先用 1 道实时题检查礼貌求助句型，再在课后布置 10 分钟学习包。</p>
+          </div>
+        </aside>
+
+        <main class="main-stage">
+          <section class="panel-head">
+            <div>
+              <p class="eyebrow">Dashboard</p>
+              <h2>今天这节课，只关注最重要的动作</h2>
+            </div>
+            <div class="panel-actions">
+              <a class="ghost-button" href="./teacher-prep.html">进入课前准备</a>
+              <a class="ghost-button" href="./teacher-live.html">进入课堂模式</a>
+              <a class="solid-button" href="./teacher-packs.html">创建学习包</a>
+            </div>
+          </section>
+
+          <section class="stats-grid">
+            <article class="stat-card">
+              <strong>29 / 32</strong>
+              <span>当前在线</span>
+            </article>
+            <article class="stat-card">
+              <strong>待发</strong>
+              <span>课堂实时任务</span>
+            </article>
+            <article class="stat-card">
+              <strong>未发布</strong>
+              <span>课后学习包</span>
+            </article>
+            <article class="stat-card">
+              <strong>6</strong>
+              <span>需重点跟进学生</span>
+            </article>
+          </section>
+
+          <section class="teacher-grid">
+            <article class="surface-card feature-card">
+              <div class="surface-head">
+                <h3>直播课堂</h3>
+                <span>本节课正在进行</span>
+              </div>
+              <p>发起实时单选题、判断题和句型填空题，边讲边看全班掌握情况。</p>
+              <div class="action-stack">
+                <a class="solid-button" href="./teacher-live.html">发起实时题</a>
+                <a class="ghost-button" href="./teacher-live-results.html">查看上次课堂结果</a>
+              </div>
+            </article>
+
+            <article class="surface-card feature-card">
+              <div class="surface-head">
+                <h3>课后巩固</h3>
+                <span>建议 10 分钟</span>
+              </div>
+              <p>把词汇、句型、听力和口语作业打包成轻量学习包，自动推送给学生。</p>
+              <div class="action-stack">
+                <a class="solid-button" href="./teacher-packs.html">编辑学习包</a>
+                <a class="ghost-button" href="./teacher-classes.html">查看班级名单</a>
+              </div>
+            </article>
+
+            <article class="surface-card feed-card">
+              <div class="surface-head">
+                <h3>教学动态</h3>
+                <span>实时更新</span>
+              </div>
+              <div class="feed-list">
+                <div class="feed-item">
+                  <span class="feed-dot green"></span>
+                  <p>课堂还未发起实时任务，建议先检查礼貌求助句型。</p>
+                </div>
+                <div class="feed-item">
+                  <span class="feed-dot amber"></span>
+                  <p>6 位学生在上次学习包中未提交口语。</p>
+                </div>
+                <div class="feed-item">
+                  <span class="feed-dot coral"></span>
+                  <p>“Would you mind...” 仍是全班最薄弱的句型。</p>
+                </div>
+              </div>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

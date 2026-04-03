@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Student Join</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="student-page student-device-phone" data-student-screen="join">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Student Experience</p>
+            <h1>学生端高保真原型</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./teacher.html">查看老师端</a>
+        </nav>
+      </header>
+
+      <section class="student-toolbar">
+        <div class="device-switcher">
+          <a class="device-toggle" data-device-toggle="phone" href="./student.html">手机</a>
+          <a class="device-toggle" data-device-toggle="tablet" href="./student.html?device=tablet">平板</a>
+        </div>
+        <div class="screen-shortcuts">
+          <a class="shortcut-pill" data-screen-link="join" href="./student.html">加入班级</a>
+          <a class="shortcut-pill" data-screen-link="live" href="./student-live.html">课堂任务</a>
+          <a class="shortcut-pill" data-screen-link="home" href="./student-home.html">今日任务</a>
+          <a class="shortcut-pill" data-screen-link="report" href="./student-report.html">学习报告</a>
+          <a class="shortcut-pill" data-screen-link="free" href="./student-free.html">免费内容</a>
+        </div>
+      </section>
+
+      <main class="student-stage">
+        <div class="device-frame">
+          <div class="device-camera"></div>
+          <div class="student-app">
+            <div class="student-app-top">
+              <div>
+                <strong>OwnEnglish 学习空间</strong>
+                <span class="small-status">加入班级后，系统会同步老师的课堂与课后任务</span>
+              </div>
+              <span class="card-tag">未入班</span>
+            </div>
+
+            <div class="student-screens">
+              <section class="student-screen is-active">
+                <div class="student-layout single">
+                  <article class="student-card hero-card navy">
+                    <p>Welcome</p>
+                    <h2>输入邀请码，进入老师班级</h2>
+                    <p>学生加入后，会自动收到课中实时任务、课后学习包和老师点评。</p>
+                    <span class="countdown-pill">邀请码 24 小时内有效</span>
+                  </article>
+
+                  <div class="mobile-stack">
+                    <article class="student-card">
+                      <div class="surface-head">
+                        <h3>班级邀请码</h3>
+                        <span>一步入班</span>
+                      </div>
+                      <div class="fake-input">EN-2034</div>
+                      <div class="student-mini-list">
+                        <div>
+                          <span>授课老师</span>
+                          <strong>Emily 老师</strong>
+                        </div>
+                        <div>
+                          <span>课程名称</span>
+                          <strong>周二晚口语提升班</strong>
+                        </div>
+                        <div>
+                          <span>本周主题</span>
+                          <strong>Polite Requests</strong>
+                        </div>
+                        <div>
+                          <span>当前状态</span>
+                          <strong>今晚 20:00 开课</strong>
+                        </div>
+                      </div>
+                      <div class="action-stack">
+                        <a class="solid-button wide-button" data-student-link="home" href="./student-home.html">加入班级</a>
+                        <a class="ghost-button wide-button" data-student-link="free" href="./student-free.html">先逛免费线练习</a>
+                      </div>
+                    </article>
+
+                    <article class="student-card">
+                      <div class="surface-head">
+                        <h3>加入后你会看到</h3>
+                        <span>真实学习闭环</span>
+                      </div>
+                      <div class="surface-list">
+                        <div class="surface-row">
+                          <strong>课堂实时任务</strong>
+                          <span>跟着老师边上课边答题</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>课后学习包</strong>
+                          <span>词汇、听力、口语一站完成</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>学习报告</strong>
+                          <span>立刻知道自己哪里最薄弱</span>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <nav class="student-nav">
+              <a class="student-nav-item" data-screen-link="home" href="./student-home.html">首页</a>
+              <a class="student-nav-item" data-screen-link="live" href="./student-live.html">课堂</a>
+              <a class="student-nav-item" data-screen-link="pack" href="./student-pack.html">学习包</a>
+              <a class="student-nav-item" data-screen-link="report" href="./student-report.html">报告</a>
+              <a class="student-nav-item" data-screen-link="free" href="./student-free.html">免费区</a>
+            </nav>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

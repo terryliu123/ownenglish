@@ -1,0 +1,33 @@
+# Dependencies
+client/node_modules/
+server/venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+client/dist/
+server/dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Cache
+.npm-cache/
+.playwright-cli/
+
+# Temporary files
+*.zip
+*.log
+output/

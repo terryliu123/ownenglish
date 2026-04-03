@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-app="entry" class="entry-page">
+    <div class="page-shell">
+      <header class="entry-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">OwnEnglish Prototype</p>
+            <h1>直播英语老师的课中课后教学系统</h1>
+          </div>
+        </div>
+        <nav class="entry-links">
+          <a href="../docs/ownenglish-prd.md">查看 PRD</a>
+        </nav>
+      </header>
+
+      <main class="entry-main">
+        <section class="entry-hero">
+          <div class="entry-copy">
+            <p class="eyebrow">Direct Prototype</p>
+            <h2>直接进入真实可操作页面，而不是流程演示。</h2>
+            <p>
+              这套原型已经拆成真实系统入口。老师端用于发起课堂实时任务、发布学习包和查看综合分析；学生端支持手机与平板两种形态，用于课堂作答、课后练习和查看报告。
+            </p>
+          </div>
+          <div class="entry-badge-wall">
+            <div class="hero-badge">
+              <strong>Teacher</strong>
+              <span>课堂模式 / 学习包 / 综合分析</span>
+            </div>
+            <div class="hero-badge">
+              <strong>Student</strong>
+              <span>实时作答 / 手机 / 平板 / 课后练习</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="entry-grid">
+          <article class="entry-card teacher-card-entry">
+            <div class="entry-card-head">
+              <p class="eyebrow">Teacher App</p>
+              <h3>老师端工作台</h3>
+            </div>
+            <p class="entry-card-copy">
+              进入老师端后可以直接切换总览、班级、课堂模式、学习包和综合分析。关键动作都已经做成可点状态。
+            </p>
+            <div class="entry-preview desktop-mini">
+              <div class="mini-topbar"></div>
+              <div class="mini-body">
+                <div class="mini-sidebar"></div>
+                <div class="mini-content">
+                  <div class="mini-hero"></div>
+                  <div class="mini-row">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="entry-actions">
+              <a class="primary-link" href="./teacher.html">进入老师端</a>
+              <a class="secondary-link" href="./teacher-prep.html">直接看课前准备</a>
+            </div>
+          </article>
+
+          <article class="entry-card student-card-entry">
+            <div class="entry-card-head">
+              <p class="eyebrow">Student App</p>
+              <h3>学生端学习空间</h3>
+            </div>
+            <p class="entry-card-copy">
+              进入学生端后可以直接切换课堂任务、今日学习包、口语提交、学习报告和免费学习区，并支持手机 / 平板切换。
+            </p>
+            <div class="entry-preview device-pair">
+              <div class="mini-phone"></div>
+              <div class="mini-tablet"></div>
+            </div>
+            <div class="entry-actions">
+              <a class="primary-link" href="./student.html">进入学生端</a>
+              <a class="secondary-link" href="./student.html?device=tablet">直接看平板版</a>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

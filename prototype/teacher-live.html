@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Teacher Live</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="teacher-page teacher-live-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Teacher Studio</p>
+            <h1>课堂模式</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./teacher.html">返回总览</a>
+          <a href="./teacher-live-results.html">查看上一轮结果</a>
+          <a href="./student-live.html">查看学生课堂页</a>
+        </nav>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-class-card">
+            <span class="eyebrow">当前班级</span>
+            <strong>周二晚 20:00 口语提升班</strong>
+            <p>29 / 32 在线</p>
+          </div>
+          <nav class="sidebar-nav">
+            <a class="sidebar-link" href="./teacher.html">总览</a>
+            <a class="sidebar-link" href="./teacher-classes.html">班级</a>
+            <a class="sidebar-link" href="./teacher-prep.html">课前准备</a>
+            <a class="sidebar-link is-active" href="./teacher-live.html">课堂模式</a>
+            <a class="sidebar-link" href="./teacher-packs.html">学习包</a>
+            <a class="sidebar-link" href="./teacher-analytics.html">综合分析</a>
+          </nav>
+        </aside>
+
+        <main class="main-stage">
+          <section class="panel-head">
+            <div>
+              <p class="eyebrow">Live Control Desk</p>
+              <h2>课堂模式现在由两个队列驱动：实时发布队列 + 待发布任务队列</h2>
+            </div>
+            <div class="panel-actions">
+              <span class="status-badge cool">双队列工作台</span>
+            </div>
+          </section>
+
+          <section class="stats-grid compact">
+            <article class="stat-card compact">
+              <strong data-live-count>3</strong>
+              <span>实时发布中</span>
+            </article>
+            <article class="stat-card compact">
+              <strong data-draft-count>5</strong>
+              <span>待发布任务</span>
+            </article>
+            <article class="stat-card compact">
+              <strong>29</strong>
+              <span>当前在线学生</span>
+            </article>
+          </section>
+
+          <section class="teacher-grid split-2">
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>实时发布队列</h3>
+                <span>列表只显示任务名称</span>
+              </div>
+              <div class="callout-card muted">
+                <strong>课堂中只保留最关心的信息。</strong>
+                <p>实时发布队列里只展示任务名称和操作，老师点“详情”才展开具体内容，避免被长题面打断讲课节奏。</p>
+              </div>
+
+              <div class="queue-board" data-live-queue>
+                <div class="queue-row is-live" data-live-row data-task-name="礼貌请求辨析" data-detail-template="live-detail-1">
+                  <div class="queue-row-main">
+                    <strong>礼貌请求辨析</strong>
+                    <span class="queue-state">进行中</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-modal-open="live-detail-1" data-modal-title="礼貌请求辨析">详情</button>
+                    <button class="mini-action" type="button" data-live-action="pause">暂停</button>
+                    <button class="mini-action danger" type="button" data-live-action="delete">删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-live" data-live-row data-task-name="图书馆场景迁移" data-detail-template="live-detail-2">
+                  <div class="queue-row-main">
+                    <strong>图书馆场景迁移</strong>
+                    <span class="queue-state">排队中</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-modal-open="live-detail-2" data-modal-title="图书馆场景迁移">详情</button>
+                    <button class="mini-action" type="button" data-live-action="pause">暂停</button>
+                    <button class="mini-action danger" type="button" data-live-action="delete">删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-live" data-live-row data-task-name="Exit Ticket 自评投票" data-detail-template="live-detail-3">
+                  <div class="queue-row-main">
+                    <strong>Exit Ticket 自评投票</strong>
+                    <span class="queue-state">排队中</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-modal-open="live-detail-3" data-modal-title="Exit Ticket 自评投票">详情</button>
+                    <button class="mini-action" type="button" data-live-action="pause">暂停</button>
+                    <button class="mini-action danger" type="button" data-live-action="delete">删除</button>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>待发布任务队列</h3>
+                <span>创建、修改、删除、发布</span>
+              </div>
+
+              <div class="split-actions">
+                <button class="solid-button" type="button" data-create-task data-modal-open="draft-editor-new" data-modal-title="创建课堂任务">创建任务</button>
+                <button class="ghost-button" type="button" data-modal-open="queue-rules" data-modal-title="课堂队列规则">查看队列规则</button>
+              </div>
+
+              <div class="queue-board" data-draft-queue>
+                <div class="queue-row is-draft is-selected" data-draft-row data-task-name="任务 01 · 礼貌请求快测" data-detail-template="draft-detail-1" data-editor-template="draft-editor-1">
+                  <div class="queue-row-main">
+                    <strong>任务 01 · 礼貌请求快测</strong>
+                    <span class="queue-subline">单选 + 判断 + 投票 · 3 内容项</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-1">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-1" data-modal-title="任务 01 · 礼貌请求快测">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-draft" data-draft-row data-task-name="任务 02 · 图书馆场景迁移" data-detail-template="draft-detail-2" data-editor-template="draft-editor-2">
+                  <div class="queue-row-main">
+                    <strong>任务 02 · 图书馆场景迁移</strong>
+                    <span class="queue-subline">图片题面 + 填空 + 听力 · 4 内容项</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-2">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-2" data-modal-title="任务 02 · 图书馆场景迁移">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-draft" data-draft-row data-task-name="任务 03 · 听力判断快测" data-detail-template="draft-detail-3" data-editor-template="draft-editor-3">
+                  <div class="queue-row-main">
+                    <strong>任务 03 · 听力判断快测</strong>
+                    <span class="queue-subline">音频内容 + 单选题 · 2 内容项</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-3">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-3" data-modal-title="任务 03 · 听力判断快测">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-draft" data-draft-row data-task-name="任务 04 · 课堂态度投票" data-detail-template="draft-detail-4" data-editor-template="draft-editor-4">
+                  <div class="queue-row-main">
+                    <strong>任务 04 · 课堂态度投票</strong>
+                    <span class="queue-subline">投票 + 开放反馈 · 2 内容项</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-4">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-4" data-modal-title="任务 04 · 课堂态度投票">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-draft" data-draft-row data-task-name="任务 05 · 场景口语回应" data-detail-template="draft-detail-5" data-editor-template="draft-editor-5">
+                  <div class="queue-row-main">
+                    <strong>任务 05 · 场景口语回应</strong>
+                    <span class="queue-subline">图片提示 + 口语按钮 + 自评 · 3 内容项</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-5">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-5" data-modal-title="任务 05 · 场景口语回应">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+
+                <div class="queue-row is-draft" hidden data-new-draft-row data-draft-row data-task-name="任务 06 · 新建课堂任务" data-detail-template="draft-detail-new" data-editor-template="draft-editor-new">
+                  <div class="queue-row-main">
+                    <strong>任务 06 · 新建课堂任务</strong>
+                    <span class="queue-subline">未保存草稿 · 待配置内容</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-draft-edit="draft-editor-new">修改</button>
+                    <button class="mini-action" type="button" data-modal-open="draft-detail-new" data-modal-title="任务 06 · 新建课堂任务">详情</button>
+                    <button class="mini-action danger" type="button" data-draft-action="delete">删除</button>
+                    <button class="mini-action publish" type="button" data-draft-action="publish">发布</button>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </section>
+
+          <section class="surface-card">
+            <div class="surface-head">
+              <h3>课堂使用说明</h3>
+              <span>编辑器改为弹出式</span>
+            </div>
+            <div class="callout-card">
+              <strong>创建任务、查看详情和修改任务，都会进入弹出式任务编辑器。</strong>
+              <p>课堂主界面只保留双队列和关键操作，避免老师在上课时被冗长配置分散注意力。任务本身支持多题目和多内容组合，包括题目、图片、音频、投票和口语按钮。</p>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <section class="live-modal" data-live-modal hidden>
+      <div class="live-modal-backdrop" data-modal-close></div>
+      <div class="live-modal-card">
+        <div class="live-modal-head">
+          <div>
+            <p class="eyebrow">Task Details</p>
+            <h2 data-modal-title>任务详情</h2>
+          </div>
+          <button class="mini-action" type="button" data-modal-close>关闭</button>
+        </div>
+        <div class="live-modal-body" data-modal-body></div>
+      </div>
+    </section>
+
+    <template id="live-detail-1">
+      <div class="builder-stack">
+        <div class="question-preview-card">
+          <label>实时任务内容</label>
+          <strong>礼貌请求辨析</strong>
+          <p>包含单选、判断和投票三种内容，适合作为课堂起手任务，快速统一全班对 polite request 的判断标准。</p>
+        </div>
+        <div class="surface-list">
+          <div class="surface-row"><strong>状态</strong><span>进行中</span></div>
+          <div class="surface-row"><strong>内容数量</strong><span>3 项</span></div>
+          <div class="surface-row"><strong>触达范围</strong><span>在线学生 29 人</span></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="live-detail-2">
+      <div class="question-preview-card">
+        <label>实时任务内容</label>
+        <strong>图书馆场景迁移</strong>
+        <p>内容结构：图片提示 → 句型填空 → 音频判断 → 单选确认，目标是验证学生能否把课堂规则迁移到真实场景。</p>
+      </div>
+    </template>
+
+    <template id="live-detail-3">
+      <div class="question-preview-card">
+        <label>实时任务内容</label>
+        <strong>Exit Ticket 自评投票</strong>
+        <p>课堂收尾任务，用投票快速判断全班信心，为是否转课后学习包提供依据。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-1">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 01 · 礼貌请求快测</strong>
+        <p>单选 + 判断 + 投票的轻量任务，适合课堂开始快速判断学生是否进入正确理解层。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-2">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 02 · 图书馆场景迁移</strong>
+        <p>一个多内容混排任务，展示课堂模式不仅能发题，也能组合图片、音频和题目内容。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-3">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 03 · 听力判断快测</strong>
+        <p>音频主导任务，用于检验学生能否听出礼貌语气和直接命令的差异。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-4">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 04 · 课堂态度投票</strong>
+        <p>课堂收尾型任务，支持投票和开放反馈，帮助老师快速收束课堂状态。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-5">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 05 · 场景口语回应</strong>
+        <p>用图片提示、口语按钮和自评组合成更开放的课堂互动任务，体现未来扩展空间。</p>
+      </div>
+    </template>
+
+    <template id="draft-detail-new">
+      <div class="question-preview-card">
+        <label>待发布任务详情</label>
+        <strong>任务 06 · 新建课堂任务</strong>
+        <p>空白草稿位，老师可以从零开始配置内容结构，保存后进入待发布队列。</p>
+      </div>
+    </template>
+
+    <template id="draft-editor-1">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>任务编辑器</h3>
+          <span>任务 01 · 礼貌请求快测</span>
+        </div>
+        <div class="type-pills">
+          <button class="type-pill is-active">单选题</button>
+          <button class="type-pill">判断题</button>
+          <button class="type-pill">投票题</button>
+          <button class="type-pill">图文内容</button>
+        </div>
+        <div class="editor-field-grid single">
+          <div class="field-card">
+            <label>任务名称</label>
+            <div class="fake-input">任务 01 · 礼貌请求快测</div>
+          </div>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>内容结构</label>
+            <div class="fake-input">单选题 → 判断题 → 投票题</div>
+          </div>
+          <div class="field-card">
+            <label>课堂目标</label>
+            <div class="fake-input">快速统一全班对 polite request 的判断标准</div>
+          </div>
+          <div class="field-card">
+            <label>题干示例</label>
+            <div class="fake-input">Which sentence sounds more polite in class?</div>
+          </div>
+          <div class="field-card">
+            <label>倒计时与结果</label>
+            <div class="fake-input">45 秒，讲后公布正确答案</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="draft-editor-2">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>任务编辑器</h3>
+          <span>任务 02 · 图书馆场景迁移</span>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>任务结构</label>
+            <div class="fake-input">图片内容 → 句型填空 → 音频内容 → 单选确认</div>
+          </div>
+          <div class="field-card">
+            <label>任务类型</label>
+            <div class="fake-input">多内容混排任务</div>
+          </div>
+          <div class="field-card">
+            <label>课堂目标</label>
+            <div class="fake-input">验证学生是否完成从规则理解到场景迁移</div>
+          </div>
+          <div class="field-card">
+            <label>内容来源</label>
+            <div class="fake-input">老师题面 + 场景图片 + 平台音频素材</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="draft-editor-3">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>任务编辑器</h3>
+          <span>任务 03 · 听力判断快测</span>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>音频来源</label>
+            <div class="fake-input">课堂原句录音 / 素材库</div>
+          </div>
+          <div class="field-card">
+            <label>内容结构</label>
+            <div class="fake-input">音频片段 → 单选判断</div>
+          </div>
+          <div class="field-card">
+            <label>倒计时</label>
+            <div class="fake-input">35 秒</div>
+          </div>
+          <div class="field-card">
+            <label>课堂目标</label>
+            <div class="fake-input">听辨 polite request 与 direct command</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="draft-editor-4">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>任务编辑器</h3>
+          <span>任务 04 · 课堂态度投票</span>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>投票问题</label>
+            <div class="fake-input">Will you naturally use a polite request tomorrow?</div>
+          </div>
+          <div class="field-card">
+            <label>投票选项</label>
+            <div class="fake-input">会 / 还不太会 / 需要再练</div>
+          </div>
+          <div class="field-card">
+            <label>开放反馈</label>
+            <div class="fake-input">写一句你最难记住的表达</div>
+          </div>
+          <div class="field-card">
+            <label>课堂目标</label>
+            <div class="fake-input">为课后学习包推荐提供依据</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="draft-editor-5">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>任务编辑器</h3>
+          <span>任务 05 · 场景口语回应</span>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>内容结构</label>
+            <div class="fake-input">图片提示 → 口语按钮 → 自评</div>
+          </div>
+          <div class="field-card">
+            <label>适用课堂</label>
+            <div class="fake-input">小班直播 / 口语强化课 / 平板课堂</div>
+          </div>
+          <div class="field-card">
+            <label>课堂价值</label>
+            <div class="fake-input">展示未来任务模型可扩展到口语与开放反馈</div>
+          </div>
+          <div class="field-card">
+            <label>结果策略</label>
+            <div class="fake-input">课堂即时完成，自评结果进入老师面板</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="draft-editor-new">
+      <div class="builder-stack">
+        <div class="surface-head">
+          <h3>创建课堂任务</h3>
+          <span>从空白草稿开始</span>
+        </div>
+        <div class="type-pills">
+          <button class="type-pill is-active">单选题</button>
+          <button class="type-pill">判断题</button>
+          <button class="type-pill">句型填空</button>
+          <button class="type-pill">图片内容</button>
+          <button class="type-pill">音频内容</button>
+          <button class="type-pill">投票题</button>
+          <button class="type-pill">口语按钮</button>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card">
+            <label>任务名称</label>
+            <div class="fake-input">任务 06 · 新建课堂任务</div>
+          </div>
+          <div class="field-card">
+            <label>内容结构</label>
+            <div class="fake-input">图片内容 → 单选题 → 投票题</div>
+          </div>
+          <div class="field-card">
+            <label>发布策略</label>
+            <div class="fake-input">创建后先保存到待发布队列，再决定何时推入实时队列</div>
+          </div>
+          <div class="field-card">
+            <label>课堂目标</label>
+            <div class="fake-input">用于快速补救、阶段检查或课堂收尾</div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template id="queue-rules">
+      <div class="builder-stack">
+        <div class="question-preview-card">
+          <label>队列规则</label>
+          <strong>实时发布队列与待发布任务队列的分工</strong>
+          <p>待发布队列负责创建和修改，实时发布队列只负责课堂中实际运行的任务，老师在课中不需要再看复杂配置。</p>
+        </div>
+        <div class="surface-list">
+          <div class="surface-row"><strong>待发布队列</strong><span>创建、修改、删除、发布</span></div>
+          <div class="surface-row"><strong>实时发布队列</strong><span>详情、暂停、删除</span></div>
+        </div>
+      </div>
+    </template>
+
+    <div class="toast" id="teacherLiveToast"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

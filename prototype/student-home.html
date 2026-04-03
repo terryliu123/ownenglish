@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Student Home</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="student-page student-device-phone" data-student-screen="home">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Student Experience</p>
+            <h1>学生端高保真原型</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./teacher.html">查看老师端</a>
+        </nav>
+      </header>
+
+      <section class="student-toolbar">
+        <div class="device-switcher">
+          <a class="device-toggle" data-device-toggle="phone" href="./student-home.html">手机</a>
+          <a class="device-toggle" data-device-toggle="tablet" href="./student-home.html?device=tablet">平板</a>
+        </div>
+        <div class="screen-shortcuts">
+          <a class="shortcut-pill" data-screen-link="join" href="./student.html">加入班级</a>
+          <a class="shortcut-pill" data-screen-link="live" href="./student-live.html">课堂任务</a>
+          <a class="shortcut-pill" data-screen-link="home" href="./student-home.html">今日任务</a>
+          <a class="shortcut-pill" data-screen-link="report" href="./student-report.html">学习报告</a>
+          <a class="shortcut-pill" data-screen-link="free" href="./student-free.html">免费内容</a>
+        </div>
+      </section>
+
+      <main class="student-stage">
+        <div class="device-frame">
+          <div class="device-camera"></div>
+          <div class="student-app">
+            <div class="student-app-top">
+              <div>
+                <strong>Emily 老师 · 周二晚口语提升班</strong>
+                <span class="small-status">今天你有 1 个课堂回顾任务和 1 个课后学习包</span>
+              </div>
+              <span class="card-tag">连续学习第 8 天</span>
+            </div>
+
+            <div class="student-screens">
+              <section class="student-screen is-active">
+                <div class="student-layout home-layout">
+                  <article class="student-card hero-card navy">
+                    <p>Today</p>
+                    <h2>课堂刚结束，先巩固最重要的两个动作</h2>
+                    <p>先回顾直播里刚做过的实时题，再完成 10 分钟学习包，老师明天会直接看到你的结果。</p>
+                    <span class="countdown-pill">预计完成 12 分钟</span>
+                  </article>
+
+                  <article class="student-card active-task">
+                    <div class="surface-head">
+                      <h3>课堂实时任务回顾</h3>
+                      <span>3 分钟</span>
+                    </div>
+                    <p>重新看老师刚才发的礼貌请求题，确认你为什么选对或选错。</p>
+                    <div class="meta-row">
+                      <span class="meta-chip">课堂同步</span>
+                      <span class="meta-chip">全班正确率 62%</span>
+                    </div>
+                    <a class="solid-button wide-button" data-student-link="live" href="./student-live.html">进入课堂任务</a>
+                  </article>
+
+                  <article class="student-card active-task">
+                    <div class="surface-head">
+                      <h3>Lesson 12 课后学习包</h3>
+                      <span>10 分钟</span>
+                    </div>
+                    <p>包含词汇热身、听力选择、句型练习和口语模仿，一次完成今天最关键的巩固。</p>
+                    <div class="meta-row">
+                      <span class="meta-chip">4 个模块</span>
+                      <span class="meta-chip">截止明晚 20:00</span>
+                    </div>
+                    <a class="solid-button wide-button" data-student-link="pack" href="./student-pack.html">打开学习包</a>
+                  </article>
+
+                  <article class="student-card">
+                    <div class="surface-head">
+                      <h3>免费补充练习</h3>
+                      <span>自主提高</span>
+                    </div>
+                    <p>如果你今晚还有余力，可以顺手做一组免费口语礼貌表达训练。</p>
+                    <div class="meta-row">
+                      <span class="meta-chip">免费线索内容</span>
+                      <span class="meta-chip">适合碎片时间</span>
+                    </div>
+                    <a class="ghost-button wide-button" data-student-link="free" href="./student-free.html">去免费区看看</a>
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <nav class="student-nav">
+              <a class="student-nav-item" data-screen-link="home" href="./student-home.html">首页</a>
+              <a class="student-nav-item" data-screen-link="live" href="./student-live.html">课堂</a>
+              <a class="student-nav-item" data-screen-link="pack" href="./student-pack.html">学习包</a>
+              <a class="student-nav-item" data-screen-link="report" href="./student-report.html">报告</a>
+              <a class="student-nav-item" data-screen-link="free" href="./student-free.html">免费区</a>
+            </nav>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

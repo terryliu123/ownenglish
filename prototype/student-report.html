@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Student Report</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="student-page student-device-phone" data-student-screen="report">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Student Experience</p>
+            <h1>学生端高保真原型</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./teacher-analytics.html">查看老师分析页</a>
+        </nav>
+      </header>
+
+      <section class="student-toolbar">
+        <div class="device-switcher">
+          <a class="device-toggle" data-device-toggle="phone" href="./student-report.html">手机</a>
+          <a class="device-toggle" data-device-toggle="tablet" href="./student-report.html?device=tablet">平板</a>
+        </div>
+        <div class="screen-shortcuts">
+          <a class="shortcut-pill" data-screen-link="join" href="./student.html">加入班级</a>
+          <a class="shortcut-pill" data-screen-link="live" href="./student-live.html">课堂任务</a>
+          <a class="shortcut-pill" data-screen-link="home" href="./student-home.html">今日任务</a>
+          <a class="shortcut-pill" data-screen-link="report" href="./student-report.html">学习报告</a>
+          <a class="shortcut-pill" data-screen-link="free" href="./student-free.html">免费内容</a>
+        </div>
+      </section>
+
+      <main class="student-stage">
+        <div class="device-frame">
+          <div class="device-camera"></div>
+          <div class="student-app">
+            <div class="student-app-top">
+              <div>
+                <strong>今晚学习报告</strong>
+                <span class="small-status">本次完成结果已同步给老师，你也可以立刻查看自己的薄弱点</span>
+              </div>
+              <span class="card-tag">已完成</span>
+            </div>
+
+            <div class="student-screens">
+              <section class="student-screen is-active">
+                <div class="student-layout report-layout">
+                  <article class="student-card hero-card navy">
+                    <p>Report</p>
+                    <h2>今天学完了，接下来要盯住最弱的一个点</h2>
+                    <p>你的整体完成度很好，但礼貌请求里的句型替换还不够自然，建议明天再补 5 分钟。</p>
+                    <span class="countdown-pill">老师已收到你的作业</span>
+                  </article>
+
+                  <article class="student-card score-card">
+                    <div class="score-ring">
+                      <strong>86%</strong>
+                    </div>
+                    <div>
+                      <div class="surface-head">
+                        <h3>综合得分</h3>
+                        <span>较上次 +8%</span>
+                      </div>
+                      <div class="surface-list">
+                        <div class="surface-row">
+                          <strong>词汇与听力</strong>
+                          <span>掌握稳定</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>句型替换</strong>
+                          <span>仍需复练</span>
+                        </div>
+                        <div class="surface-row">
+                          <strong>口语提交</strong>
+                          <span>已提交待点评</span>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+
+                  <article class="student-card">
+                    <div class="surface-head">
+                      <h3>明天复习建议</h3>
+                      <span>个性化提醒</span>
+                    </div>
+                    <div class="hint-box">
+                      <strong>建议动作</strong>
+                      <p>再做一组礼貌请求免费练习，重点复习 “Would you mind...” 和 “Could you please...” 的差异。</p>
+                    </div>
+                    <div class="action-stack">
+                      <a class="solid-button wide-button" data-student-link="free" href="./student-free.html">去做推荐免费练习</a>
+                      <a class="ghost-button wide-button" data-student-link="home" href="./student-home.html">回到首页</a>
+                    </div>
+                  </article>
+                </div>
+              </section>
+            </div>
+
+            <nav class="student-nav">
+              <a class="student-nav-item" data-screen-link="home" href="./student-home.html">首页</a>
+              <a class="student-nav-item" data-screen-link="live" href="./student-live.html">课堂</a>
+              <a class="student-nav-item" data-screen-link="pack" href="./student-pack.html">学习包</a>
+              <a class="student-nav-item" data-screen-link="report" href="./student-report.html">报告</a>
+              <a class="student-nav-item" data-screen-link="free" href="./student-free.html">免费区</a>
+            </nav>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

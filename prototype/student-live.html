@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Student Live</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="student-page student-device-phone" data-student-screen="live">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Student Experience</p>
+            <h1>学生端高保真原型</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./index.html">返回入口</a>
+          <a href="./teacher-live.html">查看老师课堂模式</a>
+        </nav>
+      </header>
+
+      <section class="student-toolbar">
+        <div class="device-switcher">
+          <a class="device-toggle" data-device-toggle="phone" href="./student-live.html">手机</a>
+          <a class="device-toggle" data-device-toggle="tablet" href="./student-live.html?device=tablet">平板</a>
+        </div>
+        <div class="screen-shortcuts">
+          <a class="shortcut-pill" data-screen-link="join" href="./student.html">加入班级</a>
+          <a class="shortcut-pill" data-screen-link="live" href="./student-live.html">课堂任务</a>
+          <a class="shortcut-pill" data-screen-link="home" href="./student-home.html">今日任务</a>
+          <a class="shortcut-pill" data-screen-link="report" href="./student-report.html">学习报告</a>
+          <a class="shortcut-pill" data-screen-link="free" href="./student-free.html">免费内容</a>
+        </div>
+      </section>
+
+      <main class="student-stage">
+        <div class="device-frame">
+          <div class="device-camera"></div>
+          <div class="student-app">
+            <div class="student-app-top">
+              <div>
+                <strong>课堂实时任务</strong>
+                <span class="small-status">老师已发起本节课第 2 题，请在倒计时内提交</span>
+              </div>
+              <span class="card-tag">直播中</span>
+            </div>
+
+            <div class="student-screens">
+              <section class="student-screen is-active">
+                <div class="student-layout live-layout">
+                  <article class="student-card hero-card coral">
+                    <p>Live Question</p>
+                    <h2>选择最自然的一句礼貌请求</h2>
+                    <p>老师正在讲解 “Would you mind...” 的使用场景，这一题会实时汇总到班级大屏。</p>
+                    <span class="countdown-pill">剩余 00:42</span>
+                  </article>
+
+                  <div class="mobile-stack">
+                    <article class="student-card question-box">
+                      <div class="surface-head">
+                        <h3>题目</h3>
+                        <span>单选题</span>
+                      </div>
+                      <p>You want someone to close the window politely. Which sentence sounds the most natural?</p>
+                      <div class="answer-options">
+                        <button class="answer-choice is-correct" type="button">A. Close the window for me.</button>
+                        <button class="answer-choice" type="button">B. Would you mind closing the window?</button>
+                        <button class="answer-choice" type="button">C. You should close the window.</button>
+                        <button class="answer-choice" type="button">D. I close the window now?</button>
+                      </div>
+                      <a class="solid-button wide-button" data-student-link="live-submitted" href="./student-live-submitted.html">提交实时答案</a>
+                    </article>
+
+                    <article class="student-card callout-card muted">
+                      <strong>老师提示</strong>
+                      <p>注意区分 “request” 和 “command”，选择真正礼貌、自然的表达。</p>
+                    </article>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <nav class="student-nav">
+              <a class="student-nav-item" data-screen-link="home" href="./student-home.html">首页</a>
+              <a class="student-nav-item" data-screen-link="live" href="./student-live.html">课堂</a>
+              <a class="student-nav-item" data-screen-link="pack" href="./student-pack.html">学习包</a>
+              <a class="student-nav-item" data-screen-link="report" href="./student-report.html">报告</a>
+              <a class="student-nav-item" data-screen-link="free" href="./student-free.html">免费区</a>
+            </nav>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

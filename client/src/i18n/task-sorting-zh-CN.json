@@ -1,0 +1,12 @@
+{
+  "taskSorting": {
+    "sorting": "排序题",
+    "orderHint": "按正确顺序录入选项，学生端会打乱后再排序作答。",
+    "moveUp": "上移",
+    "moveDown": "下移",
+    "resultTitle": "排序结果",
+    "currentOrder": "当前顺序",
+    "sortingAnswer": "正确顺序",
+    "dragHint": "学生需要把内容恢复到正确顺序。"
+  }
+}

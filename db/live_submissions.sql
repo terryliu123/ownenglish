@@ -1,0 +1,1 @@
+INSERT INTO "live_submissions" ("id", "task_id", "student_id", "answer", "is_correct", "response_time_ms", "submitted_at") VALUES ('1f9de960-fc63-414f-813e-e62b197a82e2', '46430759-1d4d-434b-9530-b60943de2084', '8a7150d2-a814-43b7-b75f-09a261746d4a', '""', 'f', NULL, '2026-03-26 18:54:41.175554+08');

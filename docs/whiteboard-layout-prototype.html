@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OwnEnglish - 白板课堂布局设计</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Noto Sans SC', sans-serif; }
+
+        /* 深色主题变量 */
+        :root {
+            --bg-primary: #0f0f13;
+            --bg-secondary: #1a1a22;
+            --bg-tertiary: #252532;
+            --bg-canvas: #141418;
+            --accent-primary: #6366f1;
+            --accent-secondary: #8b5cf6;
+            --accent-success: #22c55e;
+            --accent-warning: #f59e0b;
+            --accent-danger: #ef4444;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #2d2d3a;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+        }
+
+        /* 玻璃态效果 */
+        .glass {
+            background: rgba(26, 26, 34, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+        }
+
+        .glass-strong {
+            background: rgba(26, 26, 34, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+        }
+
+        /* 白板画布 */
+        .whiteboard-canvas {
+            background:
+                linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+                var(--bg-canvas);
+            background-size: 20px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .whiteboard-canvas::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* 模式切换动画 */
+        .mode-transition {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 讲解模式 - 白板扩展 */
+        body.lecture-mode .sidebar-left {
+            width: 56px;
+            min-width: 56px;
+        }
+
+        body.lecture-mode .sidebar-right {
+            width: 56px;
+            min-width: 56px;
+        }
+
+        body.lecture-mode .sidebar-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        body.lecture-mode .whiteboard-container {
+            flex: 1;
+        }
+
+        /* 交互模式 - 任务卡片悬浮 */
+        body.interactive-mode .floating-task-card {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* 任务卡片样式 */
+        .task-card {
+            background: linear-gradient(145deg, rgba(37, 37, 50, 0.95), rgba(26, 26, 34, 0.95));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(99, 102, 241, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .task-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(99, 102, 241, 0.2);
+        }
+
+        /* 学生头像 */
+        .student-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 600;
+            position: relative;
+        }
+
+        .student-avatar.online::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-success);
+            border-radius: 50%;
+            border: 2px solid var(--bg-secondary);
+        }
+
+        /* 工具栏按钮 */
+        .tool-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tool-btn:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--text-primary);
+        }
+
+        .tool-btn.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+        }
+
+        /* 模式切换开关 */
+        .mode-toggle {
+            background: var(--bg-tertiary);
+            border-radius: 24px;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+        }
+
+        .mode-btn {
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .mode-btn.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+        }
+
+        /* 实时统计卡片 */
+        .stat-card {
+            background: rgba(37, 37, 50, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        /* 进度条 */
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        /* 热图效果 */
+        .heat-indicator {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: heatPulse 2s infinite;
+        }
+
+        @keyframes heatPulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(1.2); }
+        }
+
+        /* 拖拽占位符 */
+        .drag-placeholder {
+            border: 2px dashed var(--accent-primary);
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 12px;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* 侧边栏图标 */
+        .sidebar-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sidebar-icon:hover {
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* 动画效果 */
+        .pulse-ring {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px solid var(--accent-success);
+            animation: pulseRing 1.5s infinite;
+        }
+
+        @keyframes pulseRing {
+            0% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="interactive-mode h-screen flex flex-col">
+    <!-- 顶部栏 -->
+    <header class="glass h-16 flex items-center justify-between px-6 z-50">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+            </div>
+            <div>
+                <h1 class="font-semibold text-lg">2026 春季口语提升班</h1>
+                <p class="text-xs text-slate-400">Live Session · 进行中</p>
+            </div>
+        </div>
+
+        <!-- 模式切换 -->
+        <div class="mode-toggle">
+            <button class="mode-btn active" onclick="setMode('interactive')" id="btn-interactive">
+                <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+                    </svg>
+                    交互模式
+                </span>
+            </button>
+            <button class="mode-btn" onclick="setMode('lecture')" id="btn-lecture">
+                <span class="flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    讲解模式
+                </span>
+            </button>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/50 border border-slate-700">
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <span class="text-sm text-slate-300">24 人在线</span>
+            </div>
+            <button class="w-10 h-10 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 flex items-center justify-center transition-colors" title="结束课堂">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主体区域 -->
+    <div class="flex-1 flex overflow-hidden">
+        <!-- 左侧边栏 - 学生列表 -->
+        <aside class="sidebar-left mode-transition glass border-r border-slate-800 w-72 flex flex-col">
+            <!-- 图标模式（讲解模式显示） -->
+            <div class="sidebar-icons p-2 hidden" id="left-icons">
+                <div class="sidebar-icon mx-auto mb-2" title="学生列表">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-icon mx-auto mb-2" title="实时统计">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 完整内容（交互模式显示） -->
+            <div class="sidebar-content flex-1 flex flex-col overflow-hidden">
+                <!-- 在线学生 -->
+                <div class="p-4 border-b border-slate-800">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-medium text-slate-300">在线学生</h3>
+                        <span class="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-400">24</span>
+                    </div>
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer group">
+                            <div class="student-avatar online">张</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">张小明</p>
+                                <p class="text-xs text-slate-500">答题中...</p>
+                            </div>
+                            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                            <div class="student-avatar online">李</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">李华</p>
+                                <p class="text-xs text-slate-500">在线</p>
+                            </div>
+                            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                            <div class="student-avatar online">王</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">王芳</p>
+                                <p class="text-xs text-slate-500">在线</p>
+                            </div>
+                            <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                        </div>
+                        <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-800/50 cursor-pointer">
+                            <div class="student-avatar" style="background: linear-gradient(135deg, #f59e0b, #ef4444);">陈</div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">陈静</p>
+                                <p class="text-xs text-slate-500">离开</p>
+                            </div>
+                            <div class="w-2 h-2 rounded-full bg-slate-600"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实时统计 -->
+                <div class="p-4 flex-1 overflow-y-auto">
+                    <h3 class="font-medium text-slate-300 mb-3">实时统计</h3>
+                    <div class="space-y-3">
+                        <div class="stat-card">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-slate-400">答题进度</span>
+                                <span class="text-sm font-semibold text-indigo-400">68%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 68%"></div>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-2">16 / 24 人已提交</p>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-slate-400">正确率</span>
+                                <span class="text-sm font-semibold text-green-400">82%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill bg-gradient-to-r from-green-500 to-emerald-400" style="width: 82%"></div>
+                            </div>
+                        </div>
+
+                        <div class="stat-card">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-slate-400">平均用时</span>
+                                <span class="text-sm font-semibold text-amber-400">2:34</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中央白板区域 -->
+        <main class="whiteboard-container mode-transition flex-1 relative flex flex-col">
+            <div class="whiteboard-canvas flex-1 relative" id="whiteboard">
+                <!-- 白板内容示例 -->
+                <div class="absolute top-8 left-8 p-6 rounded-2xl bg-slate-800/40 border border-slate-700/50 max-w-md">
+                    <h2 class="text-xl font-bold mb-4 text-indigo-300">Unit 5: Daily Routines</h2>
+                    <div class="space-y-3 text-slate-300">
+                        <p class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs">1</span>
+                            Wake up at 7:00 AM
+                        </p>
+                        <p class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs">2</span>
+                            Have breakfast
+                        </p>
+                        <p class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-xs">3</span>
+                            Go to school
+                        </p>
+                    </div>
+                    <div class="mt-4 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                        <p class="text-sm text-indigo-300 italic">"I usually wake up early in the morning."</p>
+                    </div>
+                </div>
+
+                <!-- 手绘标注示例 -->
+                <svg class="absolute top-20 left-80 w-32 h-32 pointer-events-none" viewBox="0 0 100 100">
+                    <path d="M 10 50 Q 50 10 90 50" stroke="rgba(99, 102, 241, 0.6)" stroke-width="3" fill="none" stroke-linecap="round"/>
+                    <path d="M 30 70 L 50 90 L 70 70" stroke="rgba(245, 158, 11, 0.6)" stroke-width="3" fill="none" stroke-linecap="round"/>
+                </svg>
+
+                <!-- 热图效果（学生答题密集区域） -->
+                <div class="heat-indicator w-40 h-40 bg-indigo-500/20" style="top: 30%; left: 40%;"></div>
+
+                <!-- 悬浮任务卡片（仅在交互模式显示） -->
+                <div class="floating-task-card absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96" id="floating-task" style="display: none;">
+                    <div class="task-card p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-400 text-xs font-medium">单选题</span>
+                                <span class="text-xs text-slate-500">倒计时: 1:45</span>
+                            </div>
+                            <button class="text-slate-500 hover:text-slate-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <h4 class="font-medium mb-4">What time do you usually wake up?</h4>
+
+                        <div class="space-y-2">
+                            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 cursor-pointer transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center">
+                                        <div class="w-3 h-3 rounded-full bg-indigo-500 opacity-0"></div>
+                                    </div>
+                                    <span class="text-sm">A. At 6:00 AM</span>
+                                </div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 cursor-pointer transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center">
+                                        <div class="w-3 h-3 rounded-full bg-indigo-500"></div>
+                                    </div>
+                                    <span class="text-sm">B. At 7:00 AM</span>
+                                </div>
+                                <div class="mt-2 ml-9">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                                            <div class="h-full w-3/4 bg-indigo-500 rounded-full"></div>
+                                        </div>
+                                        <span class="text-xs text-slate-500">75%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 cursor-pointer transition-colors">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-6 h-6 rounded-full border-2 border-slate-600 flex items-center justify-center">
+                                        <div class="w-3 h-3 rounded-full bg-indigo-500 opacity-0"></div>
+                                    </div>
+                                    <span class="text-sm">C. At 8:00 AM</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex gap-2">
+                            <button class="flex-1 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors">结束答题</button>
+                            <button class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm transition-colors">查看详情</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 底部工具栏 -->
+            <div class="glass border-t border-slate-800 p-3">
+                <div class="flex items-center justify-center gap-2">
+                    <button class="tool-btn active" title="画笔">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="橡皮">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="文本">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="图片">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </button>
+                    <div class="w-px h-6 bg-slate-700 mx-2"></div>
+                    <button class="tool-btn" title="插入任务">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="激光笔">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path>
+                        </svg>
+                    </button>
+                    <div class="w-px h-6 bg-slate-700 mx-2"></div>
+                    <button class="tool-btn text-red-400 hover:text-red-300" title="清除">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="撤销">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
+                        </svg>
+                    </button>
+                    <button class="tool-btn" title="重做">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧边栏 - 任务控制 -->
+        <aside class="sidebar-right mode-transition glass border-l border-slate-800 w-80 flex flex-col">
+            <!-- 图标模式 -->
+            <div class="sidebar-icons p-2 hidden" id="right-icons">
+                <div class="sidebar-icon mx-auto mb-2" title="任务组">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-icon mx-auto mb-2" title="历史记录">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="sidebar-icon mx-auto mb-2" title="挑战">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- 完整内容 -->
+            <div class="sidebar-content flex-1 flex flex-col overflow-hidden">
+                <!-- 课前准备 / 任务发布 -->
+                <div class="p-4 border-b border-slate-800">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-medium text-slate-300">课前准备</h3>
+                        <button class="text-xs px-3 py-1.5 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white transition-colors">发布任务</button>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-indigo-500/30 cursor-pointer group transition-all">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">Unit 5 词汇练习</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">草稿</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-slate-500">
+                                <span class="flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    5 题
+                                </span>
+                                <span>预计 8 分钟</span>
+                            </div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-slate-800/50 border border-slate-700 hover:border-indigo-500/30 cursor-pointer transition-all">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">日常对话练习</span>
+                                <span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">草稿</span>
+                            </div>
+                            <div class="flex items-center gap-3 text-xs text-slate-500">
+                                <span class="flex items-center gap-1">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                    3 题
+                                </span>
+                                <span>预计 5 分钟</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 历史记录 -->
+                <div class="p-4 border-b border-slate-800 flex-1 overflow-y-auto">
+                    <h3 class="font-medium text-slate-300 mb-3">历史记录</h3>
+                    <div class="space-y-2">
+                        <div class="p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm">Unit 4 复习</span>
+                                <span class="text-xs text-slate-500">2:30 PM</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="text-green-400">正确率 85%</span>
+                                <span class="text-slate-600">·</span>
+                                <span class="text-slate-500">22 人参与</span>
+                            </div>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm">词汇挑战</span>
+                                <span class="text-xs text-slate-500">2:15 PM</span>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs">
+                                <span class="text-green-400">正确率 92%</span>
+                                <span class="text-slate-600">·</span>
+                                <span class="text-slate-500">24 人参与</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 挑战/对决 -->
+                <div class="p-4">
+                    <h3 class="font-medium text-slate-300 mb-3">挑战</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="p-3 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 hover:border-indigo-500/50 transition-all text-center group">
+                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-medium">全班挑战</span>
+                        </button>
+                        <button class="p-3 rounded-xl bg-gradient-to-br from-amber-500/20 to-red-500/20 border border-amber-500/30 hover:border-amber-500/50 transition-all text-center group">
+                            <div class="w-10 h-10 mx-auto mb-2 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-medium">PK 对决</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // 模式切换
+        function setMode(mode) {
+            document.body.className = mode + '-mode h-screen flex flex-col';
+
+            // 更新按钮状态
+            document.getElementById('btn-interactive').classList.toggle('active', mode === 'interactive');
+            document.getElementById('btn-lecture').classList.toggle('active', mode === 'lecture');
+
+            // 显示/隐藏图标
+            document.getElementById('left-icons').classList.toggle('hidden', mode === 'interactive');
+            document.getElementById('right-icons').classList.toggle('hidden', mode === 'interactive');
+
+            // 显示/隐藏悬浮任务卡片
+            const floatingTask = document.getElementById('floating-task');
+            if (mode === 'interactive') {
+                setTimeout(() => {
+                    floatingTask.style.display = 'block';
+                }, 300);
+            } else {
+                floatingTask.style.display = 'none';
+            }
+        }
+
+        // 工具栏切换
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (!this.classList.contains('text-red-400')) {
+                    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                }
+            });
+        });
+
+        // 拖拽功能演示
+        let draggedElement = null;
+
+        document.querySelectorAll('.task-card').forEach(card => {
+            card.draggable = true;
+            card.addEventListener('dragstart', (e) => {
+                draggedElement = card;
+                card.style.opacity = '0.5';
+            });
+            card.addEventListener('dragend', (e) => {
+                card.style.opacity = '1';
+                draggedElement = null;
+            });
+        });
+
+        const whiteboard = document.getElementById('whiteboard');
+        whiteboard.addEventListener('dragover', (e) => {
+            e.preventDefault();
+        });
+
+        whiteboard.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (draggedElement) {
+                const rect = whiteboard.getBoundingClientRect();
+                const x = e.clientX - rect.left - draggedElement.offsetWidth / 2;
+                const y = e.clientY - rect.top - draggedElement.offsetHeight / 2;
+
+                draggedElement.style.position = 'absolute';
+                draggedElement.style.left = x + 'px';
+                draggedElement.style.top = y + 'px';
+                draggedElement.style.transform = 'none';
+
+                whiteboard.appendChild(draggedElement);
+            }
+        });
+
+        // 初始化显示任务卡片
+        setMode('interactive');
+    </script>
+</body>
+</html>

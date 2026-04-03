@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OwnEnglish Teacher Packs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Noto+Sans+SC:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="teacher-page teacher-packs-page">
+    <div class="page-shell">
+      <header class="app-topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">OE</div>
+          <div>
+            <p class="eyebrow">Teacher Studio</p>
+            <h1>课后学习包</h1>
+          </div>
+        </div>
+        <nav class="app-top-actions">
+          <a href="./teacher-live-results.html">返回课堂结果</a>
+          <a href="./student-home.html">查看学生任务页</a>
+        </nav>
+      </header>
+
+      <div class="workspace">
+        <aside class="sidebar">
+          <div class="sidebar-class-card">
+            <span class="eyebrow">当前班级</span>
+            <strong>周二晚 20:00 口语提升班</strong>
+            <p>目标：明晚 22:00 前完成</p>
+          </div>
+          <nav class="sidebar-nav">
+            <a class="sidebar-link" href="./teacher.html">总览</a>
+            <a class="sidebar-link" href="./teacher-classes.html">班级</a>
+            <a class="sidebar-link" href="./teacher-live.html">课堂模式</a>
+            <a class="sidebar-link is-active" href="./teacher-packs.html">学习包</a>
+            <a class="sidebar-link" href="./teacher-analytics.html">综合分析</a>
+          </nav>
+        </aside>
+
+        <main class="main-stage">
+          <section class="panel-head">
+            <div>
+              <p class="eyebrow">Study Packs</p>
+              <h2>左侧管理学习包，右侧管理这个学习包里的模块与具体编辑器</h2>
+            </div>
+            <div class="panel-actions">
+              <span class="status-badge cool">学习包工作台</span>
+            </div>
+          </section>
+
+          <section class="stats-grid compact">
+            <article class="stat-card compact">
+              <strong data-pack-count>4</strong>
+              <span>学习包数量</span>
+            </article>
+            <article class="stat-card compact">
+              <strong>32</strong>
+              <span>触达学生</span>
+            </article>
+            <article class="stat-card compact">
+              <strong>10m</strong>
+              <span>当前包时长</span>
+            </article>
+          </section>
+
+          <section class="teacher-grid split-2">
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>学习包列表</h3>
+                <span>支持查询与管理</span>
+              </div>
+
+              <div class="search-shell">
+                <input class="search-input" type="search" placeholder="按学习包名称查询" data-pack-search />
+              </div>
+
+              <div class="split-actions">
+                <button class="solid-button" type="button" data-pack-create>创建学习包</button>
+                <button class="ghost-button" type="button" data-pack-modal-open="pack-rules" data-pack-modal-title="学习包列表规则">查看规则</button>
+              </div>
+
+              <div class="queue-board" data-pack-list>
+                <div class="queue-row is-selected" data-pack-row data-pack-name="Lesson 12 · Asking for Help Politely" data-pack-panel="pack-lesson12">
+                  <div class="queue-row-main">
+                    <button class="pack-title-button" type="button" data-pack-select="pack-lesson12">Lesson 12 · Asking for Help Politely</button>
+                    <span class="queue-subline">4 模块 · 12 题 · 进行中</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-pack-edit="pack-editor-lesson12">编辑</button>
+                    <button class="mini-action" type="button" data-pack-copy>复制</button>
+                    <button class="mini-action" type="button" data-pack-disable>停用</button>
+                    <button class="mini-action danger" type="button" data-pack-delete>删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row" data-pack-row data-pack-name="Lesson 11 · Polite Classroom Requests" data-pack-panel="pack-lesson11">
+                  <div class="queue-row-main">
+                    <button class="pack-title-button" type="button" data-pack-select="pack-lesson11">Lesson 11 · Polite Classroom Requests</button>
+                    <span class="queue-subline">3 模块 · 8 题 · 已发布</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-pack-edit="pack-editor-lesson11">编辑</button>
+                    <button class="mini-action" type="button" data-pack-copy>复制</button>
+                    <button class="mini-action" type="button" data-pack-disable>停用</button>
+                    <button class="mini-action danger" type="button" data-pack-delete>删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row" data-pack-row data-pack-name="Scenario Pack · Library Help" data-pack-panel="pack-library">
+                  <div class="queue-row-main">
+                    <button class="pack-title-button" type="button" data-pack-select="pack-library">Scenario Pack · Library Help</button>
+                    <span class="queue-subline">4 模块 · 10 题 · 草稿</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-pack-edit="pack-editor-library">编辑</button>
+                    <button class="mini-action" type="button" data-pack-copy>复制</button>
+                    <button class="mini-action" type="button" data-pack-disable>停用</button>
+                    <button class="mini-action danger" type="button" data-pack-delete>删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row" data-pack-row data-pack-name="Speaking Pack · Office Requests" data-pack-panel="pack-speaking">
+                  <div class="queue-row-main">
+                    <button class="pack-title-button" type="button" data-pack-select="pack-speaking">Speaking Pack · Office Requests</button>
+                    <span class="queue-subline">2 模块 · 6 题 · 草稿</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-pack-edit="pack-editor-speaking">编辑</button>
+                    <button class="mini-action" type="button" data-pack-copy>复制</button>
+                    <button class="mini-action" type="button" data-pack-disable>停用</button>
+                    <button class="mini-action danger" type="button" data-pack-delete>删除</button>
+                  </div>
+                </div>
+
+                <div class="queue-row" hidden data-new-pack-row data-pack-row data-pack-name="New Pack · Untitled" data-pack-panel="pack-new">
+                  <div class="queue-row-main">
+                    <button class="pack-title-button" type="button" data-pack-select="pack-new">New Pack · Untitled</button>
+                    <span class="queue-subline">未保存 · 待配置</span>
+                  </div>
+                  <div class="queue-actions">
+                    <button class="mini-action" type="button" data-pack-edit="pack-editor-new">编辑</button>
+                    <button class="mini-action" type="button" data-pack-copy>复制</button>
+                    <button class="mini-action" type="button" data-pack-disable>停用</button>
+                    <button class="mini-action danger" type="button" data-pack-delete>删除</button>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="surface-card">
+              <div class="surface-head">
+                <h3>学习包模块</h3>
+                <span>点击模块详情进入具体编辑器</span>
+              </div>
+
+              <section class="pack-view is-active" data-pack-view="pack-lesson12">
+                <div class="question-preview-card">
+                  <label>当前学习包</label>
+                  <strong>Lesson 12 · Asking for Help Politely</strong>
+                  <p>目标：掌握礼貌求助句型和 8 个高频表达。当前包包含 4 个模块、12 道题，预计完成 10 分钟。</p>
+                </div>
+                <div class="queue-board">
+                  <div class="queue-row">
+                    <div class="queue-row-main">
+                      <strong>模块 1 · 词汇热身</strong>
+                      <span class="queue-subline">3 题 · 2 分钟</span>
+                    </div>
+                    <div class="queue-actions">
+                      <button class="mini-action" type="button" data-pack-modal-open="module-editor-vocab" data-pack-modal-title="模块 1 · 词汇热身">详情</button>
+                    </div>
+                  </div>
+                  <div class="queue-row is-selected">
+                    <div class="queue-row-main">
+                      <strong>模块 2 · 句型练习</strong>
+                      <span class="queue-subline">4 题 · 3 分钟 · 当前重点模块</span>
+                    </div>
+                    <div class="queue-actions">
+                      <button class="mini-action" type="button" data-pack-modal-open="module-editor-pattern" data-pack-modal-title="模块 2 · 句型练习">详情</button>
+                    </div>
+                  </div>
+                  <div class="queue-row">
+                    <div class="queue-row-main">
+                      <strong>模块 3 · 听力辨别</strong>
+                      <span class="queue-subline">3 题 · 3 分钟</span>
+                    </div>
+                    <div class="queue-actions">
+                      <button class="mini-action" type="button" data-pack-modal-open="module-editor-listening" data-pack-modal-title="模块 3 · 听力辨别">详情</button>
+                    </div>
+                  </div>
+                  <div class="queue-row">
+                    <div class="queue-row-main">
+                      <strong>模块 4 · 口语模仿</strong>
+                      <span class="queue-subline">2 题 · 2 分钟</span>
+                    </div>
+                    <div class="queue-actions">
+                      <button class="mini-action" type="button" data-pack-modal-open="module-editor-speaking" data-pack-modal-title="模块 4 · 口语模仿">详情</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="publish-card">
+                  <div class="publish-card-head">
+                    <div>
+                      <strong>整包操作</strong>
+                      <p>学习包按模块组织，模块详情进入具体编辑器，整包仍然以列表方式统一管理。</p>
+                    </div>
+                  </div>
+                  <div class="action-stack horizontal">
+                    <button class="ghost-button" type="button" data-pack-edit="pack-editor-lesson12">编辑当前学习包</button>
+                    <a class="solid-button" href="./teacher-published.html">发布当前学习包</a>
+                  </div>
+                </div>
+              </section>
+
+              <section class="pack-view" data-pack-view="pack-lesson11">
+                <div class="question-preview-card">
+                  <label>当前学习包</label>
+                  <strong>Lesson 11 · Polite Classroom Requests</strong>
+                  <p>更轻量的课堂请求包，适合已发布内容的复用和复制。</p>
+                </div>
+              </section>
+
+              <section class="pack-view" data-pack-view="pack-library">
+                <div class="question-preview-card">
+                  <label>当前学习包</label>
+                  <strong>Scenario Pack · Library Help</strong>
+                  <p>面向图书馆场景的专题包，模块里会混合场景图片、句型、听力和口语任务。</p>
+                </div>
+              </section>
+
+              <section class="pack-view" data-pack-view="pack-speaking">
+                <div class="question-preview-card">
+                  <label>当前学习包</label>
+                  <strong>Speaking Pack · Office Requests</strong>
+                  <p>偏口语强化的学习包，更适合后续扩展口语型课程。</p>
+                </div>
+              </section>
+
+              <section class="pack-view" data-pack-view="pack-new">
+                <div class="question-preview-card">
+                  <label>新建学习包</label>
+                  <strong>New Pack · Untitled</strong>
+                  <p>这是一个新的学习包草稿，创建后会先进入列表，再由老师在右侧查看模块结构并进入编辑器。</p>
+                </div>
+              </section>
+            </article>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <section class="live-modal" data-pack-modal hidden>
+      <div class="live-modal-backdrop" data-pack-modal-close></div>
+      <div class="live-modal-card">
+        <div class="live-modal-head">
+          <div>
+            <p class="eyebrow">Pack Editor</p>
+            <h2 data-pack-modal-title>学习包编辑器</h2>
+          </div>
+          <button class="mini-action" type="button" data-pack-modal-close>关闭</button>
+        </div>
+        <div class="live-modal-body" data-pack-modal-body></div>
+      </div>
+    </section>
+
+    <template id="pack-editor-lesson12">
+      <div class="builder-stack">
+        <div class="editor-field-grid">
+          <div class="field-card"><label>学习包名称</label><div class="fake-input">Lesson 12 · Asking for Help Politely</div></div>
+          <div class="field-card"><label>适用班级</label><div class="fake-input">周二晚 20:00 口语提升班</div></div>
+          <div class="field-card"><label>完成时长</label><div class="fake-input">10 分钟</div></div>
+          <div class="field-card"><label>提醒策略</label><div class="fake-input">未完成学生次日晚自动提醒</div></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="pack-editor-lesson11">
+      <div class="question-preview-card">
+        <label>学习包编辑器</label>
+        <strong>Lesson 11 · Polite Classroom Requests</strong>
+        <p>这个学习包更轻量，适合复制后快速改成新课内容。</p>
+      </div>
+    </template>
+
+    <template id="pack-editor-library">
+      <div class="question-preview-card">
+        <label>学习包编辑器</label>
+        <strong>Scenario Pack · Library Help</strong>
+        <p>面向图书馆场景的专题学习包，模块里会混合图片、句型、听力和口语任务。</p>
+      </div>
+    </template>
+
+    <template id="pack-editor-speaking">
+      <div class="question-preview-card">
+        <label>学习包编辑器</label>
+        <strong>Speaking Pack · Office Requests</strong>
+        <p>偏口语强化的学习包，适合作为未来学习类型扩展方向。</p>
+      </div>
+    </template>
+
+    <template id="pack-editor-new">
+      <div class="builder-stack">
+        <div class="editor-field-grid">
+          <div class="field-card"><label>学习包名称</label><div class="fake-input">New Pack · Untitled</div></div>
+          <div class="field-card"><label>学习目标</label><div class="fake-input">围绕课堂主题创建新的课后巩固路径</div></div>
+          <div class="field-card"><label>模块结构</label><div class="fake-input">词汇 → 句型 → 听力 → 口语</div></div>
+          <div class="field-card"><label>发布策略</label><div class="fake-input">先保存草稿，再决定何时发布</div></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="module-editor-vocab">
+      <div class="question-preview-card">
+        <label>模块编辑器</label>
+        <strong>模块 1 · 词汇热身</strong>
+        <p>3 题，重点复习 polite、possibly、mind、favor 等关键词，支持词义匹配和错题二刷。</p>
+      </div>
+    </template>
+
+    <template id="module-editor-pattern">
+      <div class="builder-stack">
+        <div class="question-preview-card">
+          <label>模块编辑器</label>
+          <strong>模块 2 · 句型练习</strong>
+          <p>4 题，围绕 “Would you mind...” 和 “Could you possibly...” 做判断、替换和填空。</p>
+        </div>
+        <div class="editor-field-grid">
+          <div class="field-card"><label>模块目标</label><div class="fake-input">把课堂规则转换成可操作练习</div></div>
+          <div class="field-card"><label>题目顺序</label><div class="fake-input">表达判断 → 场景替换 → 句型填空 → 判断总结</div></div>
+        </div>
+      </div>
+    </template>
+
+    <template id="module-editor-listening">
+      <div class="question-preview-card">
+        <label>模块编辑器</label>
+        <strong>模块 3 · 听力辨别</strong>
+        <p>3 题，使用课堂原句和场景音频，判断是 request 还是 command。</p>
+      </div>
+    </template>
+
+    <template id="module-editor-speaking">
+      <div class="question-preview-card">
+        <label>模块编辑器</label>
+        <strong>模块 4 · 口语模仿</strong>
+        <p>2 题，围绕图书馆与教室两个场景提交口语录音，支持老师后续点评。</p>
+      </div>
+    </template>
+
+    <template id="pack-rules">
+      <div class="builder-stack">
+        <div class="question-preview-card">
+          <label>列表规则</label>
+          <strong>学习包列表与模块工作台的分工</strong>
+          <p>左侧只负责学习包管理，右侧只负责看选中学习包里的模块结构，模块详情再进入具体编辑器。</p>
+        </div>
+      </div>
+    </template>
+
+    <div class="toast" id="teacherPackToast"></div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
