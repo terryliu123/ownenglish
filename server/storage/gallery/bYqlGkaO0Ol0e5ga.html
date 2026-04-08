@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>一年级数学游园会</title>
+    <style>
+        :root {
+            --red: #d62828;
+            --gold: #fcbf49;
+            --paper: #fffcf2;
+            --dark: #003049;
+            --gray: #ccc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: #ba181b;
+            background: radial-gradient(circle, #e5383b 0%, #a4161a 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        #app {
+            width: 96vw;
+            height: 94vh;
+            background: var(--paper);
+            border: 6px solid var(--gold);
+            border-radius: 30px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+        }
+
+        /* 顶部导航 */
+        .header {
+            padding: 10px 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            border-radius: 24px 24px 0 0;
+            border-bottom: 2px dashed var(--gold);
+        }
+
+        .btn-back {
+            background: var(--dark);
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 12px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .status-info { text-align: center; flex-grow: 1; }
+        .timer { font-size: 24px; font-weight: bold; color: var(--red); }
+        .stars-display { font-size: 20px; color: #ddd; margin-top: 2px; }
+        .stars-display .active { color: #ffca28; text-shadow: 0 0 5px orange; }
+
+        /* 内容区布局 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 15px;
+            text-align: center;
+            overflow-y: auto;
+        }
+
+        /* 首页和选择页 */
+        .menu-grid { display: flex; flex-direction: column; gap: 20px; margin-top: 50px; }
+        .btn-level {
+            background: var(--red);
+            color: white;
+            padding: 25px 40px;
+            border-radius: 20px;
+            font-size: 26px;
+            border: 4px solid var(--gold);
+            box-shadow: 0 8px 0 var(--dark);
+            cursor: pointer;
+        }
+        .item-grid { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
+        .gift-box { font-size: 80px; background: white; padding: 20px; border-radius: 20px; border: 3px solid var(--red); cursor: pointer; transition: transform 0.2s; }
+        .gift-box:active { transform: scale(0.9); }
+
+        /* 题目展示卡片 */
+        .question-card { width: 100%; max-width: 800px; }
+        
+        /* 第一关大号数字 */
+        .q-text-l1 { 
+            font-size: 60px; 
+            font-weight: 900; 
+            margin: 30px 0; 
+            color: var(--dark);
+        }
+        /* 第二关题目 */
+        .q-text-l2 { 
+            font-size: 24px; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            color: var(--dark); 
+            line-height: 1.4; 
+            text-align: left;
+        }
+
+        /* 图片控制 */
+        .img-main { width: auto; max-width: 100%; max-height: 180px; border-radius: 10px; margin: 10px 0; border: 2px solid #f0f0f0; }
+        .img-option { height: 60px; vertical-align: middle; margin-left: 10px; border-radius: 5px; }
+
+        /* 输入和键盘 */
+        .input-center-box { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .big-input {
+            font-size: 60px; width: 200px; height: 80px; text-align: center;
+            border: 5px solid var(--gold); border-radius: 20px; margin-bottom: 15px;
+            background: #fff; color: var(--red); font-weight: bold;
+        }
+
+        .keyboard {
+            display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; width: 100%; max-width: 450px;
+        }
+        .key {
+            background: white; border: 2px solid var(--dark); padding: 15px 0;
+            border-radius: 15px; font-size: 24px; font-weight: bold; cursor: pointer;
+            box-shadow: 0 4px 0 #ccc;
+        }
+        .key:active { transform: translateY(2px); box-shadow: 0 1px 0 #ccc; background: var(--gold); }
+
+        /* 选项按钮 */
+        .opts-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+        .btn-opt {
+            display: flex; align-items: center; justify-content: center;
+            padding: 12px; background: white; border: 3px solid #ddd;
+            border-radius: 15px; font-size: 20px; cursor: pointer; transition: all 0.2s;
+        }
+        .btn-opt.selected { background: #fff3b0; border-color: var(--red); }
+
+        .sticker-box { font-size: 100px; margin: 20px 0; }
+        .hidden { display: none !important; }
+
+        @media (max-width: 600px) {
+            .opts-container { grid-template-columns: 1fr; }
+            .q-text-l1 { font-size: 50px; }
+            .gift-box { font-size: 60px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div id="ui-header" class="header hidden">
+        <button class="btn-back" onclick="showHome()">🏠 退出</button>
+        <div class="status-info">
+            <div id="ui-timer" class="timer">60s</div>
+            <div id="ui-stars" class="stars-display">
+                <span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span><span class="star">★</span>
+            </div>
+        </div>
+        <div id="ui-page" style="font-weight:bold; color:var(--dark)">1/5</div> 
+    </div>
+
+    <div class="main-content">
+        <!-- 首页 -->
+        <div id="screen-home" class="menu-grid">
+            <h1 style="color:var(--red); font-size: 36px; margin-bottom: 20px;">🧧 数学游园会 🧧</h1>
+            <button class="btn-level" onclick="showSelect(1)">第一关：口算红包翻翻乐</button>
+            <button class="btn-level" style="background:#fb8500" onclick="showSelect(2)">第二关：新春福袋智慧选</button>
+        </div>
+
+        <!-- 选择关卡页 -->
+        <div id="screen-select" class="hidden">
+            <h2 id="select-title" style="color:var(--red); font-size:28px;">请选择挑战</h2>
+            <div id="select-grid" class="item-grid"></div>
+            <button class="btn-back" style="margin-top:40px; padding: 15px 40px" onclick="showHome()">返回主页</button>
+        </div>
+
+        <!-- 答题页 -->
+        <div id="screen-quiz" class="question-card hidden">
+            <div id="quiz-body"></div>
+            
+            <!-- 第一关控制：数字键盘 -->
+            <div id="l1-controls" class="input-center-box hidden">
+                <input type="text" id="l1-answer" class="big-input" readonly>
+                <div class="keyboard">
+                    <div class="key" onclick="pressNum(1)">1</div>
+                    <div class="key" onclick="pressNum(2)">2</div>
+                    <div class="key" onclick="pressNum(3)">3</div>
+                    <div class="key" onclick="pressNum(4)">4</div>
+                    <div class="key" onclick="pressNum(5)">5</div>
+                    <div class="key" onclick="pressNum(6)">6</div>
+                    <div class="key" onclick="pressNum(7)">7</div>
+                    <div class="key" onclick="pressNum(8)">8</div>
+                    <div class="key" onclick="pressNum(9)">9</div>
+                    <div class="key" onclick="pressNum(0)">0</div>
+                    <div class="key" style="grid-column: span 2; background:#eee" onclick="pressNum('del')">退格</div>
+                    <div class="key" style="grid-column: span 3; background:var(--gold)" onclick="nextQuestion()">确定</div>
+                </div>
+            </div>
+
+            <!-- 第二关控制：下一题按钮 -->
+            <div id="l2-controls" class="hidden" style="margin-top:20px;">
+                <button id="btn-next-l2" class="btn-level" style="padding:12px 60px; font-size:22px;" onclick="nextQuestion()">提交答案</button>
+            </div>
+        </div>
+
+        <!-- 结果页 -->
+        <div id="screen-result" class="hidden">
+            <h1 style="font-size:36px; color:var(--red)">挑战完成！</h1>
+            <div id="res-stars" class="stars-display" style="font-size: 50px; margin: 10px 0;"></div>
+            <div id="res-stickers" class="sticker-box">🏆🏆🏆</div>
+            <p id="res-detail" style="font-size:22px; color:var(--dark); line-height:1.6;"></p>
+            <button class="btn-level" onclick="showHome()" style="margin-top:10px">回到主页</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 第一关题库 (红包1, 2, 3)
+    const L1_DATA = [
+        { q: ["5+3=", "8-7=", "6-0=", "3+7-2=", "( )+5=9"], a: ["8","1","6","8","4"] },
+        { q: ["2+6=", "9-8=", "8-0=", "6+4-3=", "( )+3=8"], a: ["8","1","8","7","5"] },
+        { q: ["7+2=", "10-9=", "9-0=", "2+8-9=", "( )+6=9"], a: ["9","1","9","1","3"] }
+    ];
+
+    // 第二关题库 (福袋1, 2, 3)
+    const L2_DATA = [
+        { qs: [
+            { t: "1. 下图中有几个长方体？", mainImg: "https://www.teachmate.top/storage/sxk/1-1-1.jpg", opts: ["A. 1", "B. 2", "C. 3", "D. 4"], a: 1 },
+            { t: "2. 下面的钟面表示5时半的是？", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/1-2-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/1-2-1.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/1-2-1.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/1-2-1.jpg" }
+            ], a: 1, note: "提示：原题引用均为同一图，请看准选项B" },
+            { t: "3. 下面几个物品中，（ ）和其他不同类。", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/1-3-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/1-3-2.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/1-3-3.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/1-3-4.jpg" }
+            ], a: 3 },
+            { t: "4. 看下图，正确的算式是？", mainImg: "https://www.teachmate.top/storage/sxk/1-4-1.jpg", opts: ["A. 2+6+3=11", "B. 2+6-3=5", "C. 2+5-3=4", "D. 8-3=5"], a: 1 },
+            { t: "5. 1个杯子配1根吸管，还缺几根吸管？正确列式是：", mainImg: "https://www.teachmate.top/storage/sxk/1-5-1.jpg", opts: ["A. 10-5=5", "B. 5+5=10", "C. 10-4=6", "D. 4+6=10"], a: 0 }
+        ]},
+        { qs: [
+            { t: "1. 下图中有（ ）个正方体。", mainImg: "https://www.teachmate.top/storage/sxk/2-1-1.jpg", opts: ["A. 1", "B. 2", "C. 3", "D. 4"], a: 0 },
+            { t: "2. 下面的钟面表示6时半的是（ ）。", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/2-2-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/2-2-1.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/2-2-1.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/2-2-1.jpg" }
+            ], a: 2 },
+            { t: "3. 下面几个物品中，（ ）和其他不同类。", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/2-3-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/2-3-2.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/2-3-3.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/2-3-4.jpg" }
+            ], a: 0 },
+            { t: "4. 看下图，正确的算式是（ ）。", mainImg: "https://www.teachmate.top/storage/sxk/2-4-1.jpg", opts: ["A. 2+6+3=11", "B. 2+6-3=5", "C. 2+5-3=4", "D. 8-3=5"], a: 1 },
+            { t: "5. 1个杯子配1根吸管，还缺几根吸管？正确列式是：", mainImg: "https://www.teachmate.top/storage/sxk/2-5-1.jpg", opts: ["A. 10-5=5", "B. 5+5=10", "C. 10-4=6", "D. 4+6=10"], a: 0 }
+        ]},
+        { qs: [
+            { t: "1. 下图中有（ ）个圆柱。", mainImg: "https://www.teachmate.top/storage/sxk/3-1-1.jpg", opts: ["A. 1", "B. 2", "C. 3", "D. 4"], a: 1 },
+            { t: "2. 下面的钟面表示7时半的是（ ）。", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/3-2-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/3-2-1.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/3-2-1.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/3-2-1.jpg" }
+            ], a: 3 },
+            { t: "3. 下面几个物品中，（ ）和其他不同类。", opts: [
+                { t: "A", img: "https://www.teachmate.top/storage/sxk/3-3-1.jpg" }, { t: "B", img: "https://www.teachmate.top/storage/sxk/3-3-2.jpg" }, { t: "C", img: "https://www.teachmate.top/storage/sxk/3-3-3.jpg" }, { t: "D", img: "https://www.teachmate.top/storage/sxk/3-3-4.jpg" }
+            ], a: 2 },
+            { t: "4. 看下图，正确的算式是（ ）。", mainImg: "https://www.teachmate.top/storage/sxk/3-4-1.jpg", opts: ["A. 2+6+3=11", "B. 2+6-3=5", "C. 2+5-3=4", "D. 8-3=5"], a: 1 },
+            { t: "5. 1个杯子配1根吸管，还缺几根吸管？正确列式是：", mainImg: "https://www.teachmate.top/storage/sxk/3-5-1.jpg", opts: ["A. 10-5=5", "B. 5+5=10", "C. 10-4=6", "D. 4+6=10"], a: 0 }
+        ]}
+    ];
+
+    let curLv = 1, curIdx = 0, qIdx = 0, timer = null, timeLeft = 0, userAns = [], isTimeUp = false;
+    let scoreStars = [false, false, false, false, false];
+
+    function hideAll() { document.querySelectorAll('.main-content > div').forEach(d => d.classList.add('hidden')); document.getElementById('ui-header').classList.add('hidden'); }
+    function showHome() { clearInterval(timer); hideAll(); document.getElementById('screen-home').classList.remove('hidden'); }
+
+    function showSelect(lv) {
+        curLv = lv; hideAll();
+        const grid = document.getElementById('select-grid'); grid.innerHTML = "";
+        for(let i=0; i<3; i++) { grid.innerHTML += `<div class="gift-box" onclick="startQuiz(${i})">${lv==1?'🧧':'💰'}</div>`; }
+        document.getElementById('select-title').innerText = lv==1?"请点击选择一个红包":"请点击选择一个福袋";
+        document.getElementById('screen-select').classList.remove('hidden');
+    }
+
+    function startQuiz(idx) {
+        curIdx = idx; qIdx = 0; userAns = []; isTimeUp = false;
+        scoreStars = [false, false, false, false, false];
+        hideAll();
+        document.getElementById('ui-header').classList.remove('hidden');
+        document.getElementById('screen-quiz').classList.remove('hidden');
+        updateStarsUI();
+
+        if(curLv == 1) { 
+            timeLeft = 60; 
+            document.getElementById('l1-controls').classList.remove('hidden'); 
+            document.getElementById('l2-controls').classList.add('hidden'); 
+        } else { 
+            timeLeft = 120; 
+            document.getElementById('l1-controls').classList.add('hidden'); 
+            document.getElementById('l2-controls').classList.remove('hidden'); 
+        }
+        
+        renderQuestion();
+        clearInterval(timer);
+        timer = setInterval(() => {
+            timeLeft--; 
+            document.getElementById('ui-timer').innerText = timeLeft + "s";
+            if(timeLeft <= 0) { 
+                clearInterval(timer); 
+                isTimeUp = true; 
+                alert("时间到啦！继续完成剩余题目吧。"); 
+            }
+        }, 1000);
+    }
+
+    function updateStarsUI() {
+        const stars = document.querySelectorAll('#ui-stars .star');
+        stars.forEach((s, i) => {
+            if(scoreStars[i]) s.classList.add('active');
+            else s.classList.remove('active');
+        });
+    }
+
+    function renderQuestion() {
+        const body = document.getElementById('quiz-body');
+        document.getElementById('ui-page').innerText = `${qIdx + 1} / 5`;
+
+        if(curLv == 1) {
+            body.innerHTML = `<div class="q-text-l1">${L1_DATA[curIdx].q[qIdx]}</div>`;
+            document.getElementById('l1-answer').value = "";
+        } else {
+            const q = L2_DATA[curIdx].qs[qIdx];
+            let html = `<div class="q-text-l2">${q.t}</div>`;
+            if(q.mainImg) html += `<img src="${q.mainImg}" class="img-main">`;
+            html += `<div class="opts-container">`;
+            q.opts.forEach((o, i) => {
+                if(typeof o === 'string') { 
+                    html += `<button class="btn-opt" id="opt-${i}" onclick="selectL2(${i})">${o}</button>`; 
+                } else { 
+                    html += `<button class="btn-opt" id="opt-${i}" onclick="selectL2(${i})">${o.t}<img src="${o.img}" class="img-option"> </button>`; 
+                }
+            });
+            html += `</div>`;
+            body.innerHTML = html;
+            document.getElementById('btn-next-l2').style.visibility = "hidden";
+        }
+    }
+
+    function pressNum(v) {
+        const input = document.getElementById('l1-answer');
+        if(v === 'del') input.value = input.value.slice(0, -1);
+        else if(input.value.length < 2) input.value += v;
+    }
+
+    function selectL2(i) {
+        userAns[qIdx] = i;
+        document.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('selected'));
+        document.getElementById('opt-' + i).classList.add('selected');
+        document.getElementById('btn-next-l2').style.visibility = "visible";
+    }
+
+    function nextQuestion() {
+        let isCorrect = false;
+        if(curLv == 1) {
+            const val = document.getElementById('l1-answer').value;
+            if(val === "") { alert("请输入答案哦！"); return; }
+            userAns[qIdx] = val;
+            if(val === L1_DATA[curIdx].a[qIdx]) isCorrect = true;
+        } else {
+            if(userAns[qIdx] === L2_DATA[curIdx].qs[qIdx].a) isCorrect = true;
+        }
+
+        // 记录本题是否正确
+        if(isCorrect) scoreStars[qIdx] = true;
+        updateStarsUI();
+
+        if(qIdx < 4) { 
+            qIdx++; 
+            renderQuestion(); 
+        } else { 
+            finish(); 
+        }
+    }
+
+    function finish() {
+        clearInterval(timer);
+        hideAll();
+        
+        let correctCount = scoreStars.filter(s => s).length;
+        let wrongCount = 5 - correctCount;
+        let stickers = 0;
+
+        // 根据评分标准
+        if(correctCount === 5) stickers = 3;
+        else if(correctCount >= 3) stickers = 2; // 错1-2道
+        else if(correctCount >= 1) stickers = 1; // 错3-4道
+        else stickers = 0;
+
+        // 即使全对，如果超时了，按标准是否扣分？（原标准说“规定时间内”），这里按严格标准执行
+        if(isTimeUp && stickers > 2) stickers = 2;
+
+        const resStars = document.getElementById('res-stars');
+        resStars.innerHTML = "";
+        for(let i=0; i<5; i++) {
+            resStars.innerHTML += `<span style="color:${scoreStars[i]?'#ffca28':'#ccc'}">★</span>`;
+        }
+
+        document.getElementById('res-stickers').innerHTML = stickers > 0 ? "🏆".repeat(stickers) : "💪";
+        
+        let evaluation = "";
+        if(stickers === 3) evaluation = "卓越表现！全部正确！";
+        else if(stickers === 2) evaluation = "良好表现！再接再厉！";
+        else if(stickers === 1) evaluation = "需加油哦，多练习口算！";
+        else evaluation = "不要灰心，继续努力！";
+
+        document.getElementById('res-detail').innerHTML = `
+            正确题目：${correctCount} 道<br>
+            获得奖杯：${stickers} 个<br>
+            评语：${evaluation}<br>
+            <small>${isTimeUp ? "（挑战超时）" : "（在规定时间内完成）"}</small>
+        `;
+        document.getElementById('screen-result').classList.remove('hidden');
+    }
+</script>
+</body>
+</html>

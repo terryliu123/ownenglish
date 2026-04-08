@@ -42,12 +42,8 @@ export function useChallenges({
   const [showDuelModal, setShowDuelModal] = useState(false)
   const [selectedDuelParticipants, setSelectedDuelParticipants] = useState<string[]>([])
   const [showSingleQuestionDuelModal, setShowSingleQuestionDuelModal] = useState(false)
-  const [selectedSingleQuestionParticipants, setSelectedSingleQuestionParticipants] = useState<
-    string[]
-  >([])
-  const [selectedSingleQuestionTaskId, setSelectedSingleQuestionTaskId] = useState<string | null>(
-    null
-  )
+  const [selectedSingleQuestionParticipants, setSelectedSingleQuestionParticipants] = useState<string[]>([])
+  const [selectedSingleQuestionTaskId, setSelectedSingleQuestionTaskId] = useState<string | null>(null)
   const [showChallengeBoard, setShowChallengeBoard] = useState(false)
 
   const eligibleParticipantCount = classPresence?.classroom_students?.length
@@ -59,9 +55,7 @@ export function useChallenges({
     : classPresence?.online_students ?? []
 
   const singleQuestionDuelTasks =
-    selectedGroup?.tasks?.filter((task) =>
-      SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES.has(task.type)
-    ) ?? []
+    selectedGroup?.tasks?.filter((task) => SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES.has(task.type)) ?? []
 
   const unsupportedChallengeTypes = selectedGroup?.tasks?.length
     ? Array.from(
@@ -113,10 +107,7 @@ export function useChallenges({
         return
       }
 
-      if (
-        (mode === 'single_question_duel' || mode === 'duel') &&
-        (!participantIds || participantIds.length !== 2)
-      ) {
+      if ((mode === 'single_question_duel' || mode === 'duel') && (!participantIds || participantIds.length !== 2)) {
         onError?.('请选择两位参与者')
         return
       }
@@ -126,13 +117,18 @@ export function useChallenges({
         return
       }
 
+      const effectiveParticipantIds =
+        mode === 'class_challenge'
+          ? challengeCandidates.map((student) => student.id)
+          : participantIds
+
       setChallengeCreating(true)
       try {
         const challenge = await liveTaskService.createChallenge({
           class_id: currentClassId,
           task_group_id: selectedGroup.id,
           mode,
-          participant_ids: participantIds,
+          participant_ids: effectiveParticipantIds,
           task_id: taskId,
         })
         ws.startChallenge(challenge.id)
@@ -144,7 +140,7 @@ export function useChallenges({
         setChallengeCreating(false)
       }
     },
-    [currentClassId, selectedGroup, eligibleParticipantCount, ws]
+    [challengeCandidates, currentClassId, selectedGroup, eligibleParticipantCount, ws]
   )
 
   const handleToggleDuelParticipant = useCallback((studentId: string) => {
@@ -177,7 +173,7 @@ export function useChallenges({
       try {
         await document.documentElement.requestFullscreen()
       } catch {
-        // Ignore fullscreen request failures
+        // Ignore fullscreen request failures.
       }
     }
   }, [])
@@ -188,7 +184,7 @@ export function useChallenges({
       try {
         await document.exitFullscreen()
       } catch {
-        // Ignore fullscreen exit failures
+        // Ignore fullscreen exit failures.
       }
     }
   }, [])
@@ -211,7 +207,6 @@ export function useChallenges({
   }, [])
 
   return {
-    // State
     challengeCreating,
     showDuelModal,
     selectedDuelParticipants,
@@ -219,23 +214,17 @@ export function useChallenges({
     selectedSingleQuestionParticipants,
     selectedSingleQuestionTaskId,
     showChallengeBoard,
-
-    // Derived data
     eligibleParticipantCount,
     challengeCandidates,
     singleQuestionDuelTasks,
     unsupportedChallengeTypes,
     hasSingleQuestionDuelTasks,
-
-    // Setters
     setShowDuelModal,
     setSelectedDuelParticipants,
     setShowSingleQuestionDuelModal,
     setSelectedSingleQuestionParticipants,
     setSelectedSingleQuestionTaskId,
     setShowChallengeBoard,
-
-    // Actions
     createAndStartChallenge,
     handleToggleDuelParticipant,
     handleToggleSingleQuestionParticipant,

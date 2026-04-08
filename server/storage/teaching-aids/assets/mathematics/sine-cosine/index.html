@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正弦与余弦 (Sine & Cosine) - 交互式教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #262626; /* 深灰色背景 */
+            font-family: "Times New Roman", serif;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            cursor: pointer;
+        }
+
+        /* 右上角公式面板 */
+        #ui-layer {
+            position: absolute;
+            top: 40px;
+            right: 60px;
+            text-align: right;
+            pointer-events: none;
+            background: rgba(0,0,0,0.3);
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .formula-row {
+            font-size: 24px;
+            margin-bottom: 15px;
+            font-family: "Times New Roman", serif;
+        }
+
+        .label-text {
+            font-family: "Arial", sans-serif; /* 数字用无衬线字体 */
+            font-weight: bold;
+        }
+
+        .color-sin { color: #f1c40f; } /* 黄色 */
+        .color-cos { color: #1abc9c; } /* 青色 */
+
+        #hint {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #888;
+            font-family: "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <div id="ui-layer">
+            <div class="formula-row">
+                sin <span style="font-family: serif;">α</span> = <span id="val-sin" class="label-text color-sin">0.71</span>
+            </div>
+            <div class="formula-row">
+                cos <span style="font-family: serif;">α</span> = <span id="val-cos" class="label-text color-cos">0.71</span>
+            </div>
+        </div>
+        <canvas id="mainCanvas"></canvas>
+        <div id="hint">拖动圆上的白点 P 改变角度</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const valSin = document.getElementById('val-sin');
+        const valCos = document.getElementById('val-cos');
+
+        // --- 状态配置 ---
+        let unit = 250; // 单位圆半径 (像素)
+        let originX, originY; // 原点位置
+        let angle = 45 * (Math.PI / 180); // 初始角度 45度
+        let isDragging = false;
+
+        // --- 初始化 ---
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+
+            // 事件监听
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('touchstart', e => startDrag(e.touches[0]), {passive: false});
+
+            window.addEventListener('mousemove', onDrag);
+            window.addEventListener('touchmove', e => onDrag(e.touches[0]), {passive: false});
+
+            window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('touchend', stopDrag);
+
+            draw();
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // 设置原点在左下角偏右上的位置
+            originX = canvas.width * 0.35;
+            originY = canvas.height * 0.65;
+            
+            // 自适应半径
+            unit = Math.min(canvas.width, canvas.height) / 3.2;
+            draw();
+        }
+
+        // --- 交互逻辑 ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function updateAngle(pos) {
+            const dx = pos.x - originX;
+            const dy = originY - pos.y; // Canvas Y轴向下，数学Y轴向上
+            
+            // 计算角度
+            let newAngle = Math.atan2(dy, dx);
+            
+            // 限制在第一、二象限 (0 ~ 180度) 体验更好，或者全圆
+            // 这里为了复刻原图，主要限制在 0 ~ 180度，防止拖到下方
+            if (newAngle < 0) newAngle = 0; 
+            
+            angle = newAngle;
+            draw();
+        }
+
+        function startDrag(e) {
+            isDragging = true;
+            updateAngle(getMousePos(e));
+        }
+
+        function onDrag(e) {
+            if (!isDragging) return;
+            e.preventDefault(); // 防止手机端滚动
+            updateAngle(getMousePos(e));
+        }
+
+        function stopDrag() {
+            isDragging = false;
+        }
+
+        // --- 绘图逻辑 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 数值计算
+            const cosVal = Math.cos(angle);
+            const sinVal = Math.sin(angle);
+            const degVal = Math.round(angle * 180 / Math.PI);
+
+            // 更新UI面板
+            valSin.innerText = sinVal.toFixed(2);
+            valCos.innerText = cosVal.toFixed(2);
+
+            // 关键点坐标
+            const Px = originX + cosVal * unit;
+            const Py = originY - sinVal * unit;
+            
+            const Ax = Px; // A点在x轴
+            const Ay = originY;
+            
+            const Bx = originX; // B点在y轴
+            const By = Py;
+
+            // 1. 绘制坐标轴
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#888';
+            ctx.beginPath();
+            // X轴
+            ctx.moveTo(originX - 50, originY);
+            ctx.lineTo(canvas.width - 50, originY);
+            // Y轴
+            ctx.moveTo(originX, canvas.height - 50);
+            ctx.lineTo(originX, 50);
+            ctx.stroke();
+
+            // 箭头与标签
+            ctx.fillStyle = '#aaa';
+            ctx.font = 'italic 20px Times New Roman';
+            ctx.fillText('x', canvas.width - 70, originY + 25);
+            ctx.fillText('y', originX - 25, 70);
+            ctx.fillText('O', originX - 25, originY + 25);
+
+            // 2. 绘制单位圆弧
+            ctx.beginPath();
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 2;
+            ctx.arc(originX, originY, unit, 0, -Math.PI, true); // 上半圆
+            ctx.stroke();
+
+            // 3. 绘制半径 OP
+            ctx.beginPath();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(Px, Py);
+            ctx.stroke();
+
+            // 4. 辅助虚线与投影
+            
+            // 垂直线 P -> A (决定 Cosine)
+            // 原图中垂直线是黄色虚线
+            ctx.beginPath();
+            ctx.setLineDash([6, 6]);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#f1c40f'; // 黄色 (原图风格)
+            ctx.moveTo(Px, Py);
+            ctx.lineTo(Ax, Ay);
+            ctx.stroke();
+
+            // 水平线 P -> B (决定 Sine)
+            // 原图中水平线是青色虚线
+            ctx.beginPath();
+            ctx.strokeStyle = '#1abc9c'; // 青色
+            ctx.moveTo(Px, Py);
+            ctx.lineTo(Bx, By);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 5. 角度标记 Alpha
+            const arcR = 40;
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#e67e22'; // 橙色
+            ctx.arc(originX, originY, arcR, 0, -angle, true);
+            ctx.stroke();
+            // 角度填充
+            ctx.fillStyle = 'rgba(230, 126, 34, 0.2)';
+            ctx.lineTo(originX, originY);
+            ctx.fill();
+            // 角度符号
+            ctx.fillStyle = '#fff';
+            ctx.fillText('α', originX + arcR + 10, originY - 10);
+
+            // 6. 绘制点与标签
+
+            // 点 A (Cos)
+            drawPoint(Ax, Ay, '#1abc9c', 4); 
+            ctx.fillStyle = '#aaa';
+            ctx.font = '18px Times New Roman';
+            // A (val, 0) - 这里的数字用青色高亮
+            let textX = Ax;
+            let textY = Ay + 25;
+            ctx.fillStyle = '#fff'; ctx.fillText('A (', textX - 35, textY);
+            ctx.fillStyle = '#1abc9c'; ctx.fillText(cosVal.toFixed(2), textX - 10, textY);
+            ctx.fillStyle = '#fff'; ctx.fillText(', 0)', textX + 30, textY);
+
+            // 点 B (Sin)
+            drawPoint(Bx, By, '#f1c40f', 4);
+            // B (0, val) - 这里的数字用黄色高亮
+            textX = Bx - 85;
+            textY = By + 5;
+            ctx.fillStyle = '#fff'; ctx.fillText('B (0, ', textX, textY);
+            ctx.fillStyle = '#f1c40f'; ctx.fillText(sinVal.toFixed(2), textX + 45, textY);
+            ctx.fillStyle = '#fff'; ctx.fillText(')', textX + 85, textY);
+
+            // 点 P
+            // 光晕
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.arc(Px, Py, 12, 0, Math.PI*2);
+            ctx.fill();
+            // 实体
+            drawPoint(Px, Py, '#fff', 6);
+            ctx.fillStyle = '#fff';
+            ctx.fillText('P', Px - 10, Py - 20);
+            
+            // 角度数值显示在P点附近
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(degVal + '°', Px + 20, Py - 10);
+        }
+
+        function drawPoint(x, y, color, size) {
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>

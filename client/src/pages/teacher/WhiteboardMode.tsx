@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useAppStore } from '../../stores/app-store'
-import { classService, liveTaskService } from '../../services/api'
+import { classService, liveTaskService, api, liveTaskSubmissionService } from '../../services/api'
 import { useWhiteboardLive } from '../../features/whiteboard/hooks/useWhiteboardLive'
 import { WhiteboardCanvas } from '../../features/whiteboard/components/WhiteboardCanvas'
 import { WhiteboardToolbar } from '../../features/whiteboard/components/WhiteboardToolbar'
@@ -15,6 +15,17 @@ import { ShareRequestsPanel } from '../../features/whiteboard/components/ShareRe
 import { DuelModal } from '../../features/teacher-live/components/DuelModal'
 import { SingleQuestionDuelModal } from '../../features/teacher-live/components/SingleQuestionDuelModal'
 import { ChallengePanel } from '../../features/teacher-live/components/ChallengePanel'
+import { BigscreenActivityLauncherModal } from '../../features/bigscreen-activities/components/BigscreenActivityLauncherModal'
+import { isChallengeFinished } from '../../features/live-runtime/challengeRuntime'
+import { resolveMatchingAnswerRows } from '../../features/tasks/task-formatting'
+import WhiteboardAiLauncher from '../../features/whiteboard-ai/components/WhiteboardAiLauncher'
+import WhiteboardAiPanel from '../../features/whiteboard-ai/components/WhiteboardAiPanel'
+import { WhiteboardAiProvider } from '../../features/whiteboard-ai/context/WhiteboardAiContext'
+import { getTaskTypeLabel } from '../../features/tasks/task-helpers'
+import { TeachingAidLibraryModal } from '../../features/teaching-aids/TeachingAidLibraryModal'
+import ClassAiSettingsModal from '../../features/whiteboard-ai/components/ClassAiSettingsModal'
+import { DanmuScreen, AtmosphereEffects } from '../../features/danmu'
+import type { ActiveDanmu, DanmuConfig } from '../../features/danmu/types/danmu'
 import {
   SUPPORTED_CHALLENGE_TASK_TYPES,
   SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES,
@@ -26,6 +37,11 @@ import type { TaskHistoryItem } from '../../services/websocket'
 type WhiteboardTaskGroup = LiveTaskGroup & {
   source_group_id?: string
   session_id?: string | null
+  status?: LiveTaskGroup['status'] | 'ended'
+}
+
+function getWhiteboardTaskId(task: { id?: string; task_id?: string }) {
+  return task.id || task.task_id || ''
 }
 
 export default function WhiteboardMode() {
@@ -33,12 +49,22 @@ export default function WhiteboardMode() {
   const navigate = useNavigate()
   const { user } = useAppStore()
   const tWithParams = useCallback(
-    (key: string, params: Record<string, string | number>) =>
-      Object.entries(params).reduce((value, [paramKey, paramValue]) => value.replace(`{${paramKey}}`, String(paramValue)), t(key)),
+    (key: string, params: Record<string, string | number>) => {
+      let value = t(key)
+      Object.entries(params).forEach(([paramKey, paramValue]) => {
+        const nextValue = String(paramValue)
+        value = value
+          .replace(new RegExp(`\\{\\{${paramKey}\\}\\}`, 'g'), nextValue)
+          .replace(new RegExp(`\\{${paramKey}\\}`, 'g'), nextValue)
+      })
+      Object.values(params).forEach((paramValue, index) => {
+        value = value.replace(new RegExp(`\\{${index}\\}`, 'g'), String(paramValue))
+      })
+      return value
+    },
     [t]
   )
 
-  // 状态
   const [classes, setClasses] = useState<any[]>([])
   const [currentClassId, setCurrentClassId] = useState<string | null>(null)
   const [mode, setMode] = useState<'lecture' | 'interactive'>('interactive')
@@ -47,6 +73,62 @@ export default function WhiteboardMode() {
   const [canvasReady, setCanvasReady] = useState(false)
   const [showQRCode, setShowQRCode] = useState(false)
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('')
+  const selectedClassStorageKey = useMemo(
+    () => `whiteboard_selected_class_${user?.id || 'teacher'}`,
+    [user?.id]
+  )
+  const classroomStartReminderText =
+    t('classroom.startReminder') || '请先开始本节课，学生才能加入课堂并参与互动'
+  const classroomStartButtonText =
+    t('classroom.startSession') || '开始本节课'
+
+  const handleStartSession = async () => {
+    try {
+      await startClassroomSession()
+    } catch (error) {
+      alert(t('classroom.startFailed') || '开始课堂失败')
+    }
+  }
+
+  const handleEndSession = async () => {
+    if (!hasActiveClassroomSession) {
+      alert(t('classroom.sessionNotActive') || '课堂未在进行中')
+      return
+    }
+
+    if (!window.confirm(t('classroom.confirmEnd') || '确定要结束本节课吗？下课之后学生将退出课堂任务页面并返回首页。')) {
+      return
+    }
+
+    try {
+      if (activeTaskGroup) {
+        endTaskGroup(getSourceGroupId(activeTaskGroup))
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      if (currentChallenge) {
+        endChallenge(currentChallenge.id)
+        await new Promise((resolve) => setTimeout(resolve, 500))
+      }
+      await endClassroomSession()
+      disconnect()
+      clearShares()
+      clearWhiteboardData()
+      navigate('/teacher/classroom-review')
+    } catch (error) {
+      console.error('Failed to end session:', error)
+      alert(t('classroom.endFailed') || '结束课堂失败')
+    }
+  }
+
+  const formatTime = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    const secs = seconds % 60
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`
+  }
 
   // localStorage 存储键
   const getStorageKey = useCallback((key: string) => `whiteboard_${key}_${currentClassId || 'global'}`, [currentClassId])
@@ -144,11 +226,12 @@ export default function WhiteboardMode() {
   // 使用新的实时状态 hook
   const {
     isConnected,
+    roomInfoHydrated,
+    liveSessionId,
     classroomStudents,
     classroomCount,
     pendingShares,
     activeTaskGroup: wsActiveTaskGroup,
-    publishTaskGroup,
     endTaskGroup,
     handleShare,
     submissionCount,
@@ -157,12 +240,42 @@ export default function WhiteboardMode() {
     endChallenge,
     clearChallenge,
     refreshPresence,
+    getRoomInfo,
+    ensureSocketOpen,
+    taskHistory: roomTaskHistory,
     disconnect,
     clearShares,
-    endSession,
+    sendDanmuConfig,
+    danmuConfig,
+    activeDanmus,
+    sendAtmosphereEffect,
+    activeEffects,
+    currentClassroomSession: classroomSession,
+    elapsedSeconds,
+    startClassroomSession,
+    endClassroomSession,
   } = useWhiteboardLive(currentClassId)
 
   const activeTaskGroup = wsActiveTaskGroup
+  const effectiveClassroomSessionId = classroomSession?.id || liveSessionId || null
+  const hasActiveClassroomSession = Boolean(effectiveClassroomSessionId)
+
+  // 监听任务结束（当 activeTaskGroup 从有值变为 null 时，说明任务已结束）
+  const prevActiveTaskGroupRef = useRef(wsActiveTaskGroup)
+  useEffect(() => {
+    if (prevActiveTaskGroupRef.current !== null && wsActiveTaskGroup === null) {
+      // 任务组已结束，将其添加到已完成列表
+      const ended = prevActiveTaskGroupRef.current
+      if (ended) {
+        const sourceId = (ended as WhiteboardTaskGroup).source_group_id || ended.id
+        setPublishedGroups(prev => {
+          if (prev.some(g => (g as WhiteboardTaskGroup).source_group_id === sourceId || g.id === sourceId)) return prev
+          return [...prev, { ...ended, status: 'ended' as const } as unknown as WhiteboardTaskGroup]
+        })
+      }
+    }
+    prevActiveTaskGroupRef.current = wsActiveTaskGroup
+  }, [wsActiveTaskGroup])
 
   // 挑战模式状态
   const [showDuelModal, setShowDuelModal] = useState(false)
@@ -178,6 +291,10 @@ export default function WhiteboardMode() {
   const [showLeftPanel, setShowLeftPanel] = useState(true)
   const [showRightPanel, setShowRightPanel] = useState(true)
   const [showSharesPanel, setShowSharesPanel] = useState(false)
+  const [showBigscreenLauncher, setShowBigscreenLauncher] = useState(false)
+  const [showTeachingAidLibrary, setShowTeachingAidLibrary] = useState(false)
+  const [showAiSettings, setShowAiSettings] = useState(false)
+  const [openedTeachingAid, setOpenedTeachingAid] = useState<{ name: string; entryUrl: string } | null>(null)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
 
   // 画笔设置
@@ -191,6 +308,22 @@ export default function WhiteboardMode() {
   // 主题设置
   const [theme, setTheme] = useState<WhiteboardTheme>('dark')
 
+  // 氛围设置面板
+  const [showDanmuSettings, setShowDanmuSettings] = useState(false)
+  const danmuSettingsRef = useRef<HTMLDivElement>(null)
+
+  // 点击外部关闭氛围设置面板
+  useEffect(() => {
+    if (!showDanmuSettings) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (danmuSettingsRef.current && !danmuSettingsRef.current.contains(e.target as Node)) {
+        setShowDanmuSettings(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showDanmuSettings])
+
   // 分析和明细 Modal 状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -200,6 +333,10 @@ export default function WhiteboardMode() {
   const [submissionData, setSubmissionData] = useState<any>(null)
   const [submissionLoading, setSubmissionLoading] = useState(false)
   const [viewingStudentDetail, setViewingStudentDetail] = useState<any>(null)
+  const singleQuestionDuelTasks = useMemo(
+    () => (previewingGroup?.tasks || []).filter((task: any) => SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES.has(task.type)),
+    [previewingGroup],
+  )
 
   // 主题样式配置
   const getThemeClasses = (theme: WhiteboardTheme) => {
@@ -283,15 +420,43 @@ export default function WhiteboardMode() {
 
   const loadClasses = async () => {
     try {
-      const data = await classService.getAll()
+      const [data, activeSessions] = await Promise.all([
+        classService.getAll(),
+        api.get('/live/sessions', { params: { status: 'active', limit: 20 } }).then((r) => r.data).catch(() => []),
+      ])
       setClasses(data)
-      if (data.length > 0 && !currentClassId) {
-        setCurrentClassId(data[0].id)
+      if (data.length === 0) {
+        setCurrentClassId(null)
+        localStorage.removeItem(selectedClassStorageKey)
+        return
+      }
+
+      const validCurrentClassId =
+        currentClassId && data.some((cls: any) => cls.id === currentClassId) ? currentClassId : null
+      const storedClassId = localStorage.getItem(selectedClassStorageKey)
+      const validStoredClassId =
+        storedClassId && data.some((cls: any) => cls.id === storedClassId) ? storedClassId : null
+      const activeClassId = Array.isArray(activeSessions)
+        ? (
+            activeSessions.find(
+              (session: any) => session?.class_id && data.some((cls: any) => cls.id === session.class_id),
+            )?.class_id ?? null
+          )
+        : null
+
+      const nextClassId = validCurrentClassId || activeClassId || validStoredClassId || data[0].id
+      if (nextClassId !== currentClassId) {
+        setCurrentClassId(nextClassId)
       }
     } catch (e) {
       console.error('Failed to load classes:', e)
     }
   }
+
+  useEffect(() => {
+    if (!currentClassId) return
+    localStorage.setItem(selectedClassStorageKey, currentClassId)
+  }, [currentClassId, selectedClassStorageKey])
 
   const getSourceGroupId = useCallback((group: LiveTaskGroup | WhiteboardTaskGroup) => {
     return (group as WhiteboardTaskGroup).source_group_id || group.id
@@ -319,25 +484,90 @@ export default function WhiteboardMode() {
       const groups = await liveTaskService.getTaskGroups(currentClassId)
       // 待发布任务只包含 ready 状态（draft 草稿需要在任务准备页面管理）
       const readyGroups: WhiteboardTaskGroup[] = groups.filter((g: LiveTaskGroup) => g.status === 'ready')
-      setTaskGroups(readyGroups)
-      setPreviewingGroup((prev) => (prev ? readyGroups.find((group) => group.id === prev.id) || null : prev))
+      setTaskGroups((prev) =>
+        readyGroups.map((group) => {
+          const previousGroup = prev.find((item) => item.id === group.id)
+          if ((!group.tasks || group.tasks.length === 0) && previousGroup?.tasks?.length) {
+            return {
+              ...group,
+              tasks: previousGroup.tasks,
+              task_count: group.task_count ?? previousGroup.tasks.length,
+            }
+          }
+          return group
+        }),
+      )
+      setPreviewingGroup((prev) => {
+        if (!prev) return prev
+        const matchedGroup = readyGroups.find((group) => group.id === prev.id)
+        if (!matchedGroup) return null
+        if ((!matchedGroup.tasks || matchedGroup.tasks.length === 0) && prev.tasks?.length) {
+          return {
+            ...matchedGroup,
+            tasks: prev.tasks,
+            task_count: matchedGroup.task_count ?? prev.tasks.length,
+            source_group_id: prev.source_group_id,
+            session_id: prev.session_id,
+          }
+        }
+        return matchedGroup
+      })
     } catch (e) {
       console.error('Failed to load task groups:', e)
     }
   }, [currentClassId])
 
   const loadTaskHistory = useCallback(async () => {
-    if (!currentClassId) return
+    if (!currentClassId) {
+      setPublishedGroups([])
+      return
+    }
+    if (!effectiveClassroomSessionId && !classroomSession?.started_at) {
+      return
+    }
     try {
       const response = await liveTaskService.getClassTaskHistory(currentClassId)
-      const endedItems = Array.isArray(response.history)
-        ? response.history.filter((item: TaskHistoryItem) => item.status === 'ended')
+      const persistedHistory = Array.isArray(response.history) ? response.history : []
+      const runtimeHistory = Array.isArray(roomTaskHistory)
+        ? roomTaskHistory.map((item) => ({
+            ...item,
+            session_id: item.session_id ?? effectiveClassroomSessionId ?? null,
+          }))
         : []
-      setPublishedGroups(endedItems.map(mapHistoryItemToGroup))
+      const allHistoryMap = new Map<string, TaskHistoryItem>()
+      ;[...persistedHistory, ...runtimeHistory].forEach((item) => {
+        const key = item.session_id || `${item.group_id}:${item.published_at || item.ended_at || item.status}`
+        allHistoryMap.set(key, item)
+      })
+      const allHistory = Array.from(allHistoryMap.values())
+      // 显示所有已结束的任务：优先按 session_id 匹配，
+      // 如果 session_id 不匹配则按时间窗口匹配（课堂开始之后发布的都算）
+      const sessionStartedAt = classroomSession?.started_at ? new Date(classroomSession.started_at).getTime() : 0
+      const endedItems = allHistory.filter((item: TaskHistoryItem) => {
+        if (item.status !== 'ended') return false
+        if (effectiveClassroomSessionId && item.session_id === effectiveClassroomSessionId) return true
+        // session_id 不匹配时，按发布时间判断是否属于当前课堂
+        if (!sessionStartedAt) return false
+        const publishedAt = item.published_at ? new Date(item.published_at).getTime() : 0
+        const endedAt = item.ended_at ? new Date(item.ended_at).getTime() : 0
+        return Math.max(publishedAt, endedAt) >= sessionStartedAt
+      })
+      const apiGroups = endedItems.map(mapHistoryItemToGroup)
+      // 合并：内存中已有的数据（如刚结束的任务）不丢失
+      setPublishedGroups((prev) => {
+        const merged = [...prev]
+        const existingIds = new Set(prev.map(g => getSourceGroupId(g)))
+        for (const g of apiGroups) {
+          if (!existingIds.has(getSourceGroupId(g))) {
+            merged.push(g)
+          }
+        }
+        return merged
+      })
     } catch (e) {
       console.error('Failed to load task history:', e)
     }
-  }, [currentClassId, mapHistoryItemToGroup])
+  }, [currentClassId, classroomSession?.started_at, effectiveClassroomSessionId, mapHistoryItemToGroup, roomTaskHistory])
 
   const handleClearCompleted = useCallback(() => {
     setHiddenGroupIds((prev) => {
@@ -349,13 +579,19 @@ export default function WhiteboardMode() {
 
   const refreshWhiteboardOverview = useCallback(async () => {
     if (!currentClassId) return
-    await Promise.all([loadTaskGroups(), loadTaskHistory(), refreshPresence()])
+    await Promise.all([loadTaskGroups(), loadTaskHistory()])
+    void refreshPresence()
   }, [currentClassId, loadTaskGroups, loadTaskHistory, refreshPresence])
 
   useEffect(() => {
     if (!currentClassId) return
     void refreshWhiteboardOverview()
   }, [currentClassId, refreshWhiteboardOverview])
+
+  useEffect(() => {
+    if (!currentClassId || !roomInfoHydrated) return
+    void loadTaskHistory()
+  }, [currentClassId, roomInfoHydrated, loadTaskHistory])
 
   // 处理元素更新
   const handleElementsChange = useCallback((newElements: WhiteboardElement[]) => {
@@ -381,21 +617,91 @@ export default function WhiteboardMode() {
 
   // 发布任务（发布给所有学生）
   const handlePublishTask = useCallback(async (group: WhiteboardTaskGroup) => {
-    publishTaskGroup(group)
+    if (!effectiveClassroomSessionId) {
+      alert(classroomStartReminderText)
+      return
+    }
+    const socketReady = await ensureSocketOpen()
+    if (!socketReady) {
+      alert(t('connection.error') || '课堂连接未建立，请刷新课堂教学页面后重试')
+      return
+    }
+    const sourceGroupId = getSourceGroupId(group)
+    const groupToPublish = {
+      ...group,
+      id: sourceGroupId,
+    }
+    const totalCountdown = Array.isArray(groupToPublish.tasks) && groupToPublish.tasks.length > 0
+      ? groupToPublish.tasks.reduce((sum: number, task: any) => sum + (task.countdown_seconds || 30), 0) + 30
+      : undefined
+    try {
+      await liveTaskService.publishTaskGroup(sourceGroupId, totalCountdown)
+      void getRoomInfo()
+    } catch (error) {
+      console.error('Failed to publish task group:', error)
+      const publishError = error as { response?: { data?: { detail?: unknown } }; message?: unknown } | null
+      const rawMessage =
+        publishError?.response?.data?.detail ??
+        publishError?.message
+      const message = rawMessage ? String(rawMessage) : t('connection.error')
+      alert(message)
+      return
+    }
     setPreviewingGroup(null)
-    setTaskGroups(prev => prev.filter(g => g.id !== group.id))
+    setTaskGroups(prev => prev.filter(g => getSourceGroupId(g) !== sourceGroupId))
     await refreshWhiteboardOverview()
-  }, [publishTaskGroup, refreshWhiteboardOverview])
+    return
+    let publishableGroup = group
+    if (!publishableGroup.tasks || publishableGroup.tasks.length === 0) {
+      try {
+        const fullGroup = await liveTaskService.getTaskGroup(getSourceGroupId(group))
+        publishableGroup = {
+          ...fullGroup,
+          source_group_id: group.source_group_id,
+          session_id: group.session_id,
+        }
+      } catch (error) {
+        console.error('Failed to load task group before publish:', error)
+      }
+    }
+    if (!publishableGroup.tasks || publishableGroup.tasks.length === 0) {
+      alert(t('teacherLive.noTasksInGroup') || '该任务组没有题目')
+      return
+    }
+    try {
+      const totalCountdown = Array.isArray(publishableGroup.tasks) && publishableGroup.tasks.length > 0
+        ? publishableGroup.tasks.reduce((sum: number, task: any) => sum + (task.countdown_seconds || 30), 0) + 30
+        : undefined
+      await liveTaskService.publishTaskGroup(getSourceGroupId(publishableGroup), totalCountdown)
+      void getRoomInfo()
+    } catch (error) {
+      console.error('Failed to publish task group:', error)
+      const publishError = error as { response?: { data?: { detail?: unknown } }; message?: unknown } | null
+      const rawMessage =
+        publishError?.response?.data?.detail ??
+        publishError?.message
+      const message = rawMessage ? String(rawMessage) : t('connection.error')
+      alert(message)
+      return
+    }
+    setPreviewingGroup(null)
+    setTaskGroups(prev => prev.filter(g => getSourceGroupId(g) !== getSourceGroupId(publishableGroup)))
+    await refreshWhiteboardOverview()
+  }, [effectiveClassroomSessionId, classroomStartReminderText, ensureSocketOpen, getRoomInfo, getSourceGroupId, refreshWhiteboardOverview, t])
 
   // 结束任务
   const handleEndTask = useCallback(async (group: WhiteboardTaskGroup) => {
-    if (!window.confirm(`确定要结束任务「${group.title}」吗？`)) {
-      return
-    }
+    if (!window.confirm(`确定要结束任务「${group.title}」吗？`)) return
     endTaskGroup(getSourceGroupId(group))
     setPreviewingGroup(null)
-    await refreshWhiteboardOverview()
-  }, [endTaskGroup, getSourceGroupId, refreshWhiteboardOverview])
+    // 立即将任务移到已完成列表（不等服务器通知）
+    const sourceId = getSourceGroupId(group)
+    setPublishedGroups(prev => {
+      // 避免重复添加
+      if (prev.some(g => getSourceGroupId(g) === sourceId)) return prev
+      return [...prev, { ...group, status: 'ended' as const } as unknown as WhiteboardTaskGroup]
+    })
+  }, [endTaskGroup, getSourceGroupId])
 
   // 发布全部（发布第一个任务给所有学生）
   const handlePublishAll = useCallback(async () => {
@@ -425,9 +731,11 @@ export default function WhiteboardMode() {
     setAnalyticsLoading(true)
     try {
       const groupId = getSourceGroupId(group)
+      // 优先使用任务的 session_id，如果为空则使用当前活跃 session
+        const effectiveSessionId = group.session_id || effectiveClassroomSessionId
       const [groupDetail, analytics] = await Promise.all([
         liveTaskService.getTaskGroup(groupId),
-        liveTaskService.getTaskGroupAnalytics(groupId)
+        liveTaskService.getTaskGroupAnalytics(groupId, effectiveSessionId)
       ])
       setSelectedGroupForAnalysis({ ...group, tasks: groupDetail.tasks || [] })
       setAnalyticsData(analytics)
@@ -436,7 +744,7 @@ export default function WhiteboardMode() {
     } finally {
       setAnalyticsLoading(false)
     }
-  }, [getSourceGroupId])
+  }, [effectiveClassroomSessionId, getSourceGroupId])
 
   // 查看明细
   const handleViewDetails = useCallback(async (group: WhiteboardTaskGroup) => {
@@ -446,18 +754,28 @@ export default function WhiteboardMode() {
     setViewingStudentDetail(null)
     try {
       const groupId = getSourceGroupId(group)
-      const [groupDetail, submissions] = await Promise.all([
+      // 优先使用任务的 session_id，如果为空则使用当前活跃 session
+        const effectiveSessionId = group.session_id || effectiveClassroomSessionId
+      const [groupDetail, submissions, sessionSummary] = await Promise.all([
         liveTaskService.getTaskGroup(groupId),
-        liveTaskService.getTaskGroupSubmissions(groupId)
+        liveTaskService.getTaskGroupSubmissions(groupId, effectiveSessionId),
+        // 获取课堂学生参与列表，用于过滤
+        effectiveSessionId ? api.get(`/live/sessions/${effectiveSessionId}/summary`).then(r => r.data).catch(() => null) : Promise.resolve(null)
       ])
       setSelectedGroupForAnalysis({ ...group, tasks: groupDetail.tasks || [] })
+
+      // 过滤：只显示当前课堂参与的学生（参照课堂回顾）
+      if (sessionSummary?.all_students && submissions?.students) {
+        const sessionStudentIds = new Set(sessionSummary.all_students.map((s: any) => s.student_id))
+        submissions.students = submissions.students.filter((s: any) => sessionStudentIds.has(s.student_id))
+      }
       setSubmissionData(submissions)
     } catch (e) {
       console.error('Failed to load details:', e)
     } finally {
       setSubmissionLoading(false)
     }
-  }, [getSourceGroupId])
+  }, [effectiveClassroomSessionId, getSourceGroupId])
 
   // 创建并开始挑战的通用方法
   const doCreateChallenge = useCallback(async (mode: 'class_challenge' | 'duel' | 'single_question_duel', participantIds?: string[], taskId?: string) => {
@@ -466,10 +784,14 @@ export default function WhiteboardMode() {
       alert(t('challenge.activeConflict'))
       return
     }
+    if (!isConnected) {
+      alert(t('connection.error'))
+      return
+    }
 
     const challengeTasks =
       mode === 'single_question_duel'
-        ? (previewingGroup.tasks || []).filter((task) => task.id === taskId)
+        ? (previewingGroup.tasks || []).filter((task: any) => getWhiteboardTaskId(task) === taskId)
         : (previewingGroup.tasks || [])
 
     const supportedTaskTypes =
@@ -482,7 +804,8 @@ export default function WhiteboardMode() {
     )
 
     if (unsupportedTypes.length > 0) {
-      alert(tWithParams('challenge.unsupportedTypesInline', { types: unsupportedTypes.join('、') }))
+      const typeLabels = unsupportedTypes.map(type => getTaskTypeLabel(type, t, type))
+      alert(tWithParams('challenge.unsupportedTypesInline', { types: typeLabels.join('、') }))
       return
     }
 
@@ -495,34 +818,49 @@ export default function WhiteboardMode() {
       alert(t('challenge.selectBuzzQuestion'))
       return
     }
+    if (mode === 'single_question_duel' && challengeTasks.length !== 1) {
+      alert(t('challenge.selectBuzzQuestion'))
+      return
+    }
 
     if (mode === 'class_challenge' && challengeCandidates.length < 1) {
       alert(t('challenge.noEligibleParticipants'))
       return
     }
 
+    const effectiveParticipantIds =
+      mode === 'class_challenge'
+        ? challengeCandidates.map((student) => student.id)
+        : participantIds
+
     setChallengeCreating(true)
     try {
+      console.log('[Whiteboard] Creating challenge:', { mode, participantIds: effectiveParticipantIds, taskId })
       const challenge = await liveTaskService.createChallenge({
         class_id: currentClassId,
-        task_group_id: previewingGroup.id,
+        task_group_id: getSourceGroupId(previewingGroup),
         title: previewingGroup.title,
         mode,
-        participant_ids: participantIds,
+        participant_ids: effectiveParticipantIds,
         task_id: taskId,
       } as any)
-      startChallenge(challenge.id)
-      setTaskGroups(prev => prev.filter(group => group.id !== previewingGroup.id))
+      console.log('[Whiteboard] Challenge created:', challenge)
+      if (challenge?.id) {
+        console.log('[Whiteboard] Starting challenge:', challenge.id)
+        startChallenge(challenge.id)
+      } else {
+        console.error('[Whiteboard] Challenge created but no id returned')
+        alert('创建挑战失败：未返回挑战ID')
+      }
       setPreviewingGroup(null)
-      setShowChallengeBoard(true)
       await refreshWhiteboardOverview()
-    } catch (e) {
-      console.error('Failed to create challenge:', e)
-      alert('创建挑战失败')
+    } catch (e: any) {
+      console.error('[Whiteboard] Failed to create or start challenge:', e)
+      alert(e?.message || '创建挑战失败')
     } finally {
       setChallengeCreating(false)
     }
-  }, [activeTaskGroup, challengeCandidates.length, currentChallenge, currentClassId, previewingGroup, refreshWhiteboardOverview, startChallenge, t, tWithParams])
+  }, [activeTaskGroup, challengeCandidates.length, currentChallenge, currentClassId, getSourceGroupId, isConnected, previewingGroup, refreshWhiteboardOverview, startChallenge, t, tWithParams])
 
   // 发起全班挑战
   const handleStartClassChallenge = useCallback(() => {
@@ -547,17 +885,34 @@ export default function WhiteboardMode() {
   // 发起抢答模式
   const handleStartQuickAnswer = useCallback(() => {
     if (!previewingGroup) return
+    if (singleQuestionDuelTasks.length === 0) {
+      alert(t('challenge.selectBuzzQuestion'))
+      return
+    }
+    setSelectedSingleQuestionTaskId((prev) => {
+      if (prev && singleQuestionDuelTasks.some((task: any) => getWhiteboardTaskId(task) === prev)) {
+        return prev
+      }
+      return getWhiteboardTaskId(singleQuestionDuelTasks[0] as any) || null
+    })
     setShowSingleQuestionDuelModal(true)
-  }, [previewingGroup])
+  }, [previewingGroup, singleQuestionDuelTasks, t])
 
   // 确认抢答
   const handleConfirmSingleQuestionDuel = useCallback(() => {
-    if (selectedSingleQuestionParticipants.length !== 2 || !selectedSingleQuestionTaskId) return
+    if (selectedSingleQuestionParticipants.length !== 2) {
+      alert(t('challenge.selectTwoParticipants'))
+      return
+    }
+    if (!selectedSingleQuestionTaskId) {
+      alert(t('challenge.selectBuzzQuestion'))
+      return
+    }
     setShowSingleQuestionDuelModal(false)
     doCreateChallenge('single_question_duel', selectedSingleQuestionParticipants, selectedSingleQuestionTaskId)
     setSelectedSingleQuestionParticipants([])
     setSelectedSingleQuestionTaskId(null)
-  }, [selectedSingleQuestionParticipants, selectedSingleQuestionTaskId, doCreateChallenge])
+  }, [doCreateChallenge, selectedSingleQuestionParticipants, selectedSingleQuestionTaskId, t])
 
   // 结束挑战
   const handleEndChallenge = useCallback(() => {
@@ -588,10 +943,19 @@ export default function WhiteboardMode() {
       setShowChallengeBoard(false)
       return
     }
-    if (currentChallenge.status === 'ended') {
+    if (isChallengeFinished(currentChallenge)) {
       void refreshWhiteboardOverview()
     }
   }, [currentChallenge, refreshWhiteboardOverview])
+
+  // 当活跃任务组结束时刷新已完成列表
+  const prevActiveRef = useRef(activeTaskGroup)
+  useEffect(() => {
+    if (prevActiveRef.current && !activeTaskGroup && effectiveClassroomSessionId) {
+      void refreshWhiteboardOverview()
+    }
+    prevActiveRef.current = activeTaskGroup
+  }, [activeTaskGroup, effectiveClassroomSessionId, refreshWhiteboardOverview])
 
   useEffect(() => {
     if (isConnected) {
@@ -966,6 +1330,7 @@ export default function WhiteboardMode() {
   }
 
   return (
+    <WhiteboardAiProvider>
     <div className={`h-screen flex flex-col overflow-hidden ${tc.bg} ${tc.text}`}>
       {/* 顶部栏 */}
       <header className={`h-16 flex items-center justify-between px-6 border-b backdrop-blur-xl z-50 ${tc.headerBg}`}>
@@ -980,6 +1345,154 @@ export default function WhiteboardMode() {
             </svg>
             <span className="text-sm">{t('common.back')}</span>
           </button>
+
+          <div className={`h-6 w-px ${tc.divider}`} />
+
+          {/* 氛围设置按钮 - 放在左侧 */}
+          <div className="relative" ref={danmuSettingsRef}>
+            <button
+              onClick={() => setShowDanmuSettings(!showDanmuSettings)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shadow-lg ${
+                danmuConfig.enabled
+                  ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-pink-500/30 hover:shadow-pink-500/50'
+                  : theme === 'dark'
+                  ? 'bg-slate-700/80 text-slate-300 hover:bg-slate-600/80 shadow-black/20'
+                  : 'bg-white/90 text-slate-600 hover:bg-white shadow-black/10'
+              }`}
+            >
+              <span className="text-lg">🎆</span>
+              <span className="text-sm font-medium">氛围</span>
+            </button>
+
+            {/* 氛围设置面板 - 向下展开 */}
+            {showDanmuSettings && (
+              <div
+                className="absolute left-0 top-full mt-2 z-[200] rounded-xl shadow-2xl border"
+                style={{ minWidth: '340px', background: theme === 'dark' ? '#1e293b' : '#fff' }}
+              >
+                <div className="p-4 border-b border-slate-200/20">
+                  <h4 className="text-base font-semibold" style={{ color: theme === 'dark' ? '#e2e8f0' : '#334155' }}>🎆 氛围设置</h4>
+                </div>
+                <div className="p-5 space-y-5">
+                  {/* 弹幕开关 */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>弹幕</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const enabled = !danmuConfig.enabled
+                        sendDanmuConfig({ ...danmuConfig, enabled })
+                      }}
+                      className={`relative w-14 h-7 rounded-full transition-all duration-300 ${
+                        danmuConfig.enabled
+                          ? 'bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg shadow-pink-500/40'
+                          : theme === 'dark'
+                          ? 'bg-slate-600'
+                          : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-all duration-300 ${
+                          danmuConfig.enabled ? 'translate-x-8 left-0' : 'translate-x-0.5 left-0'
+                        }`}
+                        style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.25)' }}
+                      />
+                    </button>
+                  </div>
+
+                  {/* 弹幕速度 */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>速度</span>
+                    <div className="flex gap-2 ml-auto">
+                      {(['slow', 'medium', 'fast'] as const).map(speed => (
+                        <button
+                          key={speed}
+                          onClick={(e) => { e.stopPropagation(); sendDanmuConfig({ ...danmuConfig, speed }) }}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            danmuConfig.speed === speed
+                              ? 'bg-pink-500 text-white shadow'
+                              : theme === 'dark'
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {speed === 'slow' ? '慢速' : speed === 'medium' ? '中速' : '快速'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 弹幕区域 */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>区域</span>
+                    <div className="flex gap-2 ml-auto">
+                      {(['full', 'bottom', 'middle'] as const).map(area => (
+                        <button
+                          key={area}
+                          onClick={(e) => { e.stopPropagation(); sendDanmuConfig({ ...danmuConfig, area }) }}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            danmuConfig.area === area
+                              ? 'bg-pink-500 text-white shadow'
+                              : theme === 'dark'
+                              ? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {area === 'full' ? '全屏' : area === 'bottom' ? '下方' : '中间'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 弹幕背景颜色 */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>颜色</span>
+                    <div className="flex gap-3 ml-auto">
+                      {[
+                        { label: '黑色', value: 'rgba(0, 0, 0, 0.75)' },
+                        { label: '红色', value: 'rgba(220, 38, 38, 0.75)' },
+                        { label: '蓝色', value: 'rgba(37, 99, 235, 0.75)' },
+                        { label: '绿色', value: 'rgba(22, 163, 74, 0.75)' },
+                        { label: '紫色', value: 'rgba(147, 51, 234, 0.75)' },
+                      ].map(color => (
+                        <button
+                          key={color.value}
+                          onClick={(e) => { e.stopPropagation(); sendDanmuConfig({ ...danmuConfig, bgColor: color.value }) }}
+                          className={`w-10 h-10 rounded-full border-2 transition-all ${danmuConfig.bgColor === color.value ? 'border-white scale-110' : 'border-transparent hover:scale-105'}`}
+                          style={{ backgroundColor: color.value, boxShadow: danmuConfig.bgColor === color.value ? '0 0 0 2px white, 0 0 8px rgba(255,255,255,0.5)' : 'none' }}
+                          title={color.label}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 氛围效果 */}
+                  <div className="pt-2 border-t border-slate-200/20">
+                    <span className="text-sm font-medium flex-shrink-0" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>氛围效果</span>
+                    <div className="flex gap-2 mt-3 flex-wrap">
+                      {[
+                        { type: 'cheer' as const, emoji: '🎉', label: '欢呼' },
+                        { type: 'fireworks' as const, emoji: '🎆', label: '烟花' },
+                        { type: 'stars' as const, emoji: '⭐', label: '星星' },
+                        { type: 'hearts' as const, emoji: '💖', label: '爱心' },
+                        { type: 'flame' as const, emoji: '🔥', label: '火焰' },
+                      ].map(item => (
+                        <button
+                          key={item.type}
+                          onClick={(e) => { e.stopPropagation(); sendAtmosphereEffect(item.type) }}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-amber-300 hover:from-amber-500/30 hover:to-orange-500/30 transition-all"
+                          title={item.label}
+                        >
+                          <span>{item.emoji}</span>
+                          <span>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className={`h-6 w-px ${tc.divider}`} />
 
@@ -1071,59 +1584,105 @@ export default function WhiteboardMode() {
             <option value="colorful">🌈 彩色</option>
           </select>
 
-          <button
-            onClick={() => navigate('/teacher/live')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-              theme === 'dark'
-                ? 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border-indigo-500/30'
-                : theme === 'light'
-                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200 border-blue-300'
-                : 'bg-purple-100 text-purple-600 hover:bg-purple-200 border-purple-300'
-            }`}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-            </svg>
-            <span className="text-sm">{t('whiteboard.switchToLive')}</span>
-          </button>
+          {!openedTeachingAid && (
+            <>
+              <button
+                onClick={() => setShowBigscreenLauncher(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-cyan-500/14 text-cyan-100 hover:bg-cyan-500/24 border-cyan-400/40'
+                    : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-200 border-cyan-300'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5h16v10H4zM8 21h8M9 15v6m6-6v6" />
+                </svg>
+                <span className="text-sm">{t('bigscreenActivities.messages.whiteboardEntry')}</span>
+              </button>
 
-          <button
-            onClick={() => {
-              // 结束课堂：断开连接、清理状态、返回班级列表
-              if (confirm(t('live.endClassConfirm') || '确定要结束课堂吗？下课之后学生将退出课堂任务页面并返回首页。')) {
-                // 1. 如果有进行中的任务组，先结束它
-                if (activeTaskGroup) {
-                  endTaskGroup(activeTaskGroup.id)
-                }
-                // 2. 如果有进行中的挑战，结束它
-                if (currentChallenge) {
-                  endChallenge(currentChallenge.id)
-                }
-                // 3. 发送下课通知给学生（先通知再断开）
-                endSession()
-                // 4. 断开 WebSocket
-                disconnect()
-                // 5. 清理分享状态
-                clearShares()
-                // 6. 清理白板数据
-                clearWhiteboardData()
-                // 7. 返回班级列表
-                navigate('/teacher/classes')
-              }
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            <span className="text-sm">{t('live.endSession')}</span>
-          </button>
+              <button
+                onClick={() => setShowTeachingAidLibrary(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-emerald-500/30'
+                    : theme === 'light'
+                    ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-300'
+                    : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-emerald-300'
+                }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 3v5.25m0 0A2.25 2.25 0 0012 10.5a2.25 2.25 0 002.25-2.25V3M9.75 8.25H6a2.25 2.25 0 00-2.25 2.25v7.5A2.25 2.25 0 006 20.25h12a2.25 2.25 0 002.25-2.25v-7.5A2.25 2.25 0 0018 8.25h-3.75M9 14.25h6m-6 3h6" />
+                  </svg>
+                  <span className="text-sm">{t('teacherTeachingAids.openLibrary')}</span>
+                </button>
+
+                <button
+                  onClick={() => setShowAiSettings(true)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border-purple-500/30'
+                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
+                  }`}
+                >
+                  <span className="text-lg">🤖</span>
+                  <span className="text-sm">AI 设置</span>
+                </button>
+            </>
+          )}
+
+          {/* 课堂会话控制 */}
+          {!hasActiveClassroomSession ? (
+            <button
+              onClick={handleStartSession}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm">{classroomStartButtonText}</span>
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span className="text-sm font-mono font-semibold">{formatTime(elapsedSeconds)}</span>
+              </div>
+              <button
+                onClick={handleEndSession}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                </svg>
+                <span className="text-sm">{t('classroom.endSession') || '结束本节课'}</span>
+              </button>
+            </>
+          )}
+
         </div>
       </header>
 
       {/* 主体区域 */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* 左侧面板 - 学生列表 */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* 未开始本节课提醒横幅 */}
+        {currentClassId && !hasActiveClassroomSession && (roomInfoHydrated || !isConnected) && (
+            <div className="absolute inset-x-0 top-0 z-[100] flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto mt-3 flex items-center gap-3 px-5 py-2.5 bg-amber-500 text-white rounded-xl shadow-lg shadow-amber-500/30">
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-sm font-medium">{classroomStartReminderText}</span>
+              <button
+                onClick={handleStartSession}
+                className="ml-1 px-3 py-1 bg-white text-amber-600 rounded-lg text-sm font-bold hover:bg-amber-50 transition-colors"
+              >
+                {classroomStartButtonText}
+              </button>
+            </div>
+          </div>
+        )}
         {showLeftPanel && (mode === 'interactive' || pendingShares.length > 0) && (
           <StudentPanel
             classroomStudents={classroomStudents}
@@ -1152,6 +1711,11 @@ export default function WhiteboardMode() {
 
           {/* 白板画布 */}
           <div className="flex-1 relative whiteboard-container">
+            {/* 弹幕显示层 */}
+            <DanmuScreen activeDanmus={activeDanmus as ActiveDanmu[]} config={danmuConfig as DanmuConfig} />
+            {/* 氛围效果层 */}
+            <AtmosphereEffects effects={activeEffects as any} />
+
             <WhiteboardCanvas
               elements={elements}
               onElementsChange={handleElementsChange}
@@ -1250,13 +1814,16 @@ export default function WhiteboardMode() {
             onStartQuickAnswer={handleStartQuickAnswer}
             onPreview={handlePreviewTask}
             onRefresh={() => void refreshWhiteboardOverview()}
-            theme={theme}
-            activeTaskGroup={activeTaskGroup}
-            activeTaskStats={
-              activeTaskGroup
-                ? new Map([[activeTaskGroup.id, { studentCount: classroomCount, submissionCount }]])
+              theme={theme}
+              activeTaskGroup={activeTaskGroup}
+              activeTaskStats={
+                activeTaskGroup
+                ? new Map([
+                    [activeTaskGroup.id, { studentCount: classroomCount, submissionCount }],
+                    [getSourceGroupId(activeTaskGroup), { studentCount: classroomCount, submissionCount }],
+                  ])
                 : new Map()
-            }
+              }
             onViewAnalysis={handleViewAnalysis}
             onViewDetails={handleViewDetails}
           />
@@ -1344,8 +1911,15 @@ export default function WhiteboardMode() {
                         const taskOptions = (task.options as Array<{key: string, text?: string}> | undefined) || [];
                         const showOptions = isChoiceQuestion && taskOptions.length > 0;
 
+                        const matchingCorrectRows = isMatching
+                          ? resolveMatchingAnswerRows(task.correct_answer, task.pairs, { fallbackToPairs: true })
+                          : []
+
                         // Extract correct answer string
                         const correctAnswerRaw = ((): string => {
+                          if (isMatching) {
+                            return matchingCorrectRows.map((row) => `${row.leftText} -> ${row.rightText}`).join(' / ')
+                          }
                           const ans = task.correct_answer as unknown;
                           if (ans === null || ans === undefined) return '';
                           if (typeof ans === 'string') return ans;
@@ -1402,13 +1976,13 @@ export default function WhiteboardMode() {
                             )}
 
                             {/* Pairs for matching questions */}
-                            {isMatching && task.pairs && task.pairs.length > 0 && (
+                            {isMatching && matchingCorrectRows.length > 0 && (
                               <div className="grid grid-cols-2 gap-2 mb-3">
-                                {task.pairs.map((pair: {left: string, right: string}, pIdx: number) => (
+                                {matchingCorrectRows.map((pair, pIdx: number) => (
                                   <div key={pIdx} className={`flex items-center gap-2 p-2 rounded ${theme === 'dark' ? 'bg-slate-800/50' : 'bg-white/60'}`}>
-                                    <span className="font-medium text-sm text-indigo-400">{pair.left}</span>
+                                    <span className="font-medium text-sm text-indigo-400">{pair.leftText}</span>
                                     <span className="text-slate-500">→</span>
-                                    <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{pair.right}</span>
+                                    <span className={`text-sm ${theme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>{pair.rightText}</span>
                                   </div>
                                 ))}
                               </div>
@@ -1500,6 +2074,25 @@ export default function WhiteboardMode() {
                     theme === 'dark' ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-200 text-slate-600'
                   }`}>← 返回</button>
                 )}
+                {!viewingStudentDetail && submissionData?.students?.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      if (!confirm('确定要删除所有提交记录吗？学生需要重新作答。')) return
+                      try {
+                        const groupId = getSourceGroupId(selectedGroupForAnalysis)
+                          const sessionId = selectedGroupForAnalysis.session_id || effectiveClassroomSessionId || undefined
+                        await liveTaskSubmissionService.deleteTaskGroupSubmissions(groupId, sessionId)
+                        await handleViewDetails(selectedGroupForAnalysis)
+                      } catch (e) {
+                        console.error('Failed to delete submissions:', e)
+                        alert('删除失败')
+                      }
+                    }}
+                    className={`text-sm px-3 py-1.5 rounded-lg transition-colors bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20`}
+                  >
+                    🗑️ 删除提交
+                  </button>
+                )}
                 <button onClick={() => { setViewingStudentDetail(null); setShowDetailModal(false); }} className={`p-2 rounded-lg transition-colors ${
                   theme === 'dark' ? 'hover:bg-slate-700 text-slate-400' : 'hover:bg-slate-200 text-slate-600'
                 }`}>✕</button>
@@ -1577,54 +2170,61 @@ export default function WhiteboardMode() {
                       else if (questionObj?.choices && Array.isArray(questionObj.choices)) options = questionObj.choices;
 
                       // 获取正确答案
-                      const correctAnswer = (() => {
-                        if (!task?.correct_answer) return '';
-                        if (typeof task.correct_answer === 'string') {
-                          try { const parsed = JSON.parse(task.correct_answer); if (parsed?.value !== undefined) return String(parsed.value); return task.correct_answer; } catch { return task.correct_answer; }
-                        }
-                        if (typeof task.correct_answer === 'object') {
-                          const ansObj = task.correct_answer as Record<string, unknown>;
-                          if (ansObj.value !== undefined) return String(ansObj.value);
-                          if (ansObj.blanks !== undefined) return JSON.stringify(ansObj.blanks);
-                          return JSON.stringify(task.correct_answer);
-                        }
-                        return String(task.correct_answer);
-                      })();
-
-                      let studentAnswer = typeof sub.answer === 'string' ? sub.answer : JSON.stringify(sub.answer);
                       const taskType = task?.type || '';
                       const isChoiceQuestion = taskType === 'single_choice' || taskType === 'multiple_choice';
                       const isTrueFalse = taskType === 'true_false';
                       const isMatching = taskType === 'matching';
+                      const taskPairs = (task?.question?.pairs || []) as Array<{ left: unknown; right: unknown }>;
+                      const matchingCorrectRows = isMatching
+                        ? resolveMatchingAnswerRows(task?.correct_answer, taskPairs, { fallbackToPairs: true })
+                        : [];
+                      const matchingStudentRows = isMatching
+                        ? resolveMatchingAnswerRows(sub.answer, taskPairs)
+                        : [];
 
-                      // 匹配题答案格式化
-                      let matchingStudentAnswer: Array<{left: string, right: string}> = [];
-                      let matchingCorrectAnswer: Array<{left: string, right: string}> = [];
-                      const taskPairs = (task?.question?.pairs || []) as Array<Record<string, string>>;
-                      if (isMatching && taskPairs.length > 0) {
-                        // 解析学生答案 { "A": "1", "B": "2" } 格式
-                        let studentPairs: Record<string, string> = {};
-                        if (typeof sub.answer === 'string') {
-                          try { studentPairs = JSON.parse(sub.answer); } catch { studentPairs = {}; }
-                        } else if (typeof sub.answer === 'object' && sub.answer !== null) {
-                          studentPairs = sub.answer as Record<string, string>;
+                      const correctAnswer = (() => {
+                        if (isMatching) {
+                          return matchingCorrectRows.map((row) => `${row.leftText}→${row.rightText}`).join(', ');
                         }
-                        // 解析正确答案
-                        let correctPairs: Record<string, string> = {};
-                        if (typeof task?.correct_answer === 'string') {
-                          try { correctPairs = JSON.parse(task.correct_answer); } catch { correctPairs = {}; }
-                        } else if (typeof task?.correct_answer === 'object' && task?.correct_answer !== null) {
-                          correctPairs = task.correct_answer as Record<string, string>;
+                        if (!task?.correct_answer) return '';
+                        let answer = '';
+                        if (typeof task.correct_answer === 'string') {
+                          try {
+                            const parsed = JSON.parse(task.correct_answer);
+                            if (parsed && typeof parsed === 'object' && parsed.value !== undefined) {
+                              answer = String(parsed.value);
+                            } else if (typeof parsed === 'string') {
+                              answer = parsed;
+                            } else {
+                              answer = task.correct_answer;
+                            }
+                          } catch { answer = task.correct_answer; }
+                        } else if (typeof task.correct_answer === 'object') {
+                          const ansObj = task.correct_answer as Record<string, unknown>;
+                          if (ansObj.value !== undefined) answer = String(ansObj.value);
+                          else if (ansObj.blanks !== undefined) return JSON.stringify(ansObj.blanks);
+                          else answer = JSON.stringify(task.correct_answer);
+                        } else {
+                          answer = String(task.correct_answer);
                         }
-                        // 构建匹配显示
-                        taskPairs.forEach((pair: any) => {
-                          const left = pair.left || pair.key || '';
-                          const studentRight = studentPairs[left] || '-';
-                          const correctRight = correctPairs[left] || pair.right || '-';
-                          matchingStudentAnswer.push({ left, right: studentRight });
-                          matchingCorrectAnswer.push({ left, right: correctRight });
-                        });
-                        studentAnswer = matchingStudentAnswer.map(p => `${p.left}→${p.right}`).join(', ');
+                        return answer.trim();
+                      })();
+
+                      let studentAnswer = (() => {
+                        let ans = sub.answer;
+                        if (typeof ans === 'string') {
+                          try {
+                            const parsed = JSON.parse(ans);
+                            ans = typeof parsed === 'string' ? parsed : ans;
+                          } catch { /* keep original */ }
+                        } else {
+                          ans = JSON.stringify(ans);
+                        }
+                        return String(ans).trim();
+                      })();
+
+                      if (isMatching && matchingStudentRows.length > 0) {
+                        studentAnswer = matchingStudentRows.map((row) => `${row.leftText}→${row.rightText}`).join(', ');
                       }
 
                       return (
@@ -1674,19 +2274,21 @@ export default function WhiteboardMode() {
                           )}
 
                           {/* 匹配题显示 */}
-                          {isMatching && matchingStudentAnswer.length > 0 && (
+                          {isMatching && matchingStudentRows.length > 0 && (
                             <div className="space-y-2 mb-4">
                               <p className={`text-xs ${theme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>匹配结果:</p>
                               <div className="grid grid-cols-2 gap-2">
-                                {matchingStudentAnswer.map((pair, pIdx) => {
-                                  const correctPair = matchingCorrectAnswer[pIdx];
-                                  const isPairCorrect = pair.right === correctPair?.right;
+                                {matchingStudentRows.map((pair, pIdx) => {
+                                  const correctPair = matchingCorrectRows[pIdx];
+                                  const isPairCorrect = pair.leftText === correctPair?.leftText && pair.rightText === correctPair?.rightText;
                                   return (
                                     <div key={pIdx} className={`flex items-center gap-2 p-2 rounded ${isPairCorrect ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-red-500/10 border border-red-500/20'}`}>
-                                      <span className="font-medium text-indigo-400">{pair.left}</span>
+                                      <span className="font-medium text-indigo-400">{pair.leftText}</span>
                                       <span className="text-slate-500">→</span>
-                                      <span className={isPairCorrect ? 'text-emerald-400' : 'text-red-400'}>{pair.right}</span>
-                                      {!isPairCorrect && <span className="text-xs text-slate-500">(正确: {correctPair?.right})</span>}
+                                      <span className={isPairCorrect ? 'text-emerald-400' : 'text-red-400'}>{pair.rightText}</span>
+                                      {!isPairCorrect && correctPair && (
+                                        <span className="text-xs text-slate-500">(正确: {correctPair.leftText}→{correctPair.rightText})</span>
+                                      )}
                                     </div>
                                   );
                                 })}
@@ -1740,9 +2342,71 @@ export default function WhiteboardMode() {
         </div>
       )}
 
+      <TeachingAidLibraryModal
+        open={showTeachingAidLibrary}
+        onClose={() => setShowTeachingAidLibrary(false)}
+        onOpenTeachingAid={({ name, entryUrl }) => setOpenedTeachingAid({ name, entryUrl })}
+      />
+
+      <ClassAiSettingsModal
+        open={showAiSettings}
+        classId={currentClassId || ''}
+        onClose={() => setShowAiSettings(false)}
+      />
+
+      <BigscreenActivityLauncherModal
+        open={showBigscreenLauncher}
+        classId={currentClassId}
+        students={challengeCandidates}
+        onClose={() => setShowBigscreenLauncher(false)}
+        onGoManage={() => {
+          setShowBigscreenLauncher(false)
+          navigate('/teacher/bigscreen-activities')
+        }}
+        onLaunch={(session) => {
+          setShowBigscreenLauncher(false)
+          navigate(`/teacher/bigscreen-activities/run/${session.id}`)
+        }}
+      />
+
+      {openedTeachingAid && createPortal(
+        <div className="fixed inset-0 z-[1500] bg-black/70 backdrop-blur-sm p-6">
+          <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-700 bg-[#10131a] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-700 px-6 py-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">{t('teacherTeachingAids.openLibrary')}</p>
+                <h3 className="mt-1 text-xl font-semibold text-white">{openedTeachingAid.name}</h3>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setOpenedTeachingAid(null)}
+                  className="rounded-xl border border-slate-600 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
+                >
+                  {t('teacherTeachingAids.close')}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 bg-white">
+              <iframe
+                src={openedTeachingAid.entryUrl}
+                title={openedTeachingAid.name}
+                className="h-full w-full"
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* 挑战进行中面板 */}
       {currentChallenge && !showChallengeBoard && (
-        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[700px] max-w-[90vw]`}>
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-[1200] w-[700px] max-w-[90vw] overflow-auto"
+          style={{
+            top: 'max(92px, calc(env(safe-area-inset-top, 0px) + 24px))',
+            bottom: '16px',
+          }}
+        >
           <ChallengePanel
             currentChallenge={currentChallenge}
             onOpenBoard={handleOpenChallengeBoard}
@@ -1750,67 +2414,91 @@ export default function WhiteboardMode() {
             onDismissChallenge={clearChallenge}
             t={t}
             tWithParams={tWithParams}
+            variant="compact"
           />
         </div>
       )}
 
       {/* PK对决选择弹窗 */}
-      <DuelModal
-        show={showDuelModal}
-        selectedParticipants={selectedDuelParticipants}
-        challengeCandidates={challengeCandidates}
-        challengeCreating={challengeCreating}
-        onClose={() => setShowDuelModal(false)}
-        onToggleParticipant={(id) => {
-          setSelectedDuelParticipants(prev => {
-            if (prev.includes(id)) return prev.filter(p => p !== id)
-            if (prev.length >= 2) return [...prev.slice(1), id]
-            return [...prev, id]
-          })
-        }}
-        onConfirm={handleConfirmDuel}
-        t={t}
-        tWithParams={tWithParams}
-      />
+      {showDuelModal && createPortal(
+        <DuelModal
+          show={showDuelModal}
+          selectedParticipants={selectedDuelParticipants}
+          challengeCandidates={challengeCandidates}
+          challengeCreating={challengeCreating}
+          onClose={() => setShowDuelModal(false)}
+          onToggleParticipant={(id) => {
+            setSelectedDuelParticipants(prev => {
+              if (prev.includes(id)) return prev.filter(p => p !== id)
+              if (prev.length >= 2) return [...prev.slice(1), id]
+              return [...prev, id]
+            })
+          }}
+          onConfirm={handleConfirmDuel}
+          t={t}
+          tWithParams={tWithParams}
+        />,
+        document.body
+      )}
 
       {/* 抢答模式选择弹窗 */}
-      <SingleQuestionDuelModal
-        show={showSingleQuestionDuelModal}
-        tasks={previewingGroup?.tasks || []}
-        selectedTaskId={selectedSingleQuestionTaskId}
-        selectedParticipants={selectedSingleQuestionParticipants}
-        challengeCandidates={challengeCandidates}
-        challengeCreating={challengeCreating}
-        onClose={() => setShowSingleQuestionDuelModal(false)}
-        onSelectTask={(id) => setSelectedSingleQuestionTaskId(id)}
-        onToggleParticipant={(id) => {
-          setSelectedSingleQuestionParticipants(prev => {
-            if (prev.includes(id)) return prev.filter(p => p !== id)
-            if (prev.length >= 2) return [prev[1], id]
-            return [...prev, id]
-          })
-        }}
-        onConfirm={handleConfirmSingleQuestionDuel}
-        t={t}
-        tWithParams={tWithParams}
-      />
+      {showSingleQuestionDuelModal && createPortal(
+        <SingleQuestionDuelModal
+          show={showSingleQuestionDuelModal}
+          tasks={singleQuestionDuelTasks}
+          selectedTaskId={selectedSingleQuestionTaskId}
+          selectedParticipants={selectedSingleQuestionParticipants}
+          challengeCandidates={challengeCandidates}
+          challengeCreating={challengeCreating}
+          onClose={() => setShowSingleQuestionDuelModal(false)}
+          onSelectTask={(id) => setSelectedSingleQuestionTaskId(id)}
+          onToggleParticipant={(id) => {
+            setSelectedSingleQuestionParticipants(prev => {
+              if (prev.includes(id)) return prev.filter(p => p !== id)
+              if (prev.length >= 2) return [prev[1], id]
+              return [...prev, id]
+            })
+          }}
+          onConfirm={handleConfirmSingleQuestionDuel}
+          t={t}
+          tWithParams={tWithParams}
+        />,
+        document.body
+      )}
 
       {/* 全屏投屏挑战面板 */}
       {showChallengeBoard && currentChallenge && createPortal(
-        <div className="fixed inset-0 z-[99999] flex flex-col" style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)' }}>
-          <div className="flex items-center justify-between px-8 py-6">
+        <div
+          className="fixed inset-0 z-[2147483000] flex flex-col"
+          style={{
+            background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
+          }}
+        >
+          <div
+            className="fixed inset-x-0 top-0 z-40 flex items-center justify-between px-8 py-6"
+            style={{
+              paddingTop: 'max(112px, calc(env(safe-area-inset-top, 0px) + 48px))',
+              background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(15, 23, 42, 0.82))',
+              backdropFilter: 'blur(10px)',
+            }}
+          >
             <div>
               <p className="text-xs uppercase tracking-[0.32em] mb-3" style={{ color: 'rgba(255,255,255,0.46)' }}>挑战进行中</p>
               <h2 className="text-5xl font-black leading-tight text-white" style={{ letterSpacing: '-0.04em' }}>{currentChallenge.title}</h2>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="relative z-20 flex items-center gap-3">
               <button className="ghost-button py-2 px-4 text-sm" onClick={handleCloseChallengeBoard}>关闭投屏</button>
-              {currentChallenge.status !== 'ended' && (
+              {!isChallengeFinished(currentChallenge) && (
                 <button className="ghost-button py-2 px-4 text-sm" onClick={handleEndChallenge}>结束挑战</button>
               )}
             </div>
           </div>
-          <div className="flex-1 overflow-auto px-8 pb-8">
+          <div
+            className="flex-1 overflow-auto px-8 pb-8"
+            style={{
+              paddingTop: 'max(220px, calc(env(safe-area-inset-top, 0px) + 156px))',
+            }}
+          >
             <ChallengePanel
               currentChallenge={currentChallenge}
               onOpenBoard={() => {}}
@@ -1818,6 +2506,7 @@ export default function WhiteboardMode() {
               onDismissChallenge={clearChallenge}
               t={t}
               tWithParams={tWithParams}
+              variant="board"
             />
           </div>
         </div>,
@@ -1855,6 +2544,15 @@ export default function WhiteboardMode() {
         </div>,
         document.body
       )}
+
+      {/* AI 助手悬浮球 */}
+      <WhiteboardAiLauncher />
+      <WhiteboardAiPanel context={{
+        task_title: activeTaskGroup?.title,
+        task_questions: activeTaskGroup?.tasks?.map((t: any) => t.question),
+        class_id: currentClassId ?? undefined,
+      }} />
     </div>
+    </WhiteboardAiProvider>
   )
 }

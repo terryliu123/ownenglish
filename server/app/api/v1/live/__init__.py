@@ -16,6 +16,7 @@ from .task_groups import router as task_groups_router
 from .sessions import router as sessions_router
 from .challenges import router as challenges_router
 from .submissions import router as submissions_router
+from .classroom_sessions import router as classroom_sessions_router
 
 # Import WebSocket handlers
 from .websocket_handlers import (
@@ -33,6 +34,7 @@ router.include_router(task_groups_router)
 router.include_router(sessions_router)
 router.include_router(challenges_router)
 router.include_router(submissions_router)
+router.include_router(classroom_sessions_router)
 
 
 @router.websocket("/live/ws")

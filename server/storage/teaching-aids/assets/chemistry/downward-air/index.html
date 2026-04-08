@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向下排空气法演示</title>
+    <style>
+        /* 全局样式 */
+        :root {
+            --bg-color: #37474f; /* 参考图背景色 */
+            --text-color: #eceff1;
+            --gas-color: #a7ffeb; /* 氢气颜色 */
+            --glass-border: rgba(255, 255, 255, 0.6);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 1. 顶部标题 */
+        header {
+            width: 100%;
+            background-color: #fff;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; color: #333; }
+        .tag { font-size: 0.8rem; background: #e0f7fa; color: #006064; padding: 4px 8px; border-radius: 4px; margin-left: 10px; vertical-align: middle; }
+
+        /* 2. 中间实验区 */
+        .stage-container {
+            position: relative;
+            width: 800px;
+            height: 450px;
+            background-color: var(--bg-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* SVG 样式 */
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 气体填充动画 */
+        .gas-fill {
+            fill: url(#gasGradient);
+            /* 关键：向下排空气法，气体浮在上面，从上往下积聚 */
+            transform-origin: center top; 
+            animation: fillDown 6s linear infinite;
+        }
+
+        @keyframes fillDown {
+            0% { transform: scaleY(0); }
+            20% { transform: scaleY(0); } /* 停顿一下等待气体进入 */
+            80% { transform: scaleY(1); }
+            100% { transform: scaleY(1); }
+        }
+
+        /* 进气粒子动画 */
+        .particle-in {
+            opacity: 0;
+            animation: flowIn 6s linear infinite;
+        }
+        @keyframes flowIn {
+            0% { offset-distance: 0%; opacity: 1; }
+            30% { offset-distance: 100%; opacity: 1; }
+            31% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+
+        /* 排气粒子动画 */
+        .particle-out {
+            opacity: 0;
+            animation: flowOut 6s linear infinite;
+        }
+        @keyframes flowOut {
+            0% { opacity: 0; }
+            30% { offset-distance: 0%; opacity: 0; } /* 等气体进来后再排气 */
+            40% { opacity: 1; }
+            90% { offset-distance: 100%; opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        /* 文本淡入淡出 */
+        .label-text {
+            animation: fadeInOut 6s ease-in-out infinite;
+        }
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        /* 3. 尾部说明 */
+        footer {
+            width: 800px;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .highlight { color: #00897b; font-weight: bold; }
+        .book-info { font-size: 0.85rem; color: #999; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>向下排空气法<span class="tag">气体收集装置</span></h1>
+    </header>
+
+    <div class="stage-container">
+        <svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- 气体渐变色 (氢气) -->
+                <linearGradient id="gasGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#a7ffeb;stop-opacity:0.8" />
+                    <stop offset="100%" style="stop-color:#a7ffeb;stop-opacity:0.4" />
+                </linearGradient>
+                
+                <!-- 玻璃光泽 -->
+                <linearGradient id="glassShine" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:white;stop-opacity:0.1" />
+                    <stop offset="50%" style="stop-color:white;stop-opacity:0" />
+                    <stop offset="100%" style="stop-color:white;stop-opacity:0.1" />
+                </linearGradient>
+
+                <!-- 瓶身剪切路径 (用于限制气体形状) -->
+                <clipPath id="bottleClip">
+                    <rect x="320" y="120" width="160" height="240" rx="10" ry="10" />
+                </clipPath>
+            </defs>
+
+            <!-- 1. 气体层 (最底层) -->
+            <g clip-path="url(#bottleClip)">
+                <!-- 背景空气 -->
+                <rect x="320" y="120" width="160" height="240" fill="#455a64" />
+                
+                <!-- 氢气填充动画 (从上往下长) -->
+                <rect class="gas-fill" x="320" y="120" width="160" height="240" />
+            </g>
+
+            <!-- 2. 瓶身结构 -->
+            <!-- 轮廓 -->
+            <path d="M320,120 L320,360 Q320,370 330,370 L470,370 Q480,370 480,360 L480,120 Q480,100 460,90 L340,90 Q320,100 320,120 Z" 
+                  fill="url(#glassShine)" stroke="rgba(255,255,255,0.8)" stroke-width="4" />
+            
+            <!-- 瓶塞 -->
+            <rect x="340" y="70" width="120" height="25" fill="#90a4ae" stroke="#fff" stroke-width="2"/>
+
+            <!-- 3. 导管系统 -->
+            
+            <!-- 右侧：进气管 (短管) -->
+            <!-- 逻辑：密度小的气体浮在上面，所以从短管进，留在上方 -->
+            <g>
+                <path id="pathIn" d="M600,60 L440,60 L440,130" fill="none" stroke="#a7ffeb" stroke-width="6" stroke-linecap="round" />
+                <text x="610" y="65" fill="#a7ffeb" font-size="14" font-weight="bold" class="label-text">H₂ 进 (密度小)</text>
+                
+                <!-- 进气粒子 -->
+                <circle r="3" fill="#fff" class="particle-in">
+                    <animateMotion href="#pathIn" dur="6s" repeatCount="indefinite" rotate="auto" />
+                </circle>
+                <circle r="3" fill="#fff" class="particle-in" style="animation-delay: 0.5s;">
+                    <animateMotion href="#pathIn" dur="6s" repeatCount="indefinite" rotate="auto" />
+                </circle>
+            </g>
+
+            <!-- 左侧：排气管 (长管) -->
+            <!-- 逻辑：空气被压到下方，从长管排出 -->
+            <g>
+                <path id="pathOut" d="M360,340 L360,60 L200,60" fill="none" stroke="#b0bec5" stroke-width="6" stroke-linecap="round" />
+                <text x="140" y="65" fill="#b0bec5" font-size="14" class="label-text">空气 出</text>
+
+                <!-- 排气粒子 -->
+                <circle r="3" fill="#90a4ae" class="particle-out">
+                    <animateMotion href="#pathOut" dur="6s" repeatCount="indefinite" rotate="auto" />
+                </circle>
+                <circle r="3" fill="#90a4ae" class="particle-out" style="animation-delay: 0.5s;">
+                    <animateMotion href="#pathOut" dur="6s" repeatCount="indefinite" rotate="auto" />
+                </circle>
+            </g>
+
+            <!-- 4. 标注 -->
+            <!-- 短管进 -->
+            <text x="455" y="120" fill="#fff" font-size="12" opacity="0.8">短管进</text>
+            <!-- 长管出 -->
+            <text x="375" y="330" fill="#fff" font-size="12" opacity="0.8">长管出</text>
+
+            <!-- 瓶中气体标签 -->
+            <text x="400" y="180" text-anchor="middle" fill="#333" font-weight="bold" font-size="16" opacity="0">
+                氢气
+                <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.2;0.5;0.9;1" dur="6s" repeatCount="indefinite" />
+            </text>
+
+        </svg>
+    </div>
+
+    <footer>
+        <p>
+            <strong>原理说明：</strong><br>
+            氢气（$H_2$）、甲烷（$CH_4$）、氨气（$NH_3$）等气体的密度比空气小。
+            使用万能瓶（广口瓶）收集此类气体时，应采用<strong>向下排空气法</strong>。
+            <br>
+            <span class="highlight">进气口（短管）：</span>密度小的气体浮在上方，所以从短管进入，聚集在瓶子顶部。<br>
+            <span class="highlight">出气口（长管）：</span>随着气体增多，将密度大的空气向下挤压，空气从底部的长管排出。
+        </p>
+        <div class="book-info">
+            适配教科书：沪教版(2024) / 沪教版(上海) / 鲁教版 / 鲁教版(2024) / 人教版 / 人教版(2024)
+        </div>
+    </footer>
+
+</body>
+</html>

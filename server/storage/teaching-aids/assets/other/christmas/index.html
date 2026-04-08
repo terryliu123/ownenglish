@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Magical Christmas Polaroid</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Permanent+Marker&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #020202; 
+            font-family: 'Cinzel', serif;
+            touch-action: none;
+            cursor: pointer; 
+        }
+
+        /* === UI 层 === */
+        #title {
+            position: absolute;
+            top: 5%;
+            width: 100%;
+            text-align: center;
+            color: #F8F8FF;
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 8px;
+            text-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+            pointer-events: none;
+            z-index: 10;
+            transition: opacity 0.5s;
+        }
+
+        #subtitle {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.9rem;
+            letter-spacing: 2px;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+            z-index: 10;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+
+        /* === 左下角相机 === */
+        .camera-container {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 220px;
+            height: 200px;
+            z-index: 100;
+            animation: slideUp 1s ease-out;
+            pointer-events: auto; 
+        }
+
+        .polaroid-camera {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            background: #fdfdfd;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(50, 50, 50, 0.3);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            box-sizing: border-box;
+        }
+
+        .stripe {
+            position: absolute; top: 50%; left: 0; width: 100%; height: 15px;
+            background: linear-gradient(90deg, #ff9999 0%, #ff9999 20%, #ffcc99 20%, #ffcc99 40%, #ffff99 40%, #ffff99 60%, #99ff99 60%, #99ff99 80%, #99ccff 80%, #99ccff 100%);
+            z-index: 1;
+        }
+
+        .lens-outer {
+            width: 100px; height: 100px; background: #333; border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            border: 4px solid #ddd; z-index: 2; position: relative;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        .lens-inner {
+            width: 80px; height: 80px; border-radius: 50%; overflow: hidden;
+            background: #000; position: relative;
+        }
+        
+        video#cam-feed {
+            width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+        }
+
+        .shutter-btn {
+            position: absolute; top: 20px; right: 15px; width: 30px; height: 30px;
+            background: #ff4444; border-radius: 50%; border: 3px solid #ddd;
+            cursor: pointer; z-index: 5; transition: transform 0.1s;
+        }
+        .shutter-btn:active { transform: scale(0.9); }
+
+        .flash-light {
+            position: absolute; top: 20px; left: 15px; width: 40px; height: 20px;
+            background: #555; border-radius: 4px;
+        }
+        .flash-glass {
+            width: 30px; height: 12px; background: rgba(255,255,255,0.8);
+            margin: 4px auto; border-radius: 2px;
+        }
+
+        .slot {
+            position: absolute; bottom: -5px; width: 160px; height: 10px;
+            background: #222; border-radius: 0 0 10px 10px; z-index: 0;
+        }
+
+        .hint {
+            position: absolute; bottom: -30px; width: 100%; text-align: center;
+            color: #666; font-size: 12px; font-family: sans-serif; pointer-events: none;
+        }
+
+        /* === 飞行的照片动画 === */
+        .flying-photo {
+            position: fixed; width: 60px; height: 72px; 
+            background: #fff; padding: 4px 4px 15px 4px; box-sizing: border-box;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5); z-index: 999;
+            pointer-events: none; transition: all 1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .flying-photo img { width: 100%; height: 100%; object-fit: cover; background: #333; }
+
+        /* 屏幕闪光 */
+        #screen-flash {
+            position: fixed; top:0; left:0; width:100%; height:100%;
+            background: white; opacity: 0; pointer-events: none; z-index: 2000;
+            transition: opacity 0.2s;
+        }
+
+        /* === 详情弹窗 === */
+        #modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 3000;
+            justify-content: center; align-items: center; flex-direction: column;
+            cursor: zoom-out; animation: fadeIn 0.3s;
+        }
+        #modal-photo {
+            background: #fff; padding: 15px 15px 60px 15px;
+            max-width: 80%; max-height: 80%; transform: rotate(-2deg);
+            box-shadow: 0 0 50px rgba(255,255,255,0.1); pointer-events: auto;
+        }
+        #modal-photo img { max-width: 100%; max-height: 60vh; display: block; border: 1px solid #ddd; }
+        #modal-text {
+            font-family: 'Permanent Marker', cursive; color: #333;
+            text-align: center; margin-top: 15px; font-size: 1.5rem;
+        }
+
+        @keyframes slideUp { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    </style>
+</head>
+<body>
+
+    <div id="title">MERRY CHRISTMAS</div>
+    <div id="subtitle">Click tree to Explode · Click photo to View</div>
+    
+    <canvas id="canvas"></canvas>
+
+    <div id="screen-flash"></div>
+
+    <div class="camera-container" id="camera-area">
+        <div class="polaroid-camera">
+            <div class="flash-light"><div class="flash-glass"></div></div>
+            <div class="shutter-btn" id="shutter"></div>
+            <div class="stripe"></div>
+            <div class="lens-outer">
+                <div class="lens-inner">
+                    <video id="cam-feed" autoplay playsinline muted></video>
+                </div>
+            </div>
+            <div class="slot"></div>
+        </div>
+        <div class="hint">Take a photo!</div>
+    </div>
+
+    <canvas id="temp-canvas" style="display: none;"></canvas>
+
+    <div id="modal">
+        <div id="modal-photo">
+            <img id="modal-img" src="" alt="">
+            <div id="modal-text">Merry Christmas!</div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let particles = [];
+        let isExploded = false; 
+
+        const CONFIG = {
+            particleCount: 1350, 
+            treeWidth: 360,
+            treeHeight: 560,
+            focalLength: 600,
+            spinSpeed: 0.004,
+            explodeForce: 25,
+            friction: 0.95,
+            gravity: 0.08,
+            // 基础颜色 (树叶)
+            baseColors: ['#FFD700', '#DAA520', '#0f3d0f', '#228B22'],
+            // 灯光
+            lightColors: ['#FF0000', '#00FF00', '#FFFF00', '#00FFFF', '#FF00FF'],
+            // 礼物盒
+            giftColors: ['#D32F2F', '#1E90FF', '#FFD700', '#9370DB']
+        };
+
+        class Particle {
+            constructor(fixedType = null, imgElement = null) {
+                // 概率分布：增加更多种类
+                if (fixedType) {
+                    this.type = fixedType;
+                } else {
+                    const r = Math.random();
+                    if (r > 0.97) this.type = 'pony';       // 3% 摇摆小马 (新)
+                    else if (r > 0.95) this.type = 'sock';  // 2% 圣诞袜 (新)
+                    else if (r > 0.92) this.type = 'gift';  // 3% 礼物盒
+                    else if (r > 0.89) this.type = 'candy'; // 3% 拐杖糖
+                    else if (r > 0.85) this.type = 'snow';  // 4% 雪花
+                    else if (r > 0.77) this.type = 'light'; // 8% 彩灯
+                    else if (r > 0.72) this.type = 'bauble';// 5% 装饰球
+                    else this.type = 'orb';                 // 72% 基础
+                }
+
+                this.img = imgElement; 
+                this.initTreePosition();
+                
+                this.x = this.tx; this.y = this.ty; this.z = this.tz;
+                this.vx = 0; this.vy = 0; this.vz = 0;
+                this.rotation = Math.random() * Math.PI * 2;
+                
+                this.initStyle();
+            }
+
+            initStyle() {
+                if (this.type === 'photo') {
+                    this.w = 40; this.h = 48; this.size = 20;
+                } else if (this.type === 'star') {
+                    this.size = 18; this.color = '#FFFFFF';
+                } else if (this.type === 'bauble') {
+                    this.size = Math.random() * 3 + 3;
+                    const c = ['#D32F2F', '#C0C0C0', '#FFD700'];
+                    this.color = c[Math.floor(Math.random() * c.length)];
+                } else if (this.type === 'light') {
+                    this.size = Math.random() * 2 + 2; 
+                    this.color = CONFIG.lightColors[Math.floor(Math.random() * CONFIG.lightColors.length)];
+                    this.blinkOffset = Math.random() * 100; 
+                    this.blinkSpeed = 0.05 + Math.random() * 0.05;
+                } else if (this.type === 'gift') {
+                    this.size = Math.random() * 4 + 7; 
+                    this.color = CONFIG.giftColors[Math.floor(Math.random() * CONFIG.giftColors.length)];
+                } else if (this.type === 'candy') {
+                    this.size = 12; 
+                } else if (this.type === 'snow') {
+                    this.size = Math.random() * 3 + 4;
+                } else if (this.type === 'pony') {
+                    this.size = 14; // 小马尺寸
+                } else if (this.type === 'sock') {
+                    this.size = 10; // 袜子尺寸
+                } else {
+                    this.size = Math.random() * 2 + 1;
+                    this.color = CONFIG.baseColors[Math.floor(Math.random() * CONFIG.baseColors.length)];
+                }
+            }
+
+            initTreePosition() {
+                if (this.type === 'star') {
+                    this.tx = 0; this.ty = -CONFIG.treeHeight / 2 - 25; this.tz = 0;
+                    return;
+                }
+
+                const isPhoto = (this.type === 'photo');
+                let u = Math.random(); 
+                if (isPhoto) u = 0.2 + Math.random() * 0.8; 
+
+                const yPos = (u - 0.5) * CONFIG.treeHeight;
+                let radius = Math.pow(u, 0.9) * (CONFIG.treeWidth / 2);
+
+                if (this.type === 'orb') radius += (Math.random() - 0.5) * 50;
+                else radius += (Math.random() - 0.5) * 15 + 10; // 装饰物靠外
+
+                if (isPhoto) radius += 20;
+
+                const angle = u * Math.PI * 2 * 15 + (Math.random() * 0.5);
+
+                this.tx = Math.cos(angle) * radius;
+                this.ty = yPos;
+                this.tz = Math.sin(angle) * radius;
+            }
+
+            explode() {
+                const force = CONFIG.explodeForce * (0.5 + Math.random());
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos((Math.random() * 2) - 1);
+                this.vx = force * Math.sin(phi) * Math.cos(theta);
+                this.vy = force * Math.sin(phi) * Math.sin(theta);
+                this.vz = force * Math.cos(phi);
+            }
+
+            update(globalRotation, time) {
+                if (isExploded) {
+                    this.x += this.vx; this.y += this.vy; this.z += this.vz;
+                    this.vx *= CONFIG.friction; this.vy *= CONFIG.friction; this.vz *= CONFIG.friction;
+                    this.vy += CONFIG.gravity;
+                    this._rx = this.x; this._ry = this.y; this._rz = this.z;
+                } else {
+                    this.x += (this.tx - this.x) * 0.08;
+                    this.y += (this.ty - this.y) * 0.08;
+                    this.z += (this.tz - this.z) * 0.08;
+                    const cos = Math.cos(globalRotation);
+                    const sin = Math.sin(globalRotation);
+                    this._rx = this.x * cos - this.z * sin;
+                    this._ry = this.y;
+                    this._rz = this.x * sin + this.z * cos; 
+                }
+
+                if (this.type === 'light') {
+                    this.alpha = 0.4 + 0.6 * Math.abs(Math.sin(time * this.blinkSpeed + this.blinkOffset));
+                }
+            }
+
+            draw(ctx, centerX, centerY) {
+                const scale = CONFIG.focalLength / (CONFIG.focalLength + this._rz);
+                if (scale <= 0) { this._sx = null; return; }
+
+                const sx = centerX + this._rx * scale;
+                const sy = centerY + this._ry * scale;
+                this._sx = sx; this._sy = sy; this._scale = scale;
+
+                const s = this.size * scale;
+
+                switch (this.type) {
+                    case 'photo':
+                        ctx.save(); this.drawPhoto(ctx, sx, sy, scale); ctx.restore(); break;
+                    case 'star':
+                        ctx.save(); this.drawStar(ctx, sx, sy, s); ctx.restore(); break;
+                    
+                    case 'pony':
+                        // === 摇摆小马 (Rocking Horse) ===
+                        ctx.save();
+                        ctx.translate(sx, sy);
+                        // 1. 摇杆 (金色弧线)
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#DAA520';
+                        ctx.lineWidth = 2 * scale;
+                        ctx.arc(0, s*0.6, s*0.6, Math.PI * 0.8, Math.PI * 0.2, true); 
+                        ctx.stroke();
+                        // 2. 身体 (木马)
+                        ctx.fillStyle = '#CD853F'; // 褐色
+                        ctx.beginPath();
+                        ctx.moveTo(-s/3, s/3); // 屁股底
+                        ctx.lineTo(s/3, s/3);  // 胸底
+                        ctx.lineTo(s/3, -s/4); // 脖子根
+                        ctx.lineTo(s/2, -s/2); // 头顶
+                        ctx.lineTo(s/4, -s/2); // 鼻子
+                        ctx.lineTo(s/5, -s/4); // 下巴
+                        ctx.lineTo(-s/3, 0);   // 背部
+                        ctx.fill();
+                        ctx.restore();
+                        break;
+
+                    case 'sock':
+                        // === 圣诞袜 (Stocking) ===
+                        ctx.save();
+                        ctx.translate(sx, sy);
+                        ctx.fillStyle = '#D32F2F'; // 红色
+                        ctx.beginPath();
+                        // 简易靴子形状
+                        ctx.moveTo(s/4, -s/2);
+                        ctx.lineTo(s/4, s/5);
+                        ctx.quadraticCurveTo(s/4, s/2, -s/4, s/2); // 脚尖
+                        ctx.lineTo(-s/3, 0); 
+                        ctx.quadraticCurveTo(-s/5, 0, -s/4, -s/2);
+                        ctx.fill();
+                        // 白色毛绒边
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(-s/3, -s/2 - 2*scale, s*0.8, s/3);
+                        ctx.restore();
+                        break;
+
+                    case 'candy':
+                        // === 拐杖糖 ===
+                        ctx.save();
+                        ctx.translate(sx, sy);
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#eee';
+                        ctx.lineWidth = 3 * scale;
+                        ctx.lineCap = 'round';
+                        ctx.moveTo(0, s); ctx.lineTo(0, -s/2); 
+                        ctx.arc(-s/3, -s/2, s/3, 0, Math.PI, true); ctx.stroke();
+                        ctx.beginPath();
+                        ctx.strokeStyle = '#D32F2F';
+                        ctx.setLineDash([2 * scale, 2 * scale]); 
+                        ctx.moveTo(0, s); ctx.lineTo(0, -s/2); 
+                        ctx.arc(-s/3, -s/2, s/3, 0, Math.PI, true); ctx.stroke();
+                        ctx.restore();
+                        break;
+
+                    case 'gift':
+                        // === 礼物盒 ===
+                        ctx.fillStyle = this.color;
+                        ctx.fillRect(sx - s/2, sy - s/2, s, s);
+                        ctx.fillStyle = '#FFD700';
+                        const w = s * 0.2;
+                        ctx.fillRect(sx - s/2, sy - w/2, s, w); 
+                        ctx.fillRect(sx - w/2, sy - s/2, w, s); 
+                        break;
+
+                    case 'snow':
+                        // === 雪花 ===
+                        ctx.beginPath();
+                        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                        ctx.lineWidth = 1.5 * scale;
+                        ctx.moveTo(sx, sy - s); ctx.lineTo(sx, sy + s);
+                        ctx.moveTo(sx - s*0.8, sy - s*0.6); ctx.lineTo(sx + s*0.8, sy + s*0.6);
+                        ctx.moveTo(sx + s*0.8, sy - s*0.6); ctx.lineTo(sx - s*0.8, sy + s*0.6);
+                        ctx.stroke();
+                        break;
+
+                    case 'bauble':
+                        // === 装饰球 ===
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, s, 0, Math.PI * 2);
+                        ctx.fillStyle = this.color; ctx.fill();
+                        ctx.fillStyle = "rgba(255,255,255,0.5)";
+                        ctx.beginPath(); ctx.arc(sx - s*0.3, sy - s*0.3, s*0.3, 0, Math.PI * 2); ctx.fill();
+                        break;
+
+                    case 'light':
+                        // === 彩灯 ===
+                        ctx.save();
+                        ctx.globalAlpha = this.alpha;
+                        ctx.beginPath(); ctx.arc(sx, sy, s, 0, Math.PI * 2);
+                        ctx.fillStyle = this.color;
+                        if (scale > 0.6) {
+                            ctx.shadowBlur = 10 * scale; ctx.shadowColor = this.color;
+                        }
+                        ctx.fill();
+                        ctx.restore();
+                        break;
+
+                    default: // 'orb'
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, s, 0, Math.PI * 2);
+                        ctx.fillStyle = this.color; ctx.fill();
+                        break;
+                }
+            }
+
+            drawPhoto(ctx, x, y, scale) {
+                const w = this.w * scale; const h = this.h * scale;
+                ctx.translate(x, y);
+                ctx.fillStyle = '#fff'; ctx.fillRect(-w/2, -h/2, w, h);
+                if (this.img) ctx.drawImage(this.img, -w/2 + 2*scale, -h/2 + 2*scale, w - 4*scale, w - 4*scale);
+                else { ctx.fillStyle = '#333'; ctx.fillRect(-w/2 + 2*scale, -h/2 + 2*scale, w - 4*scale, w - 4*scale); }
+                ctx.fillStyle = '#222'; ctx.fillRect(-w/4, h/2 - 6*scale, w/2, 1*scale);
+            }
+
+            drawStar(ctx, x, y, r) {
+                ctx.shadowBlur = 40; ctx.shadowColor = '#ffffaa';
+                ctx.fillStyle = '#fffdf0'; ctx.beginPath();
+                for(let i=0; i<8; i++) {
+                    ctx.lineTo(x + r * Math.cos(i * Math.PI / 4), y + r * Math.sin(i * Math.PI / 4));
+                    ctx.lineTo(x + (r*0.4) * Math.cos((i * Math.PI / 4) + Math.PI / 8), y + (r*0.4) * Math.sin((i * Math.PI / 4) + Math.PI / 8));
+                }
+                ctx.fill();
+            }
+        }
+
+        function initTree() {
+            onResize();
+            particles = [];
+            for (let i = 0; i < CONFIG.particleCount; i++) particles.push(new Particle());
+            particles.push(new Particle('star'));
+            animate();
+        }
+
+        function onResize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', onResize);
+
+        let rotation = 0;
+        let time = 0; 
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            const cx = width / 2;
+            const cy = height / 2 + 50;
+            time += 1;
+
+            if (!isExploded) rotation += CONFIG.spinSpeed;
+
+            particles.sort((a, b) => b._rz - a._rz);
+
+            particles.forEach(p => {
+                p.update(rotation, time);
+                p.draw(ctx, cx, cy);
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // === 交互与相机逻辑 ===
+        canvas.addEventListener('click', (e) => { if (handlePhotoClick(e)) return; toggleExplosion(); });
+
+        function toggleExplosion() {
+            isExploded = !isExploded;
+            const t = document.getElementById('title');
+            const s = document.getElementById('subtitle');
+            if (isExploded) { particles.forEach(p => p.explode()); t.style.opacity = 0; s.style.opacity = 0; }
+            else { t.style.opacity = 1; s.style.opacity = 1; }
+        }
+
+        function handlePhotoClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left; const mouseY = e.clientY - rect.top;
+            let clickedParticle = null; let maxZ = -Infinity;
+            for (let p of particles) {
+                if (p.type !== 'photo') continue; 
+                if (p._sx === null) continue;     
+                const dx = mouseX - p._sx; const dy = mouseY - p._sy;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < (p.w * p._scale) / 2 + 10) {
+                    if (p._rz > maxZ) { maxZ = p._rz; clickedParticle = p; }
+                }
+            }
+            if (clickedParticle) { showModal(clickedParticle.img.src); return true; }
+            return false;
+        }
+        
+        const video = document.getElementById('cam-feed');
+        const shutter = document.getElementById('shutter');
+        const tempCanvas = document.getElementById('temp-canvas');
+        const screenFlash = document.getElementById('screen-flash');
+        const cameraContainer = document.querySelector('.camera-container');
+
+        cameraContainer.addEventListener('click', (e) => e.stopPropagation());
+
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 300, height: 300 } })
+            .then(stream => video.srcObject = stream)
+            .catch(err => { console.error("Camera error", err); video.style.background = '#333'; });
+
+        shutter.addEventListener('click', (e) => { e.stopPropagation(); takePhoto(); });
+
+        function takePhoto() {
+            screenFlash.style.opacity = 0.8;
+            setTimeout(() => screenFlash.style.opacity = 0, 100);
+            const context = tempCanvas.getContext('2d');
+            const size = 300;
+            tempCanvas.width = size; tempCanvas.height = size;
+            context.translate(size, 0); context.scale(-1, 1);
+            
+            const vRatio = video.videoWidth / video.videoHeight;
+            let sx, sy, sWidth, sHeight;
+            if (vRatio > 1) {
+                sHeight = video.videoHeight; sWidth = sHeight;
+                sx = (video.videoWidth - sWidth) / 2; sy = 0;
+            } else {
+                sWidth = video.videoWidth; sHeight = sWidth;
+                sx = 0; sy = (video.videoHeight - sHeight) / 2;
+            }
+            context.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, size, size);
+            const imgUrl = tempCanvas.toDataURL('image/jpeg');
+            const imgObj = new Image(); imgObj.src = imgUrl;
+            animateFlyingPhoto(imgUrl, imgObj);
+        }
+
+        function animateFlyingPhoto(url, imgObj) {
+            if (isExploded) toggleExplosion();
+            const flyEl = document.createElement('div');
+            flyEl.className = 'flying-photo'; flyEl.innerHTML = `<img src="${url}">`;
+            const camRect = cameraContainer.getBoundingClientRect();
+            flyEl.style.left = (camRect.left + camRect.width / 2 - 30) + 'px';
+            flyEl.style.top = (camRect.top + 140) + 'px';
+            flyEl.style.transform = 'scale(0.5)'; 
+            document.body.appendChild(flyEl); flyEl.offsetHeight; 
+
+            const tLeft = window.innerWidth / 2 - 30; const tTop = window.innerHeight / 2 - 36; 
+            setTimeout(() => {
+                flyEl.style.left = tLeft + 'px'; flyEl.style.top = tTop + 'px';
+                flyEl.style.opacity = '0'; flyEl.style.transform = 'scale(1) rotate(360deg)';
+            }, 50);
+            setTimeout(() => { flyEl.remove(); addPhotoToTree(imgObj); }, 1000); 
+        }
+
+        function addPhotoToTree(imgObj) { particles.push(new Particle('photo', imgObj)); }
+        
+        const modal = document.getElementById('modal');
+        const modalImg = document.getElementById('modal-img');
+        function showModal(src) { modalImg.src = src; modal.style.display = 'flex'; }
+        modal.addEventListener('click', () => modal.style.display = 'none');
+
+        initTree();
+    </script>
+</body>
+</html>

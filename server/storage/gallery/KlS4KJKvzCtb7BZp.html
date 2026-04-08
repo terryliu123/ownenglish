@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：三角形的高、中线与角平分线</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 黑板色 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 25px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: crosshair;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            background-color: #2a2a2a;
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #333;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 漂亮的复选框和图例 */
+        .toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .line-sample {
+            width: 30px;
+            height: 3px;
+            display: inline-block;
+        }
+
+        button {
+            background-color: #555;
+            border: 1px solid #666;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        button:hover { background-color: #666; }
+        button.highlight { background-color: #009688; border-color: #009688; }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>三角形的高、中线与角平分线</h1>
+
+    <div class="controls">
+        <!-- 线的开关 -->
+        <label class="toggle-item">
+            <input type="checkbox" id="showAltitude" checked>
+            <span class="line-sample" style="background:#2979FF;"></span> 高 (Altitude)
+        </label>
+        <label class="toggle-item">
+            <input type="checkbox" id="showBisector" checked>
+            <span class="line-sample" style="background:#FF9100;"></span> 角平分线 (Bisector)
+        </label>
+        <label class="toggle-item">
+            <input type="checkbox" id="showMedian" checked>
+            <span class="line-sample" style="background:#FFEA00;"></span> 中线 (Median)
+        </label>
+
+        <div style="width: 1px; height: 20px; background: #555; margin: 0 10px;"></div>
+
+        <!-- 特殊三角形快捷键 -->
+        <button onclick="makeIsosceles()">设为等腰 (AB=BC)</button>
+        <button class="highlight" onclick="makeEquilateral()">设为等边三角形</button>
+        <button onclick="resetShape()">重置</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="info">
+        从顶点 <b>B</b> 向对边 <b>AC</b> 作线。<br>
+        拖动顶点，观察什么时候三条线会重合？（三线合一）
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI Controls
+    const checkAlt = document.getElementById('showAltitude');
+    const checkBis = document.getElementById('showBisector');
+    const checkMed = document.getElementById('showMedian');
+
+    // 初始坐标 (模拟截图布局: B在左下, A在上, C在右下)
+    let points = {
+        A: { x: 350, y: 100 },
+        B: { x: 150, y: 400 },
+        C: { x: 650, y: 400 }
+    };
+
+    let draggingPoint = null;
+
+    // --- 数学工具函数 ---
+
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    // 像素转显示数值 (模拟)
+    function toLabel(val) {
+        return (val / 40).toFixed(1); 
+    }
+
+    // 计算点 P 到线段 AB 的垂足投影
+    function getProjection(P, A, B) {
+        const dx = B.x - A.x;
+        const dy = B.y - A.y;
+        const t = ((P.x - A.x) * dx + (P.y - A.y) * dy) / (dx * dx + dy * dy);
+        return {
+            x: A.x + t * dx,
+            y: A.y + t * dy,
+            t: t // t在[0,1]之间表示在线段上
+        };
+    }
+
+    // 计算角平分线与对边的交点
+    // 计算 ∠ABC 的平分线交 AC 于点 P
+    // 根据角平分线定理: AB / BC = AP / PC
+    function getBisectorFoot(A, B, C) {
+        const c = dist(A, B); // AB长
+        const a = dist(B, C); // BC长
+        // P 分 AC 的比为 c : a
+        // P = (a*A + c*C) / (a+c)
+        const k = c / (a + c); 
+        // 向量插值
+        return {
+            x: A.x + (C.x - A.x) * (a / (a+c)), // 注意比率方向，AP/AC = c/(a+c)
+            y: A.y + (C.y - A.y) * (a / (a+c))
+        };
+    }
+
+    // --- 绘图函数 ---
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制三角形边框
+        ctx.beginPath();
+        ctx.moveTo(points.A.x, points.A.y);
+        ctx.lineTo(points.B.x, points.B.y);
+        ctx.lineTo(points.C.x, points.C.y);
+        ctx.closePath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#ddd";
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // 2. 绘制三条特殊线 (从顶点 B 到边 AC)
+        const A = points.A;
+        const B = points.B;
+        const C = points.C;
+
+        // --- 高 Altitude (蓝色) ---
+        const H = getProjection(B, A, C);
+        if (checkAlt.checked) {
+            ctx.beginPath();
+            ctx.moveTo(B.x, B.y);
+            ctx.lineTo(H.x, H.y);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#2979FF"; // 亮蓝
+            ctx.stroke();
+
+            // 画直角符号
+            drawRightAngleMark(B, H, C); // 或 A，取决于方向，这里简单画个方块
+        }
+
+        // --- 角平分线 Bisector (橙色) ---
+        const P = getBisectorFoot(A, B, C);
+        if (checkBis.checked) {
+            ctx.beginPath();
+            ctx.moveTo(B.x, B.y);
+            ctx.lineTo(P.x, P.y);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#FF9100"; // 橙色
+            ctx.stroke();
+            
+            // 可以在B点画两个小弧线表示角相等(略)
+        }
+
+        // --- 中线 Median (黄色) ---
+        const M = { x: (A.x + C.x)/2, y: (A.y + C.y)/2 };
+        if (checkMed.checked) {
+            ctx.beginPath();
+            ctx.moveTo(B.x, B.y);
+            ctx.lineTo(M.x, M.y);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#FFEA00"; // 黄色
+            ctx.stroke();
+
+            // 显示中线分成的两段长度
+            drawSegmentText(A, M, toLabel(dist(A, M)), -15);
+            drawSegmentText(C, M, toLabel(dist(C, M)), -15);
+            
+            // 画中点标记 (小点)
+            ctx.fillStyle = "#FFEA00";
+            ctx.beginPath(); ctx.arc(M.x, M.y, 4, 0, Math.PI*2); ctx.fill();
+        }
+
+        // 如果高落在三角形外，绘制AC的延长线辅助
+        if (H.t < 0 || H.t > 1) {
+            ctx.save();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = "#666";
+            ctx.beginPath();
+            ctx.moveTo(A.x, A.y);
+            ctx.lineTo(C.x, C.y);
+            // 延伸到垂足
+            ctx.lineTo(H.x, H.y);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 3. 绘制顶点
+        drawPoint(points.A, "A", 0, -15);
+        drawPoint(points.B, "B", -20, 10);
+        drawPoint(points.C, "C", 20, 10);
+
+        // 4. 绘制三边长度 (辅助显示)
+        drawSegmentText(points.A, points.B, toLabel(dist(points.A, points.B)), 20);
+        // AC边的总长略微移远一点，避免和中线分段长度重叠
+        // drawSegmentText(points.A, points.C, toLabel(dist(points.A, points.C)), 30); 
+        drawSegmentText(points.B, points.C, toLabel(dist(points.B, points.C)), 20);
+    }
+
+    // 辅助绘图：直角符号
+    function drawRightAngleMark(Start, Corner, End) {
+        const size = 10;
+        const angle = Math.atan2(Start.y - Corner.y, Start.x - Corner.x);
+        const lineAngle = Math.atan2(End.y - Corner.y, End.x - Corner.x);
+        
+        // 简单处理：直接在垂足处画一个小正方形，不随线旋转太复杂
+        ctx.save();
+        ctx.translate(Corner.x, Corner.y);
+        // 旋转到AC线的角度
+        ctx.rotate(lineAngle);
+        
+        ctx.strokeStyle = "#2979FF";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // 假设Start在上方，逆时针旋转
+        ctx.moveTo(0, -size);
+        ctx.lineTo(-size, -size);
+        ctx.lineTo(-size, 0);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawPoint(p, label, offX, offY) {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = "bold 18px Arial";
+        ctx.fillText(label, p.x + offX, p.y + offY);
+    }
+
+    function drawSegmentText(p1, p2, text, offset) {
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        ctx.fillStyle = "#aaa";
+        ctx.font = "14px Arial";
+        
+        // 简单的偏移，防止文字压线
+        // 计算法线方向太复杂，这里简单向下或向上
+        ctx.fillText(text, mx + 5, my + offset);
+    }
+
+    // --- 预设形状 ---
+    
+    function resetShape() {
+        points = { A: { x: 350, y: 100 }, B: { x: 150, y: 400 }, C: { x: 650, y: 400 } };
+        draw();
+    }
+
+    function makeIsosceles() {
+        // 保持底边AC不变，将B移动到垂直平分线上
+        // 实际上截图是从B出发，所以我们让 AB = BC
+        // 保持 B 和 C 不变，移动 A 使得 BA = BC
+        // 为了视觉效果好，我们设定为以 B 为顶点的等腰? 
+        // 不，通常教学演示三线合一是指：从顶点引出的三线。
+        // 在本图中，线是从 B 引出的。所以要演示三线合一，必须 BA = BC (B为顶点)。
+        
+        const midAC = { x: (points.A.x + points.C.x)/2, y: (points.A.y + points.C.y)/2 };
+        // 这样只能让中线竖直。
+        // 要让BA=BC，需要B在AC的垂直平分线上。
+        // 让我们调整 B 的位置到 AC 的垂直平分线上
+        
+        // 计算AC中点
+        const mX = (points.A.x + points.C.x) / 2;
+        // B的X设为mX
+        points.B.x = mX;
+        // B的Y保持大致不变或调整
+        points.B.y = 100; // 顶点在上方
+        points.A.y = 400; 
+        points.C.y = 400;
+        // 现在是从B(上) 到 AC(下)。符合三线合一演示习惯
+        draw();
+    }
+    
+    function makeEquilateral() {
+        // 设为等边
+        const side = 300;
+        const h = side * Math.sqrt(3) / 2;
+        const cx = canvas.width / 2;
+        const cy = 400;
+        
+        points.A = { x: cx - side/2, y: cy };
+        points.C = { x: cx + side/2, y: cy };
+        points.B = { x: cx, y: cy - h }; // 顶点B在上
+        draw();
+    }
+
+    // --- 交互逻辑 ---
+
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    canvas.addEventListener('mousedown', e => {
+        const pos = getMousePos(e);
+        ['A', 'B', 'C'].forEach(key => {
+            if (dist(pos, points[key]) < 20) draggingPoint = key;
+        });
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        const pos = getMousePos(e);
+        
+        // Cursor style
+        let hover = false;
+        ['A', 'B', 'C'].forEach(key => { if (dist(pos, points[key]) < 20) hover = true; });
+        canvas.style.cursor = hover ? 'pointer' : 'crosshair';
+
+        if (draggingPoint) {
+            points[draggingPoint].x = Math.max(10, Math.min(canvas.width-10, pos.x));
+            points[draggingPoint].y = Math.max(10, Math.min(canvas.height-10, pos.y));
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', () => draggingPoint = null);
+    
+    // 监听Checkbox
+    checkAlt.addEventListener('change', draw);
+    checkBis.addEventListener('change', draw);
+    checkMed.addEventListener('change', draw);
+
+    draw();
+
+</script>
+</body>
+</html>

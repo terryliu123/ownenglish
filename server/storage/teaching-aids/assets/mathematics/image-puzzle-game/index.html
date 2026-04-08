@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧩 拼图游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f3e7f3 0%, #fce4ec 100%);
+            min-height: 100vh;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        @media (max-width: 768px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-content {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .upload-button {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            background: #f9fafb;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .upload-button:hover {
+            border-color: #9ca3af;
+            background: #f3f4f6;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-item input[type="radio"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        .radio-item label {
+            cursor: pointer;
+            color: #374151;
+        }
+
+        .button {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+            color: #374151;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .button:hover {
+            background: #f9fafb;
+            border-color: #9ca3af;
+        }
+
+        .success-message {
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            color: #166534;
+        }
+
+        .success-message h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .puzzle-area {
+            width: 100%;
+            height: 400px;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9fafb;
+        }
+
+        .puzzle-grid {
+            display: grid;
+            gap: 2px;
+            width: 420px;
+            height: 420px;
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin: 0 auto;
+        }
+
+        .puzzle-piece {
+            border: 1px solid #e5e7eb;
+            cursor: move;
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .puzzle-piece:hover {
+            transform: scale(1.02);
+        }
+
+        .puzzle-piece.dragging {
+            opacity: 0.5;
+            transform: scale(0.95);
+        }
+
+        .puzzle-piece.correct {
+            border: 2px solid #10b981;
+            box-shadow: 0 0 0 1px #10b981;
+        }
+
+        .puzzle-piece img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            pointer-events: none;
+        }
+
+        .placeholder-content {
+            text-align: center;
+            color: #6b7280;
+        }
+
+        .placeholder-content .icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #6b7280;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .falling-emoji {
+            position: fixed;
+            font-size: 24px;
+            pointer-events: none;
+            z-index: 1000;
+            animation: fall 3s linear forwards;
+        }
+
+        @keyframes fall {
+            0% {
+                transform: translateY(-50px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧩 拼图游戏</h1>
+            <p>上传图片，选择难度，开始挑战！</p>
+        </div>
+
+        <div class="game-layout">
+            <!-- 控制面板 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        📤 游戏设置
+                    </div>
+                </div>
+                <div class="card-content">
+                    <!-- 图片上传 -->
+                    <div class="form-group">
+                        <label class="form-label">上传图片</label>
+                        <input type="file" id="imageInput" accept="image/*" class="hidden">
+                        <div class="upload-button" onclick="document.getElementById('imageInput').click()">
+                            📤 选择图片
+                        </div>
+                    </div>
+
+                    <!-- 难度选择 -->
+                    <div class="form-group">
+                        <label class="form-label">拼图难度</label>
+                        <div class="radio-group">
+                            <div class="radio-item">
+                                <input type="radio" id="size4" name="gridSize" value="4" checked>
+                                <label for="size4">4×4 (入门)</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size5" name="gridSize" value="5">
+                                <label for="size5">5×5 (简单)</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size6" name="gridSize" value="6">
+                                <label for="size6">6×6 (中等)</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size7" name="gridSize" value="7">
+                                <label for="size7">7×7 (困难)</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size8" name="gridSize" value="8">
+                                <label for="size8">8×8 (专家)</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 重新开始按钮 -->
+                    <div class="form-group">
+                        <button class="button" id="resetButton" onclick="resetPuzzle()" style="display: none;">
+                            🔄 重新开始
+                        </button>
+                    </div>
+
+                    <!-- 成功提示 -->
+                    <div id="successMessage" class="success-message" style="display: none;">
+                        <h3>🎉 挑战成功！</h3>
+                        <p>恭喜您完成了拼图挑战！</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 拼图区域 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">拼图区域</div>
+                </div>
+                <div class="card-content">
+                    <div id="puzzleContainer" class="puzzle-area">
+                        <div class="placeholder-content">
+                            <div class="icon">📤</div>
+                            <p>请先上传一张图片开始游戏</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的canvas用于图片处理 -->
+    <canvas id="hiddenCanvas" class="hidden"></canvas>
+
+    <script>
+        let uploadedImage = null;
+        let gridSize = 4;
+        let puzzlePieces = [];
+        let isCompleted = false;
+        let draggedElement = null;
+        let draggedPieceId = null;
+
+        const emojis = ["🎉", "🎊", "✨", "🌟", "💫", "🎈", "🏆", "👏"];
+
+        // 初始化事件监听器
+        document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+        document.querySelectorAll('input[name="gridSize"]').forEach(radio => {
+            radio.addEventListener('change', handleGridSizeChange);
+        });
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    uploadedImage = e.target.result;
+                    isCompleted = false;
+                    document.getElementById('successMessage').style.display = 'none';
+                    createPuzzlePieces();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function handleGridSizeChange(event) {
+            gridSize = parseInt(event.target.value);
+            if (uploadedImage) {
+                createPuzzlePieces();
+            }
+        }
+
+        function createPuzzlePieces() {
+            if (!uploadedImage) return;
+
+            const container = document.getElementById('puzzleContainer');
+            container.innerHTML = '<div class="loading"><div class="spinner"></div><p>正在生成拼图...</p></div>';
+
+            setTimeout(() => {
+                const canvas = document.getElementById('hiddenCanvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+
+                img.onload = function() {
+                    const pieceSize = 400 / gridSize;
+                    canvas.width = 400;
+                    canvas.height = 400;
+
+                    // 绘制缩放后的图片
+                    ctx.drawImage(img, 0, 0, 400, 400);
+
+                    // 创建拼图块
+                    puzzlePieces = [];
+                    for (let row = 0; row < gridSize; row++) {
+                        for (let col = 0; col < gridSize; col++) {
+                            const pieceCanvas = document.createElement('canvas');
+                            const pieceCtx = pieceCanvas.getContext('2d');
+                            pieceCanvas.width = pieceSize;
+                            pieceCanvas.height = pieceSize;
+
+                            // 提取图片片段
+                            const imageData = ctx.getImageData(col * pieceSize, row * pieceSize, pieceSize, pieceSize);
+                            pieceCtx.putImageData(imageData, 0, 0);
+
+                            const correctPosition = row * gridSize + col;
+                            puzzlePieces.push({
+                                id: correctPosition,
+                                currentPosition: correctPosition,
+                                correctPosition: correctPosition,
+                                imageData: pieceCanvas.toDataURL()
+                            });
+                        }
+                    }
+
+                    // 打乱拼图
+                    shufflePuzzle();
+                    renderPuzzle();
+                    document.getElementById('resetButton').style.display = 'block';
+                };
+
+                img.src = uploadedImage;
+            }, 100);
+        }
+
+        function shufflePuzzle() {
+            // Fisher-Yates 洗牌算法
+            for (let i = puzzlePieces.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const temp = puzzlePieces[i].currentPosition;
+                puzzlePieces[i].currentPosition = puzzlePieces[j].currentPosition;
+                puzzlePieces[j].currentPosition = temp;
+            }
+        }
+
+        function renderPuzzle() {
+            const container = document.getElementById('puzzleContainer');
+            const pieceSize = 400 / gridSize;
+
+            const puzzleGrid = document.createElement('div');
+            puzzleGrid.className = 'puzzle-grid';
+            puzzleGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+            for (let i = 0; i < gridSize * gridSize; i++) {
+                const piece = puzzlePieces.find(p => p.currentPosition === i);
+                const pieceElement = document.createElement('div');
+                pieceElement.className = 'puzzle-piece';
+                pieceElement.style.width = `${pieceSize}px`;
+                pieceElement.style.height = `${pieceSize}px`;
+                pieceElement.dataset.position = i;
+
+                if (piece) {
+                    const img = document.createElement('img');
+                    img.src = piece.imageData;
+                    img.alt = `Puzzle piece ${piece.id}`;
+                    img.draggable = false;
+
+                    pieceElement.appendChild(img);
+                    pieceElement.draggable = true;
+                    pieceElement.dataset.pieceId = piece.id;
+
+                    // 检查是否在正确位置
+                    if (piece.currentPosition === piece.correctPosition) {
+                        pieceElement.classList.add('correct');
+                    }
+
+                    // 添加拖拽事件
+                    pieceElement.addEventListener('dragstart', handleDragStart);
+                    pieceElement.addEventListener('dragover', handleDragOver);
+                    pieceElement.addEventListener('drop', handleDrop);
+                    pieceElement.addEventListener('dragend', handleDragEnd);
+                }
+
+                // 为空位置也添加拖拽事件
+                pieceElement.addEventListener('dragover', handleDragOver);
+                pieceElement.addEventListener('drop', handleDrop);
+
+                puzzleGrid.appendChild(pieceElement);
+            }
+
+            container.innerHTML = '';
+            container.appendChild(puzzleGrid);
+
+            checkCompletion();
+        }
+
+        function handleDragStart(e) {
+            draggedElement = e.target.closest('.puzzle-piece');
+            draggedPieceId = parseInt(draggedElement.dataset.pieceId);
+            draggedElement.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            if (!draggedElement) return;
+
+            const targetElement = e.target.closest('.puzzle-piece');
+            if (!targetElement || targetElement === draggedElement) return;
+
+            const targetPosition = parseInt(targetElement.dataset.position);
+            const draggedPosition = parseInt(draggedElement.dataset.position);
+
+            // 交换拼图块位置
+            swapPieces(draggedPosition, targetPosition);
+        }
+
+        function handleDragEnd(e) {
+            if (draggedElement) {
+                draggedElement.classList.remove('dragging');
+                draggedElement = null;
+                draggedPieceId = null;
+            }
+        }
+
+        function swapPieces(pos1, pos2) {
+            const piece1 = puzzlePieces.find(p => p.currentPosition === pos1);
+            const piece2 = puzzlePieces.find(p => p.currentPosition === pos2);
+
+            if (piece1 && piece2) {
+                const temp = piece1.currentPosition;
+                piece1.currentPosition = piece2.currentPosition;
+                piece2.currentPosition = temp;
+            } else if (piece1) {
+                piece1.currentPosition = pos2;
+            } else if (piece2) {
+                piece2.currentPosition = pos1;
+            }
+
+            renderPuzzle();
+        }
+
+        function checkCompletion() {
+            if (puzzlePieces.length === 0) return;
+
+            const completed = puzzlePieces.every(piece => 
+                piece.currentPosition === piece.correctPosition
+            );
+
+            if (completed && !isCompleted) {
+                isCompleted = true;
+                document.getElementById('successMessage').style.display = 'block';
+                createFallingEmojis();
+            }
+        }
+
+        function createFallingEmojis() {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const emoji = document.createElement('div');
+                    emoji.className = 'falling-emoji';
+                    emoji.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+                    emoji.style.left = Math.random() * window.innerWidth + 'px';
+                    emoji.style.top = '-50px';
+                    
+                    document.body.appendChild(emoji);
+
+                    // 3秒后移除emoji
+                    setTimeout(() => {
+                        if (emoji.parentNode) {
+                            emoji.parentNode.removeChild(emoji);
+                        }
+                    }, 3000);
+                }, i * 100);
+            }
+        }
+
+        function resetPuzzle() {
+            if (puzzlePieces.length > 0) {
+                isCompleted = false;
+                document.getElementById('successMessage').style.display = 'none';
+                shufflePuzzle();
+                renderPuzzle();
+            }
+        }
+    </script>
+</body>
+</html>

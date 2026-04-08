@@ -37,7 +37,7 @@ class AdminStatsResponse(BaseModel):
     active_users_7d: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserListResponse(BaseModel):
@@ -55,7 +55,7 @@ class UserListResponse(BaseModel):
     membership_expires_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class UserListWithCount(BaseModel):
@@ -218,7 +218,7 @@ async def update_membership_plan(
     if not plan:
         raise HTTPException(status_code=404, detail="Membership plan not found")
 
-    updates = data.dict(exclude_unset=True)
+    updates = data.model_dump(exclude_unset=True)
     for key, value in updates.items():
         setattr(plan, key, value)
     await db.flush()
@@ -232,7 +232,7 @@ async def update_wechat_pay_settings(
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
-    payload = data.dict()
+    payload = data.model_dump()
     for key in WECHAT_PAY_SETTING_KEYS:
         meta = WECHAT_PAY_SETTING_META[key]
         await upsert_system_setting(

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倍数特征复习小游戏</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        .game-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .number-display {
+            font-size: 72px;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #3498db;
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-2 {
+            background-color: #e74c3c;
+            color: white;
+        }
+        .btn-3 {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .btn-5 {
+            background-color: #f39c12;
+            color: white;
+        }
+        .btn-none {
+            background-color: #95a5a6;
+            color: white;
+        }
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .next-btn {
+            background-color: #3498db;
+            color: white;
+            font-size: 20px;
+            padding: 12px 30px;
+            margin-top: 20px;
+        }
+        .score-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .correct {
+            color: #2ecc71;
+        }
+        .incorrect {
+            color: #e74c3c;
+        }
+        .feedback {
+            font-size: 20px;
+            margin: 15px 0;
+            min-height: 30px;
+        }
+        .rules {
+            text-align: left;
+            background-color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .rules h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .rules ul {
+            padding-left: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>倍数特征复习小游戏</h1>
+    
+    <div class="game-container">
+        <div class="rules">
+            <h3>倍数特征规则：</h3>
+            <ul>
+                <li><strong>2的倍数</strong>：个位数字是0、2、4、6、8</li>
+                <li><strong>3的倍数</strong>：各位数字之和是3的倍数</li>
+                <li><strong>5的倍数</strong>：个位数字是0或5</li>
+            </ul>
+            <p>游戏规则：判断显示的数字是哪些数的倍数，点击相应按钮。可以多选。</p>
+        </div>
+        
+        <div class="number-display" id="numberDisplay">?</div>
+        
+        <div class="feedback" id="feedback"></div>
+        
+        <div class="buttons">
+            <button class="btn-2" id="btn2">2的倍数</button>
+            <button class="btn-3" id="btn3">3的倍数</button>
+            <button class="btn-5" id="btn5">5的倍数</button>
+            <button class="btn-none" id="btnNone">都不是</button>
+        </div>
+        
+        <button class="next-btn" id="nextBtn">下一个数字</button>
+        
+        <div class="score-container">
+            <div>正确: <span id="correctCount">0</span></div>
+            <div>错误: <span id="incorrectCount">0</span></div>
+            <div>准确率: <span id="accuracy">0</span>%</div>
+        </div>
+    </div>
+
+    <script>
+        // 游戏变量
+        let currentNumber = 0;
+        let correctAnswers = [];
+        let correctCount = 0;
+        let incorrectCount = 0;
+        
+        // DOM元素
+        const numberDisplay = document.getElementById('numberDisplay');
+        const feedback = document.getElementById('feedback');
+        const btn2 = document.getElementById('btn2');
+        const btn3 = document.getElementById('btn3');
+        const btn5 = document.getElementById('btn5');
+        const btnNone = document.getElementById('btnNone');
+        const nextBtn = document.getElementById('nextBtn');
+        const correctCountEl = document.getElementById('correctCount');
+        const incorrectCountEl = document.getElementById('incorrectCount');
+        const accuracyEl = document.getElementById('accuracy');
+        
+        // 初始化游戏
+        function initGame() {
+            generateNumber();
+            updateScore();
+        }
+        
+        // 生成随机数字
+        function generateNumber() {
+            currentNumber = Math.floor(Math.random() * 999) + 1; // 1-999
+            numberDisplay.textContent = currentNumber;
+            feedback.textContent = '';
+            feedback.className = 'feedback';
+            
+            // 重置按钮状态
+            [btn2, btn3, btn5, btnNone].forEach(btn => {
+                btn.disabled = false;
+                btn.style.opacity = 1;
+            });
+            
+            // 计算正确答案
+            correctAnswers = [];
+            if (isMultipleOf2(currentNumber)) correctAnswers.push(2);
+            if (isMultipleOf3(currentNumber)) correctAnswers.push(3);
+            if (isMultipleOf5(currentNumber)) correctAnswers.push(5);
+            if (correctAnswers.length === 0) correctAnswers.push('none');
+        }
+        
+        // 判断是否是2的倍数
+        function isMultipleOf2(num) {
+            return num % 2 === 0;
+        }
+        
+        // 判断是否是3的倍数
+        function isMultipleOf3(num) {
+            // 计算各位数字之和
+            const sum = String(num).split('').reduce((acc, digit) => acc + parseInt(digit), 0);
+            return sum % 3 === 0;
+        }
+        
+        // 判断是否是5的倍数
+        function isMultipleOf5(num) {
+            return num % 5 === 0;
+        }
+        
+        // 检查答案
+        function checkAnswer(selected) {
+            // 禁用所有按钮
+            [btn2, btn3, btn5, btnNone].forEach(btn => {
+                btn.disabled = true;
+            });
+            
+            // 判断用户选择是否正确
+            const userAnswers = [];
+            if (selected === 2 || selected === 3 || selected === 5) {
+                userAnswers.push(selected);
+            } else if (selected === 'none') {
+                // 用户选择了"都不是"
+            }
+            
+            let isCorrect;
+            
+            if (selected === 'none') {
+                isCorrect = correctAnswers.length === 1 && correctAnswers[0] === 'none';
+            } else {
+                isCorrect = correctAnswers.includes(selected);
+            }
+            
+            // 更新分数
+            if (isCorrect) {
+                correctCount++;
+                feedback.textContent = '正确！';
+                feedback.className = 'feedback correct';
+            } else {
+                incorrectCount++;
+                feedback.textContent = `错误！正确答案是: ${formatCorrectAnswers()}`;
+                feedback.className = 'feedback incorrect';
+            }
+            
+            updateScore();
+            
+            // 高亮显示正确按钮
+            highlightCorrectButtons();
+        }
+        
+        // 格式化正确答案显示
+        function formatCorrectAnswers() {
+            if (correctAnswers[0] === 'none') return '都不是';
+            return correctAnswers.join('、') + '的倍数';
+        }
+        
+        // 高亮显示正确按钮
+        function highlightCorrectButtons() {
+            // 先重置所有按钮
+            [btn2, btn3, btn5, btnNone].forEach(btn => {
+                btn.style.opacity = 0.5;
+            });
+            
+            // 高亮正确按钮
+            correctAnswers.forEach(answer => {
+                if (answer === 2) btn2.style.opacity = 1;
+                if (answer === 3) btn3.style.opacity = 1;
+                if (answer === 5) btn5.style.opacity = 1;
+                if (answer === 'none') btnNone.style.opacity = 1;
+            });
+        }
+        
+        // 更新分数显示
+        function updateScore() {
+            correctCountEl.textContent = correctCount;
+            incorrectCountEl.textContent = incorrectCount;
+            
+            const total = correctCount + incorrectCount;
+            const accuracy = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+            accuracyEl.textContent = accuracy;
+        }
+        
+        // 事件监听
+        btn2.addEventListener('click', () => checkAnswer(2));
+        btn3.addEventListener('click', () => checkAnswer(3));
+        btn5.addEventListener('click', () => checkAnswer(5));
+        btnNone.addEventListener('click', () => checkAnswer('none'));
+        nextBtn.addEventListener('click', generateNumber);
+        
+        // 开始游戏
+        initGame();
+    </script>
+</body>
+</html>

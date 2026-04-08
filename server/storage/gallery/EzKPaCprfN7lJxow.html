@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>启普发生器 - 沉浸式仿真实验</title>
+    <style>
+        /* --- 基础布局 --- */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            background-color: #263238; /* 深色背景衬托玻璃仪器 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #eceff1;
+        }
+
+        /* 1. 顶部 */
+        header {
+            width: 100%;
+            background: rgba(0,0,0,0.2);
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        h1 { margin: 0; font-size: 1.6rem; font-weight: 300; letter-spacing: 2px; }
+
+        /* 2. 实验区 */
+        .stage-container {
+            position: relative;
+            margin: 30px 0;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background: radial-gradient(circle at 50% 30%, #37474f 0%, #102027 100%); /* 聚光灯背景 */
+            cursor: default; /* 默认光标 */
+        }
+        
+        /* 交互提示悬浮层 */
+        .hint-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+        
+        .status-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+        .status-on { background-color: rgba(76, 175, 80, 0.8); color: #fff; }
+        .status-off { background-color: rgba(244, 67, 54, 0.8); color: #fff; }
+
+        /* 鼠标悬停在活塞上的样式，通过JS动态添加class实现 */
+        .cursor-pointer { cursor: pointer !important; }
+
+        /* 3. 底部说明 */
+        footer {
+            max-width: 800px;
+            padding: 0 20px 40px 20px;
+            color: #b0bec5;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            text-align: justify;
+        }
+        .highlight { color: #4dd0e1; font-weight: bold; }
+        .book-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            border: 1px solid #546e7a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 5px;
+            color: #78909c;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>启普发生器</h1>
+    </header>
+
+    <div class="stage-container">
+        <canvas id="simCanvas" width="900" height="540"></canvas>
+        
+        <!-- 界面UI元素 -->
+        <div class="hint-overlay">💡 提示：点击右侧的 <strong>活塞旋钮</strong> 来控制反应</div>
+        <div id="statusBadge" class="status-badge status-off">阀门已关闭</div>
+    </div>
+
+    <footer>
+        <p>
+            <span class="book-tag">原理演示</span>
+            启普发生器是利用气压原理实现“随开随用，随关随停”的气体发生装置。
+            <br>
+            <strong>开启时：</strong>导管内外压强平衡，酸液在重力作用下浸没固体，反应开始，产生气体。
+            <br>
+            <strong>关闭时：</strong>导管封闭，产生气体的压强增大，将酸液压回球形漏斗，固液分离，反应停止。
+        </p>
+    </footer>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusBadge = document.getElementById('statusBadge');
+
+    // --- 配置参数 ---
+    const CX = canvas.width / 2; // 中心X
+    const CY = canvas.height / 2 + 20; // 中心Y (略微下移)
+    
+    // 液体颜色 (稀硫酸)
+    const LIQUID_COLOR = "rgba(79, 195, 247, 0.6)"; 
+    const LIQUID_TOP_COLOR = "rgba(179, 229, 252, 0.8)";
+    
+    // 玻璃参数
+    const GLASS_Border = "rgba(255, 255, 255, 0.5)";
+    const GLASS_Highlight = "rgba(255, 255, 255, 0.15)";
+    
+    // 活塞热区 (用于点击检测)
+    const VALVE_POS = { x: CX + 170, y: CY - 60, r: 25 };
+
+    // --- 状态变量 ---
+    let isValveOpen = false;
+    let targetLevel = 0; // 0: 分离(液面低), 1: 接触(液面高)
+    let currentLevel = 0; // 当前动画过渡值
+    let bubbles = [];
+
+    // --- 交互事件 ---
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        // 检测是否悬停在活塞上
+        const dist = Math.sqrt((x - VALVE_POS.x)**2 + (y - VALVE_POS.y)**2);
+        if (dist < VALVE_POS.r) {
+            canvas.classList.add('cursor-pointer');
+        } else {
+            canvas.classList.remove('cursor-pointer');
+        }
+    });
+
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const dist = Math.sqrt((x - VALVE_POS.x)**2 + (y - VALVE_POS.y)**2);
+        if (dist < VALVE_POS.r) {
+            toggleValve();
+        }
+    });
+
+    function toggleValve() {
+        isValveOpen = !isValveOpen;
+        
+        if (isValveOpen) {
+            statusBadge.textContent = "阀门已打开 (反应中)";
+            statusBadge.className = "status-badge status-on";
+            targetLevel = 1;
+        } else {
+            statusBadge.textContent = "阀门已关闭 (液体被压回)";
+            statusBadge.className = "status-badge status-off";
+            targetLevel = 0;
+        }
+    }
+
+    // --- 绘图辅助函数 ---
+    
+    // 创建玻璃质感路径
+    function strokeGlass(ctx) {
+        ctx.shadowColor = "rgba(255, 255, 255, 0.5)";
+        ctx.shadowBlur = 10;
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = GLASS_Border;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    // 绘制锌粒 (多边形模拟)
+    function drawZinc(x, y, size) {
+        ctx.fillStyle = "#90a4ae"; // 锌灰色
+        ctx.strokeStyle = "#546e7a";
+        ctx.lineWidth = 1;
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x + size, y - size/2);
+        ctx.lineTo(x + size*0.8, y + size);
+        ctx.lineTo(x - size*0.8, y + size*0.8);
+        ctx.lineTo(x - size, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        // 高光
+        ctx.fillStyle = "rgba(255,255,255,0.3)";
+        ctx.beginPath();
+        ctx.arc(x - size/3, y - size/3, size/4, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // 绘制气泡
+    function drawBubble(b) {
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.fill();
+        // 气泡高光
+        ctx.beginPath();
+        ctx.arc(b.x - b.r*0.3, b.y - b.r*0.3, b.r*0.3, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 255, 255, 1)";
+        ctx.fill();
+    }
+
+    // 定义启普发生器主轮廓 (用于裁剪和描边)
+    function defineKippPath() {
+        ctx.beginPath();
+        
+        // 1. 底部大球
+        ctx.arc(CX, CY + 120, 100, Math.PI * 0.15, Math.PI * 0.85, false); 
+        
+        // 2. 左侧腰部连接
+        ctx.bezierCurveTo(CX - 70, CY + 60, CX - 90, CY + 40, CX - 70, CY);
+        
+        // 3. 中间反应球
+        // 留出左侧进料口接口，右侧出气口接口
+        ctx.arc(CX, CY, 70, Math.PI * 0.85, Math.PI * 2.15, false); 
+        
+        // 4. 右侧腰部连接
+        ctx.bezierCurveTo(CX + 90, CY + 40, CX + 70, CY + 60, CX + 94, CY + 150); // 闭合到底部球
+        
+        ctx.closePath();
+    }
+
+    // --- 核心渲染循环 ---
+    function animate() {
+        // 1. 物理计算 (缓动动画)
+        // 使用 lerp 插值使液面升降更自然
+        currentLevel += (targetLevel - currentLevel) * 0.05;
+
+        // 气泡逻辑
+        if (currentLevel > 0.8) {
+            if (Math.random() < 0.4) { // 产生气泡
+                bubbles.push({
+                    x: CX - 20 + Math.random() * 40,
+                    y: CY + 20 + Math.random() * 10,
+                    r: 2 + Math.random() * 3,
+                    speed: 1 + Math.random() * 1.5,
+                    wobble: Math.random() * Math.PI
+                });
+            }
+        }
+
+        // 更新气泡
+        for (let i = bubbles.length - 1; i >= 0; i--) {
+            let b = bubbles[i];
+            b.y -= b.speed;
+            b.x += Math.sin(b.y * 0.05 + b.wobble) * 0.5; // 摇摆上升
+            
+            // 消失条件
+            if (b.y < CY - 80) { // 进入导管口附近消失
+                bubbles.splice(i, 1);
+            } else if (!isValveOpen && b.y < CY - 50) {
+                 // 关闭时气泡积聚消失
+                 b.r *= 0.9;
+                 if(b.r < 0.1) bubbles.splice(i, 1);
+            }
+        }
+
+        // 2. 清空画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // --- 绘制开始 ---
+
+        // A. 绘制长颈漏斗 (内管) - 位于最底层
+        // 漏斗液面高度逻辑：反比于主体液面
+        // 反应进行(level=1) -> 压强小 -> 漏斗液面低
+        // 反应停止(level=0) -> 压强大 -> 液体被压回漏斗 -> 漏斗液面高
+        const funnelLiquidY = (CY - 150) - (1 - currentLevel) * 120; 
+
+        ctx.save();
+        ctx.beginPath();
+        // 漏斗顶部球
+        ctx.arc(CX, CY - 180, 50, 0, Math.PI * 2);
+        // 漏斗长管
+        ctx.rect(CX - 12, CY - 180, 24, 380); 
+        ctx.clip(); // 裁剪区域
+
+        // 漏斗内液体
+        ctx.fillStyle = LIQUID_COLOR;
+        ctx.fillRect(CX - 60, funnelLiquidY, 120, 600);
+        
+        // 液体顶面 (椭圆)
+        ctx.fillStyle = LIQUID_TOP_COLOR;
+        ctx.beginPath();
+        ctx.ellipse(CX, funnelLiquidY, 12, 4, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // 绘制漏斗玻璃轮廓
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 2;
+        ctx.stroke(); // 描边当前路径(漏斗整体)
+        ctx.restore();
+
+        // B. 绘制长颈漏斗的高光 (使其看起来像插在里面的管子)
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(CX - 12, CY - 230);
+        ctx.lineTo(CX - 12, CY + 200);
+        ctx.arc(CX, CY + 200, 12, Math.PI, 0, true); // 底部开口
+        ctx.lineTo(CX + 12, CY - 230);
+        // 顶部球轮廓
+        ctx.moveTo(CX + 12, CY - 140);
+        ctx.arc(CX, CY - 180, 50, Math.PI * 0.3, Math.PI * 2.7);
+        
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.stroke();
+        
+        // 添加管身反光条
+        ctx.beginPath();
+        ctx.moveTo(CX - 6, CY - 130);
+        ctx.lineTo(CX - 6, CY + 180);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.stroke();
+        ctx.restore();
+
+
+        // C. 绘制启普发生器主体
+        ctx.save();
+        defineKippPath(); // 定义路径
+        ctx.clip(); // 裁剪
+
+        // 主体液面高度
+        // level=1 (反应) -> 液面高 (覆盖固体)
+        // level=0 (停止) -> 液面低 (在底部球内)
+        // 固体大概在 CY + 20 附近，底部球底在 CY + 220
+        // 最高液面 CY; 最低液面 CY + 100
+        const mainLiquidY = (CY + 120) - currentLevel * 120;
+        
+        ctx.fillStyle = LIQUID_COLOR;
+        ctx.fillRect(CX - 150, mainLiquidY, 300, 400);
+
+        // 液体表面
+        ctx.fillStyle = LIQUID_TOP_COLOR;
+        ctx.beginPath();
+        // 这里的宽度近似计算，实际应该求交点，为了视觉效果简化
+        ctx.ellipse(CX, mainLiquidY, 90, 10, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore(); // 结束主体裁剪
+
+        // D. 绘制固体 (锌粒) - 在中间球的缩口处
+        // 固体位置固定
+        drawZinc(CX - 35, CY + 30, 15);
+        drawZinc(CX + 30, CY + 35, 14);
+        drawZinc(CX - 10, CY + 25, 16);
+        drawZinc(CX + 15, CY + 15, 12);
+        drawZinc(CX - 20, CY + 45, 13);
+
+        // E. 绘制气泡
+        for (let b of bubbles) {
+            drawBubble(b);
+        }
+
+        // F. 绘制主体玻璃轮廓 (高光与描边)
+        ctx.save();
+        defineKippPath();
+        
+        // 添加玻璃材质填充 (极淡的渐变)
+        let glassGrad = ctx.createLinearGradient(CX - 100, CY, CX + 100, CY);
+        glassGrad.addColorStop(0, "rgba(255,255,255,0.1)");
+        glassGrad.addColorStop(0.2, "rgba(255,255,255,0)");
+        glassGrad.addColorStop(0.8, "rgba(255,255,255,0)");
+        glassGrad.addColorStop(1, "rgba(255,255,255,0.15)");
+        ctx.fillStyle = glassGrad;
+        ctx.fill();
+
+        strokeGlass(ctx);
+
+        // 绘制玻璃高光条
+        ctx.beginPath();
+        ctx.arc(CX, CY, 60, Math.PI * 1.1, Math.PI * 1.4);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(CX, CY + 120, 90, Math.PI * 0.6, Math.PI * 0.8);
+        ctx.stroke();
+        ctx.restore();
+
+        // G. 绘制右侧导气管与活塞
+        drawOutletSystem();
+
+        requestAnimationFrame(animate);
+    }
+
+    // 绘制右侧导气系统
+    function drawOutletSystem() {
+        ctx.save();
+        
+        // 1. 橡胶塞
+        ctx.fillStyle = "#d7ccc8"; // 橡胶色
+        ctx.beginPath();
+        ctx.moveTo(CX + 62, CY - 25);
+        ctx.lineTo(CX + 78, CY - 35);
+        ctx.lineTo(CX + 82, CY - 15);
+        ctx.lineTo(CX + 66, CY - 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // 2. 玻璃导管
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = 8;
+        ctx.strokeStyle = "rgba(255,255,255,0.6)"; // 导管颜色
+        
+        ctx.beginPath();
+        ctx.moveTo(CX + 72, CY - 25); // 从塞子出
+        ctx.lineTo(CX + 130, CY - 60); // 斜向上
+        ctx.lineTo(CX + 240, CY - 60); // 水平向右
+        ctx.stroke();
+
+        // 导管内径 (营造管状感)
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "rgba(200,200,200,0.2)";
+        ctx.stroke();
+
+        // 3. 活塞 (阀门) - 关键交互点
+        const vx = VALVE_POS.x;
+        const vy = VALVE_POS.y;
+
+        // 阀体
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.beginPath();
+        ctx.arc(vx, vy, 14, 0, Math.PI*2);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#ccc";
+        ctx.stroke();
+
+        // 旋钮 (根据状态旋转)
+        ctx.save();
+        ctx.translate(vx, vy);
+        // 打开时竖直(通气)，关闭时水平(阻断) —— 实际上实验室旋钮通常与管平行是开，垂直是关
+        // 这里我们设定：竖直=关闭，水平=打开 (或者反过来，为了视觉明显，转动90度即可)
+        // 设定：水平 = 开 (顺着管子)，垂直 = 关 (切断管子)
+        let rotation = isValveOpen ? 0 : Math.PI / 2; 
+        // 添加一点过渡动画效果
+        
+        ctx.rotate(rotation);
+        
+        // 绘制旋钮形状
+        ctx.fillStyle = "#455a64"; // 深色旋钮
+        ctx.beginPath();
+        ctx.roundRect(-18, -6, 36, 12, 4);
+        ctx.fill();
+        
+        // 旋钮纹理
+        ctx.strokeStyle = "#78909c";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-10, 0); ctx.lineTo(10, 0);
+        ctx.stroke();
+        
+        ctx.restore();
+
+        // 4. 气体流出动画 (如果打开)
+        if (isValveOpen && currentLevel > 0.8) {
+            ctx.fillStyle = "rgba(255,255,255,0.5)";
+            const gasX = CX + 245 + (Date.now() % 300) / 20; // 快速向右飞
+            ctx.beginPath();
+            ctx.arc(gasX, CY - 60, 4, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // 5. 绘制点击热区提示圈 (呼吸效果)
+        if (!isValveOpen) {
+            const pulse = (Math.sin(Date.now() / 300) + 1) * 0.5;
+            ctx.strokeStyle = `rgba(255, 235, 59, ${0.3 + pulse * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(vx, vy, 22 + pulse * 5, 0, Math.PI*2);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    // 开始
+    animate();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>五子棋</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --board-color: #e3b04b;
+            --primary-btn: #4CAF50;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: var(--bg-color);
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            touch-action: manipulation; /* 优化点击延迟 */
+            overflow: hidden; /* 防止移动端回弹动画 */
+            height: 100vh;
+        }
+
+        h1 {
+            margin: 15px 0 5px;
+            font-size: 1.5rem;
+            color: #333;
+        }
+
+        #status {
+            margin: 10px 0;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 20px;
+            background: #eee;
+        }
+
+        /* 棋盘容器 - 响应式核心 */
+        .canvas-container {
+            width: 95vw;
+            max-width: 600px;
+            aspect-ratio: 1 / 1;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            background-color: var(--board-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            border-radius: 4px;
+            display: block;
+            touch-action: none; /* 极其重要：禁止浏览器处理触摸（防止滚动/缩放） */
+        }
+
+        .controls {
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 40px;
+            font-size: 1rem;
+            background-color: var(--primary-btn);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button:active {
+            transform: scale(0.95);
+            background-color: #45a049;
+        }
+
+        /* 胜利提示样式 */
+        .win-text { color: #d32f2f; font-size: 1.3rem; }
+    </style>
+</head>
+<body>
+
+    <h1>五子棋</h1>
+    <div id="status">黑棋回合</div>
+    
+    <div class="canvas-container">
+        <!-- 逻辑分辨率保持 600x600，CSS 会自动缩放显示 -->
+        <canvas id="chessBoard" width="600" height="600"></canvas>
+    </div>
+    
+    <div class="controls">
+        <button onclick="resetGame()">重新开始</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('chessBoard');
+        const ctx = canvas.getContext('2d');
+        const statusDisplay = document.getElementById('status');
+        
+        const padding = 30; 
+        const size = 15;    
+        const cellSize = (canvas.width - padding * 2) / (size - 1);
+        
+        let board = [];
+        let isBlackTurn = true;
+        let gameOver = false;
+
+        function initBoard() {
+            board = Array.from({ length: size }, () => Array(size).fill(0));
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 绘制背景纹理（可选）
+            ctx.strokeStyle = "#333";
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i < size; i++) {
+                // 横线
+                ctx.beginPath();
+                ctx.moveTo(padding, padding + i * cellSize);
+                ctx.lineTo(canvas.width - padding, padding + i * cellSize);
+                ctx.stroke();
+
+                // 纵线
+                ctx.beginPath();
+                ctx.moveTo(padding + i * cellSize, padding);
+                ctx.lineTo(padding + i * cellSize, canvas.height - padding);
+                ctx.stroke();
+            }
+
+            // 绘制 15x15 的五个定位点（星位）
+            const dots = [[3,3], [11,3], [7,7], [3,11], [11,11]];
+            dots.forEach(([r, c]) => {
+                ctx.beginPath();
+                ctx.arc(padding + c * cellSize, padding + r * cellSize, 4, 0, Math.PI * 2);
+                ctx.fillStyle = "#333";
+                ctx.fill();
+            });
+        }
+
+        function drawPiece(row, col, player) {
+            const x = padding + col * cellSize;
+            const y = padding + row * cellSize;
+            
+            ctx.beginPath();
+            ctx.arc(x, y, cellSize * 0.42, 0, Math.PI * 2);
+            
+            const gradient = ctx.createRadialGradient(x - 3, y - 3, cellSize * 0.05, x, y, cellSize * 0.4);
+            
+            if (player === 1) {
+                gradient.addColorStop(0, "#666");
+                gradient.addColorStop(1, "#000");
+            } else {
+                gradient.addColorStop(0, "#fff");
+                gradient.addColorStop(1, "#ccc");
+            }
+            
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        }
+
+        // 核心改动：统一处理点击和触摸
+        function handleInput(e) {
+            if (gameOver) return;
+
+            // 阻止默认行为（如滚动、缩放）
+            if (e.cancelable) e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            let clientX, clientY;
+
+            // 判断是触摸还是鼠标点击
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // 计算缩放比例：逻辑分辨率 / 屏幕显示分辨率
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            // 计算在 600x600 坐标系下的位置
+            const canvasX = (clientX - rect.left) * scaleX;
+            const canvasY = (clientY - rect.top) * scaleY;
+
+            // 换算成行列
+            const col = Math.round((canvasX - padding) / cellSize);
+            const row = Math.round((canvasY - padding) / cellSize);
+
+            if (row >= 0 && row < size && col >= 0 && col < size && board[row][col] === 0) {
+                placePiece(row, col);
+            }
+        }
+
+        function placePiece(row, col) {
+            const currentPlayer = isBlackTurn ? 1 : 2;
+            board[row][col] = currentPlayer;
+            drawPiece(row, col, currentPlayer);
+            
+            if (checkWin(row, col, currentPlayer)) {
+                statusDisplay.innerHTML = `<span class="win-text">${isBlackTurn ? "黑棋" : "白棋"} 获胜！</span>`;
+                gameOver = true;
+            } else {
+                isBlackTurn = !isBlackTurn;
+                statusDisplay.innerText = isBlackTurn ? "黑棋回合" : "白棋回合";
+                statusDisplay.style.background = isBlackTurn ? "#333" : "#fff";
+                statusDisplay.style.color = isBlackTurn ? "#fff" : "#333";
+            }
+        }
+
+        function checkWin(r, c, p) {
+            const directions = [[0,1], [1,0], [1,1], [1,-1]];
+            for (let [dr, dc] of directions) {
+                let count = 1;
+                let i = 1;
+                while (r+dr*i>=0 && r+dr*i<size && c+dc*i>=0 && c+dc*i<size && board[r+dr*i][c+dc*i]===p) { count++; i++; }
+                i = 1;
+                while (r-dr*i>=0 && r-dr*i<size && c-dc*i>=0 && c-dc*i<size && board[r-dr*i][c-dc*i]===p) { count++; i++; }
+                if (count >= 5) return true;
+            }
+            return false;
+        }
+
+        function resetGame() {
+            initBoard();
+            drawBoard();
+            isBlackTurn = true;
+            gameOver = false;
+            statusDisplay.innerText = "黑棋回合";
+            statusDisplay.style.background = "#eee";
+            statusDisplay.style.color = "#333";
+        }
+
+        // 监听鼠标点击
+        canvas.addEventListener('mousedown', handleInput);
+        // 监听触摸开始
+        canvas.addEventListener('touchstart', handleInput, { passive: false });
+
+        initBoard();
+        drawBoard();
+    </script>
+</body>
+</html>

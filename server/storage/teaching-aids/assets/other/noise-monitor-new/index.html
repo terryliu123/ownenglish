@@ -1,0 +1,505 @@
+<!-- 
+设计思路:
+1. 增强小球弹跳的随机性，包括初始位置、速度、大小和颜色
+2. 确保环境评估与声音可视化高度一致，使用相同的分贝值驱动
+3. 扩大小球可视化区域，占据更多屏幕空间
+4. 简化环境评估显示，只显示大字体的当前状态
+5. 改进小球物理引擎，使其对声音变化更敏感且更随机
+6. 色彩方案保持科技感，使用深色背景和荧光色元素
+7. 响应式设计确保在各种设备上都有良好体验
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教室分贝检测系统</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .header-bg {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+        }
+        
+        .glass-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(100, 116, 139, 0.3);
+            box-shadow: 0 8px 32px rgba(2, 12, 27, 0.4);
+            border-radius: 16px;
+        }
+        
+        .db-display {
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 700;
+            text-shadow: 0 0 15px rgba(74, 222, 128, 0.7);
+            transition: all 0.3s ease;
+        }
+        
+        canvas {
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.5);
+        }
+        
+        .control-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .ball-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        .status-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .dot-active {
+            background-color: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
+        
+        .dot-inactive {
+            background-color: #64748b;
+        }
+        
+        .environment-status {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin: 1rem 0;
+            transition: all 0.3s ease;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-6">
+    <!-- 头部信息区 -->
+    <header class="header-bg rounded-2xl p-6 mb-6 glass-card">
+        <div class="flex flex-col md:flex-row justify-between items-center">
+            <div class="flex items-center mb-4 md:mb-0">
+                <i class="fas fa-volume-up text-3xl text-green-400 mr-4"></i>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">教室分贝检测系统</h1>
+                    <p class="text-slate-400">实时监测教室音量环境</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center">
+                <span class="status-dot dot-active mr-2"></span>
+                <span>系统运行中</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- 主要内容区 -->
+    <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- 左侧: 分贝显示和环境评估 -->
+        <div class="lg:col-span-1 space-y-6 h-60 ">
+            <!-- 实时分贝显示 -->
+            <div class="glass-card p-6">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-wave-square mr-2 text-blue-400"></i>
+                    实时分贝值
+                </h2>
+                <div class="text-center py-4">
+                    <div id="decibel-value" class="db-display text-6xl text-green-400">0</div>
+                    <div class="mt-2 text-slate-400">分贝 (dB)</div>
+                </div>
+            </div>
+            
+            <!-- 环境评估 -->
+            <div class="glass-card p-6 h-60">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-clipboard-check mr-2 text-purple-400"></i>
+                    环境评估
+                </h2>
+                <div id="environment-status" class="environment-status text-green-400">
+                    安静
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧: 小球可视化区域 (更大显示面积) -->
+        <div class="lg:col-span-2">
+            <div class="glass-card p-6 h-full">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i class="fas fa-circle-notch mr-2 text-yellow-400"></i>
+                    声音可视化
+                </h2>
+                
+                <div class="ball-container w-full" style="height: 390px;">
+                    <canvas id="ball-canvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- 控制面板 -->
+    <div class="mt-6 glass-card p-6">
+        <h2 class="text-xl font-semibold mb-4 flex items-center">
+            <i class="fas fa-sliders-h mr-2 text-pink-400"></i>
+            系统控制
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button id="start-btn" class="control-btn bg-green-600 hover:bg-green-700 text-white py-3 px-4 rounded-lg flex items-center justify-center">
+                <i class="fas fa-play mr-2"></i> 开始监测
+            </button>
+            
+            <button id="stop-btn" class="control-btn bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg flex items-center justify-center">
+                <i class="fas fa-stop mr-2"></i> 停止监测
+            </button>
+            
+            <button id="reset-btn" class="control-btn bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg flex items-center justify-center">
+                <i class="fas fa-sync-alt mr-2"></i> 重置系统
+            </button>
+        </div>
+        
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-slate-300 mb-2">敏感度调节</label>
+                <input type="range" id="sensitivity" min="1" max="10" value="5" class="w-full">
+                <div class="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>低</span>
+                    <span>高</span>
+                </div>
+            </div>
+            
+            <div>
+                <label class="block text-slate-300 mb-2">小球数量</label>
+                <input type="range" id="ball-count" min="20" max="200" value="100" class="w-full">
+                <div class="flex justify-between text-xs text-slate-500 mt-1">
+                    <span>少</span>
+                    <span>多</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 使用立即执行函数避免全局命名冲突
+        (function() {
+            // 分贝检测系统核心逻辑
+            class ClassroomDecibelDetector {
+                constructor() {
+                    this.audioContext = null;
+                    this.analyser = null;
+                    this.microphone = null;
+                    this.scriptProcessor = null;
+                    this.isRunning = false;
+                    this.sensitivity = 5;
+                    this.ballCount = 100;
+                    this.dbValue = 0;
+                    this.lastDbValue = 0;
+                    
+                    // 初始化UI元素
+                    this.initElements();
+                    this.initCanvas();
+                    this.initEventListeners();
+                    this.initBalls();
+                    
+                    // 请求音频权限
+                    this.requestAudioPermission();
+                }
+                
+                initElements() {
+                    this.decibelValueEl = document.getElementById('decibel-value');
+                    this.environmentStatusEl = document.getElementById('environment-status');
+                    this.startBtn = document.getElementById('start-btn');
+                    this.stopBtn = document.getElementById('stop-btn');
+                    this.resetBtn = document.getElementById('reset-btn');
+                    this.sensitivitySlider = document.getElementById('sensitivity');
+                    this.ballCountSlider = document.getElementById('ball-count');
+                }
+                
+                initCanvas() {
+                    this.canvas = document.getElementById('ball-canvas');
+                    this.ctx = this.canvas.getContext('2d');
+                    this.resizeCanvas();
+                    window.addEventListener('resize', () => this.resizeCanvas());
+                }
+                
+                resizeCanvas() {
+                    const container = this.canvas.parentElement;
+                    this.canvas.width = container.clientWidth;
+                    this.canvas.height = container.clientHeight;
+                }
+                
+                initEventListeners() {
+                    this.startBtn.addEventListener('click', () => this.start());
+                    this.stopBtn.addEventListener('click', () => this.stop());
+                    this.resetBtn.addEventListener('click', () => this.reset());
+                    this.sensitivitySlider.addEventListener('input', (e) => {
+                        this.sensitivity = parseInt(e.target.value);
+                    });
+                    this.ballCountSlider.addEventListener('input', (e) => {
+                        this.ballCount = parseInt(e.target.value);
+                        this.initBalls();
+                    });
+                }
+                
+                async requestAudioPermission() {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                        stream.getTracks().forEach(track => track.stop());
+                        this.startBtn.disabled = false;
+                    } catch (err) {
+                        console.error('无法获取麦克风权限:', err);
+                    }
+                }
+                
+                initBalls() {
+                    this.balls = [];
+                    for (let i = 0; i < this.ballCount; i++) {
+                        // 增强随机性
+                        const hue = Math.floor(Math.random() * 360);
+                        const saturation = 70 + Math.random() * 30;
+                        const lightness = 50 + Math.random() * 30;
+                        
+                        this.balls.push({
+                            x: Math.random() * this.canvas.width,
+                            y: Math.random() * this.canvas.height,
+                            radius: Math.random() * 12 + 3,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: (Math.random() - 0.5) * 4,
+                            color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                            // 添加额外属性增强随机性
+                            mass: Math.random() * 0.5 + 0.5,
+                            bounce: 0.7 + Math.random() * 0.3,
+                            friction: 0.98 + Math.random() * 0.02
+                        });
+                    }
+                }
+                
+                async start() {
+                    if (this.isRunning) return;
+                    
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        this.analyser = this.audioContext.createAnalyser();
+                        this.microphone = this.audioContext.createMediaStreamSource(stream);
+                        
+                        // 使用更精确的音频处理方法
+                        this.scriptProcessor = this.audioContext.createScriptProcessor(2048, 1, 1);
+                        this.microphone.connect(this.analyser);
+                        this.analyser.connect(this.scriptProcessor);
+                        this.scriptProcessor.connect(this.audioContext.destination);
+                        
+                        this.analyser.fftSize = 256;
+                        
+                        // 音频数据处理
+                        this.scriptProcessor.onaudioprocess = (e) => {
+                            const inputData = e.inputBuffer.getChannelData(0);
+                            let sum = 0;
+                            for (let i = 0; i < inputData.length; i++) {
+                                sum += inputData[i] * inputData[i];
+                            }
+                            const rms = Math.sqrt(sum / inputData.length);
+                            this.dbValue = 20 * Math.log10(rms) + 94; // 校准到实际分贝
+                            this.dbValue = Math.max(0, this.dbValue);
+                        };
+                        
+                        this.isRunning = true;
+                        this.animate();
+                        
+                        this.startBtn.disabled = true;
+                        this.stopBtn.disabled = false;
+                    } catch (err) {
+                        console.error('启动音频分析失败:', err);
+                    }
+                }
+                
+                stop() {
+                    if (!this.isRunning) return;
+                    
+                    this.isRunning = false;
+                    if (this.scriptProcessor) {
+                        this.scriptProcessor.disconnect();
+                    }
+                    if (this.microphone) {
+                        this.microphone.disconnect();
+                    }
+                    if (this.audioContext) {
+                        this.audioContext.close();
+                    }
+                    
+                    this.startBtn.disabled = false;
+                    this.stopBtn.disabled = true;
+                }
+                
+                reset() {
+                    this.stop();
+                    this.decibelValueEl.textContent = '0';
+                    this.environmentStatusEl.textContent = '安静';
+                    this.environmentStatusEl.className = 'environment-status text-green-400';
+                }
+                
+                updateEnvironmentInfo(db) {
+                    let status, color;
+                    
+                    if (db < 30) {
+                        status = '安静';
+                        color = 'text-green-400';
+                    } else if (db < 50) {
+                        status = '正常';
+                        color = 'text-yellow-400';
+                    } else if (db < 70) {
+                        status = '吵闹';
+                        color = 'text-orange-400';
+                    } else {
+                        status = '非常吵闹';
+                        color = 'text-red-400';
+                    }
+                    
+                    this.environmentStatusEl.textContent = status;
+                    this.environmentStatusEl.className = `environment-status ${color}`;
+                }
+                
+                updateBalls(db) {
+                    // 使用平滑的分贝值变化
+                    this.lastDbValue = this.lastDbValue * 0.7 + db * 0.3;
+                    const intensity = Math.min(1, this.lastDbValue / 100); // 归一化强度
+                    
+                    this.balls.forEach(ball => {
+                        // 根据分贝值调整小球运动
+                        ball.vy += 0.2 * ball.mass; // 重力，考虑质量
+                        
+                        // 声音驱动的随机力
+                        if (intensity > 0.1) {
+                            const soundForce = intensity * 2;
+                            ball.vx += (Math.random() - 0.5) * soundForce;
+                            ball.vy += (Math.random() - 0.5) * soundForce;
+                            
+                            // 当声音很大时，给小球一个向上的冲击力
+                            if (intensity > 0.7 && Math.random() > 0.7) {
+                                ball.vy -= 15 * intensity;
+                            }
+                        }
+                        
+                        ball.x += ball.vx;
+                        ball.y += ball.vy;
+                        
+                        // 速度衰减
+                        ball.vx *= ball.friction;
+                        ball.vy *= ball.friction;
+                        
+                        // 边界碰撞检测
+                        if (ball.x + ball.radius > this.canvas.width) {
+                            ball.x = this.canvas.width - ball.radius;
+                            ball.vx *= -ball.bounce;
+                        } else if (ball.x - ball.radius < 0) {
+                            ball.x = ball.radius;
+                            ball.vx *= -ball.bounce;
+                        }
+                        
+                        if (ball.y + ball.radius > this.canvas.height) {
+                            ball.y = this.canvas.height - ball.radius;
+                            ball.vy *= -ball.bounce;
+                            
+                            // 根据音量给与额外的向上力
+                            if (intensity > 0.3) {
+                                ball.vy -= 8 * intensity * ball.mass;
+                            }
+                        } else if (ball.y - ball.radius < 0) {
+                            ball.y = ball.radius;
+                            ball.vy *= -ball.bounce;
+                        }
+                        
+                        // 限制最大速度
+                        const maxSpeed = 15;
+                        if (Math.abs(ball.vx) > maxSpeed) ball.vx = maxSpeed * Math.sign(ball.vx);
+                        if (Math.abs(ball.vy) > maxSpeed) ball.vy = maxSpeed * Math.sign(ball.vy);
+                    });
+                }
+                
+                drawBalls() {
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                    
+                    this.balls.forEach(ball => {
+                        this.ctx.beginPath();
+                        this.ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                        this.ctx.fillStyle = ball.color;
+                        
+                        // 添加发光效果
+                        this.ctx.shadowColor = ball.color;
+                        this.ctx.shadowBlur = 10;
+                        this.ctx.fill();
+                        this.ctx.closePath();
+                        
+                        // 重置阴影
+                        this.ctx.shadowBlur = 0;
+                    });
+                }
+                
+                animate() {
+                    if (!this.isRunning) return;
+                    
+                    const db = this.dbValue * this.sensitivity / 5; // 应用敏感度调节
+                    
+                    // 更新UI
+                    this.decibelValueEl.textContent = Math.round(db);
+                    
+                    // 根据分贝值改变颜色
+                    if (db < 40) {
+                        this.decibelValueEl.className = 'db-display text-6xl text-green-400';
+                    } else if (db < 70) {
+                        this.decibelValueEl.className = 'db-display text-6xl text-yellow-400';
+                    } else {
+                        this.decibelValueEl.className = 'db-display text-6xl text-red-400 pulse';
+                    }
+                    
+                    // 环境评估与声音可视化使用相同的分贝值
+                    this.updateEnvironmentInfo(db);
+                    this.updateBalls(db);
+                    this.drawBalls();
+                    
+                    requestAnimationFrame(() => this.animate());
+                }
+            }
+            
+            // 初始化应用
+            document.addEventListener('DOMContentLoaded', () => {
+                window.classroomDecibelDetector = new ClassroomDecibelDetector();
+                
+                // 设置初始状态
+                document.getElementById('stop-btn').disabled = true;
+            });
+        })();
+    </script>
+</body>
+</html>

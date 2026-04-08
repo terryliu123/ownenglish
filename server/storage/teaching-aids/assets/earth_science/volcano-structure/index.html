@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火山构造教学演示</title>
+    <style>
+        :root {
+            --bg-sky-top: #dcfce4;
+            --bg-sky-bottom: #8fd3f4;
+            --magma-color: #e74c3c;
+            --ground-dark: #3e2723;
+            --ground-light: #5d4037;
+            --highlight: #fff;
+            --text-color: #333;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 主容器 */
+        .container {
+            display: flex;
+            width: 90%;
+            max-width: 1100px;
+            height: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 左侧：交互视图区 */
+        .view-area {
+            flex: 2;
+            position: relative;
+            background: linear-gradient(to bottom, #e0f7fa, #b2dfdb);
+            overflow: hidden;
+        }
+
+        /* SVG 样式 */
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 岩浆流动动画 */
+        .magma-flow {
+            animation: flow 3s infinite alternate ease-in-out;
+        }
+        @keyframes flow {
+            0% { fill: #e74c3c; }
+            100% { fill: #ff7043; }
+        }
+
+        /* 交互点样式 */
+        .hotspot-group {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .hotspot-circle {
+            fill: white;
+            stroke: rgba(0,0,0,0.2);
+            stroke-width: 1;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .hotspot-pulse {
+            fill: white;
+            opacity: 0.5;
+            transform-origin: center;
+            animation: pulse 2s infinite;
+        }
+
+        .hotspot-line {
+            stroke: white;
+            stroke-width: 2;
+            stroke-linecap: round;
+        }
+
+        .hotspot-text {
+            font-size: 16px;
+            font-weight: bold;
+            fill: white;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+            pointer-events: none; /* 防止文字遮挡点击 */
+        }
+
+        /* 选中状态 */
+        .hotspot-group:hover .hotspot-circle, 
+        .hotspot-group.active .hotspot-circle {
+            fill: #ffeb3b;
+            transform: scale(1.1);
+            transition: transform 0.2s;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+        
+        .hotspot-group.active .hotspot-line {
+            stroke: #ffeb3b;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(1.8); opacity: 0; }
+        }
+
+
+        /* 右侧：信息面板区 */
+        .info-panel {
+            flex: 1;
+            padding: 40px;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-left: 1px solid #eee;
+        }
+
+        .info-card {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.4s ease;
+            display: none; /* 默认隐藏 */
+        }
+
+        .info-card.show {
+            opacity: 1;
+            transform: translateY(0);
+            display: block;
+        }
+
+        .info-title {
+            font-size: 28px;
+            color: #d35400;
+            margin-bottom: 15px;
+            border-bottom: 3px solid #ffe0b2;
+            padding-bottom: 10px;
+            display: inline-block;
+        }
+
+        .info-content {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #555;
+            text-align: justify;
+        }
+
+        .default-msg {
+            text-align: center;
+            color: #999;
+        }
+        .default-msg h3 {
+            font-size: 22px;
+            color: #777;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+            .view-area {
+                height: 400px;
+            }
+            .info-panel {
+                min-height: 200px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 左侧交互图 -->
+    <div class="view-area">
+        <svg viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <!-- 土地渐变 -->
+                <linearGradient id="earth-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#795548;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#3e2723;stop-opacity:1" />
+                </linearGradient>
+                <!-- 岩浆渐变 -->
+                <linearGradient id="magma-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#e74c3c;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#ff7043;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#e74c3c;stop-opacity:1" />
+                </linearGradient>
+                <!-- 天空云朵滤镜 -->
+                <filter id="cloud-glow">
+                    <feGaussianBlur stdDeviation="5" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+
+            <!-- 1. 背景天空与云朵 -->
+            <rect width="800" height="500" fill="url(#sky-gradient)" />
+            <!-- 云朵装饰 -->
+            <path d="M100,80 Q130,50 160,80 T220,80" fill="none" stroke="white" stroke-width="3" opacity="0.4" stroke-linecap="round"/>
+            <path d="M600,120 Q640,90 680,120 T750,120" fill="none" stroke="white" stroke-width="3" opacity="0.4" stroke-linecap="round"/>
+
+            <!-- 2. 远山背景 -->
+            <path d="M0,350 L50,300 L150,350 L250,280 L350,350 L800,350 L800,500 L0,500 Z" fill="#a1887f" opacity="0.5"/>
+
+            <!-- 3. 地层剖面 -->
+            <!-- 最底层 (基岩) -->
+            <path d="M0,350 L800,350 L800,500 L0,500 Z" fill="#4e342e" />
+            
+            <!-- 地下水层 (蓝色带) -->
+            <path d="M0,380 Q150,390 280,350 L330,350 L350,500 L450,500 L470,350 L520,350 Q650,390 800,380 L800,420 Q650,430 500,400 L300,400 Q150,430 0,420 Z" fill="#81d4fa" opacity="0.8" />
+
+            <!-- 上层土壤 -->
+            <path d="M0,350 Q200,350 250,300 Q400,100 550,300 Q600,350 800,350 L800,380 Q600,380 520,350 L470,350 L450,500 L350,500 L330,350 L280,350 Q200,380 0,380 Z" fill="url(#earth-gradient)" />
+
+            <!-- 4. 火山主体 -->
+            <!-- 火山锥体 (分层效果) -->
+            <path d="M250,300 Q400,100 550,300 L470,350 L330,350 Z" fill="#5d4037" />
+            <!-- 锥体纹理 (层状构造) -->
+            <path d="M300,250 Q400,150 500,250" fill="none" stroke="#4e342e" stroke-width="2" opacity="0.3" />
+            <path d="M280,280 Q400,180 520,280" fill="none" stroke="#4e342e" stroke-width="2" opacity="0.3" />
+
+            <!-- 5. 岩浆系统 -->
+            <!-- 岩浆房 (底部) -->
+            <path class="magma-flow" d="M250,500 Q400,420 550,500 Z" fill="url(#magma-gradient)" />
+            <!-- 火山通道 (垂直) -->
+            <path class="magma-flow" d="M360,500 L380,100 L420,100 L440,500 Z" fill="url(#magma-gradient)" />
+            <!-- 火山口内壁 -->
+            <path d="M380,100 L420,100 L430,110 L370,110 Z" fill="#bf360c" />
+
+            <!-- 6. 交互热点 (Hotspots) -->
+            
+            <!-- 热点1: 火山口 (Crater) -->
+            <g class="hotspot-group" onclick="showInfo('crater', this)">
+                <line x1="400" y1="100" x2="550" y2="80" class="hotspot-line" />
+                <circle cx="400" cy="100" r="15" class="hotspot-pulse" />
+                <circle cx="400" cy="100" r="6" class="hotspot-circle" />
+                <text x="560" y="85" class="hotspot-text">火山口</text>
+            </g>
+
+            <!-- 热点2: 火山锥 (Cone) -->
+            <g class="hotspot-group" onclick="showInfo('cone', this)">
+                <line x1="320" y1="230" x2="200" y2="230" class="hotspot-line" />
+                <circle cx="320" cy="230" r="15" class="hotspot-pulse" />
+                <circle cx="320" cy="230" r="6" class="hotspot-circle" />
+                <text x="140" y="235" class="hotspot-text">火山锥</text>
+            </g>
+
+            <!-- 热点3: 火山通道 (Vent) -->
+            <g class="hotspot-group" onclick="showInfo('vent', this)">
+                <line x1="410" y1="350" x2="550" y2="350" class="hotspot-line" />
+                <circle cx="410" cy="350" r="15" class="hotspot-pulse" />
+                <circle cx="410" cy="350" r="6" class="hotspot-circle" />
+                <text x="560" y="355" class="hotspot-text">火山通道</text>
+            </g>
+
+            <!-- 热点4: 岩浆房 (Magma Chamber) -->
+            <g class="hotspot-group" onclick="showInfo('chamber', this)">
+                <line x1="400" y1="480" x2="250" y2="450" class="hotspot-line" />
+                <circle cx="400" cy="480" r="15" class="hotspot-pulse" />
+                <circle cx="400" cy="480" r="6" class="hotspot-circle" />
+                <text x="180" y="455" class="hotspot-text">岩浆房</text>
+            </g>
+
+        </svg>
+    </div>
+
+    <!-- 右侧信息面板 -->
+    <div class="info-panel" id="infoPanel">
+        <div class="default-msg" id="defaultMsg">
+            <h3>探究火山构造</h3>
+            <p>点击左图中的白色圆点<br>查看各部位的详细说明</p>
+            <div style="margin-top:20px; opacity:0.5;">
+                <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 火山口内容 -->
+        <div class="info-card" id="info-crater">
+            <div class="info-title">火山口 (Crater)</div>
+            <div class="info-content">
+                <p>火山喷发物喷出地表时形成的漏斗状或碗状凹陷。</p>
+                <p>它位于火山顶部，是岩浆、气体和火山灰喷出地面的出口。有些火山口在休眠期会积水形成美丽的火山口湖（如长白山天池）。</p>
+            </div>
+        </div>
+
+        <!-- 火山锥内容 -->
+        <div class="info-card" id="info-cone">
+            <div class="info-title">火山锥 (Volcanic Cone)</div>
+            <div class="info-content">
+                <p>由火山喷发出的熔岩、火山灰、火山渣等堆积而成的山体。</p>
+                <p>随着多次喷发，这些物质层层堆叠，使得山体越来越高，形成上小下大的圆锥形地貌。剖面图中可以清晰看到层状的堆积结构。</p>
+            </div>
+        </div>
+
+        <!-- 火山通道内容 -->
+        <div class="info-card" id="info-vent">
+            <div class="info-title">火山通道 (Volcanic Vent)</div>
+            <div class="info-content">
+                <p>连接地下岩浆房和地表火山口的管状通道。</p>
+                <p>这是高温岩浆向上输送的“喉管”。在火山喷发停止后，滞留在通道内的岩浆可能会冷却凝固，形成坚硬的岩柱。</p>
+            </div>
+        </div>
+
+        <!-- 岩浆房内容 -->
+        <div class="info-card" id="info-chamber">
+            <div class="info-title">岩浆房 (Magma Chamber)</div>
+            <div class="info-content">
+                <p>位于地壳深处，储存高温熔岩的巨大地下空间。</p>
+                <p>这里是火山喷发的动力源泉。当内部压力积累到一定程度，岩浆便会冲破岩层，沿着火山通道冲向地表。</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function showInfo(type, element) {
+        // 1. 处理左侧热点的高亮状态
+        // 移除所有 active 类
+        document.querySelectorAll('.hotspot-group').forEach(el => {
+            el.classList.remove('active');
+        });
+        // 给当前点击的添加 active 类
+        element.classList.add('active');
+
+        // 2. 处理右侧信息的显示
+        // 隐藏默认提示
+        document.getElementById('defaultMsg').style.display = 'none';
+        
+        // 隐藏所有卡片
+        document.querySelectorAll('.info-card').forEach(card => {
+            card.classList.remove('show');
+            // 延时一点点设置为none，为了动画流畅，这里简化处理直接利用CSS transition
+            setTimeout(() => {
+                if(!card.classList.contains('show')) card.style.display = 'none';
+            }, 100); // 快速隐藏
+        });
+
+        // 显示目标卡片
+        const targetCard = document.getElementById('info-' + type);
+        if(targetCard) {
+            targetCard.style.display = 'block';
+            // 使用 setTimeout 触发 CSS reflow 实现淡入动画
+            setTimeout(() => {
+                targetCard.classList.add('show');
+            }, 10);
+        }
+    }
+</script>
+
+</body>
+</html>

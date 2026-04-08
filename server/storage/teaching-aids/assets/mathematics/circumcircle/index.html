@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：三角形的外接圆</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 黑板色 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        canvas {
+            background-color: #333;
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #444;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button, label {
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+        }
+
+        button {
+            background-color: #00A1E9;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #008bc9;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 20px;
+            text-align: center;
+            max-width: 600px;
+        }
+        
+        .highlight {
+            color: #00A1E9;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>作三角形的外接圆</h1>
+
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showBisectors"> 显示垂直平分线 (作图原理)
+        </label>
+        <label>
+            <input type="checkbox" id="showRadius" checked> 显示半径 OA
+        </label>
+        <button onclick="resetTriangle()">重置形状</button>
+        <button onclick="makeRightTriangle()">设为直角三角形</button>
+        <button onclick="makeObtuseTriangle()">设为钝角三角形</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="800" height="600"></canvas>
+    </div>
+
+    <div class="info">
+        拖动顶点 A、B、C。观察<span class="highlight">外心 O</span> 的位置变化：<br>
+        锐角在内部，直角在斜边上，钝角在外部。
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    const checkboxBisectors = document.getElementById('showBisectors');
+    const checkboxRadius = document.getElementById('showRadius');
+
+    // 初始顶点
+    let points = {
+        A: { x: 400, y: 100 },
+        B: { x: 200, y: 400 },
+        C: { x: 600, y: 400 }
+    };
+
+    let draggingPoint = null;
+
+    // 计算两点距离
+    function dist(p1, p2) {
+        return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+    }
+
+    // 计算两点中点
+    function midPoint(p1, p2) {
+        return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    }
+
+    // 核心算法：计算外心 (Circumcenter)
+    // 使用行列式或垂直平分线交点公式
+    function getCircumcenter(A, B, C) {
+        const D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+        
+        // 防止三点共线导致除以零 (虽然拖动限制了，但做个保护)
+        if (Math.abs(D) < 0.001) return null; 
+
+        const Ux = ((A.x**2 + A.y**2)*(B.y - C.y) + (B.x**2 + B.y**2)*(C.y - A.y) + (C.x**2 + C.y**2)*(A.y - B.y)) / D;
+        const Uy = ((A.x**2 + A.y**2)*(C.x - B.x) + (B.x**2 + B.y**2)*(A.x - C.x) + (C.x**2 + C.y**2)*(B.x - A.x)) / D;
+        
+        return { x: Ux, y: Uy };
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const O = getCircumcenter(points.A, points.B, points.C);
+        
+        // 如果三点共线无法构成三角形
+        if (!O) return;
+
+        const R = dist(O, points.A); // 外接圆半径 (O到任意顶点距离)
+
+        // 1. 绘制垂直平分线 (如果勾选)
+        if (checkboxBisectors.checked) {
+            drawPerpendicularBisector(points.A, points.B, O);
+            drawPerpendicularBisector(points.B, points.C, O);
+            drawPerpendicularBisector(points.C, points.A, O);
+        }
+
+        // 2. 绘制半径 OA (如果勾选)
+        if (checkboxRadius.checked) {
+            ctx.beginPath();
+            ctx.moveTo(O.x, O.y);
+            ctx.lineTo(points.A.x, points.A.y);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#00A1E9"; // 蓝色
+            ctx.setLineDash([5, 5]); // 虚线表示辅助线
+            ctx.stroke();
+            ctx.setLineDash([]); // 恢复实线
+        }
+
+        // 3. 绘制外接圆
+        ctx.beginPath();
+        ctx.arc(O.x, O.y, R, 0, Math.PI * 2);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#00A1E9"; // 亮蓝色
+        ctx.stroke();
+        // 极淡的蓝色填充
+        ctx.fillStyle = "rgba(0, 161, 233, 0.05)";
+        ctx.fill();
+
+        // 4. 绘制三角形
+        ctx.beginPath();
+        ctx.moveTo(points.A.x, points.A.y);
+        ctx.lineTo(points.B.x, points.B.y);
+        ctx.lineTo(points.C.x, points.C.y);
+        ctx.closePath();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#fff"; // 白色边框
+        ctx.stroke();
+
+        // 5. 绘制外心 O
+        ctx.fillStyle = "#ff3333"; // 红色点
+        ctx.beginPath();
+        ctx.arc(O.x, O.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "italic bold 24px Times New Roman";
+        ctx.fillText("O", O.x + 10, O.y + 5);
+
+        // 6. 绘制顶点
+        drawPoint(points.A, "A", -10, -15);
+        drawPoint(points.B, "B", -25, 10);
+        drawPoint(points.C, "C", 10, 10);
+    }
+
+    // 辅助：绘制垂直平分线 (从中点画一条穿过圆心的线)
+    function drawPerpendicularBisector(p1, p2, center) {
+        const mid = midPoint(p1, p2);
+        
+        ctx.save();
+        ctx.strokeStyle = "#666";
+        ctx.setLineDash([2, 4]);
+        ctx.lineWidth = 1;
+
+        // 绘制从中点到圆心的线段，并向两端延伸
+        // 为了简单，我们画一条很长的线穿过这两个点
+        
+        const dx = center.x - mid.x;
+        const dy = center.y - mid.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        
+        // 如果圆心就在中点(直角三角形斜边)，特殊处理
+        // 不过通常可以直接用斜率画
+        
+        if (len < 0.1) {
+             // 如果圆心和中点重合（极其罕见，除非正好是直角边中点？不对，直角三角形外心在斜边中点，
+             // 但对于直角边来说，垂直平分线仍然存在。这里简化逻辑：
+             // 直接计算垂线方向
+             const edgeDx = p2.x - p1.x;
+             const edgeDy = p2.y - p1.y;
+             // 垂线向量 (-dy, dx)
+             ctx.beginPath();
+             ctx.moveTo(mid.x - edgeDy*10, mid.y + edgeDx*10);
+             ctx.lineTo(mid.x + edgeDy*10, mid.y - edgeDx*10);
+             ctx.stroke();
+        } else {
+            // 延伸系数
+            const scale = 1000; 
+            const nx = dx / len;
+            const ny = dy / len;
+
+            ctx.beginPath();
+            // 从中点向两个方向延伸
+            // 方向1: 指向圆心并穿过
+            ctx.moveTo(mid.x - nx * scale, mid.y - ny * scale);
+            ctx.lineTo(mid.x + nx * scale, mid.y + ny * scale);
+            ctx.stroke();
+        }
+
+        // 画垂足点
+        ctx.fillStyle = "#999";
+        ctx.beginPath();
+        ctx.arc(mid.x, mid.y, 3, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    function drawPoint(p, label, offsetX, offsetY) {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.font = "italic bold 24px Times New Roman";
+        ctx.fillText(label, p.x + offsetX, p.y + offsetY);
+    }
+
+    // 预设图形功能
+    function resetTriangle() {
+        points = { A: {x:400, y:100}, B: {x:200, y:400}, C: {x:600, y:400} };
+        draw();
+    }
+
+    function makeRightTriangle() {
+        // 直角三角形，外心在斜边中点
+        points = { A: {x:200, y:100}, B: {x:200, y:400}, C: {x:600, y:400} }; // B是直角
+        draw();
+    }
+
+    function makeObtuseTriangle() {
+        // 钝角三角形，外心在外部
+        points = { A: {x:400, y:250}, B: {x:200, y:400}, C: {x:600, y:400} }; // A角很大
+        draw();
+    }
+
+    // 交互逻辑
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(e);
+        ['A', 'B', 'C'].forEach(key => {
+            if (dist(pos, points[key]) < 20) draggingPoint = key;
+        });
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getMousePos(e);
+        if (draggingPoint) {
+            pos.x = Math.max(10, Math.min(canvas.width - 10, pos.x));
+            pos.y = Math.max(10, Math.min(canvas.height - 10, pos.y));
+            points[draggingPoint] = pos;
+            draw();
+        } else {
+            let cursor = 'default';
+            ['A', 'B', 'C'].forEach(key => {
+                if (dist(pos, points[key]) < 20) cursor = 'pointer';
+            });
+            canvas.style.cursor = cursor;
+        }
+    });
+
+    window.addEventListener('mouseup', () => draggingPoint = null);
+    
+    checkboxBisectors.addEventListener('change', draw);
+    checkboxRadius.addEventListener('change', draw);
+
+    draw();
+
+</script>
+
+</body>
+</html>

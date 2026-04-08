@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>热传递的三种方式 - 修正版</title>
+    <style>
+        :root {
+            --primary-blue: #5b7bd1;
+            --dark-blue: #34495e;
+            --bg-color: #f0f4f8;
+            --text-color: #333;
+            --accent-yellow: #f1c40f;
+            --heat-red: #e74c3c;
+            --heat-pink: #ff7979;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            width: 100%;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--dark-blue);
+            font-size: 24px;
+        }
+
+        #experiment-stage {
+            position: relative;
+            width: 100%;
+            max-width: 800px;
+            height: 450px;
+            margin: 20px auto;
+            background: linear-gradient(135deg, #6fa3cf 0%, #4b7bc2 100%);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bg-deco {
+            position: absolute;
+            opacity: 0.2;
+            fill: #fff;
+        }
+
+        svg {
+            width: 90%;
+            height: 90%;
+            overflow: visible;
+        }
+
+        /* 动画定义 */
+        @keyframes flicker {
+            0% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 0.8; }
+        }
+
+        @keyframes rise {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-40px); opacity: 0; }
+        }
+
+        @keyframes flowMove {
+            0% { stroke-dashoffset: 20; }
+            100% { stroke-dashoffset: 0; }
+        }
+
+        @keyframes heatMove {
+            0% { transform: translate(0,0); opacity: 1; }
+            100% { transform: translate(-60px, 60px); opacity: 0; } 
+            /* 沿棒方向移动 */
+        }
+
+        /* 实验组件样式 */
+        .glassware {
+            fill: rgba(255, 255, 255, 0.15);
+            stroke: #fff;
+            stroke-width: 2;
+        }
+
+        .water {
+            fill: rgba(135, 206, 235, 0.5); /* 半透明以便看到插入的棒 */
+        }
+
+        .stand {
+            stroke: #2c3e50;
+            stroke-width: 4;
+            fill: none;
+            stroke-linecap: round;
+        }
+
+        .flame {
+            fill: #e67e22;
+            animation: flicker 0.2s infinite alternate;
+            transform-origin: center bottom;
+        }
+        .flame-inner {
+            fill: #f1c40f;
+            animation: flicker 0.3s infinite alternate-reverse;
+            transform-origin: center bottom;
+        }
+
+        /* 热传递动画元素 */
+        .radiation-wave {
+            stroke: var(--heat-pink);
+            stroke-width: 2;
+            fill: none;
+            opacity: 0;
+        }
+        .anim-radiation {
+            animation: rise 1.5s infinite linear;
+        }
+        .anim-radiation:nth-child(2) { animation-delay: 0.5s; }
+        .anim-radiation:nth-child(3) { animation-delay: 1s; }
+
+        .convection-arrow {
+            fill: none;
+            stroke: var(--heat-red);
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-dasharray: 10 10;
+            animation: flowMove 1s infinite linear;
+        }
+
+        /* 导热棒样式 */
+        .conduction-rod {
+            fill: #95a5a6;
+            stroke: #7f8c8d;
+            stroke-width: 1;
+        }
+        /* 夹子 */
+        .clamp {
+            fill: #e67e22; 
+            stroke: #d35400;
+        }
+
+        /* 标签样式 */
+        .label-group {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .label-group:hover {
+            transform: scale(1.05);
+        }
+        .label-bg {
+            fill: #f39c12;
+            rx: 5;
+            ry: 5;
+        }
+        .label-text {
+            fill: #fff;
+            font-family: sans-serif;
+            font-weight: bold;
+            font-size: 14px;
+            text-anchor: middle;
+            dominant-baseline: middle;
+        }
+        .label-line {
+            stroke: #f39c12;
+            stroke-width: 2;
+            stroke-dasharray: 4 2;
+        }
+
+        /* 交互状态类 */
+        .highlighted {
+            opacity: 1 !important;
+            filter: drop-shadow(0 0 5px gold);
+        }
+        .dimmed {
+            opacity: 0.2;
+            transition: opacity 0.3s;
+        }
+
+        #info-panel {
+            width: 100%;
+            max-width: 800px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            box-sizing: border-box;
+            border-left: 5px solid var(--primary-blue);
+        }
+
+        .description {
+            color: #555;
+            line-height: 1.6;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: 1px solid var(--primary-blue);
+            background: transparent;
+            color: var(--primary-blue);
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .btn:hover, .btn.active {
+            background: var(--primary-blue);
+            color: #fff;
+        }
+        .book-tag {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>热传递的三种方式</h1>
+    </header>
+
+    <main id="experiment-stage">
+        <!-- SVG 场景 -->
+        <svg viewBox="0 0 600 400" id="scene">
+            <defs>
+                <!-- 热传导渐变 -->
+                <linearGradient id="grad-heat" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:rgb(255,50,50);stop-opacity:0.9" />
+                    <stop offset="100%" style="stop-color:rgb(255,50,50);stop-opacity:0" />
+                </linearGradient>
+            </defs>
+
+            <!-- 1. 器材架设 (火焰、三脚架) -->
+            <g id="apparatus">
+                <!-- 酒精灯 (居中 x=300) -->
+                <path d="M270,380 L330,380 L340,340 L260,340 Z" fill="rgba(255,255,255,0.5)" stroke="#fff" />
+                <rect x="290" y="325" width="20" height="15" fill="#ccc" />
+                <line x1="300" y1="325" x2="300" y2="310" stroke="#8e44ad" stroke-width="3" />
+                
+                <!-- 火焰 (居中 x=300) -->
+                <path class="flame" d="M300,310 Q315,310 300,270 Q285,310 300,310 Z" />
+                <path class="flame-inner" d="M300,308 Q308,308 300,290 Q292,308 300,308 Z" />
+
+                <!-- 三脚架 (居中，顶部 y=330 承接烧杯) -->
+                <line x1="240" y1="330" x2="220" y2="400" class="stand" /> <!-- 左腿 -->
+                <line x1="360" y1="330" x2="380" y2="400" class="stand" /> <!-- 右腿 -->
+                <line x1="240" y1="330" x2="360" y2="330" class="stand" stroke-width="3" /> <!-- 承接面 -->
+            </g>
+
+            <!-- 2. 热辐射 (Radiation) - 位于背景层 -->
+            <g id="group-radiation">
+                <path class="radiation-wave anim-radiation" d="M280,320 Q260,300 270,280 T260,250" />
+                <path class="radiation-wave anim-radiation" d="M320,320 Q340,300 330,280 T340,250" />
+                <!-- 标签 -->
+                <line x1="340" y1="300" x2="390" y2="300" class="label-line" />
+                <g class="label-group" onclick="highlight('radiation')">
+                    <rect x="390" y="285" width="60" height="30" class="label-bg" />
+                    <text x="420" y="301" class="label-text">热辐射</text>
+                </g>
+            </g>
+
+            <!-- 3. 热传导 (Conduction) - 棒子需要插入水中，层级在水之前或之中 -->
+            <g id="group-conduction">
+                <!-- 夹子 (固定在右上角) -->
+                <g transform="translate(440, 80) rotate(45)">
+                    <rect x="-10" y="-15" width="20" height="40" class="clamp" />
+                    <rect x="-25" y="10" width="50" height="5" fill="#aaa" /> <!-- 支架杆 -->
+                </g>
+
+                <!-- 导热棒 (从右上斜插向左下，进入烧杯中心区域) -->
+                <!-- 坐标计算: 假设起点(右上) 440,80 -> 终点(杯中) 300,260 -->
+                <g transform="translate(440, 80) rotate(135)">
+                    <!-- 棒体 -->
+                    <rect x="0" y="-6" width="200" height="12" rx="2" class="conduction-rod" />
+                    <!-- 热量传递视觉 (红色渐变层) -->
+                    <rect x="0" y="-6" width="200" height="12" rx="2" fill="url(#grad-heat)" opacity="0.7" />
+                    
+                    <!-- 传导箭头动画 -->
+                    <path d="M20,0 L30,0 L25,-4 M30,0 L25,4" stroke="#fff" stroke-width="2" fill="none">
+                        <animate attributeName="transform" type="translate" from="0 0" to="160 0" dur="2s" repeatCount="indefinite" />
+                        <animate attributeName="opacity" values="1;0" dur="2s" repeatCount="indefinite" />
+                    </path>
+                </g>
+
+                <!-- 标签 -->
+                <line x1="400" y1="140" x2="460" y2="140" class="label-line" />
+                <g class="label-group" onclick="highlight('conduction')">
+                    <rect x="460" y="125" width="60" height="30" class="label-bg" />
+                    <text x="490" y="141" class="label-text">热传导</text>
+                </g>
+            </g>
+
+            <!-- 4. 热对流 (Convection) - 烧杯和水 -->
+            <g id="group-convection">
+                <!-- 烧杯轮廓 (底部居中 x=300, y=330) -->
+                <!-- 宽120: x从240到360 -->
+                <path class="glassware" d="M240,180 L240,320 Q240,330 300,330 Q360,330 360,320 L360,180" />
+                
+                <!-- 水 (半透明，这样能看到插在里面的棒子) -->
+                <path class="water" d="M245,200 L245,315 Q245,325 300,325 Q355,325 355,315 L355,200 Z" />
+
+                <!-- 温度计 -->
+                <g transform="translate(255, 190)">
+                    <rect x="0" y="0" width="6" height="120" rx="3" fill="#fff" stroke="#ccc" />
+                    <rect x="1" y="60" width="4" height="55" rx="2" fill="#e74c3c" />
+                    <circle cx="3" cy="120" r="5" fill="#e74c3c" />
+                </g>
+
+                <!-- 对流循环箭头 -->
+                <g transform="translate(300, 270)">
+                    <!-- 循环动画容器 -->
+                    <g> 
+                        <!-- 左侧向上 -->
+                        <path class="convection-arrow" d="M-15,25 Q-30,0 -15,-25" stroke="#e74c3c">
+                            <animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="3s" repeatCount="indefinite" />
+                        </path>
+                        <!-- 右侧向下 -->
+                        <path class="convection-arrow" d="M15,-25 Q30,0 15,25" stroke="#ff7979" transform="rotate(180)">
+                             <animateTransform attributeName="transform" type="rotate" from="180 0 0" to="540 0 0" dur="3s" repeatCount="indefinite" />
+                        </path>
+                    </g>
+                </g>
+
+                <!-- 标签 -->
+                <line x1="360" y1="250" x2="430" y2="250" class="label-line" />
+                <g class="label-group" onclick="highlight('convection')">
+                    <rect x="430" y="235" width="60" height="30" class="label-bg" />
+                    <text x="460" y="251" class="label-text">热对流</text>
+                </g>
+            </g>
+
+        </svg>
+    </main>
+
+    <footer id="info-panel">
+        <div class="description" id="desc-text">
+            热可以从一个物体传递给另一个物体，或者从物体的一部分传递到另一部分。热传递的方式有三种，即<b>热传导</b>、<b>热辐射</b>、<b>热对流</b>。
+            <br><br>
+            <i>提示：点击下方按钮或图中的标签以单独观察每种现象。</i>
+        </div>
+
+        <div class="controls">
+            <button class="btn active" onclick="highlight('all')">显示全部</button>
+            <button class="btn" onclick="highlight('conduction')">只看热传导</button>
+            <button class="btn" onclick="highlight('convection')">只看热对流</button>
+            <button class="btn" onclick="highlight('radiation')">只看热辐射</button>
+        </div>
+
+        <div class="book-tag">
+            适配教科书：苏教版 / 教科版
+        </div>
+    </footer>
+
+    <script>
+        function highlight(mode) {
+            const groups = {
+                conduction: document.getElementById('group-conduction'),
+                convection: document.getElementById('group-convection'),
+                radiation: document.getElementById('group-radiation')
+            };
+            const descText = document.getElementById('desc-text');
+
+            // 重置按钮
+            document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
+
+            // 重置视觉效果
+            Object.values(groups).forEach(g => {
+                g.classList.remove('dimmed');
+                g.classList.remove('highlighted');
+            });
+
+            if (mode === 'all') {
+                document.querySelector("button[onclick=\"highlight('all')\"]").classList.add('active');
+                descText.innerHTML = "热可以从一个物体传递给另一个物体，或者从物体的一部分传递到另一部分。热传递的方式有三种，即<b>热传导</b>、<b>热辐射</b>、<b>热对流</b>。<br><br><i>提示：点击下方按钮或图中的标签以单独观察每种现象。</i>";
+            } else {
+                document.querySelector(`button[onclick="highlight('${mode}')"]`).classList.add('active');
+                
+                for (let key in groups) {
+                    if (key === mode) {
+                        groups[key].classList.add('highlighted');
+                    } else {
+                        groups[key].classList.add('dimmed');
+                    }
+                }
+
+                switch(mode) {
+                    case 'conduction':
+                        descText.innerHTML = "<b>热传导 (Conduction)</b>：热量沿着金属棒从温度高的一端传递到温度低的一端（即浸入水中的部分）。<br><i>现象：金属棒上的热量逐渐向水中传递。</i>";
+                        break;
+                    case 'convection':
+                        descText.innerHTML = "<b>热对流 (Convection)</b>：烧杯底部的液态水受热膨胀上升，周围较冷的液体流过来补充，形成循环。<br><i>现象：水流循环流动，使整杯水变热。</i>";
+                        break;
+                    case 'radiation':
+                        descText.innerHTML = "<b>热辐射 (Radiation)</b>：热量不依靠介质，直接从热源（火焰）向四周发射。<br><i>现象：手在旁边也能感受到热度。</i>";
+                        break;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

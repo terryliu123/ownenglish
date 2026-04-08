@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>我的复古拍立得</title>
+    
+    <!-- 引入 html2canvas 用于截图下载 -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    
+    <style>
+      /* 引入手写字体，增加复古感 */
+      @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
+
+      * { box-sizing: border-box; outline: none; }
+
+      body {
+        margin: 0; padding: 0;
+        /* 背景纹理 */
+        background-color: #d4d4d4;
+        background-image: radial-gradient(#e0e0e0 15%, transparent 16%), radial-gradient(#e0e0e0 15%, transparent 16%);
+        background-size: 20px 20px;
+        background-position: 0 0, 10px 10px;
+        height: 100vh; width: 100vw;
+        font-family: sans-serif;
+        overflow: hidden;
+        display: flex;
+        flex-direction: row;
+        user-select: none;
+        touch-action: none;
+      }
+
+      /* 左侧相机区域 */
+      .camera-zone {
+        flex: 0 0 50%;
+        max-width: 600px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end; /* 相机靠下 */
+        align-items: center;
+        position: relative;
+        z-index: 20;
+        padding: 20px;
+        padding-bottom: 80px;
+        pointer-events: none; /* 让点击穿透，除非点击按钮 */
+      }
+
+      .camera-wrapper {
+        position: relative;
+        width: 100%;
+        max-width: 450px;
+        aspect-ratio: 1 / 1;
+        pointer-events: auto;
+      }
+
+      /* 相机贴图 */
+      .camera-img {
+        width: 100%;
+        height: auto;
+        position: relative;
+        z-index: 20;
+        pointer-events: none;
+        filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.4));
+      }
+
+      /* 镜头区域 */
+      .lens-wrapper {
+        position: absolute;
+        bottom: 35%; left: 62%;
+        transform: translateX(-50%);
+        width: 26%; height: 26%;
+        border-radius: 50%;
+        overflow: hidden;
+        z-index: 25;
+        background: #000;
+        box-shadow: inset 0 0 15px #000;
+      }
+
+      video#cam-feed {
+        width: 100%; height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1); /* 镜像翻转 */
+        opacity: 0.9;
+      }
+
+      /* 镜头反光效果 */
+      .lens-shine {
+        position: absolute;
+        top: 15%; left: 15%;
+        width: 30%; height: 20%;
+        background: rgba(255, 255, 255, 0.3);
+        transform: rotate(-45deg);
+        filter: blur(3px);
+        z-index: 26;
+        pointer-events: none;
+      }
+
+      /* 快门按钮热区 */
+      .shutter-btn {
+        position: absolute;
+        bottom: 42%; left: 18%;
+        width: 11%; height: 11%;
+        border-radius: 50%;
+        z-index: 30;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .shutter-btn:active { background: rgba(0,0,0,0.1); }
+
+      /* 出片口 */
+      .ejection-slot {
+        position: absolute;
+        z-index: 15;
+        top: -40%; left: 50%;
+        transform: translateX(-50%);
+        width: 35%; height: 100%;
+        pointer-events: none;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        padding-bottom: 20%;
+      }
+
+      /* 右侧桌面区域 */
+      .desk-zone {
+        flex: 1;
+        position: relative;
+        height: 100%;
+      }
+
+      /* 顶部按钮组 */
+      .btn-container {
+        position: absolute;
+        top: 20px; right: 20px;
+        z-index: 200;
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-btn {
+        background: rgba(255, 255, 255, 0.9);
+        border: 2px solid #222;
+        color: #222;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-family: 'Permanent Marker', cursive;
+        font-size: 14px;
+        cursor: pointer;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: all 0.2s;
+      }
+      .action-btn:hover { background: #222; color: white; }
+      .action-btn:active { transform: scale(0.95); }
+
+      /* --- 相纸样式 --- */
+      .polaroid {
+        width: 170px;
+        background: #fdfdfd;
+        padding: 10px 10px 55px 10px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        position: absolute;
+        cursor: grab;
+        pointer-events: auto;
+        transform-origin: center center;
+        touch-action: none;
+        transition: transform 0.2s;
+      }
+      .polaroid:active {
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+        z-index: 10000 !important;
+        cursor: grabbing;
+      }
+
+      .polaroid img {
+        width: 100%; height: 170px;
+        object-fit: cover;
+        background: #222;
+        border: 1px solid #e0e0e0;
+        pointer-events: none;
+        display: block;
+        will-change: filter;
+      }
+
+      /* 显影动画 */
+      .polaroid.developing-start img { filter: blur(15px) grayscale(0.8) brightness(0.2); }
+      .polaroid.developing-slow img { transition: filter 6s ease-in-out; filter: blur(0) grayscale(0) brightness(1); }
+      .polaroid.developing-fast img { transition: filter 3s ease-out !important; filter: blur(0) grayscale(0) brightness(1); }
+
+      /* 文字区域 */
+      .polaroid .caption-main {
+        position: absolute;
+        bottom: 22px; left: 10px;
+        width: 150px;
+        text-align: center;
+        color: #222;
+        opacity: 0.9;
+        cursor: text;
+        font-family: 'Permanent Marker', cursive;
+        font-size: 14px;
+        line-height: 1.1;
+        min-height: 18px;
+      }
+      .polaroid .caption-main:empty::before { content: '美好的一天'; opacity: 0.5; }
+
+      .polaroid .caption-date {
+        position: absolute;
+        bottom: 8px; left: 10px;
+        width: 150px;
+        text-align: center;
+        font-family: 'Permanent Marker', cursive;
+        font-size: 10px;
+        color: #555;
+        pointer-events: none;
+      }
+
+      /* 弹出动画 */
+      .polaroid.ejecting {
+        transform: translateY(100%);
+        animation: riseOut 2s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+      }
+      @keyframes riseOut {
+        0% { transform: translateY(100%); opacity: 1; }
+        100% { transform: translateY(-50px); opacity: 1; }
+      }
+
+      /* 闪光灯层 */
+      .flash {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: white;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 10000;
+        transition: opacity 0.1s;
+      }
+      .flash-active { opacity: 1; }
+
+      /* 删除按钮（悬浮） */
+      .delete-btn {
+        position: absolute; top: -10px; right: -10px;
+        width: 24px; height: 24px;
+        background: #d93025; color: white;
+        border-radius: 50%;
+        display: none; justify-content: center; align-items: center;
+        cursor: pointer; font-weight: bold; font-size: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      }
+      .polaroid:hover .delete-btn { display: flex; }
+
+      /* 移动端适配 */
+      @media (max-width: 768px) {
+        body { flex-direction: column; }
+        .camera-zone {
+          flex: 0 0 auto; width: 100%; height: auto;
+          padding-top: 60px; padding-bottom: 40px;
+        }
+        .desk-zone { width: 100%; height: 100%; min-height: 400px;}
+        .btn-container { top: 10px; right: 10px; }
+        .polaroid { width: 140px; padding-bottom: 45px; }
+        .polaroid img { height: 140px; }
+      }
+    </style>
+  </head>
+  <body>
+    
+    <!-- 按钮组 -->
+    <div class="btn-container">
+      <button class="action-btn" id="download-btn">下载照片墙</button>
+      <button class="action-btn" id="reset-btn">清空桌面</button>
+    </div>
+
+    <!-- 相机区域 -->
+    <div class="camera-zone">
+      <div class="camera-wrapper">
+        <!-- 吐照片的口子 -->
+        <div class="ejection-slot" id="slot"></div>
+        
+        <!-- 镜头与视频流 -->
+        <div class="lens-wrapper">
+          <video id="cam-feed" autoplay playsinline muted></video>
+          <div class="lens-shine"></div>
+        </div>
+        
+        <!-- 相机图片 (使用远程资源，可替换为本地) -->
+        <img src="https://www.bubbbly.com/assets/retro-camera.webp" class="camera-img" alt="Retro Camera" />
+        
+        <!-- 快门按钮 -->
+        <div class="shutter-btn" id="shutter"></div>
+      </div>
+    </div>
+
+    <!-- 桌面区域 -->
+    <div class="desk-zone" id="desk"></div>
+
+    <!-- 闪光灯效果 -->
+    <div class="flash" id="flash"></div>
+    
+    <!-- 隐藏的 Canvas 用于截图 -->
+    <canvas id="canvas" style="display: none"></canvas>
+
+    <script>
+      const video = document.getElementById('cam-feed');
+      const canvas = document.getElementById('canvas');
+      const shutter = document.getElementById('shutter');
+      const slot = document.getElementById('slot');
+      const flash = document.getElementById('flash');
+      const desk = document.getElementById('desk');
+      const resetBtn = document.getElementById('reset-btn');
+      const downloadBtn = document.getElementById('download-btn');
+      const cameraZone = document.querySelector('.camera-zone');
+      const btnContainer = document.querySelector('.btn-container');
+
+      // 音效 (使用远程资源)
+      const printSound = new Audio('https://www.bubbbly.com/assets/retro-camera/polaroid-camera.mp3');
+      printSound.volume = 0.6;
+
+      // 调用摄像头
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: 'user', width: 480, height: 480 } })
+        .then((stream) => (video.srcObject = stream))
+        .catch((err) => {
+            console.error(err);
+            alert("无法访问摄像头，请确保允许权限或使用HTTPS环境。");
+        });
+
+      // 获取当前日期
+      function getTodayDateString() {
+        const d = new Date();
+        return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+      }
+
+      // 预设几张 Demo 照片
+      const demoDate = getTodayDateString();
+      const demos = [
+        { src: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=400', rot: '-5deg', top: '20%', left: '10%' },
+        { src: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?w=400', rot: '8deg', top: '25%', left: '30%' }
+      ];
+
+      function spawnDemos() {
+        demos.forEach((d) => {
+          createPolaroidElement(d.src, demoDate, d.top, d.left, d.rot, false);
+        });
+      }
+      spawnDemos();
+
+      // 创建拍立得元素
+      function createPolaroidElement(imgSrc, dateStr, top, left, rot, isNew = false) {
+        const div = document.createElement('div');
+        div.className = 'polaroid';
+
+        if (isNew) {
+          div.classList.add('developing-start'); // 开始显影状态
+        }
+
+        div.innerHTML = `
+            <div class="delete-btn">×</div>
+            <img src="${imgSrc}">
+            <div class="caption-main" contenteditable="true" spellcheck="false"></div>
+            <div class="caption-date">${dateStr}</div>
+        `;
+
+        // 随机位置或指定位置
+        if (top) div.style.top = top;
+        else div.style.top = (Math.random() * 20 + 10) + '%';
+        
+        if (left) div.style.left = left;
+        else div.style.left = (Math.random() * 20 + 10) + '%';
+
+        if (rot) div.style.transform = `rotate(${rot})`;
+
+        // 删除功能
+        div.querySelector('.delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation(); // 防止触发拖拽
+            div.remove();
+        });
+
+        if (isNew) {
+           // 放入桌面
+           // 使用 requestAnimationFrame 确保 CSS transition 生效
+           requestAnimationFrame(() => {
+             div.offsetWidth; // 强制重绘
+             div.classList.add('developing-slow');
+             div.classList.remove('developing-start');
+           });
+        }
+
+        desk.appendChild(div);
+        makeDraggable(div);
+        return div;
+      }
+
+      // 清空功能
+      resetBtn.addEventListener('click', () => {
+        desk.innerHTML = '';
+        slot.innerHTML = '';
+      });
+
+      // 下载功能
+      downloadBtn.addEventListener('click', () => {
+        // 隐藏UI
+        cameraZone.style.display = 'none';
+        btnContainer.style.display = 'none';
+
+        html2canvas(document.body, {
+          backgroundColor: '#d4d4d4',
+          useCORS: true, // 允许跨域图片
+          scale: 2, // 高清
+        }).then((canvas) => {
+            // 恢复UI
+            cameraZone.style.display = 'flex';
+            btnContainer.style.display = 'flex';
+            
+            // 下载
+            const link = document.createElement('a');
+            link.download = 'my-polaroid.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }).catch(() => {
+             cameraZone.style.display = 'flex';
+             btnContainer.style.display = 'flex';
+             alert('下载失败，可能是图片跨域问题。');
+        });
+      });
+
+      // 快门点击事件
+      shutter.addEventListener('click', (e) => {
+        e.preventDefault();
+
+        // 闪光灯动画
+        flash.classList.add('flash-active');
+        setTimeout(() => flash.classList.remove('flash-active'), 100);
+
+        // 音效
+        printSound.currentTime = 0;
+        printSound.play().catch(() => {});
+
+        // 截取视频帧
+        const ctx = canvas.getContext('2d');
+        const size = Math.min(video.videoWidth, video.videoHeight);
+        canvas.width = 400;
+        canvas.height = 400;
+        // 镜像翻转绘制
+        ctx.translate(400, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(
+          video,
+          (video.videoWidth - size) / 2,
+          (video.videoHeight - size) / 2,
+          size, size, 0, 0, 400, 400
+        );
+
+        ejectPhoto(canvas.toDataURL('image/jpeg'));
+      });
+
+      // 吐片效果
+      function ejectPhoto(src) {
+        // 清除旧的吐片动画元素
+        if (slot.firstChild) slot.removeChild(slot.firstChild);
+        
+        // 创建一个临时元素在相机口
+        const p = createPolaroidElement(src, getTodayDateString(), null, null, '0deg', true);
+        p.classList.add('ejecting'); // 添加吐片动画类
+        
+        // 这里的 p 暂时不应该在 desk 里，而是在 slot 里展示动画
+        // 但 createPolaroidElement 默认加到了 desk，我们先把它移出来
+        desk.removeChild(p); 
+        slot.appendChild(p);
+      }
+
+      // 拖拽逻辑
+      function makeDraggable(elm) {
+        let startX = 0, startY = 0, initialLeft = 0, initialTop = 0;
+
+        elm.addEventListener('mousedown', dragStart);
+        elm.addEventListener('touchstart', dragStart, { passive: false });
+
+        function dragStart(e) {
+          // 如果点击的是文字编辑区或删除按钮，不拖拽
+          if (e.target.classList.contains('caption-main') || e.target.classList.contains('delete-btn')) return;
+
+          e.preventDefault();
+
+          // 如果是从相机口拿下来的
+          if (elm.classList.contains('ejecting')) {
+             const rect = elm.getBoundingClientRect();
+             elm.classList.remove('ejecting');
+             desk.appendChild(elm); // 移到桌面层
+             // 加速显影
+             elm.classList.remove('developing-slow');
+             void elm.offsetWidth;
+             elm.classList.add('developing-fast');
+             
+             // 转换坐标
+             elm.style.position = 'absolute';
+             elm.style.left = rect.left + 'px';
+             elm.style.top = rect.top + 'px';
+             elm.style.transform = 'rotate(0deg)';
+          }
+
+          elm.style.zIndex = 10000; // 拖拽时置顶
+
+          if (e.type === 'touchstart') {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+          } else {
+            startX = e.clientX;
+            startY = e.clientY;
+          }
+
+          initialLeft = elm.offsetLeft;
+          initialTop = elm.offsetTop;
+
+          document.addEventListener('mouseup', dragEnd);
+          document.addEventListener('mousemove', dragMove);
+          document.addEventListener('touchend', dragEnd);
+          document.addEventListener('touchmove', dragMove, { passive: false });
+        }
+
+        function dragMove(e) {
+          e.preventDefault();
+          let currentX, currentY;
+          if (e.type === 'touchmove') {
+            currentX = e.touches[0].clientX;
+            currentY = e.touches[0].clientY;
+          } else {
+            currentX = e.clientX;
+            currentY = e.clientY;
+          }
+
+          const dx = currentX - startX;
+          const dy = currentY - startY;
+
+          elm.style.left = initialLeft + dx + 'px';
+          elm.style.top = initialTop + dy + 'px';
+
+          // 拖拽时稍微倾斜放大  
+          const tilt = Math.max(-8, Math.min(8, dx * 0.1));
+          elm.style.transform = `rotate(${tilt}deg) scale(1.05)`;
+        }
+
+        function dragEnd() {
+          document.removeEventListener('mouseup', dragEnd);
+          document.removeEventListener('mousemove', dragMove);
+          document.removeEventListener('touchend', dragEnd);
+          document.removeEventListener('touchmove', dragMove);
+
+          elm.style.zIndex = 'auto';
+          const finalRot = (Math.random() * 20 - 10).toFixed(1);
+          elm.style.transition = 'transform 0.2s';
+          elm.style.transform = `rotate(${finalRot}deg) scale(1)`;
+          setTimeout(() => { elm.style.transition = ''; }, 200);
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>活力城市建造者 3D (加强版)</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Segoe UI', -apple-system, Roboto, sans-serif; 
+            user-select: none; 
+            background: #87CEEB;
+            touch-action: none; 
+            -webkit-user-select: none;
+        }
+        
+        /* 工具栏样式优化 */
+        #toolbar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,60,100,0.15);
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+            overflow-x: auto;
+            width: 92%;
+            max-width: 700px;
+            -webkit-overflow-scrolling: touch;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        #toolbar::-webkit-scrollbar { display: none; }
+
+        .tool-btn {
+            min-width: 60px;
+            height: 70px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            background: #f0f4f8;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: 0.1s;
+            font-size: 11px;
+            font-weight: bold;
+            color: #555;
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tool-btn:active { transform: scale(0.95); background: #e1e8ed; }
+        .tool-btn.active { 
+            border-color: #007aff; 
+            background: #e3f2fd; 
+            color: #007aff; 
+            box-shadow: 0 4px 12px rgba(0,122,255,0.2);
+        }
+        .tool-btn.danger { color: #e74c3c; }
+        .tool-btn.danger.active { border-color: #e74c3c; background: #ffebee; }
+        
+        .icon { font-size: 24px; margin-bottom: 5px; pointer-events: none; }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            color: #333;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.6);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        h2 { margin: 0 0 5px 0; font-size: 18px; color: #007aff; font-weight: 800; }
+        p { margin: 0; font-size: 12px; color: #666; }
+
+        #stats {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            z-index: 10;
+            font-weight: bold;
+            color: #444;
+        }
+        
+        #loading {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: #87CEEB; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            color: #fff; z-index: 999; font-weight: bold;
+            transition: opacity 0.5s;
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading">
+        <div style="font-size: 40px; margin-bottom: 10px;">🏗️</div>
+        <div>正在初始化城市资源...</div>
+    </div>
+
+    <div id="hud">
+        <div class="panel">
+            <h2>🏙️ 活力城市</h2>
+            <p>☝️ 单指拖动旋转 | 👇 点击放置</p>
+            <p style="margin-top:5px; color:#888;">包含：学校、餐厅、电影院</p>
+        </div>
+    </div>
+
+    <div id="stats" class="panel">
+        <div id="population">人口: 0</div>
+        <div id="traffic">车辆: 0</div>
+    </div>
+
+    <div id="toolbar">
+        <div class="tool-btn active" onclick="selectTool('road')">
+            <span class="icon">🛣️</span>道路
+        </div>
+        <div class="tool-btn" onclick="selectTool('house')">
+            <span class="icon">🏠</span>住宅
+        </div>
+        <div class="tool-btn" onclick="selectTool('shop')">
+            <span class="icon">🏪</span>商店
+        </div>
+        <!-- 新增组件开始 -->
+        <div class="tool-btn" onclick="selectTool('school')">
+            <span class="icon">🏫</span>学校
+        </div>
+        <div class="tool-btn" onclick="selectTool('restaurant')">
+            <span class="icon">🍽️</span>餐厅
+        </div>
+        <div class="tool-btn" onclick="selectTool('cinema')">
+            <span class="icon">🎬</span>影院
+        </div>
+        <!-- 新增组件结束 -->
+        <div class="tool-btn" onclick="selectTool('skyscraper')">
+            <span class="icon">🏢</span>大厦
+        </div>
+        <div class="tool-btn" onclick="selectTool('factory')">
+            <span class="icon">🏭</span>工厂
+        </div>
+        <div class="tool-btn" onclick="selectTool('water')">
+            <span class="icon">💧</span>水域
+        </div>
+        <div class="tool-btn" onclick="selectTool('park')">
+            <span class="icon">🌳</span>公园
+        </div>
+        <div class="tool-btn danger" onclick="selectTool('bulldoze')">
+            <span class="icon">🚜</span>铲除
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const GRID_SIZE = 10;
+        
+        let scene, camera, renderer, controls;
+        let raycaster, pointer, plane, rollOverMesh;
+        
+        let isDragging = false;
+        let touchStartPos = new THREE.Vector2();
+        let touchStartTime = 0;
+        
+        let currentTool = 'road';
+        const gridMap = new Map(); 
+        const vehicles = []; 
+        const pedestrians = []; 
+        const particles = []; 
+
+        let stats = { population: 0, traffic: 0 };
+
+        const mats = {
+            grass: new THREE.MeshStandardMaterial({ color: 0x7ec850 }),
+            water: new THREE.MeshStandardMaterial({ color: 0x4fc3f7, transparent: true, opacity: 0.8, roughness: 0.1 }),
+            asphalt: new THREE.MeshStandardMaterial({ color: 0x455a64, roughness: 0.8 }),
+            wall: new THREE.MeshStandardMaterial({ color: 0xf5f5f5 }),
+            roof: new THREE.MeshStandardMaterial({ color: 0xff7043 }),
+            glass: new THREE.MeshPhysicalMaterial({ color: 0xb3e5fc, metalness: 0.1, roughness: 0, transparent: true, opacity: 0.7 }),
+            brick: new THREE.MeshStandardMaterial({ color: 0x8d6e63 }),
+            factory: new THREE.MeshStandardMaterial({ color: 0x546e7a }),
+            car: [
+                new THREE.MeshStandardMaterial({ color: 0xe53935 }), 
+                new THREE.MeshStandardMaterial({ color: 0x1e88e5 }), 
+                new THREE.MeshStandardMaterial({ color: 0xffffff }), 
+                new THREE.MeshStandardMaterial({ color: 0xfdd835 })  
+            ],
+            person: new THREE.MeshStandardMaterial({ color: 0xffca28 })
+        };
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 50, 300);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.set(60, 60, 60);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambient);
+            const sun = new THREE.DirectionalLight(0xfffde7, 1.2);
+            sun.position.set(100, 150, 50);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048;
+            sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
+            sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
+            scene.add(sun);
+
+            const groundGeo = new THREE.PlaneGeometry(1000, 1000);
+            groundGeo.rotateX(-Math.PI / 2);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0xa5d6a7 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.position.y = -0.1;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            const gridHelper = new THREE.GridHelper(300, 30, 0xffffff, 0xffffff);
+            gridHelper.material.opacity = 0.3;
+            gridHelper.material.transparent = true;
+            scene.add(gridHelper);
+
+            const planeGeo = new THREE.PlaneGeometry(300, 300);
+            planeGeo.rotateX(-Math.PI / 2);
+            plane = new THREE.Mesh(planeGeo, new THREE.MeshBasicMaterial({ visible: false }));
+            scene.add(plane);
+
+            rollOverMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(GRID_SIZE, 0.5, GRID_SIZE),
+                new THREE.MeshBasicMaterial({ color: 0x007aff, opacity: 0.5, transparent: true })
+            );
+            scene.add(rollOverMesh);
+
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.1;
+            
+            const canvas = renderer.domElement;
+            canvas.addEventListener('pointerdown', onPointerDown);
+            canvas.addEventListener('pointermove', onPointerMove);
+            canvas.addEventListener('pointerup', onPointerUp);
+            
+            window.addEventListener('resize', onResize);
+            window.selectTool = selectTool; 
+
+            setTimeout(() => {
+                document.getElementById('loading').style.opacity = 0;
+                setTimeout(()=>document.getElementById('loading').style.display='none', 500);
+            }, 500);
+        }
+
+        function selectTool(name) {
+            currentTool = name;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            if (name === 'bulldoze') rollOverMesh.material.color.setHex(0xff3b30);
+            else rollOverMesh.material.color.setHex(0x007aff);
+        }
+
+        function onPointerDown(event) {
+            if (event.target.closest('#toolbar')) return;
+            isDragging = false;
+            touchStartTime = Date.now();
+            touchStartPos.set(event.clientX, event.clientY);
+            updateCursor(event);
+        }
+
+        function onPointerMove(event) {
+            updateCursor(event);
+            const dx = event.clientX - touchStartPos.x;
+            const dy = event.clientY - touchStartPos.y;
+            if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isDragging = true;
+        }
+
+        function onPointerUp(event) {
+            if (isDragging) return;
+            if (Date.now() - touchStartTime > 500) return;
+            if (event.target.closest('#toolbar')) return;
+            handlePlacement();
+        }
+
+        function updateCursor(event) {
+            pointer.set(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObject(plane);
+            if (intersects.length > 0) {
+                const pt = intersects[0].point;
+                const x = Math.floor(pt.x / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+                const z = Math.floor(pt.z / GRID_SIZE) * GRID_SIZE + GRID_SIZE / 2;
+                rollOverMesh.position.set(x, 0, z);
+            }
+        }
+
+        function handlePlacement() {
+            const x = rollOverMesh.position.x;
+            const z = rollOverMesh.position.z;
+            const key = `${x},${z}`;
+
+            if (currentTool === 'bulldoze') {
+                if (gridMap.has(key)) {
+                    const item = gridMap.get(key);
+                    scene.remove(item.mesh);
+                    gridMap.delete(key);
+                    updateStats(-5, 0); 
+                }
+            } else {
+                if (gridMap.has(key)) return; 
+
+                const mesh = createBuilding(currentTool, x, z);
+                scene.add(mesh);
+                gridMap.set(key, { type: currentTool, mesh: mesh });
+
+                mesh.scale.set(0,0,0);
+                let s = 0;
+                const anim = setInterval(()=>{
+                    s+=0.2; 
+                    if(s>=1){mesh.scale.set(1,1,1); clearInterval(anim);}
+                    else mesh.scale.set(s,s,s);
+                }, 20);
+            }
+        }
+
+        function createBuilding(type, x, z) {
+            const group = new THREE.Group();
+            group.position.set(x, 0, z);
+            group.userData = { type: type, x: x, z: z };
+
+            // 基础组件
+            if (type === 'road') {
+                const road = new THREE.Mesh(new THREE.BoxGeometry(GRID_SIZE, 0.1, GRID_SIZE), mats.asphalt);
+                road.receiveShadow = true;
+                const line = new THREE.Mesh(new THREE.BoxGeometry(4, 0.12, 0.6), new THREE.MeshBasicMaterial({color:0xffffff}));
+                group.add(road, line);
+                if (Math.random() > 0.7) spawnCar(x, z);
+            }
+            else if (type === 'house') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.5, 6), mats.wall);
+                body.position.y = 1.75; body.castShadow = true;
+                const roof = new THREE.Mesh(new THREE.ConeGeometry(4.5, 2.5, 4), mats.roof);
+                roof.position.y = 4.75; roof.rotation.y = Math.PI/4; roof.castShadow = true;
+                group.add(body, roof);
+                updateStats(5, 0);
+            }
+            else if (type === 'shop') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 7), mats.wall);
+                body.position.y = 2; body.castShadow = true;
+                const awning = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.2, 2), new THREE.MeshStandardMaterial({color:0xff9800}));
+                awning.position.set(0, 3, 3); awning.rotation.x = 0.3;
+                group.add(body, awning);
+                updateStats(10, 0);
+            }
+            
+            // --- 新增组件逻辑 ---
+
+            // 1. 学校 (School)
+            else if (type === 'school') {
+                // 主教学楼 (宽体)
+                const body = new THREE.Mesh(new THREE.BoxGeometry(9, 4, 5), new THREE.MeshStandardMaterial({ color: 0xffe0b2 })); // 浅杏色
+                body.position.y = 2; body.castShadow = true;
+                
+                // 钟楼部分
+                const tower = new THREE.Mesh(new THREE.BoxGeometry(2.5, 7, 2.5), new THREE.MeshStandardMaterial({ color: 0xffcc80 }));
+                tower.position.set(0, 3.5, 0); tower.castShadow = true;
+                
+                // 钟楼尖顶
+                const top = new THREE.Mesh(new THREE.ConeGeometry(1.8, 2, 4), new THREE.MeshStandardMaterial({ color: 0x5d4037 })); // 深褐色
+                top.position.set(0, 8, 0); top.rotation.y = Math.PI/4;
+
+                // 模拟时钟 (白色圆片)
+                const clock = new THREE.Mesh(new THREE.CircleGeometry(0.6, 16), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                clock.position.set(0, 6, 1.26);
+
+                group.add(body, tower, top, clock);
+                updateStats(20, 0); // 学校吸引更多人口
+            }
+
+            // 2. 餐厅 (Restaurant)
+            else if (type === 'restaurant') {
+                // 餐厅主体 (奶白色)
+                const body = new THREE.Mesh(new THREE.BoxGeometry(6, 3.5, 6), new THREE.MeshStandardMaterial({ color: 0xfff3e0 }));
+                body.position.y = 1.75; body.castShadow = true;
+
+                // 特色屋顶 (平顶 + 装饰)
+                const roof = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.5, 6.5), new THREE.MeshStandardMaterial({ color: 0xd84315 })); // 深橙色
+                roof.position.y = 3.75;
+
+                // 户外招牌柱子
+                const signPost = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+                signPost.position.set(2.5, 1.5, 2.5);
+                const signBoard = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1, 0.1), new THREE.MeshStandardMaterial({ color: 0xffeb3b })); // 黄色招牌
+                signBoard.position.set(2.5, 3, 2.5);
+
+                group.add(body, roof, signPost, signBoard);
+                updateStats(8, 0);
+            }
+
+            // 3. 电影院 (Cinema)
+            else if (type === 'cinema') {
+                // 影院主体 (深蓝灰色)
+                const body = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 8), new THREE.MeshStandardMaterial({ color: 0x263238 }));
+                body.position.y = 2.5; body.castShadow = true;
+
+                // 正面大屏幕/海报区
+                const screen = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 0.5), new THREE.MeshStandardMaterial({ color: 0xe0f7fa, emissive: 0x006064, emissiveIntensity: 0.2 }));
+                screen.position.set(0, 3, 4);
+
+                // 顶部红色招牌条
+                const marquee = new THREE.Mesh(new THREE.BoxGeometry(8.2, 1, 8.2), new THREE.MeshStandardMaterial({ color: 0xc62828 }));
+                marquee.position.y = 5;
+
+                group.add(body, screen, marquee);
+                updateStats(12, 0);
+            }
+
+            // --- 原有其他组件 ---
+            
+            else if (type === 'skyscraper') {
+                const h = 12 + Math.random() * 15;
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(7, h, 7), mats.glass);
+                mesh.position.y = h/2; mesh.castShadow = true;
+                const core = new THREE.Mesh(new THREE.BoxGeometry(4, h-1, 4), mats.wall);
+                core.position.y = h/2;
+                group.add(core, mesh);
+                updateStats(50, 0);
+            }
+            else if (type === 'factory') {
+                const body = new THREE.Mesh(new THREE.BoxGeometry(8, 5, 8), mats.factory);
+                body.position.y = 2.5; body.castShadow = true;
+                const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1, 4, 16), mats.brick);
+                stack.position.set(2, 6, 2); stack.castShadow = true;
+                group.add(body, stack);
+                group.userData.hasSmoke = true;
+                group.userData.smokePos = new THREE.Vector3(x+2, 8, z+2);
+                updateStats(10, 0);
+            }
+            else if (type === 'water') {
+                const water = new THREE.Mesh(new THREE.BoxGeometry(GRID_SIZE, 0.5, GRID_SIZE), mats.water);
+                water.position.y = -0.2; 
+                group.add(water);
+            }
+            else if (type === 'park') {
+                const grass = new THREE.Mesh(new THREE.BoxGeometry(GRID_SIZE, 0.2, GRID_SIZE), mats.grass);
+                grass.receiveShadow = true;
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.5), new THREE.MeshStandardMaterial({color:0x5d4037}));
+                trunk.position.set(0, 0.75, 0); trunk.castShadow = true;
+                const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2), new THREE.MeshStandardMaterial({color:0x2e7d32}));
+                leaves.position.set(0, 2, 0); leaves.castShadow = true;
+                group.add(grass, trunk, leaves);
+                const count = 1 + Math.floor(Math.random()*2);
+                for(let i=0; i<count; i++) spawnPedestrian(x, z);
+                updateStats(2, 0);
+            }
+
+            return group;
+        }
+
+        function spawnCar(x, z) {
+            const carGroup = new THREE.Group();
+            const colorMat = mats.car[Math.floor(Math.random()*mats.car.length)];
+            const chassis = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1, 1.2), colorMat);
+            chassis.position.y = 0.8; chassis.castShadow = true;
+            const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 1), new THREE.MeshStandardMaterial({color:0x333333}));
+            top.position.y = 1.6;
+            carGroup.add(chassis, top);
+            carGroup.position.set(x, 0, z);
+            carGroup.userData = { targetX: x, targetZ: z, speed: 0.1 + Math.random() * 0.05, state: 'idle' };
+            scene.add(carGroup);
+            vehicles.push(carGroup);
+            updateStats(0, 1);
+        }
+
+        function spawnPedestrian(parkX, parkZ) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 0.8), mats.person);
+            body.position.y = 0.4;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.25), mats.person);
+            head.position.y = 1.0;
+            group.add(body, head);
+            const lx = (Math.random()-0.5) * 6;
+            const lz = (Math.random()-0.5) * 6;
+            group.position.set(parkX + lx, 0, parkZ + lz);
+            group.userData = { homeX: parkX, homeZ: parkZ, targetX: parkX + lx, targetZ: parkZ + lz, speed: 0.02 + Math.random() * 0.01, waitTime: 0 };
+            scene.add(group);
+            pedestrians.push(group);
+        }
+
+        function updateTraffic() {
+            vehicles.forEach(car => {
+                const data = car.userData;
+                const dx = data.targetX - car.position.x;
+                const dz = data.targetZ - car.position.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+
+                if (dist < 0.2) {
+                    car.position.x = data.targetX;
+                    car.position.z = data.targetZ;
+                    const neighbors = [
+                        {x: data.targetX + GRID_SIZE, z: data.targetZ},
+                        {x: data.targetX - GRID_SIZE, z: data.targetZ},
+                        {x: data.targetX, z: data.targetZ + GRID_SIZE},
+                        {x: data.targetX, z: data.targetZ - GRID_SIZE}
+                    ];
+                    const validRoads = neighbors.filter(n => {
+                        const key = `${n.x},${n.z}`;
+                        const cell = gridMap.get(key);
+                        return cell && cell.type === 'road';
+                    });
+
+                    if (validRoads.length > 0) {
+                        const next = validRoads[Math.floor(Math.random() * validRoads.length)];
+                        data.targetX = next.x;
+                        data.targetZ = next.z;
+                        car.lookAt(data.targetX, car.position.y, data.targetZ);
+                    }
+                } else {
+                    car.translateZ(data.speed);
+                }
+            });
+        }
+
+        function updatePedestrians() {
+            pedestrians.forEach(p => {
+                const data = p.userData;
+                if (data.waitTime > 0) {
+                    data.waitTime--;
+                    if(data.waitTime % 20 === 0) p.position.y = 0.2; else p.position.y = 0;
+                    return;
+                }
+                const dx = data.targetX - p.position.x;
+                const dz = data.targetZ - p.position.z;
+                const dist = Math.sqrt(dx*dx + dz*dz);
+
+                if (dist < 0.1) {
+                    const lx = (Math.random()-0.5) * 8;
+                    const lz = (Math.random()-0.5) * 8;
+                    data.targetX = data.homeX + lx;
+                    data.targetZ = data.homeZ + lz;
+                    p.lookAt(data.targetX, 0, data.targetZ);
+                    data.waitTime = 50 + Math.random() * 100;
+                } else {
+                    p.translateZ(data.speed);
+                    p.position.y = Math.abs(Math.sin(Date.now() * 0.01)) * 0.2;
+                }
+            });
+        }
+
+        function updateParticles() {
+            gridMap.forEach((val, key) => {
+                if (val.mesh.userData.hasSmoke && Math.random() > 0.8) {
+                    const pos = val.mesh.userData.smokePos;
+                    const p = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.5, 0.5, 0.5),
+                        new THREE.MeshBasicMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.6 })
+                    );
+                    p.position.set(pos.x + (Math.random()-0.5), pos.y, pos.z + (Math.random()-0.5));
+                    p.userData = { life: 1.0, vY: 0.05 + Math.random()*0.05 };
+                    scene.add(p);
+                    particles.push(p);
+                }
+            });
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.position.y += p.userData.vY;
+                p.position.x += (Math.random()-0.5)*0.05;
+                p.rotation.x += 0.1;
+                p.scale.multiplyScalar(1.02);
+                p.material.opacity -= 0.01;
+                p.userData.life -= 0.01;
+                if (p.userData.life <= 0) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateStats(popDelta, carDelta) {
+            stats.population = Math.max(0, stats.population + popDelta);
+            stats.traffic = Math.max(0, stats.traffic + carDelta);
+            document.getElementById('population').innerText = `人口: ${stats.population}`;
+            document.getElementById('traffic').innerText = `车辆: ${stats.traffic}`;
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateTraffic();
+            updatePedestrians();
+            updateParticles();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

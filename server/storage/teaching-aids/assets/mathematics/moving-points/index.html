@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>函数的应用：异速双动点 (直角三角形面积问题)</title>
+    <style>
+        :root {
+            --bg-color: #222;
+            --panel-bg: #2e2e2e;
+            --text-color: #eee;
+            --accent-blue: #4a90e2;
+            --accent-green: #50e3c2;
+            --accent-yellow: #f5a623;
+            --grid-color: #444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            padding: 15px;
+            text-align: center;
+            width: 100%;
+            background: #1a1a1a;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        h1 { margin: 0; font-size: 1.4rem; font-weight: normal; }
+        .subtitle { font-size: 0.9rem; color: #aaa; margin-top: 5px; }
+
+        .main-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 20px;
+            width: 100%;
+            max-width: 1200px;
+            box-sizing: border-box;
+        }
+
+        .canvas-panel {
+            background: var(--panel-bg);
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            position: relative;
+            flex: 1;
+            min-width: 350px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background: #1e1e1e;
+            border-radius: 4px;
+            cursor: crosshair;
+        }
+
+        .controls {
+            width: 100%;
+            max-width: 800px;
+            background: var(--panel-bg);
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        button {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        button:hover { background: #357abd; }
+
+        input[type="range"] {
+            flex-grow: 1;
+            height: 6px;
+            background: #555;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--text-color);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .info-display {
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            min-width: 120px;
+            text-align: right;
+        }
+
+        .formula-box {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            pointer-events: none;
+            border-left: 3px solid var(--accent-green);
+        }
+
+        /* Custom math styling */
+        .math-var { font-style: italic; font-family: 'Times New Roman', Times, serif; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>函数的应用：异速双动点 (面积问题)</h1>
+    <div class="subtitle">
+        已知: AC=6, BC=8, <span class="math-var">Vp</span>=3, <span class="math-var">Vq</span>=2. P从C→A→B运动, Q从C→B运动.
+    </div>
+</header>
+
+<div class="main-container">
+    <!-- 几何画板 -->
+    <div class="canvas-panel">
+        <canvas id="geoCanvas" width="400" height="350"></canvas>
+        <div class="formula-box" id="geoInfo">
+            当前阶段: P在AC上
+        </div>
+    </div>
+
+    <!-- 函数图象 -->
+    <div class="canvas-panel">
+        <canvas id="funcCanvas" width="400" height="350"></canvas>
+        <div class="formula-box" style="border-color: var(--accent-yellow);">
+            <div id="funcExpr">S = 3t²</div>
+        </div>
+    </div>
+</div>
+
+<div class="controls">
+    <button id="playBtn">播放</button>
+    <span style="font-size:0.9rem; color:#aaa;">0s</span>
+    <input type="range" id="timeSlider" min="0" max="4" step="0.01" value="0">
+    <span style="font-size:0.9rem; color:#aaa;">4s</span>
+    <div class="info-display">
+        t = <span id="tVal" style="color: var(--accent-green)">0.00</span><br>
+        S = <span id="sVal" style="color: var(--accent-yellow)">0.00</span>
+    </div>
+</div>
+
+<script>
+    // 常量定义
+    const AC = 6;
+    const BC = 8;
+    const AB = 10; // 勾股定理
+    const Vp = 3;
+    const Vq = 2;
+    
+    // 画布上下文
+    const geoCanvas = document.getElementById('geoCanvas');
+    const geoCtx = geoCanvas.getContext('2d');
+    const funcCanvas = document.getElementById('funcCanvas');
+    const funcCtx = funcCanvas.getContext('2d');
+
+    // 状态
+    let time = 0;
+    let isPlaying = false;
+    let animId;
+
+    // DOM 元素
+    const slider = document.getElementById('timeSlider');
+    const tVal = document.getElementById('tVal');
+    const sVal = document.getElementById('sVal');
+    const playBtn = document.getElementById('playBtn');
+    const geoInfo = document.getElementById('geoInfo');
+    const funcExpr = document.getElementById('funcExpr');
+
+    // 几何坐标转换 (为了让三角形居中并放大)
+    // 原点在画布左下角附近
+    const scale = 40; // 1单位 = 40像素
+    const offsetX = 50;
+    const offsetY = 300;
+
+    // 坐标转换函数
+    function toScreen(x, y) {
+        return {
+            x: offsetX + x * scale,
+            y: offsetY - y * scale // Y轴向上为正，Canvas向下为正
+        };
+    }
+
+    // 主渲染循环
+    function render() {
+        // 清除画布
+        geoCtx.clearRect(0, 0, geoCanvas.width, geoCanvas.height);
+        funcCtx.clearRect(0, 0, funcCanvas.width, funcCanvas.height);
+
+        // --- 1. 计算几何逻辑 ---
+        
+        // Q 点位置 (始终在 BC 上, 即 x轴)
+        // Q 从 C(0,0) 到 B(8,0)
+        let distQ = Vq * time;
+        let posQ = { x: distQ, y: 0 };
+
+        // P 点位置
+        let posP = { x: 0, y: 0 };
+        let area = 0;
+        let phase = "";
+
+        if (time <= 2) {
+            // 阶段 1: P 在 AC 上 (C -> A)
+            // AC 长度 6, Vp=3, 耗时 2秒
+            phase = "P在AC上 (0 ≤ t ≤ 2)";
+            let distP = Vp * time;
+            posP = { x: 0, y: distP }; // 沿 Y 轴向上
+            
+            // 面积计算 S = 1/2 * base * height = 1/2 * (2t) * (3t) = 3t^2
+            area = 0.5 * (2 * time) * (3 * time);
+            funcExpr.innerHTML = "S = 3t²";
+        } else {
+            // 阶段 2: P 在 AB 上 (A -> B)
+            // t > 2, P 已经过了 A 点
+            phase = "P在AB上 (2 < t ≤ 4)";
+            let timeOnAB = time - 2;
+            let distOnAB = Vp * timeOnAB; // P 在 AB 上走的距离
+            
+            // AB 向量计算
+            // A=(0,6), B=(8,0). 向量 AB = (8, -6). 单位向量 u = (0.8, -0.6)
+            posP = {
+                x: 0 + distOnAB * 0.8,
+                y: 6 + distOnAB * (-0.6)
+            };
+
+            // 面积计算
+            // Base = CQ = 2t
+            // Height = P 的 y 坐标 = 6 - 0.6 * (3*(t-2)) = 6 - 1.8(t-2) = 6 - 1.8t + 3.6 = 9.6 - 1.8t
+            // S = 1/2 * 2t * (9.6 - 1.8t) = 9.6t - 1.8t^2
+            let height = posP.y;
+            let base = posQ.x;
+            area = 0.5 * base * height;
+            funcExpr.innerHTML = "S = -1.8t² + 9.6t";
+        }
+
+        // --- 2. 绘制几何场景 (左侧) ---
+        
+        // 定义顶点屏幕坐标
+        const C_scr = toScreen(0, 0);
+        const A_scr = toScreen(0, 6);
+        const B_scr = toScreen(8, 0);
+        const P_scr = toScreen(posP.x, posP.y);
+        const Q_scr = toScreen(posQ.x, posQ.y);
+
+        // 绘制网格背景 (可选)
+        drawGrid(geoCtx, scale, offsetX, offsetY);
+
+        // 绘制三角形 ABC
+        geoCtx.beginPath();
+        geoCtx.moveTo(C_scr.x, C_scr.y);
+        geoCtx.lineTo(A_scr.x, A_scr.y);
+        geoCtx.lineTo(B_scr.x, B_scr.y);
+        geoCtx.closePath();
+        geoCtx.strokeStyle = '#888';
+        geoCtx.lineWidth = 2;
+        geoCtx.stroke();
+
+        // 标注顶点
+        drawLabel(geoCtx, "C", C_scr.x - 15, C_scr.y + 15);
+        drawLabel(geoCtx, "A", A_scr.x - 15, A_scr.y - 10);
+        drawLabel(geoCtx, "B", B_scr.x + 10, B_scr.y + 15);
+        
+        // 标注边长
+        geoCtx.fillStyle = "#666";
+        geoCtx.font = "12px Arial";
+        geoCtx.fillText("6", toScreen(0, 3).x - 20, toScreen(0, 3).y); // AC边
+        geoCtx.fillText("8", toScreen(4, 0).x, toScreen(4, 0).y + 20); // CB边
+
+        // 绘制动态三角形 CPQ (填充)
+        geoCtx.beginPath();
+        geoCtx.moveTo(C_scr.x, C_scr.y);
+        geoCtx.lineTo(P_scr.x, P_scr.y);
+        geoCtx.lineTo(Q_scr.x, Q_scr.y);
+        geoCtx.closePath();
+        geoCtx.fillStyle = 'rgba(74, 144, 226, 0.5)'; // 半透明蓝
+        geoCtx.fill();
+        geoCtx.strokeStyle = '#4a90e2';
+        geoCtx.stroke();
+
+        // 绘制动点 P 和 Q
+        drawPoint(geoCtx, P_scr.x, P_scr.y, '#f5a623', 'P');
+        drawPoint(geoCtx, Q_scr.x, Q_scr.y, '#f5a623', 'Q');
+
+        // 绘制直角符号
+        geoCtx.strokeStyle = '#888';
+        geoCtx.beginPath();
+        geoCtx.moveTo(C_scr.x + 15, C_scr.y);
+        geoCtx.lineTo(C_scr.x + 15, C_scr.y - 15);
+        geoCtx.lineTo(C_scr.x, C_scr.y - 15);
+        geoCtx.stroke();
+
+        // 更新文本
+        geoInfo.innerText = phase;
+        tVal.innerText = time.toFixed(2);
+        sVal.innerText = area.toFixed(2);
+
+
+        // --- 3. 绘制函数图象 (右侧) ---
+        drawFunctionGraph(area);
+    }
+
+    function drawFunctionGraph(currentS) {
+        const w = funcCanvas.width;
+        const h = funcCanvas.height;
+        const padding = 40;
+        
+        // 图表比例
+        // t: 0-5 (x轴)
+        // S: 0-16 (y轴)
+        const maxT = 5; // x轴稍微留白
+        const maxS = 16; 
+        
+        const xScale = (w - 2 * padding) / maxT;
+        const yScale = (h - 2 * padding) / maxS;
+
+        // 绘制坐标轴
+        funcCtx.strokeStyle = '#fff';
+        funcCtx.lineWidth = 1;
+        funcCtx.beginPath();
+        // y轴
+        funcCtx.moveTo(padding, padding);
+        funcCtx.lineTo(padding, h - padding);
+        // x轴
+        funcCtx.moveTo(padding, h - padding);
+        funcCtx.lineTo(w - padding, h - padding);
+        funcCtx.stroke();
+        
+        // 箭头
+        funcCtx.fillStyle = '#fff';
+        // y箭头
+        funcCtx.beginPath(); funcCtx.moveTo(padding, padding); funcCtx.lineTo(padding-5, padding+10); funcCtx.lineTo(padding+5, padding+10); funcCtx.fill();
+        // x箭头
+        funcCtx.beginPath(); funcCtx.moveTo(w-padding, h-padding); funcCtx.lineTo(w-padding-10, h-padding-5); funcCtx.lineTo(w-padding-10, h-padding+5); funcCtx.fill();
+
+        // 标签
+        funcCtx.font = "14px Arial";
+        funcCtx.textAlign = "center";
+        funcCtx.fillText("t", w - padding, h - padding + 20);
+        funcCtx.fillText("S", padding - 20, padding + 10);
+        funcCtx.fillText("O", padding - 10, h - padding + 15);
+
+        // 刻度
+        // t=2
+        const x2 = padding + 2 * xScale;
+        funcCtx.beginPath(); funcCtx.moveTo(x2, h-padding); funcCtx.lineTo(x2, h-padding-5); funcCtx.stroke();
+        funcCtx.fillText("2", x2, h - padding + 15);
+        // t=4
+        const x4 = padding + 4 * xScale;
+        funcCtx.beginPath(); funcCtx.moveTo(x4, h-padding); funcCtx.lineTo(x4, h-padding-5); funcCtx.stroke();
+        funcCtx.fillText("4", x4, h - padding + 15);
+
+        // 绘制 S-t 曲线
+        funcCtx.beginPath();
+        funcCtx.strokeStyle = '#50e3c2'; // 绿色线条
+        funcCtx.lineWidth = 2;
+
+        for(let i = 0; i <= 400; i++) {
+            let t = (i / 400) * 4; // 绘制到 t=4
+            let s = 0;
+            if(t <= 2) s = 3 * t * t;
+            else s = -1.8 * t * t + 9.6 * t;
+
+            let px = padding + t * xScale;
+            let py = (h - padding) - s * yScale;
+
+            if(i === 0) funcCtx.moveTo(px, py);
+            else funcCtx.lineTo(px, py);
+        }
+        funcCtx.stroke();
+
+        // 绘制当前动点
+        let curX = padding + time * xScale;
+        let curY = (h - padding) - currentS * yScale;
+        
+        // 虚线
+        funcCtx.setLineDash([5, 5]);
+        funcCtx.strokeStyle = '#666';
+        funcCtx.lineWidth = 1;
+        // 垂线到x轴
+        funcCtx.beginPath(); funcCtx.moveTo(curX, curY); funcCtx.lineTo(curX, h - padding); funcCtx.stroke();
+        // 垂线到y轴
+        funcCtx.beginPath(); funcCtx.moveTo(curX, curY); funcCtx.lineTo(padding, curY); funcCtx.stroke();
+        funcCtx.setLineDash([]);
+
+        // 点
+        funcCtx.fillStyle = '#f5a623';
+        funcCtx.beginPath();
+        funcCtx.arc(curX, curY, 5, 0, Math.PI * 2);
+        funcCtx.fill();
+        
+        // 显示坐标文本
+        funcCtx.fillStyle = '#eee';
+        funcCtx.textAlign = "left";
+        funcCtx.fillText(`(${time.toFixed(2)}, ${currentS.toFixed(2)})`, curX + 8, curY - 8);
+    }
+
+    function drawPoint(ctx, x, y, color, label) {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(x, y, 5, 0, Math.PI*2);
+        ctx.fill();
+        if(label) {
+            ctx.fillStyle = '#fff';
+            ctx.font = "bold 14px Arial";
+            ctx.fillText(label, x + 8, y - 8);
+        }
+    }
+
+    function drawLabel(ctx, text, x, y) {
+        ctx.fillStyle = '#fff';
+        ctx.font = "16px Arial";
+        ctx.fillText(text, x, y);
+    }
+
+    function drawGrid(ctx, scale, ox, oy) {
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        // 简单的网格
+        /*
+        ctx.beginPath();
+        for(let i=0; i<10; i++) {
+            // 竖线
+            ctx.moveTo(ox + i*scale, 0);
+            ctx.lineTo(ox + i*scale, 400);
+            // 横线
+            ctx.moveTo(0, oy - i*scale);
+            ctx.lineTo(400, oy - i*scale);
+        }
+        ctx.stroke();
+        */
+    }
+
+    // 动画逻辑
+    function animate() {
+        if(isPlaying) {
+            time += 0.02; // 速度
+            if(time > 4) {
+                time = 4;
+                isPlaying = false;
+                playBtn.innerText = "重播";
+            }
+            slider.value = time;
+            render();
+            animId = requestAnimationFrame(animate);
+        }
+    }
+
+    // 事件监听
+    slider.addEventListener('input', (e) => {
+        time = parseFloat(e.target.value);
+        if(isPlaying) {
+            isPlaying = false;
+            playBtn.innerText = "播放";
+            cancelAnimationFrame(animId);
+        }
+        if(time >= 4) playBtn.innerText = "重播";
+        else playBtn.innerText = "播放";
+        render();
+    });
+
+    playBtn.addEventListener('click', () => {
+        if(isPlaying) {
+            isPlaying = false;
+            playBtn.innerText = "播放";
+            cancelAnimationFrame(animId);
+        } else {
+            if(time >= 4) time = 0;
+            isPlaying = true;
+            playBtn.innerText = "暂停";
+            animate();
+        }
+    });
+
+    // 初始化
+    render();
+
+</script>
+</body>
+</html>

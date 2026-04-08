@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>卡宏鼓 (Cajón) 训练站</title>
+    <style>
+        :root {
+            --wood-primary: #8d6e63;
+            --wood-dark: #5d4037;
+            --wood-light: #a1887f;
+            --snare-zone: rgba(255, 255, 255, 0.1);
+            --bass-zone: rgba(0, 0, 0, 0.1);
+            --active-highlight: #ffca28;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            background: #222;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Segoe UI', sans-serif;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+        }
+
+        /* === 顶部教学区 === */
+        #learning-panel {
+            width: 100%;
+            height: 35vh;
+            background: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 8px 16px;
+            background: var(--wood-primary);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        button.active { background: var(--active-highlight); color: #333; }
+
+        select {
+            padding: 5px;
+            border-radius: 5px;
+            background: #444;
+            color: white;
+            border: 1px solid #666;
+        }
+
+        /* 节奏谱 (Step Sequencer 风格) */
+        #score-display {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr); /* 8拍 */
+            gap: 4px;
+            background: #222;
+            padding: 10px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        .beat-col {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+            opacity: 0.3;
+            transition: opacity 0.1s;
+        }
+
+        .beat-col.current {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .beat-dot {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .dot-snare { background: #e67e22; border: 2px solid #fff; } /* 上方：Snare */
+        .dot-bass { background: #3498db; }  /* 下方：Bass */
+        .dot-empty { background: #444; }
+
+        /* === 底部乐器区 === */
+        #cajon-body {
+            flex-grow: 1;
+            width: 90%;
+            max-width: 500px;
+            margin: 20px 0;
+            background:  repeating-linear-gradient(
+                45deg,
+                var(--wood-primary),
+                var(--wood-primary) 10px,
+                var(--wood-light) 10px,
+                var(--wood-light) 20px
+            );
+            border-radius: 10px;
+            box-shadow: 
+                inset 0 0 50px rgba(0,0,0,0.6),
+                0 10px 20px rgba(0,0,0,0.5);
+            border: 8px solid var(--wood-dark);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 螺丝装饰 */
+        .screw {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #bbb;
+            border-radius: 50%;
+            box-shadow: inset 1px 1px 2px #000;
+        }
+        .screw:nth-child(1) { top: 10px; left: 10px; }
+        .screw:nth-child(2) { top: 10px; right: 10px; }
+        .screw:nth-child(3) { bottom: 10px; left: 10px; }
+        .screw:nth-child(4) { bottom: 10px; right: 10px; }
+
+        /* 击打区域 */
+        .zone-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 上半部分：Snare (响弦) */
+        .snare-row {
+            height: 35%;
+            display: flex;
+            border-bottom: 2px solid rgba(0,0,0,0.1);
+        }
+
+        .hit-zone {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: rgba(255,255,255,0.3);
+            transition: background 0.05s;
+            position: relative;
+        }
+        
+        .hit-zone:active, .hit-zone.active {
+            background: rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.9);
+        }
+
+        .zone-snare { background: var(--snare-zone); }
+        .zone-bass { background: var(--bass-zone); height: 65%; }
+
+        .label {
+            pointer-events: none;
+            text-align: center;
+        }
+        .label span { display: block; font-size: 12px; opacity: 0.7;}
+
+    </style>
+</head>
+<body>
+
+    <div id="learning-panel">
+        <div class="controls">
+            <select id="rhythm-select" onchange="loadPattern()">
+                <option value="rock">节奏 1: 基础摇滚 (Rock)</option>
+                <option value="funk">节奏 2: 动感放克 (Funk)</option>
+                <option value="pop">节奏 3: 流行伴奏 (Pop)</option>
+            </select>
+            <button id="btn-play" onclick="togglePlay()">▶ 开始跟练</button>
+        </div>
+
+        <!-- 8步进节奏谱 -->
+        <div id="score-display">
+            <!-- JS 将动态生成 8 列 -->
+        </div>
+        <div style="color:#888; font-size:12px; margin-top:10px;">上方橙色为边缘(Snare)，下方蓝色为中心(Bass)</div>
+    </div>
+
+    <div id="cajon-body">
+        <div class="screw"></div><div class="screw"></div><div class="screw"></div><div class="screw"></div>
+        
+        <div class="zone-container">
+            <!-- Snare 区域 (分左右手) -->
+            <div class="snare-row">
+                <div class="hit-zone zone-snare" id="snare-L" data-type="snare">
+                    <div class="label">Snare<br><span>(左上角)</span></div>
+                </div>
+                <div class="hit-zone zone-snare" id="snare-R" data-type="snare">
+                    <div class="label">Snare<br><span>(右上角)</span></div>
+                </div>
+            </div>
+
+            <!-- Bass 区域 -->
+            <div class="hit-zone zone-bass" id="bass" data-type="bass">
+                <div class="label">Bass<br><span>(中心拍击)</span></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // === 1. 音频引擎 (Web Audio API) ===
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        // 噪音缓冲 (用于 Snare 的沙沙声)
+        const bufferSize = audioCtx.sampleRate * 2.0;
+        const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            output[i] = Math.random() * 2 - 1;
+        }
+
+        const sounds = {
+            // Bass: 深沉的咚声 (正弦波 + 快速音高下降)
+            bass: () => {
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.frequency.setValueAtTime(100, t);
+                osc.frequency.exponentialRampToValueAtTime(30, t + 0.3); // 模拟鼓皮松弛
+
+                gain.gain.setValueAtTime(1.5, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+
+                // 添加低通滤波，使声音更闷、更像木箱
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 200;
+
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start(t);
+                osc.stop(t + 0.4);
+            },
+            // Snare: 啪声 (高频噪音 + 短促木头撞击声)
+            snare: () => {
+                const t = audioCtx.currentTime;
+                
+                // 1. 响弦噪音 (Wires)
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = noiseBuffer;
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'highpass';
+                noiseFilter.frequency.value = 2000; // 只保留高频
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.setValueAtTime(0.8, t);
+                noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2); // 很短
+
+                noise.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(audioCtx.destination);
+                noise.start(t);
+
+                // 2. 木板撞击声 (Wood crack)
+                const osc = audioCtx.createOscillator();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(400, t);
+                const oscGain = audioCtx.createGain();
+                oscGain.gain.setValueAtTime(0.5, t);
+                oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                
+                osc.connect(oscGain);
+                oscGain.connect(audioCtx.destination);
+                osc.start(t);
+                osc.stop(t+0.1);
+            }
+        };
+
+        // === 2. 节奏模式数据 ===
+        // 0: 空, 1: Bass, 2: Snare
+        const patterns = {
+            'rock': [1, 0, 2, 0, 1, 1, 2, 0], // 咚 - 啪 - 咚咚 啪 -
+            'funk': [1, 0, 2, 0, 0, 1, 2, 0], // 咚 - 啪 - - 咚 啪 -
+            'pop':  [1, 0, 1, 0, 2, 0, 0, 0]  // 咚 - 咚 - 啪 - - -
+        };
+        let currentPattern = patterns['rock'];
+
+        // === 3. 乐谱显示与渲染 ===
+        function renderScore() {
+            const container = document.getElementById('score-display');
+            container.innerHTML = '';
+            
+            currentPattern.forEach((note, index) => {
+                const col = document.createElement('div');
+                col.className = 'beat-col';
+                col.id = `beat-${index}`;
+                
+                // 上半部分：Snare
+                const snareDot = document.createElement('div');
+                snareDot.className = `beat-dot ${note === 2 ? 'dot-snare' : 'dot-empty'}`;
+                snareDot.innerText = note === 2 ? 'S' : '';
+                
+                // 下半部分：Bass
+                const bassDot = document.createElement('div');
+                bassDot.className = `beat-dot ${note === 1 ? 'dot-bass' : 'dot-empty'}`;
+                bassDot.innerText = note === 1 ? 'B' : '';
+
+                col.appendChild(snareDot);
+                col.appendChild(bassDot);
+                container.appendChild(col);
+            });
+        }
+
+        function loadPattern() {
+            const val = document.getElementById('rhythm-select').value;
+            currentPattern = patterns[val];
+            renderScore();
+            // 如果正在播放，重置索引
+            if(isPlaying) {
+                stepIndex = 0;
+            }
+        }
+
+        // === 4. 播放控制逻辑 ===
+        let isPlaying = false;
+        let timer = null;
+        let stepIndex = 0;
+        const BPM = 100; // 速度
+        
+        function togglePlay() {
+            const btn = document.getElementById('btn-play');
+            if (isPlaying) {
+                // 停止
+                clearInterval(timer);
+                isPlaying = false;
+                btn.innerText = "▶ 开始跟练";
+                btn.classList.remove('active');
+                // 清除高亮
+                document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('current'));
+            } else {
+                // 开始
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                isPlaying = true;
+                btn.innerText = "⏹ 停止";
+                btn.classList.add('active');
+                stepIndex = 0;
+                
+                const interval = (60 / BPM) * 1000 / 2; // 8分音符
+                timer = setInterval(playStep, interval);
+            }
+        }
+
+        function playStep() {
+            // 1. UI 高亮
+            document.querySelectorAll('.beat-col').forEach(c => c.classList.remove('current'));
+            const currentCol = document.getElementById(`beat-${stepIndex}`);
+            if(currentCol) currentCol.classList.add('current');
+
+            // 2. 播放示范音
+            const note = currentPattern[stepIndex];
+            if (note === 1) {
+                sounds.bass();
+                // 视觉模拟：Bass区闪烁
+                triggerVisual('bass');
+            } else if (note === 2) {
+                sounds.snare();
+                // 视觉模拟：随机左右Snare闪烁
+                triggerVisual(Math.random() > 0.5 ? 'snare-L' : 'snare-R');
+            }
+
+            // 3. 循环
+            stepIndex = (stepIndex + 1) % 8;
+        }
+
+        function triggerVisual(id) {
+            const el = document.getElementById(id);
+            if(el) {
+                el.classList.add('active');
+                setTimeout(() => el.classList.remove('active'), 100);
+            }
+        }
+
+        // === 5. 交互处理 (触控) ===
+        function hit(type, elementId) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // 播放声音
+            if (type === 'bass') sounds.bass();
+            if (type === 'snare') sounds.snare();
+        }
+
+        // 绑定事件
+        document.querySelectorAll('.hit-zone').forEach(zone => {
+            const handler = (e) => {
+                e.preventDefault(); // 防止双击放大
+                const type = zone.getAttribute('data-type');
+                hit(type);
+                
+                // 视觉反馈
+                zone.classList.add('active');
+                setTimeout(() => zone.classList.remove('active'), 100); // 手动移除，防止touchmove粘滞
+            };
+
+            zone.addEventListener('touchstart', handler, {passive: false});
+            zone.addEventListener('mousedown', handler);
+        });
+
+        // 初始化
+        renderScore();
+
+    </script>
+</body>
+</html>

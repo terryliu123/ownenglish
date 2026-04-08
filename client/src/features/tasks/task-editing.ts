@@ -22,6 +22,8 @@ type ManualTaskDraft = {
   manualOptions: string[]
   manualAnswer: string
   manualHtmlUrl: string
+  manualTeachingAidId: string | null
+  manualTeachingAidName: string
   manualCountdown: number
   manualBlanks: string[]
   manualPairs: Array<{ left: string; right: string }>
@@ -143,6 +145,8 @@ export function buildManualTaskPayload(draft: ManualTaskDraft): CreateTaskData {
   }
 
   if (draft.manualType === 'experiment') {
+    questionPayload.teaching_aid_id = draft.manualTeachingAidId || undefined
+    questionPayload.teaching_aid_name = draft.manualTeachingAidName || undefined
     questionPayload.html_url = draft.manualHtmlUrl || undefined
     questionPayload.answer_required = draft.manualAnswerRequired
   }

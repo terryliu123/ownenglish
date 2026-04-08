@@ -1,0 +1,2036 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://code.jquery.com https://unpkg.com https://d3js.org https://threejs.org https://cdn.plot.ly https://stackpath.bootstrapcdn.com https://maps.googleapis.com https://cdn.tailwindcss.com https://ajax.googleapis.com https://kit.fontawesome.com https://cdn.datatables.net https://maxcdn.bootstrapcdn.com https://code.highcharts.com https://tako-static-assets-production.s3.amazonaws.com https://www.youtube.com https://fonts.googleapis.com https://fonts.gstatic.com https://pfst.cf2.poecdn.net https://puc.poecdn.net https://i.imgur.com https://wikimedia.org https://*.icons8.com https://*.giphy.com https://picsum.photos https://images.unsplash.com; frame-src 'self' https://www.youtube.com https://trytako.com; child-src 'self'; manifest-src 'self'; worker-src 'self'; upgrade-insecure-requests; block-all-mixed-content;">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能英文填字游戏生成器 - 自适应难度</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #6c757d;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            background: white;
+            color: #4facfe;
+            border-bottom: 3px solid #4facfe;
+        }
+        
+        .tab:hover {
+            background: #e9ecef;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .input-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .input-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .difficulty-settings {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 2px solid #28a745;
+        }
+        
+        .difficulty-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #155724;
+        }
+        
+        .difficulty-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-group label {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 14px;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .slider {
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+        }
+        
+        .slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #4facfe;
+            cursor: pointer;
+            border: none;
+        }
+        
+        .slider-value {
+            min-width: 40px;
+            text-align: center;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        
+        .difficulty-preview {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #856404;
+        }
+        
+        .feature-highlight {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            border: 2px solid #4facfe;
+        }
+        
+        .feature-highlight .icon {
+            font-size: 20px;
+        }
+        
+        .feature-highlight .text {
+            font-weight: bold;
+            color: #1976d2;
+        }
+        
+        .input-hint {
+            color: #6c757d;
+            font-size: 14px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        
+        .word-input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .word-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+            min-height: 80px;
+            resize: vertical;
+        }
+        
+        .word-input:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+        
+        .input-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #218838;
+        }
+        
+        .btn-smart {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+        }
+        
+        .btn-smart:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .word-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .word-tag {
+            background: #007bff;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .remove-word {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .generate-btn {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .generate-btn:disabled {
+            background: #6c757d;
+            transform: none;
+            cursor: not-allowed;
+        }
+        
+        .game-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4facfe;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .game-area {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .crossword-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .crossword {
+            display: inline-grid;
+            gap: 1px;
+            background-color: #333;
+            border: 2px solid #333;
+            border-radius: 5px;
+        }
+        
+        .cell {
+            width: 35px;
+            height: 35px;
+            background-color: white;
+            border: none;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            color: #2c3e50;
+        }
+        
+        .cell:focus {
+            outline: 2px solid #4facfe;
+            background-color: #e3f2fd;
+        }
+        
+        .cell.pre-filled {
+            background-color: #e8f5e8;
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .cell.pre-filled:focus {
+            background-color: #d4edda;
+        }
+        
+        .blocked {
+            background-color: #333 !important;
+        }
+        
+        .number {
+            position: relative;
+        }
+        
+        .number::before {
+            content: attr(data-number);
+            position: absolute;
+            top: 1px;
+            left: 2px;
+            font-size: 9px;
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .clues-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .clues h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .clue-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .clue-item {
+            margin-bottom: 10px;
+            padding: 12px;
+            background: white;
+            border-left: 4px solid #4facfe;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .clue-item:hover {
+            background: #e3f2fd;
+            transform: translateX(5px);
+        }
+        
+        .clue-main {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .clue-hint {
+            color: #6c757d;
+            font-size: 12px;
+            display: none;
+        }
+        
+        .clue-item.expanded .clue-hint {
+            display: block;
+        }
+        
+        .pre-filled-indicator {
+            background: #28a745;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        
+        .game-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .control-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .check-btn {
+            background: #28a745;
+            color: white;
+        }
+        
+        .check-btn:hover {
+            background: #218838;
+        }
+        
+        .clear-btn {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .clear-btn:hover {
+            background: #c82333;
+        }
+        
+        .hint-btn {
+            background: #ffc107;
+            color: #212529;
+        }
+        
+        .hint-btn:hover {
+            background: #e0a800;
+        }
+        
+        .reset-btn {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .reset-btn:hover {
+            background: #138496;
+        }
+        
+        .results-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .word-result {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 5px solid #6c757d;
+        }
+        
+        .word-result.correct {
+            border-left-color: #28a745;
+        }
+        
+        .word-result.incorrect {
+            border-left-color: #dc3545;
+        }
+        
+        .word-result h5 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+        
+        .word-definition {
+            color: #6c757d;
+            line-height: 1.6;
+        }
+        
+        .smart-explanation {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        
+        .message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .no-game {
+            text-align: center;
+            padding: 50px;
+            color: #6c757d;
+        }
+        
+        .no-game h3 {
+            margin-bottom: 20px;
+        }
+        
+        .switch-tab-btn {
+            background: #4facfe;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        .switch-tab-btn:hover {
+            background: #3b8bfe;
+        }
+        
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .difficulty-controls {
+                grid-template-columns: 1fr;
+            }
+            
+            .game-area {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .cell {
+                width: 30px;
+                height: 30px;
+                font-size: 12px;
+            }
+            
+            .input-buttons {
+                flex-direction: column;
+            }
+            
+            .game-controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .control-btn {
+                width: 200px;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .game-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 智能英文填字游戏生成器</h1>
+            <p>自适应难度系统，智能预填字母，提供个性化学习体验</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('teacher')">
+                👨‍🏫 教师生成面板
+            </button>
+            <button class="tab" onclick="switchTab('student')">
+                👨‍🎓 学生游戏面板
+            </button>
+        </div>
+        
+        <!-- 教师生成面板 -->
+        <div class="tab-content active" id="teacher-tab">
+            <div class="input-section">
+                <h3>📝 输入单词 (1-10个)</h3>
+                
+                <div class="difficulty-settings">
+                    <div class="difficulty-title">
+                        <span>🎯</span>
+                        <span>智能难度控制系统</span>
+                    </div>
+                    
+                    <div class="difficulty-controls">
+                        <div class="control-group">
+                            <label for="preFilledSlider">预填字母比例</label>
+                            <div class="slider-container">
+                                <input type="range" id="preFilledSlider" class="slider" min="0" max="30" value="15" oninput="updateDifficultyPreview()">
+                                <span class="slider-value" id="preFilledValue">15%</span>
+                            </div>
+                        </div>
+                        
+                        <div class="control-group">
+                            <label for="difficultySlider">整体难度等级</label>
+                            <div class="slider-container">
+                                <input type="range" id="difficultySlider" class="slider" min="1" max="5" value="3" oninput="updateDifficultyPreview()">
+                                <span class="slider-value" id="difficultyValue">中等</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="difficulty-preview" id="difficultyPreview">
+                        预填15%的字母，中等难度 - 适合大多数学生，既有挑战性又不会太困难
+                    </div>
+                </div>
+                
+                <div class="feature-highlight">
+                    <span class="icon">🧠</span>
+                    <span class="text">智能预填系统：根据单词难度和学习目标，智能选择预填字母位置</span>
+                </div>
+                
+                <div class="input-hint">
+                    💡 <strong>功能说明：</strong><br>
+                    • 自适应难度：根据设置自动调整预填字母数量<br>
+                    • 智能选择：优先选择关键位置的字母进行预填<br>
+                    • 学习友好：预填字母用绿色标识，帮助学生理解<br>
+                    • 个性化：可根据学生水平调整难度等级
+                </div>
+                
+                <div class="word-input-container">
+                    <textarea class="word-input" placeholder="输入英文单词，多个单词用逗号分隔
+例如：than, dinosaur, together, survey, report, clothes" id="wordInput"></textarea>
+                    <div class="input-buttons">
+                        <button class="btn btn-primary" onclick="addWords()">添加单词</button>
+                        <button class="btn btn-smart" onclick="recommendWords()">🧠 智能推荐</button>
+                        <button class="btn btn-secondary" onclick="clearInput()">清空输入</button>
+                    </div>
+                </div>
+                
+                <div class="word-list" id="wordList"></div>
+                <button class="generate-btn" onclick="generateCrossword()" id="generateBtn" disabled="">🎮 生成自适应填字游戏</button>
+            </div>
+            
+            <div id="teacherMessage"></div>
+        </div>
+        
+        <!-- 学生游戏面板 -->
+        <div class="tab-content" id="student-tab">
+            <div id="noGameMessage" class="no-game">
+                <h3>🎯 还没有可用的游戏</h3>
+                <p>请先在教师面板生成填字游戏</p>
+                <button class="switch-tab-btn" onclick="switchTab('teacher')">前往生成游戏</button>
+            </div>
+            
+            <div id="gameArea" style="display: none;">
+                <div class="game-stats" id="gameStats"></div>
+                
+                <div class="game-area">
+                    <div class="crossword-container">
+                        <h4>🧩 填字网格 <small style="color: #28a745;">（绿色字母为提示）</small></h4>
+                        <div class="crossword" id="crossword"></div>
+                    </div>
+                    <div class="clues-container">
+                        <div class="clues">
+                            <h4>📋 单词线索 <small>（点击查看详细提示）</small></h4>
+                            <ul class="clue-list" id="cluesList"></ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="game-controls">
+                    <button class="control-btn check-btn" onclick="checkAnswers()">✅ 检查答案</button>
+                    <button class="control-btn clear-btn" onclick="clearGrid()">🗑️ 清空填写</button>
+                    <button class="control-btn hint-btn" onclick="showSmartHint()">💡 智能提示</button>
+                    <button class="control-btn reset-btn" onclick="resetToOriginal()">🔄 重置预填</button>
+                </div>
+                
+                <div class="results-section" id="resultsSection">
+                    <h4>📖 智能答案解析</h4>
+                    <div id="wordResults"></div>
+                </div>
+            </div>
+            
+            <div id="studentMessage"></div>
+        </div>
+    </div>
+
+    <script>
+        let words = [];
+        let currentPuzzle = null;
+        let currentGrid = null;
+        let preFilledCells = new Set(); // 存储预填的单元格
+        let gameStartTime = null;
+        let hintsUsed = 0;
+        
+        // 扩展的单词定义数据库
+        const wordDatabase = {
+            'THAN': {
+                definition: '比 - 用于比较的连词',
+                phonetic: '/ðæn/',
+                partOfSpeech: '连词',
+                example: 'She is taller than her brother.',
+                difficulty: 'easy',
+                category: 'grammar',
+                learningTip: '比较级句型中的关键词，记住"A is better than B"的结构',
+                commonMistakes: '不要和then（然后）混淆，than用于比较',
+                mnemonics: '想象两个人在比赛，than就是比较的桥梁',
+                keyLetters: [0, 2] // 关键字母位置
+            },
+            'DINOSAUR': {
+                definition: '恐龙 - 已灭绝的古代爬行动物',
+                phonetic: '/ˈdaɪnəsɔːr/',
+                partOfSpeech: '名词',
+                example: 'The museum has many dinosaur fossils.',
+                difficulty: 'medium',
+                category: 'animals',
+                learningTip: '词根分析：dino-（可怕的）+ -saur（蜥蜴）= 可怕的蜥蜴',
+                commonMistakes: '注意拼写，中间是-saur不是-sour',
+                mnemonics: '想象恐龙的巨大身影，帮助记忆这个词',
+                keyLetters: [0, 4, 7] // D, S, R
+            },
+            'TOGETHER': {
+                definition: '一起 - 共同地，同时地',
+                phonetic: '/təˈɡeðər/',
+                partOfSpeech: '副词',
+                example: 'We work together as a team.',
+                difficulty: 'easy',
+                category: 'common',
+                learningTip: '表示团结合作的概念，强调共同行动',
+                commonMistakes: '不要写成togather，记住是-gether',
+                mnemonics: '把to-get-her分开记忆可以帮助拼写',
+                keyLetters: [0, 2, 5] // T, G, H
+            },
+            'SURVEY': {
+                definition: '调查 - 收集信息的研究方法',
+                phonetic: '/ˈsɜːrveɪ/',
+                partOfSpeech: '名词/动词',
+                example: 'We conducted a survey about student preferences.',
+                difficulty: 'medium',
+                category: 'academic',
+                learningTip: '调研和研究的重要工具，用于收集数据和意见',
+                commonMistakes: '作动词时重音在第二个音节sur-VEY',
+                mnemonics: '想象拿着问卷在街头调查的场景',
+                keyLetters: [0, 3] // S, V
+            },
+            'REPORT': {
+                definition: '报告 - 详细的说明或描述',
+                phonetic: '/rɪˈpɔːrt/',
+                partOfSpeech: '名词/动词',
+                example: 'Please write a report about your project.',
+                difficulty: 'easy',
+                category: 'academic',
+                learningTip: '学术和工作中的重要文体，用于汇报和总结',
+                commonMistakes: '注意双写的p，re-port',
+                mnemonics: '想象记者在报告新闻的场景',
+                keyLetters: [0, 2] // R, P
+            },
+            'CLOTHES': {
+                definition: '衣服 - 穿在身上的物品',
+                phonetic: '/kloʊðz/',
+                partOfSpeech: '名词',
+                example: 'She bought new clothes for the party.',
+                difficulty: 'easy',
+                category: 'daily',
+                learningTip: '日常生活必需品，注意是复数形式',
+                commonMistakes: '发音中th读作/ð/，不是/θ/',
+                mnemonics: '想象衣柜里挂满各种衣服',
+                keyLetters: [0, 3, 6] // C, T, S
+            },
+            'SCIENCE': {
+                definition: '科学 - 系统化的知识体系',
+                phonetic: '/ˈsaɪəns/',
+                partOfSpeech: '名词',
+                example: 'She loves studying science at school.',
+                difficulty: 'medium',
+                category: 'academic',
+                learningTip: '探索自然规律的学科，包括物理、化学、生物等',
+                commonMistakes: '注意sc-的发音是/s/不是/sk/',
+                mnemonics: '想象科学家在实验室做实验',
+                keyLetters: [0, 1, 6] // S, C, E
+            },
+            'NATURE': {
+                definition: '自然 - 天然的环境和现象',
+                phonetic: '/ˈneɪtʃər/',
+                partOfSpeech: '名词',
+                example: 'We should protect nature for future generations.',
+                difficulty: 'easy',
+                category: 'environment',
+                learningTip: '指代自然界的一切，强调原生态',
+                commonMistakes: '注意-ture的发音是/tʃər/',
+                mnemonics: '想象美丽的自然风景',
+                keyLetters: [0, 2] // N, T
+            },
+            'OCEAN': {
+                definition: '海洋 - 地球上的大水体',
+                phonetic: '/ˈoʊʃən/',
+                partOfSpeech: '名词',
+                example: 'The Pacific Ocean is the largest ocean.',
+                difficulty: 'easy',
+                category: 'geography',
+                learningTip: '地球表面最大的水体，覆盖大部分地球',
+                commonMistakes: '注意o-ce-an三个音节的划分',
+                mnemonics: '想象无边无际的蓝色海洋',
+                keyLetters: [0, 2] // O, E
+            },
+            'PLANET': {
+                definition: '行星 - 围绕恒星运转的天体',
+                phonetic: '/ˈplænɪt/',
+                partOfSpeech: '名词',
+                example: 'Earth is the third planet from the Sun.',
+                difficulty: 'medium',
+                category: 'space',
+                learningTip: '太阳系中的天体，包括地球在内共有八大行星',
+                commonMistakes: '注意重音在第一音节PLAN-et',
+                mnemonics: '想象行星围绕太阳运转的轨道',
+                keyLetters: [0, 2, 5] // P, A, T
+            },
+            'FOREST': {
+                definition: '森林 - 大面积的树木群落',
+                phonetic: '/ˈfɔːrɪst/',
+                partOfSpeech: '名词',
+                example: 'The Amazon forest is very important.',
+                difficulty: 'easy',
+                category: 'environment',
+                learningTip: '生态系统的重要组成部分，是许多动物的家园',
+                commonMistakes: '不要和forecast（预报）混淆',
+                mnemonics: '想象茂密的树林和林间小径',
+                keyLetters: [0, 2] // F, R
+            },
+            'ANIMAL': {
+                definition: '动物 - 有生命的移动生物',
+                phonetic: '/ˈænɪməl/',
+                partOfSpeech: '名词',
+                example: 'Dogs are loyal animals.',
+                difficulty: 'easy',
+                category: 'animals',
+                learningTip: '生物界的一大类，具有感觉和运动能力',
+                commonMistakes: '注意重音在第一音节AN-i-mal',
+                mnemonics: '想象动物园里各种各样的动物',
+                keyLetters: [0, 2] // A, I
+            }
+        };
+
+        // 推荐单词库
+        const recommendedWordSets = {
+            'school': ['SCIENCE', 'REPORT', 'STUDENT', 'TEACHER', 'LIBRARY'],
+            'nature': ['FOREST', 'OCEAN', 'ANIMAL', 'PLANET', 'NATURE'],
+            'daily': ['CLOTHES', 'WATER', 'HOUSE', 'FRIEND', 'FAMILY'],
+            'comparison': ['THAN', 'BETTER', 'BIGGER', 'SMALLER', 'FASTER'],
+            'time': ['TODAY', 'TOMORROW', 'YESTERDAY', 'MORNING', 'EVENING'],
+            'animals': ['DINOSAUR', 'ELEPHANT', 'TIGER', 'RABBIT', 'MONKEY']
+        };
+
+        // 更新难度预览
+        function updateDifficultyPreview() {
+            const preFilledPercent = document.getElementById('preFilledSlider').value;
+            const difficultyLevel = document.getElementById('difficultySlider').value;
+            
+            document.getElementById('preFilledValue').textContent = preFilledPercent + '%';
+            
+            const difficultyNames = ['很简单', '简单', '中等', '困难', '很困难'];
+            const difficultyName = difficultyNames[difficultyLevel - 1];
+            document.getElementById('difficultyValue').textContent = difficultyName;
+            
+            const preview = document.getElementById('difficultyPreview');
+            let description = '';
+            
+            if (preFilledPercent <= 5) {
+                description = '极少预填字母，';
+            } else if (preFilledPercent <= 15) {
+                description = '少量预填字母，';
+            } else if (preFilledPercent <= 25) {
+                description = '适量预填字母，';
+            } else {
+                description = '较多预填字母，';
+            }
+            
+            description += difficultyName + '难度 - ';
+            
+            if (difficultyLevel <= 2) {
+                description += '适合初学者，提供更多学习支持';
+            } else if (difficultyLevel <= 3) {
+                description += '适合大多数学生，平衡挑战与支持';
+            } else {
+                description += '适合高水平学生，提供更大挑战';
+            }
+            
+            preview.textContent = description;
+        }
+
+        // 标签页切换
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+            
+            if (tabName === 'student') {
+                updateStudentInterface();
+            }
+        }
+
+        function updateStudentInterface() {
+            const noGameMessage = document.getElementById('noGameMessage');
+            const gameArea = document.getElementById('gameArea');
+            
+            if (currentPuzzle) {
+                noGameMessage.style.display = 'none';
+                gameArea.style.display = 'block';
+                updateGameStats();
+            } else {
+                noGameMessage.style.display = 'block';
+                gameArea.style.display = 'none';
+            }
+        }
+
+        function updateGameStats() {
+            const statsContainer = document.getElementById('gameStats');
+            const totalWords = currentPuzzle ? currentPuzzle.words.length : 0;
+            const totalCells = currentPuzzle ? currentPuzzle.words.reduce((sum, word) => sum + word.word.length, 0) : 0;
+            const preFilledCount = preFilledCells.size;
+            const avgDifficulty = calculateAverageDifficulty();
+            
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${totalWords}</div>
+                    <div class="stat-label">单词数量</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${totalCells}</div>
+                    <div class="stat-label">字母总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${preFilledCount}</div>
+                    <div class="stat-label">预填字母</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${avgDifficulty}</div>
+                    <div class="stat-label">难度等级</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${hintsUsed}</div>
+                    <div class="stat-label">使用提示</div>
+                </div>
+            `;
+        }
+
+        function calculateAverageDifficulty() {
+            if (!currentPuzzle) return '未知';
+            
+            const difficulties = currentPuzzle.words.map(wordData => {
+                const def = wordDatabase[wordData.word];
+                return def ? def.difficulty : 'medium';
+            });
+            
+            const difficultyMap = { 'easy': 1, 'medium': 2, 'hard': 3 };
+            const avg = difficulties.reduce((sum, diff) => sum + (difficultyMap[diff] || 2), 0) / difficulties.length;
+            
+            if (avg <= 1.3) return '简单';
+            if (avg <= 2.3) return '中等';
+            return '困难';
+        }
+
+        function recommendWords() {
+            const themes = Object.keys(recommendedWordSets);
+            const randomTheme = themes[Math.floor(Math.random() * themes.length)];
+            const recommendedWords = recommendedWordSets[randomTheme];
+            
+            const count = Math.floor(Math.random() * 3) + 4;
+            const selectedWords = [];
+            
+            while (selectedWords.length < count && selectedWords.length < recommendedWords.length) {
+                const word = recommendedWords[Math.floor(Math.random() * recommendedWords.length)];
+                if (!selectedWords.includes(word)) {
+                    selectedWords.push(word);
+                }
+            }
+            
+            const input = document.getElementById('wordInput');
+            input.value = selectedWords.join(', ');
+            
+            showMessage('teacher', `🧠 智能推荐了${count}个"${getThemeName(randomTheme)}"主题的单词！`, 'success');
+        }
+
+        function getThemeName(theme) {
+            const themeNames = {
+                'school': '学校教育',
+                'nature': '自然环境',
+                'daily': '日常生活',
+                'comparison': '比较级',
+                'time': '时间',
+                'animals': '动物'
+            };
+            return themeNames[theme] || theme;
+        }
+
+        function addWords() {
+            const input = document.getElementById('wordInput');
+            const inputText = input.value.trim();
+            
+            if (!inputText) {
+                showMessage('teacher', '请输入单词', 'error');
+                return;
+            }
+            
+            const inputWords = inputText.split(/[,\s]+/)
+                .map(word => word.trim().toUpperCase())
+                .filter(word => word.length > 0);
+            
+            if (inputWords.length === 0) {
+                showMessage('teacher', '请输入有效的单词', 'error');
+                return;
+            }
+            
+            let addedCount = 0;
+            let skippedWords = [];
+            
+            for (let word of inputWords) {
+                if (!/^[A-Z]+$/.test(word)) {
+                    skippedWords.push(`${word}(包含非字母字符)`);
+                    continue;
+                }
+                
+                if (words.includes(word)) {
+                    skippedWords.push(`${word}(已存在)`);
+                    continue;
+                }
+                
+                if (words.length >= 10) {
+                    skippedWords.push(`${word}(超过10个单词限制)`);
+                    continue;
+                }
+                
+                words.push(word);
+                addedCount++;
+            }
+            
+            input.value = '';
+            updateWordList();
+            
+            let message = '';
+            if (addedCount > 0) {
+                message += `成功添加 ${addedCount} 个单词`;
+                const analysis = analyzeWords(words);
+                if (analysis) {
+                    message += `\n📊 ${analysis}`;
+                }
+            }
+            if (skippedWords.length > 0) {
+                message += (addedCount > 0 ? '；' : '') + `跳过：${skippedWords.join(', ')}`;
+            }
+            
+            showMessage('teacher', message, addedCount > 0 ? 'success' : 'error');
+        }
+
+        function analyzeWords(wordList) {
+            const categories = {};
+            const difficulties = {};
+            
+            wordList.forEach(word => {
+                const def = wordDatabase[word];
+                if (def) {
+                    categories[def.category] = (categories[def.category] || 0) + 1;
+                    difficulties[def.difficulty] = (difficulties[def.difficulty] || 0) + 1;
+                }
+            });
+            
+            const mainCategory = Object.keys(categories).reduce((a, b) => 
+                categories[a] > categories[b] ? a : b, Object.keys(categories)[0]);
+            const mainDifficulty = Object.keys(difficulties).reduce((a, b) => 
+                difficulties[a] > difficulties[b] ? a : b, Object.keys(difficulties)[0]);
+            
+            return `主要类别：${getCategoryName(mainCategory)}，难度：${getDifficultyName(mainDifficulty)}`;
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                'grammar': '语法词汇',
+                'animals': '动物',
+                'common': '常用词汇',
+                'academic': '学术词汇',
+                'daily': '日常生活',
+                'environment': '环境',
+                'space': '太空',
+                'geography': '地理'
+            };
+            return names[category] || category;
+        }
+
+        function getDifficultyName(difficulty) {
+            const names = {
+                'easy': '简单',
+                'medium': '中等',
+                'hard': '困难'
+            };
+            return names[difficulty] || difficulty;
+        }
+
+        function clearInput() {
+            document.getElementById('wordInput').value = '';
+        }
+
+        function updateWordList() {
+            const wordList = document.getElementById('wordList');
+            const generateBtn = document.getElementById('generateBtn');
+            
+            wordList.innerHTML = '';
+            
+            words.forEach(word => {
+                const tag = document.createElement('span');
+                tag.className = 'word-tag';
+                
+                const def = wordDatabase[word];
+                const difficultyIcon = def ? getDifficultyIcon(def.difficulty) : '';
+                
+                tag.innerHTML = `
+                    ${difficultyIcon} ${word}
+                    <button class="remove-word" onclick="removeWord('${word}')">×</button>
+                `;
+                wordList.appendChild(tag);
+            });
+            
+            generateBtn.disabled = words.length === 0;
+        }
+
+        function getDifficultyIcon(difficulty) {
+            const icons = {
+                'easy': '🟢',
+                'medium': '🟡',
+                'hard': '🔴'
+            };
+            return icons[difficulty] || '⚪';
+        }
+
+        function removeWord(word) {
+            words = words.filter(w => w !== word);
+            updateWordList();
+        }
+
+        function generateCrossword() {
+            if (words.length === 0) {
+                showMessage('teacher', '请至少添加一个单词', 'error');
+                return;
+            }
+            
+            gameStartTime = new Date();
+            hintsUsed = 0;
+            preFilledCells.clear();
+            
+            const puzzle = createSmartCrosswordLayout(words);
+            currentPuzzle = puzzle;
+            
+            createGrid(puzzle);
+            addPreFilledLetters(puzzle);
+            createSmartClues(puzzle);
+            
+            const preFilledPercent = document.getElementById('preFilledSlider').value;
+            showMessage('teacher', `🎯 智能生成成功！已预填${preFilledPercent}%的字母，包含 ${puzzle.words.length} 个单词。`, 'success');
+            
+            setTimeout(() => {
+                switchTab('student');
+            }, 2000);
+        }
+
+        // 智能预填字母系统
+        function addPreFilledLetters(puzzle) {
+            const preFilledPercent = parseInt(document.getElementById('preFilledSlider').value);
+            const difficultyLevel = parseInt(document.getElementById('difficultySlider').value);
+            
+            // 计算总字母数
+            const totalLetters = puzzle.words.reduce((sum, word) => sum + word.word.length, 0);
+            const targetPreFilled = Math.floor(totalLetters * preFilledPercent / 100);
+            
+            const candidates = [];
+            
+            // 收集所有可能的预填位置
+            puzzle.words.forEach(wordData => {
+                const { word, row, col, direction } = wordData;
+                const def = wordDatabase[word];
+                
+                for (let i = 0; i < word.length; i++) {
+                    const cellRow = direction === 'across' ? row : row + i;
+                    const cellCol = direction === 'across' ? col + i : col;
+                    const cellId = `cell-${cellRow}-${cellCol}`;
+                    
+                    // 计算这个位置的优先级
+                    let priority = 0;
+                    
+                    // 基础优先级：关键字母位置
+                    if (def && def.keyLetters && def.keyLetters.includes(i)) {
+                        priority += 30;
+                    }
+                    
+                    // 难度调整：简单单词优先预填
+                    if (def) {
+                        if (def.difficulty === 'easy') priority += 20;
+                        else if (def.difficulty === 'medium') priority += 10;
+                    }
+                    
+                    // 位置调整：首字母和尾字母优先级高
+                    if (i === 0) priority += 25; // 首字母
+                    else if (i === word.length - 1) priority += 15; // 尾字母
+                    else if (i === Math.floor(word.length / 2)) priority += 10; // 中间字母
+                    
+                    // 交叉点优先级更高
+                    if (isIntersection(cellRow, cellCol, puzzle)) {
+                        priority += 40;
+                    }
+                    
+                    // 根据整体难度等级调整
+                    if (difficultyLevel <= 2) {
+                        // 简单模式：优先预填关键位置
+                        if (i === 0 || (def && def.keyLetters && def.keyLetters.includes(i))) {
+                            priority += 20;
+                        }
+                    } else if (difficultyLevel >= 4) {
+                        // 困难模式：减少关键位置的预填
+                        if (i === 0) priority -= 10;
+                    }
+                    
+                    candidates.push({
+                        cellId,
+                        row: cellRow,
+                        col: cellCol,
+                        letter: word[i],
+                        priority,
+                        wordData
+                    });
+                }
+            });
+            
+            // 按优先级排序并去重
+            const uniqueCandidates = [];
+            const seenCells = new Set();
+            
+            candidates.sort((a, b) => b.priority - a.priority).forEach(candidate => {
+                if (!seenCells.has(candidate.cellId)) {
+                    seenCells.add(candidate.cellId);
+                    uniqueCandidates.push(candidate);
+                }
+            });
+            
+            // 选择预填的字母
+            const selectedCount = Math.min(targetPreFilled, uniqueCandidates.length);
+            for (let i = 0; i < selectedCount; i++) {
+                const candidate = uniqueCandidates[i];
+                preFilledCells.add(candidate.cellId);
+                
+                const cell = document.getElementById(candidate.cellId);
+                if (cell) {
+                    cell.value = candidate.letter;
+                    cell.classList.add('pre-filled');
+                    cell.readOnly = true; // 预填字母不可修改
+                    currentGrid[candidate.row][candidate.col] = candidate.letter;
+                }
+            }
+        }
+
+        // 检查是否为交叉点
+        function isIntersection(row, col, puzzle) {
+            let count = 0;
+            puzzle.words.forEach(wordData => {
+                const { word, row: wordRow, col: wordCol, direction } = wordData;
+                
+                for (let i = 0; i < word.length; i++) {
+                    const cellRow = direction === 'across' ? wordRow : wordRow + i;
+                    const cellCol = direction === 'across' ? wordCol + i : wordCol;
+                    
+                    if (cellRow === row && cellCol === col) {
+                        count++;
+                        break;
+                    }
+                }
+            });
+            return count > 1;
+        }
+
+        // 智能填字游戏布局算法
+        function createSmartCrosswordLayout(wordList) {
+            const sortedWords = [...wordList].sort((a, b) => {
+                const scoreA = a.length + getLetterFrequencyScore(a);
+                const scoreB = b.length + getLetterFrequencyScore(b);
+                return scoreB - scoreA;
+            });
+            
+            const gridSize = Math.max(15, Math.max(...wordList.map(w => w.length)) + 5);
+            const grid = Array(gridSize).fill().map(() => Array(gridSize).fill(''));
+            const placedWords = [];
+            
+            // 放置第一个单词
+            if (sortedWords.length > 0) {
+                const firstWord = sortedWords[0];
+                const startRow = Math.floor(gridSize / 2);
+                const startCol = Math.floor((gridSize - firstWord.length) / 2);
+                
+                for (let i = 0; i < firstWord.length; i++) {
+                    grid[startRow][startCol + i] = firstWord[i];
+                }
+                
+                placedWords.push({
+                    word: firstWord,
+                    row: startRow,
+                    col: startCol,
+                    direction: 'across',
+                    number: 1
+                });
+            }
+            
+            // 智能放置其他单词
+            let wordNumber = 2;
+            for (let i = 1; i < sortedWords.length; i++) {
+                const word = sortedWords[i];
+                const bestPlacement = findBestPlacement(grid, word, placedWords, gridSize);
+                
+                if (bestPlacement) {
+                    const { row, col, direction } = bestPlacement;
+                    
+                    if (direction === 'across') {
+                        for (let j = 0; j < word.length; j++) {
+                            grid[row][col + j] = word[j];
+                        }
+                    } else {
+                        for (let j = 0; j < word.length; j++) {
+                            grid[row + j][col] = word[j];
+                        }
+                    }
+                    
+                    placedWords.push({
+                        word: word,
+                        row: row,
+                        col: col,
+                        direction: direction,
+                        number: wordNumber++
+                    });
+                }
+            }
+            
+            return {
+                grid: grid,
+                words: placedWords,
+                size: gridSize
+            };
+        }
+
+        function getLetterFrequencyScore(word) {
+            const commonLetters = 'ETAOINSHRDLCUMWFGYPBVKJXQZ';
+            let score = 0;
+            for (let char of word) {
+                const index = commonLetters.indexOf(char);
+                score += index === -1 ? 0 : (26 - index);
+            }
+            return score;
+        }
+
+        function findBestPlacement(grid, word, placedWords, gridSize) {
+            const placements = [];
+            
+            for (let placedWord of placedWords) {
+                for (let i = 0; i < word.length; i++) {
+                    for (let j = 0; j < placedWord.word.length; j++) {
+                        if (word[i] === placedWord.word[j]) {
+                            let newRow, newCol, newDirection;
+                            
+                            if (placedWord.direction === 'across') {
+                                newDirection = 'down';
+                                newRow = placedWord.row - i;
+                                newCol = placedWord.col + j;
+                            } else {
+                                newDirection = 'across';
+                                newRow = placedWord.row + j;
+                                newCol = placedWord.col - i;
+                            }
+                            
+                            if (canPlaceWord(grid, word, newRow, newCol, newDirection, gridSize, placedWords)) {
+                                const score = calculatePlacementScore(grid, word, newRow, newCol, newDirection, placedWords);
+                                placements.push({
+                                    row: newRow,
+                                    col: newCol,
+                                    direction: newDirection,
+                                    score: score
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if (placements.length > 0) {
+                return placements.reduce((best, current) => 
+                    current.score > best.score ? current : best);
+            }
+            
+            return null;
+        }
+
+        function calculatePlacementScore(grid, word, row, col, direction, placedWords) {
+            let score = 0;
+            
+            score += word.length * 10;
+            
+            let intersections = 0;
+            for (let i = 0; i < word.length; i++) {
+                let checkRow = direction === 'across' ? row : row + i;
+                let checkCol = direction === 'across' ? col + i : col;
+                
+                if (grid[checkRow][checkCol] !== '') {
+                    intersections++;
+                }
+            }
+            score += intersections * 50;
+            
+            const gridCenter = grid.length / 2;
+            const centerDistance = Math.abs(row - gridCenter) + Math.abs(col - gridCenter);
+            score -= centerDistance * 2;
+            
+            return score;
+        }
+
+        function canPlaceWord(grid, word, row, col, direction, gridSize, placedWords) {
+            if (direction === 'across') {
+                if (col + word.length > gridSize || row < 0 || row >= gridSize || col < 0) {
+                    return false;
+                }
+                
+                if (col > 0 && grid[row][col - 1] !== '') return false;
+                if (col + word.length < gridSize && grid[row][col + word.length] !== '') return false;
+                
+                for (let i = 0; i < word.length; i++) {
+                    const currentCell = grid[row][col + i];
+                    if (currentCell !== '' && currentCell !== word[i]) {
+                        return false;
+                    }
+                    
+                    if (currentCell === '') {
+                        if (row > 0 && grid[row - 1][col + i] !== '') return false;
+                        if (row < gridSize - 1 && grid[row + 1][col + i] !== '') return false;
+                    }
+                }
+            } else {
+                if (row + word.length > gridSize || col < 0 || col >= gridSize || row < 0) {
+                    return false;
+                }
+                
+                if (row > 0 && grid[row - 1][col] !== '') return false;
+                if (row + word.length < gridSize && grid[row + word.length][col] !== '') return false;
+                
+                for (let i = 0; i < word.length; i++) {
+                    const currentCell = grid[row + i][col];
+                    if (currentCell !== '' && currentCell !== word[i]) {
+                        return false;
+                    }
+                    
+                    if (currentCell === '') {
+                        if (col > 0 && grid[row + i][col - 1] !== '') return false;
+                        if (col < gridSize - 1 && grid[row + i][col + 1] !== '') return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        function createGrid(puzzle) {
+            const crossword = document.getElementById('crossword');
+            crossword.innerHTML = '';
+            crossword.style.gridTemplateColumns = `repeat(${puzzle.size}, 35px)`;
+            crossword.style.gridTemplateRows = `repeat(${puzzle.size}, 35px)`;
+            
+            currentGrid = Array(puzzle.size).fill().map(() => Array(puzzle.size).fill(''));
+            
+            const activeCells = Array(puzzle.size).fill().map(() => Array(puzzle.size).fill(false));
+            
+            puzzle.words.forEach(wordData => {
+                const { row, col, word, direction } = wordData;
+                for (let i = 0; i < word.length; i++) {
+                    if (direction === 'across') {
+                        activeCells[row][col + i] = true;
+                    } else {
+                        activeCells[row + i][col] = true;
+                    }
+                }
+            });
+            
+            for (let row = 0; row < puzzle.size; row++) {
+                for (let col = 0; col < puzzle.size; col++) {
+                    const cell = document.createElement('input');
+                    cell.className = 'cell';
+                    cell.type = 'text';
+                    cell.maxLength = 1;
+                    cell.id = `cell-${row}-${col}`;
+                    
+                    if (!activeCells[row][col]) {
+                        cell.className += ' blocked';
+                        cell.disabled = true;
+                    } else {
+                        cell.addEventListener('input', function() {
+                            if (!this.readOnly) {
+                                this.value = this.value.toUpperCase();
+                                currentGrid[row][col] = this.value;
+                            }
+                        });
+                        cell.addEventListener('keydown', (e) => handleKeyDown(e, row, col));
+                    }
+                    
+                    crossword.appendChild(cell);
+                }
+            }
+            
+            puzzle.words.forEach(wordData => {
+                const { row, col, number } = wordData;
+                const cell = document.getElementById(`cell-${row}-${col}`);
+                if (cell && !cell.disabled) {
+                    cell.classList.add('number');
+                    cell.setAttribute('data-number', number);
+                }
+            });
+        }
+
+        function createSmartClues(puzzle) {
+            const cluesList = document.getElementById('cluesList');
+            cluesList.innerHTML = '';
+            
+            puzzle.words.forEach(wordData => {
+                const { word, number, direction } = wordData;
+                const li = document.createElement('div');
+                li.className = 'clue-item';
+                
+                const definition = wordDatabase[word];
+                let clue = '';
+                let hints = '';
+                let preFilledInfo = '';
+                
+                // 计算该单词的预填字母数量
+                const preFilledCount = getPreFilledCountForWord(wordData);
+                if (preFilledCount > 0) {
+                    preFilledInfo = `<span class="pre-filled-indicator">${preFilledCount}个提示</span>`;
+                }
+                
+                if (definition) {
+                    clue = definition.definition.split(' - ')[1] || definition.definition;
+                    hints = `
+                        💡 ${definition.learningTip}<br>
+                        📖 词性：${definition.partOfSpeech} | 音标：${definition.phonetic}<br>
+                        🎯 难度：${getDifficultyName(definition.difficulty)} | 类别：${getCategoryName(definition.category)}<br>
+                        ⚠️ 常见错误：${definition.commonMistakes}<br>
+                        🧠 记忆技巧：${definition.mnemonics}
+                    `;
+                } else {
+                    clue = `${word.length}个字母的英文单词`;
+                    hints = '💡 点击展开更多学习提示...';
+                }
+                
+                li.innerHTML = `
+                    <div class="clue-main">
+                        <strong>${number}. ${direction === 'across' ? '横向' : '纵向'}</strong> 
+                        (${word.length}字母) - ${clue} ${preFilledInfo}
+                    </div>
+                    <div class="clue-hint">${hints}</div>
+                `;
+                
+                li.addEventListener('click', () => {
+                    li.classList.toggle('expanded');
+                });
+                
+                cluesList.appendChild(li);
+            });
+        }
+
+        function getPreFilledCountForWord(wordData) {
+            const { word, row, col, direction } = wordData;
+            let count = 0;
+            
+            for (let i = 0; i < word.length; i++) {
+                const cellRow = direction === 'across' ? row : row + i;
+                const cellCol = direction === 'across' ? col + i : col;
+                const cellId = `cell-${cellRow}-${cellCol}`;
+                
+                if (preFilledCells.has(cellId)) {
+                    count++;
+                }
+            }
+            
+            return count;
+        }
+
+        function handleKeyDown(event, row, col) {
+            if (event.key === 'ArrowRight') {
+                moveTo(row, col + 1);
+            } else if (event.key === 'ArrowLeft') {
+                moveTo(row, col - 1);
+            } else if (event.key === 'ArrowDown') {
+                moveTo(row + 1, col);
+            } else if (event.key === 'ArrowUp') {
+                moveTo(row - 1, col);
+            }
+        }
+
+        function moveTo(row, col) {
+            if (row >= 0 && row < currentPuzzle.size && col >= 0 && col < currentPuzzle.size) {
+                const nextCell = document.getElementById(`cell-${row}-${col}`);
+                if (nextCell && !nextCell.disabled) {
+                    nextCell.focus();
+                }
+            }
+        }
+
+        function checkAnswers() {
+            if (!currentPuzzle) return;
+            
+            const results = [];
+            let correctCount = 0;
+            
+            currentPuzzle.words.forEach(wordData => {
+                const { word, row, col, direction, number } = wordData;
+                let userAnswer = '';
+                
+                for (let i = 0; i < word.length; i++) {
+                    if (direction === 'across') {
+                        userAnswer += currentGrid[row][col + i] || '';
+                    } else {
+                        userAnswer += currentGrid[row + i][col] || '';
+                    }
+                }
+                
+                const isCorrect = userAnswer === word;
+                if (isCorrect) correctCount++;
+                
+                results.push({
+                    word: word,
+                    userAnswer: userAnswer,
+                    correct: isCorrect,
+                    number: number,
+                    direction: direction
+                });
+            });
+            
+            displaySmartResults(results, correctCount, currentPuzzle.words.length);
+            updateGameStats();
+        }
+
+        function displaySmartResults(results, correctCount, totalCount) {
+            const resultsSection = document.getElementById('resultsSection');
+            const wordResults = document.getElementById('wordResults');
+            
+            wordResults.innerHTML = '';
+            
+            results.forEach(result => {
+                const div = document.createElement('div');
+                div.className = `word-result ${result.correct ? 'correct' : 'incorrect'}`;
+                
+                const definition = wordDatabase[result.word] || {
+                    definition: '这是一个英文单词',
+                    phonetic: '',
+                    partOfSpeech: '未知',
+                    example: '',
+                    learningTip: '建议查阅词典了解更多信息',
+                    commonMistakes: '注意拼写准确性'
+                };
+                
+                const performance = analyzePerformance(result);
+                
+                div.innerHTML = `
+                    <h5>${result.number}. ${result.word} ${result.correct ? '✅' : '❌'}</h5>
+                    <div class="word-definition">
+                        <p><strong>你的答案:</strong> ${result.userAnswer || '(未填写)'}</p>
+                        <p><strong>正确答案:</strong> ${result.word}</p>
+                        <p><strong>释义:</strong> ${definition.definition}</p>
+                        <p><strong>例句:</strong> ${definition.example}</p>
+                        
+                        <div class="smart-explanation">
+                            <strong>📊 智能分析:</strong> ${performance}<br>
+                            <strong>💡 学习建议:</strong> ${definition.learningTip}<br>
+                            <strong>⚠️ 避免错误:</strong> ${definition.commonMistakes}
+                        </div>
+                    </div>
+                `;
+                
+                wordResults.appendChild(div);
+            });
+            
+            resultsSection.style.display = 'block';
+            
+            const completionTime = gameStartTime ? Math.round((new Date() - gameStartTime) / 1000) : 0;
+            const performance = getPerformanceLevel(correctCount, totalCount, completionTime, hintsUsed);
+            
+            if (correctCount === totalCount) {
+                showMessage('student', `🎉 恭喜全部答对！${performance}`, 'success');
+            } else {
+                showMessage('student', `答对了 ${correctCount}/${totalCount} 个单词。${performance}`, 'info');
+            }
+        }
+
+        function analyzePerformance(result) {
+            if (result.correct) {
+                return '完全正确！很好地掌握了这个单词。';
+            } else if (result.userAnswer === '') {
+                return '未填写答案，建议仔细阅读线索并尝试作答。';
+            } else {
+                const similarity = calculateSimilarity(result.userAnswer, result.word);
+                if (similarity > 0.7) {
+                    return '答案很接近！可能是拼写上的小错误。';
+                } else if (similarity > 0.3) {
+                    return '部分正确，建议重新理解词汇含义。';
+                } else {
+                    return '答案差异较大，建议复习该单词的基本含义。';
+                }
+            }
+        }
+
+        function calculateSimilarity(str1, str2) {
+            const longer = str1.length > str2.length ? str1 : str2;
+            const shorter = str1.length > str2.length ? str2 : str1;
+            
+            if (longer.length === 0) return 1.0;
+            
+            const distance = levenshteinDistance(longer, shorter);
+            return (longer.length - distance) / longer.length;
+        }
+
+        function levenshteinDistance(str1, str2) {
+            const matrix = [];
+            
+            for (let i = 0; i <= str2.length; i++) {
+                matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= str1.length; j++) {
+                matrix[0][j] = j;
+            }
+            
+            for (let i = 1; i <= str2.length; i++) {
+                for (let j = 1; j <= str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            
+            return matrix[str2.length][str1.length];
+        }
+
+        function getPerformanceLevel(correct, total, time, hints) {
+            const accuracy = correct / total;
+            const efficiency = time > 0 ? (correct * 60) / time : 0;
+            
+            if (accuracy === 1 && hints === 0 && efficiency > 0.5) {
+                return '表现优秀！完美完成挑战！';
+            } else if (accuracy >= 0.8) {
+                return '表现良好！继续保持！';
+            } else if (accuracy >= 0.6) {
+                return '还需努力，建议多练习词汇。';
+            } else {
+                return '需要加强学习，建议复习基础词汇。';
+            }
+        }
+
+        function clearGrid() {
+            if (!currentPuzzle) return;
+            
+            for (let row = 0; row < currentPuzzle.size; row++) {
+                for (let col = 0; col < currentPuzzle.size; col++) {
+                    const cell = document.getElementById(`cell-${row}-${col}`);
+                    const cellId = `cell-${row}-${col}`;
+                    
+                    if (cell && !cell.disabled && !preFilledCells.has(cellId)) {
+                        cell.value = '';
+                        currentGrid[row][col] = '';
+                    }
+                }
+            }
+            
+            document.getElementById('resultsSection').style.display = 'none';
+            showMessage('student', '已清空用户填写的内容，预填字母保留', 'info');
+        }
+
+        function resetToOriginal() {
+            if (!currentPuzzle) return;
+            
+            for (let row = 0; row < currentPuzzle.size; row++) {
+                for (let col = 0; col < currentPuzzle.size; col++) {
+                    const cell = document.getElementById(`cell-${row}-${col}`);
+                    const cellId = `cell-${row}-${col}`;
+                    
+                    if (cell && !cell.disabled) {
+                        if (preFilledCells.has(cellId)) {
+                            // 恢复预填字母
+                            const letter = getOriginalLetterAt(row, col);
+                            cell.value = letter;
+                            cell.classList.add('pre-filled');
+                            cell.readOnly = true;
+                            currentGrid[row][col] = letter;
+                        } else {
+                            // 清空用户填写的内容
+                            cell.value = '';
+                            cell.classList.remove('pre-filled');
+                            cell.readOnly = false;
+                            currentGrid[row][col] = '';
+                        }
+                    }
+                }
+            }
+            
+            document.getElementById('resultsSection').style.display = 'none';
+            showMessage('student', '已重置到初始状态，恢复预填字母', 'info');
+        }
+
+        function getOriginalLetterAt(row, col) {
+            // 从puzzle中找到对应位置的字母
+            for (let wordData of currentPuzzle.words) {
+                const { word, row: wordRow, col: wordCol, direction } = wordData;
+                
+                for (let i = 0; i < word.length; i++) {
+                    const cellRow = direction === 'across' ? wordRow : wordRow + i;
+                    const cellCol = direction === 'across' ? wordCol + i : wordCol;
+                    
+                    if (cellRow === row && cellCol === col) {
+                        return word[i];
+                    }
+                }
+            }
+            return '';
+        }
+
+        function showSmartHint() {
+            if (!currentPuzzle || currentPuzzle.words.length === 0) return;
+            
+            hintsUsed++;
+            
+            // 找到未完成的单词
+            const incompleteWords = currentPuzzle.words.filter(wordData => {
+                const { word, row, col, direction } = wordData;
+                let completed = 0;
+                
+                for (let i = 0; i < word.length; i++) {
+                    const cellRow = direction === 'across' ? row : row + i;
+                    const cellCol = direction === 'across' ? col + i : col;
+                    if (currentGrid[cellRow][cellCol] === word[i]) {
+                        completed++;
+                    }
+                }
+                
+                return completed < word.length;
+            });
+            
+            if (incompleteWords.length === 0) {
+                showMessage('student', '🎉 所有单词都已完成！', 'success');
+                return;
+            }
+            
+            const targetWord = incompleteWords.reduce((best, current) => {
+                const bestDef = wordDatabase[best.word];
+                const currentDef = wordDatabase[current.word];
+                
+                const bestDifficulty = bestDef ? bestDef.difficulty : 'medium';
+                const currentDifficulty = currentDef ? currentDef.difficulty : 'medium';
+                
+                if (bestDifficulty === 'easy' && currentDifficulty !== 'easy') return best;
+                if (currentDifficulty === 'easy' && bestDifficulty !== 'easy') return current;
+                
+                return best;
+            });
+            
+            const { word, row, col, direction } = targetWord;
+            
+            // 找到第一个未填写且非预填的位置
+            let targetRow, targetCol, targetIndex = -1;
+            
+            for (let i = 0; i < word.length; i++) {
+                const cellRow = direction === 'across' ? row : row + i;
+                const cellCol = direction === 'across' ? col + i : col;
+                const cellId = `cell-${cellRow}-${cellCol}`;
+                
+                if (currentGrid[cellRow][cellCol] !== word[i] && !preFilledCells.has(cellId)) {
+                    targetRow = cellRow;
+                    targetCol = cellCol;
+                    targetIndex = i;
+                    break;
+                }
+            }
+            
+            if (targetIndex !== -1) {
+                const cell = document.getElementById(`cell-${targetRow}-${targetCol}`);
+                const letter = word[targetIndex];
+                
+                if (cell && !cell.disabled) {
+                    cell.value = letter;
+                    currentGrid[targetRow][targetCol] = letter;
+                    cell.style.backgroundColor = '#fff3cd';
+                    setTimeout(() => {
+                        cell.style.backgroundColor = '';
+                    }, 2000);
+                    
+                    const definition = wordDatabase[word];
+                    const hint = definition ? definition.mnemonics : `这个字母是 ${word} 的第 ${targetIndex + 1} 个字母`;
+                    
+                    showMessage('student', `🧠 智能提示：填入了字母 "${letter}"！${hint}`, 'info');
+                    updateGameStats();
+                }
+            }
+        }
+
+        function showMessage(tab, text, type) {
+            const messageDiv = document.getElementById(`${tab}Message`);
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 4000);
+        }
+
+        // 初始化难度预览
+        updateDifficultyPreview();
+
+        // 监听回车键添加单词
+        document.getElementById('wordInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                addWords();
+            }
+        });
+    </script>
+
+
+</body></html>

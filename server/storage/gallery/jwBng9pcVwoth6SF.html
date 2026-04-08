@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>数独游戏</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+
+        #controls {
+            margin: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #sudoku-board {
+            border: 3px solid #333;
+            border-collapse: collapse;
+            background-color: white;
+        }
+
+        .cell {
+            width: 50px;
+            height: 50px;
+            text-align: center;
+            font-size: 20px;
+            border: 1px solid #ccc;
+        }
+
+        .cell input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 20px;
+        }
+
+        .cell input:focus {
+            background-color: #e6f3ff;
+            outline: none;
+        }
+
+        .thick-right {
+            border-right: 3px solid #333;
+        }
+
+        .thick-bottom {
+            border-bottom: 3px solid #333;
+        }
+
+        .initial {
+            background-color: #f0f0f0;
+            font-weight: bold;
+        }
+
+        .conflict {
+            background-color: #ffcccc;
+        }
+
+        #timer {
+            font-size: 24px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="new-game">新游戏</button>
+        <select id="difficulty">
+            <option value="easy">简单</option>
+            <option value="medium">中等</option>
+            <option value="hard">困难</option>
+        </select>
+        <button id="check">检查答案</button>
+    </div>
+    <div id="timer">时间: <span id="time">00:00</span></div>
+    <table id="sudoku-board"></table>
+
+    <script>
+        class SudokuGame {
+            constructor() {
+                this.board = Array(9).fill().map(() => Array(9).fill(0));
+                this.solution = [];
+                this.startTime = null;
+                this.timerInterval = null;
+                this.initBoard();
+                this.bindEvents();
+            }
+
+            initBoard() {
+                const table = document.getElementById('sudoku-board');
+                table.innerHTML = '';
+
+                for (let i = 0; i < 9; i++) {
+                    const row = table.insertRow();
+                    for (let j = 0; j < 9; j++) {
+                        const cell = row.insertCell();
+                        cell.className = 'cell' + 
+                            (j % 3 === 2 && j !== 8 ? ' thick-right' : '') + 
+                            (i % 3 === 2 && i !== 8 ? ' thick-bottom' : '');
+                        
+                        const input = document.createElement('input');
+                        input.maxLength = 1;
+                        input.dataset.row = i;
+                        input.dataset.col = j;
+                        cell.appendChild(input);
+                    }
+                }
+            }
+
+            generatePuzzle(difficulty) {
+                // 生成完整数独
+                this.solution = this.generateCompleteBoard();
+                // 根据难度移除数字
+                const cellsToRemove = {
+                    easy: 30,
+                    medium: 40,
+                    hard: 50
+                }[difficulty];
+                
+                this.board = this.solution.map(row => [...row]);
+                for (let i = 0; i < cellsToRemove; i++) {
+                    const row = Math.floor(Math.random() * 9);
+                    const col = Math.floor(Math.random() * 9);
+                    this.board[row][col] = 0;
+                }
+                this.updateDisplay();
+            }
+
+            generateCompleteBoard() {
+                // 使用回溯算法生成有效数独
+                const board = Array(9).fill().map(() => Array(9).fill(0));
+                this.solveSudoku(board);
+                return board;
+            }
+
+            solveSudoku(board) {
+                const findEmpty = () => {
+                    for (let i = 0; i < 9; i++) {
+                        for (let j = 0; j < 9; j++) {
+                            if (board[i][j] === 0) return [i, j];
+                        }
+                    }
+                    return null;
+                };
+
+                const isValid = (num, pos) => {
+                    const [row, col] = pos;
+
+                    // 检查行
+                    for (let i = 0; i < 9; i++) {
+                        if (board[row][i] === num && i !== col) return false;
+                    }
+
+                    // 检查列
+                    for (let i = 0; i < 9; i++) {
+                        if (board[i][col] === num && i !== row) return false;
+                    }
+
+                    // 检查宫
+                    const boxRow = Math.floor(row / 3) * 3;
+                    const boxCol = Math.floor(col / 3) * 3;
+                    for (let i = boxRow; i < boxRow + 3; i++) {
+                        for (let j = boxCol; j < boxCol + 3; j++) {
+                            if (board[i][j] === num && i !== row && j !== col) return false;
+                        }
+                    }
+
+                    return true;
+                };
+
+                const solve = () => {
+                    const emptyPos = findEmpty();
+                    if (!emptyPos) return true;
+
+                    const [row, col] = emptyPos;
+                    for (let num = 1; num <= 9; num++) {
+                        if (isValid(num, [row, col])) {
+                            board[row][col] = num;
+                            if (solve()) return true;
+                            board[row][col] = 0;
+                        }
+                    }
+                    return false;
+                };
+
+                solve();
+                return board;
+            }
+
+            updateDisplay() {
+                const inputs = document.querySelectorAll('#sudoku-board input');
+                inputs.forEach(input => {
+                    const row = input.dataset.row;
+                    const col = input.dataset.col;
+                    const value = this.board[row][col];
+                    input.value = value || '';
+                    input.readOnly = value !== 0;
+                    input.className = value !== 0 ? 'initial' : '';
+                });
+            }
+
+            checkConflicts() {
+                const inputs = document.querySelectorAll('#sudoku-board input');
+                inputs.forEach(input => {
+                    const row = parseInt(input.dataset.row);
+                    const col = parseInt(input.dataset.col);
+                    const value = parseInt(input.value) || 0;
+                    
+                    if (value !== 0 && !this.isValidPlacement(row, col, value)) {
+                        input.classList.add('conflict');
+                    } else {
+                        input.classList.remove('conflict');
+                    }
+                });
+            }
+
+            isValidPlacement(row, col, num) {
+                // 检查行
+                for (let i = 0; i < 9; i++) {
+                    if (this.board[row][i] === num && i !== col) return false;
+                }
+
+                // 检查列
+                for (let i = 0; i < 9; i++) {
+                    if (this.board[i][col] === num && i !== row) return false;
+                }
+
+                // 检查宫
+                const boxRow = Math.floor(row / 3) * 3;
+                const boxCol = Math.floor(col / 3) * 3;
+                for (let i = boxRow; i < boxRow + 3; i++) {
+                    for (let j = boxCol; j < boxCol + 3; j++) {
+                        if (this.board[i][j] === num && i !== row && j !== col) return false;
+                    }
+                }
+
+                return true;
+            }
+
+            startTimer() {
+                this.startTime = Date.now();
+                if (this.timerInterval) clearInterval(this.timerInterval);
+                this.timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                    const seconds = (elapsed % 60).toString().padStart(2, '0');
+                    document.getElementById('time').textContent = `${minutes}:${seconds}`;
+                }, 1000);
+            }
+
+            bindEvents() {
+                // 输入验证
+                document.querySelectorAll('#sudoku-board input').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const value = e.target.value.replace(/[^1-9]/g, '');
+                        e.target.value = value;
+                        const row = parseInt(input.dataset.row);
+                        const col = parseInt(input.dataset.col);
+                        this.board[row][col] = value ? parseInt(value) : 0;
+                        this.checkConflicts();
+                    });
+                });
+
+                document.getElementById('new-game').addEventListener('click', () => {
+                    const difficulty = document.getElementById('difficulty').value;
+                    this.generatePuzzle(difficulty);
+                    this.startTimer();
+                });
+
+                document.getElementById('check').addEventListener('click', () => {
+                    const isComplete = this.board.every(row => 
+                        row.every(cell => cell !== 0)
+                    );
+                    const isCorrect = this.board.every((row, i) => 
+                        row.every((cell, j) => cell === this.solution[i][j])
+                    );
+
+                    if (!isComplete) {
+                        alert('请先完成所有格子！');
+                    } else if (isCorrect) {
+                        alert('恭喜！答案正确！');
+                        clearInterval(this.timerInterval);
+                    } else {
+                        alert('答案有错误，请检查！');
+                    }
+                });
+            }
+        }
+
+        // 初始化游戏
+        const game = new SudokuGame();
+        game.generatePuzzle('easy');
+        game.startTimer();
+    </script>
+</body>
+</html>

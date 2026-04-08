@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认知心理实验：规则破壁者</title>
+    <style>
+        :root {
+            --bg-color: #f5f6fa;
+            --text-color: #2f3640;
+            --card-bg: #ffffff;
+            --accent: #487eb0;
+            --success: #4cd137;
+            --error: #e84118;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        .container {
+            max-width: 800px;
+            width: 90%;
+            text-align: center;
+        }
+
+        h1 { margin-bottom: 5px; letter-spacing: 1px; }
+        .subtitle { color: #7f8fa6; margin-bottom: 30px; font-size: 0.9em; }
+
+        /* 游戏区域 */
+        .game-board {
+            background: #dcdde1;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+            display: none; /* 默认隐藏 */
+        }
+
+        /* 顶部参考牌区域 */
+        .reference-area {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 50px;
+            border-bottom: 2px dashed #b2bec3;
+            padding-bottom: 30px;
+        }
+
+        /* 卡牌样式 */
+        .card {
+            width: 100px;
+            height: 140px;
+            background-color: white;
+            border-radius: 10px;
+            border: 2px solid #7f8fa6;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+
+        /* 参考牌稍微大一点 */
+        .ref-card {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .ref-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        /* 待分类的手牌 */
+        .active-card-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 200px; /* 预留空间 */
+        }
+
+        .active-card {
+            border-color: var(--accent);
+            box-shadow: 0 10px 20px rgba(72, 126, 176, 0.2);
+            animation: dealCard 0.5s ease-out;
+        }
+
+        /* 卡牌内的图形 */
+        .symbol-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            width: 80%;
+            height: 80%;
+            gap: 5px;
+        }
+        
+        .symbol { font-size: 24px; line-height: 1; }
+
+        /* 反馈信息 */
+        #feedback {
+            font-size: 24px;
+            font-weight: bold;
+            height: 40px;
+            margin: 20px 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .correct-txt { color: var(--success); }
+        .wrong-txt { color: var(--error); }
+
+        /* 按钮与界面 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        button:hover { background-color: #40739e; transform: translateY(-2px); }
+
+        .stats-panel {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: left;
+            line-height: 1.8;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        @keyframes dealCard {
+            from { opacity: 0; transform: translateY(50px) scale(0.8); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* 简单的统计条 */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            margin-top: 20px;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- 首页 -->
+    <div id="start-screen" class="screen active container">
+        <h1>🧠 规则破壁者</h1>
+        <div class="subtitle">改编自经典的“威斯康星卡片分类测验 (WCST)”</div>
+        
+        <div class="stats-panel" style="text-align: center;">
+            <p><strong>这是一个关于“逻辑”与“变通”的测试。</strong></p>
+            <ul style="text-align: left; display: inline-block;">
+                <li>你需要把下方的牌，归类到上方的4张牌中。</li>
+                <li>分类的规则可能是：<strong>颜色</strong>、<strong>形状</strong> 或 <strong>数量</strong>。</li>
+                <li>系统只会告诉你“对”或“错”。你需要通过试错来猜出当前规则。</li>
+                <li>⚠️ <strong>警告：</strong> 规则会在游戏中途悄悄改变！</li>
+            </ul>
+        </div>
+        <br>
+        <button onclick="startGame()">开始测试</button>
+    </div>
+
+    <!-- 游戏页 -->
+    <div id="game-screen" class="screen container">
+        <div class="progress-bar"><div id="progress" class="progress-fill"></div></div>
+        <div id="feedback">准备...</div>
+
+        <div class="game-board" style="display: block;">
+            <!-- 参考牌区域 -->
+            <div class="reference-area">
+                <!-- 1红三角, 2绿星, 3黄十字, 4蓝圆 -->
+                <div class="card ref-card" onclick="playerGuess(0)">
+                    <div class="symbol-container" id="ref-0"></div>
+                </div>
+                <div class="card ref-card" onclick="playerGuess(1)">
+                    <div class="symbol-container" id="ref-1"></div>
+                </div>
+                <div class="card ref-card" onclick="playerGuess(2)">
+                    <div class="symbol-container" id="ref-2"></div>
+                </div>
+                <div class="card ref-card" onclick="playerGuess(3)">
+                    <div class="symbol-container" id="ref-3"></div>
+                </div>
+            </div>
+
+            <!-- 手牌区域 -->
+            <div class="active-card-area">
+                <div class="card active-card" id="active-card">
+                    <!-- JS 生成 -->
+                </div>
+                <p style="color: #7f8fa6; margin-top: 15px;">点击上方的一张牌进行匹配</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果页 -->
+    <div id="result-screen" class="screen container">
+        <h1>测试报告</h1>
+        <div class="stats-panel">
+            <h3 style="border-bottom: 1px solid #eee; padding-bottom: 10px;">你的认知数据：</h3>
+            <p>总尝试次数：<strong id="res-total">0</strong></p>
+            <p>正确率：<strong id="res-accuracy">0%</strong></p>
+            <p style="color: #c0392b;"><strong>持续性错误 (Perseverative Errors)：<span id="res-pers-error">0</span> 次</strong></p>
+            <p style="font-size: 0.9em; color: #666;">*持续性错误：指规则已经改变，但你仍固执地坚持旧规则的次数。这个指标越低，代表思维越灵活。</p>
+        </div>
+
+        <div class="stats-panel" style="background-color: #f1f2f6;">
+            <h4>👨‍⚕️ 心理学解读：</h4>
+            <p>这个测试考察的是你的<strong>执行功能 (Executive Function)</strong>。在生活中，我们经常遇到情况变了、老办法行不通的时候。</p>
+            <p>能够迅速察觉变化、抑制旧习惯、建立新策略，是大脑年轻、高效的重要标志。</p>
+        </div>
+
+        <br>
+        <button onclick="startGame()">重新挑战</button>
+    </div>
+
+    <script>
+        // 常量定义
+        // 规则: 0=Color, 1=Shape, 2=Count
+        const RULES = ['Color', 'Shape', 'Count'];
+        const COLORS = ['#e84118', '#4cd137', '#fbc531', '#0097e6']; // 红 绿 黄 蓝
+        const SHAPES = ['▲', '★', '✚', '●']; // 三角 星 十字 圆
+        const COUNTS = [1, 2, 3, 4];
+        
+        // 参考牌的固定属性 (WCST标准设置)
+        const REF_CARDS = [
+            { color: 0, shape: 0, count: 0 }, // 1 红 三角
+            { color: 1, shape: 1, count: 1 }, // 2 绿 星
+            { color: 2, shape: 2, count: 2 }, // 3 黄 十字
+            { color: 3, shape: 3, count: 3 }  // 4 蓝 圆
+        ];
+
+        // 游戏状态
+        let currentRuleIndex = 0; // 当前生效的规则
+        let streak = 0; // 当前规则下连续正确的次数
+        let totalTrials = 0;
+        let correctCount = 0;
+        let perseverativeErrors = 0; // 持续性错误计数
+        
+        let lastRuleIndex = -1; // 上一个规则（用于检测持续性错误）
+        let activeCardData = {}; // 当前手牌数据
+        let maxTrials = 40; // 总测试次数
+
+        // DOM
+        const feedbackEl = document.getElementById('feedback');
+        const activeCardEl = document.getElementById('active-card');
+        const progressBar = document.getElementById('progress');
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // 初始化参考牌
+        function initRefCards() {
+            REF_CARDS.forEach((card, idx) => {
+                const el = document.getElementById(`ref-${idx}`);
+                el.innerHTML = '';
+                for(let i=0; i<COUNTS[card.count]; i++) {
+                    const span = document.createElement('span');
+                    span.className = 'symbol';
+                    span.style.color = COLORS[card.color];
+                    span.textContent = SHAPES[card.shape];
+                    el.appendChild(span);
+                }
+            });
+        }
+
+        function startGame() {
+            // 重置数据
+            totalTrials = 0;
+            correctCount = 0;
+            perseverativeErrors = 0;
+            streak = 0;
+            lastRuleIndex = -1;
+            
+            // 随机初始规则
+            currentRuleIndex = Math.floor(Math.random() * 3);
+            
+            initRefCards();
+            generateActiveCard();
+            updateUI();
+            showScreen('game-screen');
+        }
+
+        function generateActiveCard() {
+            // 生成一张手牌
+            // 为了保证游戏体验，生成的牌最好不要和某张参考牌完全一样（虽然概率很低）
+            // 并且最好在不同属性上匹配不同的参考牌（制造歧义）
+            
+            const c = Math.floor(Math.random() * 4);
+            const s = Math.floor(Math.random() * 4);
+            const n = Math.floor(Math.random() * 4);
+            
+            activeCardData = { color: c, shape: s, count: n };
+            
+            // 渲染手牌
+            activeCardEl.innerHTML = '';
+            const container = document.createElement('div');
+            container.className = 'symbol-container';
+            
+            for(let i=0; i<COUNTS[n]; i++) {
+                const span = document.createElement('span');
+                span.className = 'symbol';
+                span.style.color = COLORS[c];
+                span.textContent = SHAPES[s];
+                container.appendChild(span);
+            }
+            activeCardEl.appendChild(container);
+            
+            // 移除旧的动画类以便重播
+            activeCardEl.classList.remove('active-card');
+            void activeCardEl.offsetWidth; // trigger reflow
+            activeCardEl.classList.add('active-card');
+        }
+
+        function playerGuess(refIndex) {
+            if (totalTrials >= maxTrials) return;
+
+            const ref = REF_CARDS[refIndex];
+            const act = activeCardData;
+            
+            // 检查匹配情况
+            const matchColor = (ref.color === act.color);
+            const matchShape = (ref.shape === act.shape);
+            const matchCount = (ref.count === act.count);
+            
+            let isCorrect = false;
+            
+            // 根据当前规则判断
+            if (currentRuleIndex === 0 && matchColor) isCorrect = true;
+            else if (currentRuleIndex === 1 && matchShape) isCorrect = true;
+            else if (currentRuleIndex === 2 && matchCount) isCorrect = true;
+
+            // 记录数据
+            totalTrials++;
+            if (isCorrect) {
+                correctCount++;
+                streak++;
+                showFeedback(true);
+            } else {
+                streak = 0; // 出错则连胜清零
+                showFeedback(false);
+                
+                // 检测是否为“持续性错误”
+                // 如果玩家的分类符合“上一个规则”，但当前判断为错，这就是思维定势
+                if (lastRuleIndex !== -1) {
+                    let matchesOldRule = false;
+                    if (lastRuleIndex === 0 && matchColor) matchesOldRule = true;
+                    if (lastRuleIndex === 1 && matchShape) matchesOldRule = true;
+                    if (lastRuleIndex === 2 && matchCount) matchesOldRule = true;
+                    
+                    if (matchesOldRule) {
+                        perseverativeErrors++;
+                        console.log("持续性错误 +1");
+                    }
+                }
+            }
+
+            // 检查是否需要切换规则 (WCST机制：连续做对一定次数后切换)
+            // 这里设定为连续对 5-8 次随机切换
+            // 简单起见，设为固定 6 次
+            if (streak >= 6) {
+                switchRule();
+            }
+
+            updateUI();
+            
+            if (totalTrials >= maxTrials) {
+                setTimeout(endGame, 1000);
+            } else {
+                generateActiveCard();
+            }
+        }
+
+        function switchRule() {
+            lastRuleIndex = currentRuleIndex;
+            streak = 0;
+            
+            // 选择一个新规则
+            let newRule;
+            do {
+                newRule = Math.floor(Math.random() * 3);
+            } while (newRule === currentRuleIndex);
+            
+            currentRuleIndex = newRule;
+            console.log("规则已改变！"); 
+            // 注意：不通知玩家，这是游戏的核心
+        }
+
+        function showFeedback(isCorrect) {
+            feedbackEl.style.opacity = '1';
+            if (isCorrect) {
+                feedbackEl.textContent = "正确";
+                feedbackEl.className = "correct-txt";
+            } else {
+                feedbackEl.textContent = "错误";
+                feedbackEl.className = "wrong-txt";
+            }
+            
+            // 1秒后淡出
+            setTimeout(() => {
+                feedbackEl.style.opacity = '0';
+            }, 800);
+        }
+
+        function updateUI() {
+            const pct = (totalTrials / maxTrials) * 100;
+            progressBar.style.width = `${pct}%`;
+        }
+
+        function endGame() {
+            showScreen('result-screen');
+            document.getElementById('res-total').textContent = totalTrials;
+            
+            const accuracy = Math.round((correctCount / totalTrials) * 100);
+            document.getElementById('res-accuracy').textContent = `${accuracy}%`;
+            
+            document.getElementById('res-pers-error').textContent = perseverativeErrors;
+        }
+
+        // 初始化
+        initRefCards();
+
+    </script>
+</body>
+</html>

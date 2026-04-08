@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角形的边角关系交互演示</title>
+    <style>
+        :root { 
+            --bg-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-green: #76ff03;
+            --accent-red: #ff5252;
+            --accent-yellow: #ffca28;
+            --line-color: #aaaaaa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none; /* 防止拖拽时选中文本 */
+        }
+
+        h1 { margin: 15px 0; font-weight: normal; font-size: 1.4rem; color: #fff; }
+
+        .main-container {
+            position: relative;
+            width: 90%;
+            max-width: 800px;
+            height: 500px;
+            background: #2a2a2a;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            display: flex;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            flex-grow: 1;
+            cursor: crosshair;
+        }
+
+        /* 右侧信息面板 */
+        .info-panel {
+            width: 200px;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-left: 1px solid #444;
+        }
+
+        .rule-item {
+            margin-bottom: 20px;
+            font-size: 0.95rem;
+            color: #888;
+            transition: all 0.3s;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .rule-item.active {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            font-weight: bold;
+            border-left: 4px solid var(--accent-yellow);
+        }
+
+        .highlight-text {
+            color: var(--accent-yellow);
+        }
+        
+        .tip {
+            position: absolute;
+            bottom: 10px;
+            left: 20px;
+            color: #666;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>三角形的边角关系：大边对大角</h1>
+
+    <div class="main-container">
+        <canvas id="triCanvas"></canvas>
+        
+        <div class="info-panel">
+            <div class="rule-item" id="rule-big">
+                大边对大角<br>
+                <span style="font-size:12px">最大边: <span id="maxSideName">--</span></span>
+            </div>
+            <div class="rule-item" id="rule-small">
+                小边对小角<br>
+                <span style="font-size:12px">最小边: <span id="minSideName">--</span></span>
+            </div>
+            <div class="rule-item" id="rule-equal">
+                等边对等角<br>
+                <span style="font-size:12px" id="equalInfo">无等边</span>
+            </div>
+        </div>
+        <div class="tip">拖动顶点 A 改变形状</div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('triCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // DOM 元素
+    const ruleBig = document.getElementById('rule-big');
+    const ruleSmall = document.getElementById('rule-small');
+    const ruleEqual = document.getElementById('rule-equal');
+    const maxSideName = document.getElementById('maxSideName');
+    const minSideName = document.getElementById('minSideName');
+    const equalInfo = document.getElementById('equalInfo');
+
+    // 缩放比例 (像素 -> 显示数值)
+    const UNIT_SCALE = 100; 
+
+    // 状态
+    let width, height;
+    let isDragging = false;
+    
+    // 定义三个点
+    // 坐标系原点在左上角
+    const points = {
+        A: { x: 0, y: 0, color: '#76ff03', label: 'A' }, // 绿色
+        B: { x: 0, y: 0, color: '#ff5252', label: 'B' }, // 红色
+        C: { x: 0, y: 0, color: '#ffca28', label: 'C' }  // 黄色
+    };
+
+    // 初始化尺寸和位置
+    function init() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width - 200; // 减去右侧面板宽度
+        canvas.height = rect.height;
+        width = canvas.width;
+        height = canvas.height;
+
+        // 设置初始位置 (仿照截图)
+        points.B.x = width * 0.2;
+        points.B.y = height * 0.8;
+        
+        points.C.x = width * 0.8;
+        points.C.y = height * 0.8;
+
+        points.A.x = width * 0.5;
+        points.A.y = height * 0.2;
+
+        draw();
+    }
+    
+    window.addEventListener('resize', init);
+
+    // --- 数学工具函数 ---
+
+    // 两点距离
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    // 余弦定理求角度 (返回角度值)
+    function getAngle(a, b, c) {
+        // a是对边, b,c是邻边
+        // cosA = (b^2 + c^2 - a^2) / 2bc
+        let cosVal = (b**2 + c**2 - a**2) / (2 * b * c);
+        // 防止浮点误差导致 acos 越界
+        cosVal = Math.min(1, Math.max(-1, cosVal));
+        return Math.acos(cosVal) * (180 / Math.PI);
+    }
+
+    // --- 绘图逻辑 ---
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. 计算边长 (像素)
+        const sidec = dist(points.A, points.B); // AB边 (c)
+        const sideb = dist(points.A, points.C); // AC边 (b)
+        const sidea = dist(points.B, points.C); // BC边 (a)
+
+        // 显示数值 (模拟单位)
+        const valc = (sidec / UNIT_SCALE).toFixed(2);
+        const valb = (sideb / UNIT_SCALE).toFixed(2);
+        const vala = (sidea / UNIT_SCALE).toFixed(2);
+
+        // 2. 计算角度
+        const angA = getAngle(sidea, sideb, sidec);
+        const angB = getAngle(sideb, sidea, sidec);
+        const angC = getAngle(sidec, sidea, sideb);
+
+        // 3. 绘制三角形连线
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = '#aaaaaa';
+        
+        ctx.beginPath();
+        ctx.moveTo(points.A.x, points.A.y);
+        ctx.lineTo(points.B.x, points.B.y);
+        ctx.lineTo(points.C.x, points.C.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // 4. 绘制角 (扇形)
+        drawAngleArc(points.A, points.B, points.C, angA, points.A.color);
+        drawAngleArc(points.B, points.C, points.A, angB, points.B.color);
+        drawAngleArc(points.C, points.A, points.B, angC, points.C.color);
+
+        // 5. 绘制顶点点
+        drawVertex(points.A);
+        drawVertex(points.B);
+        drawVertex(points.C);
+
+        // 6. 绘制文字标签 (角度和顶点名)
+        drawLabel(points.A, angA, 'A', -30);
+        drawLabel(points.B, angB, 'B', -10); // 这里稍微调整一下偏移逻辑
+        drawLabel(points.C, angC, 'C', -10);
+
+        // 7. 绘制边长文字
+        drawSideLabel(points.A, points.B, valc);
+        drawSideLabel(points.A, points.C, valb);
+        drawSideLabel(points.B, points.C, vala);
+
+        // 8. 更新右侧面板逻辑
+        updateRules({a: parseFloat(vala), b: parseFloat(valb), c: parseFloat(valc)}, {A: angA, B: angB, C: angC});
+    }
+
+    function drawVertex(p) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#888'; // 内部灰
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff'; // 外部白圈
+        ctx.stroke();
+        
+        // 如果是 A 点，画一个暗示拖动的光晕
+        if (p === points.A) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+    }
+
+    function drawAngleArc(center, p1, p2, angleVal, color) {
+        const radius = 40;
+        // 计算起始角度和结束角度
+        const startAngle = Math.atan2(p1.y - center.y, p1.x - center.x);
+        const endAngle = Math.atan2(p2.y - center.y, p2.x - center.x);
+        
+        ctx.beginPath();
+        ctx.moveTo(center.x, center.y);
+        ctx.arc(center.x, center.y, radius, startAngle, endAngle, angleVal > 180); // 简单的逆时针判断可能不够，但在三角形内通常没问题，除非凹多边形
+        // 修正：三角形内角绘制。如果 diff > PI，则反向绘制。
+        // 其实 Math.atan2 的值域是 -PI 到 PI。
+        // 简单的 fill 就可以
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        
+        // 写角度文字
+        // 计算角平分线方向放置文字
+        // 这里为了简单，直接取点坐标均值方向（不完全准确但够用）
+        // 更准确是 (startAngle + endAngle) / 2，需处理越界
+    }
+
+    function drawLabel(p, angleVal, text, yOffset) {
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 16px Arial';
+        
+        // 顶点名称
+        let labelX = p.x;
+        let labelY = p.y - 25;
+        if (text === 'B') { labelX -= 15; labelY += 15; } // 左下
+        if (text === 'C') { labelX += 15; labelY += 15; } // 右下
+        
+        ctx.fillText(text, labelX, labelY);
+
+        // 角度数值
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#ddd';
+        
+        // 简单的向内偏移显示角度
+        let dirY = (height/2 - p.y) > 0 ? 1 : -1;
+        let dirX = (width/2 - p.x) > 0 ? 1 : -1;
+        
+        // 更智能的角度文字位置：基于重心方向
+        const centerX = (points.A.x + points.B.x + points.C.x) / 3;
+        const centerY = (points.A.y + points.B.y + points.C.y) / 3;
+        const vecX = centerX - p.x;
+        const vecY = centerY - p.y;
+        const dist = Math.sqrt(vecX**2 + vecY**2);
+        const textX = p.x + (vecX/dist) * 55;
+        const textY = p.y + (vecY/dist) * 55;
+
+        ctx.fillText(Math.round(angleVal) + "°", textX - 10, textY + 5);
+    }
+
+    function drawSideLabel(p1, p2, val) {
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        
+        // 向外稍微偏移，以免压线
+        // 向量 (p2-p1) 的法向量
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        // 垂直向量 (-dy, dx)
+        // 我们需要判断哪个方向是“外侧”。简单判定：远离三角形重心
+        const centerX = (points.A.x + points.B.x + points.C.x) / 3;
+        const centerY = (points.A.y + points.B.y + points.C.y) / 3;
+        
+        let nx = -dy;
+        let ny = dx;
+        
+        // 归一化
+        const len = Math.sqrt(nx**2 + ny**2);
+        nx /= len; ny /= len;
+        
+        // 检查是否指向重心，如果是，反转
+        if ((midX + nx*10 - centerX)**2 + (midY + ny*10 - centerY)**2 < (midX - centerX)**2 + (midY - centerY)**2) {
+            nx = -nx;
+            ny = -ny;
+        }
+
+        const offset = 20;
+        ctx.fillStyle = '#ccc';
+        ctx.font = '14px Arial';
+        ctx.fillText(val, midX + nx * offset - 10, midY + ny * offset + 5);
+    }
+
+    function updateRules(sides, angles) {
+        // sides: {a, b, c}, angles: {A, B, C}
+        // 找出最大边和角
+        const sArr = [
+            {name: 'BC (a)', val: sides.a, angleName: 'A', angleVal: angles.A},
+            {name: 'AC (b)', val: sides.b, angleName: 'B', angleVal: angles.B},
+            {name: 'AB (c)', val: sides.c, angleName: 'C', angleVal: angles.C}
+        ];
+        
+        // 排序
+        sArr.sort((x, y) => y.val - x.val); // 降序
+
+        // 更新 UI
+        ruleBig.classList.add('active');
+        ruleSmall.classList.add('active');
+        
+        maxSideName.innerHTML = `${sArr[0].name} <span class="highlight-text">(${Math.round(sArr[0].angleVal)}°)</span>`;
+        minSideName.innerHTML = `${sArr[2].name} <span class="highlight-text">(${Math.round(sArr[2].angleVal)}°)</span>`;
+
+        // 等边判定
+        let eqText = "无";
+        let hasEqual = false;
+        if (Math.abs(sides.a - sides.b) < 0.05 && Math.abs(sides.b - sides.c) < 0.05) {
+            eqText = "等边三角形 (三边相等)";
+            hasEqual = true;
+        } else if (Math.abs(sides.a - sides.b) < 0.05 || Math.abs(sides.b - sides.c) < 0.05 || Math.abs(sides.a - sides.c) < 0.05) {
+            eqText = "等腰三角形 (两边相等)";
+            hasEqual = true;
+        }
+
+        if(hasEqual) {
+            ruleEqual.classList.add('active');
+            equalInfo.innerText = eqText;
+            equalInfo.classList.add('highlight-text');
+        } else {
+            ruleEqual.classList.remove('active');
+            equalInfo.innerText = "三边不等";
+            equalInfo.classList.remove('highlight-text');
+        }
+    }
+
+    // --- 交互逻辑 ---
+    
+    function handleStart(x, y) {
+        const d = dist({x, y}, points.A);
+        if (d < 30) {
+            isDragging = true;
+            canvas.style.cursor = 'grabbing';
+        }
+    }
+
+    function handleMove(x, y) {
+        if (isDragging) {
+            // 限制范围，防止跑出画布
+            points.A.x = Math.max(10, Math.min(width - 10, x));
+            points.A.y = Math.max(10, Math.min(height - 10, y));
+            
+            // 简单的防翻转/共线处理（可选，为了演示简单暂不加复杂限制，允许拉成钝角）
+            draw();
+        } else {
+            // 鼠标悬停效果
+            const d = dist({x, y}, points.A);
+            canvas.style.cursor = d < 30 ? 'grab' : 'crosshair';
+        }
+    }
+
+    function handleEnd() {
+        isDragging = false;
+        canvas.style.cursor = 'grab';
+    }
+
+    // 鼠标事件
+    canvas.addEventListener('mousedown', e => handleStart(e.offsetX, e.offsetY));
+    canvas.addEventListener('mousemove', e => handleMove(e.offsetX, e.offsetY));
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('mouseleave', handleEnd);
+
+    // 触摸事件 (支持手机平板)
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        handleStart(touch.clientX - rect.left, touch.clientY - rect.top);
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        handleMove(touch.clientX - rect.left, touch.clientY - rect.top);
+    }, {passive: false});
+
+    canvas.addEventListener('touchend', handleEnd);
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>

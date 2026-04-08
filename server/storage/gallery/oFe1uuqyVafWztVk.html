@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>火柴棍数学 - 符号增强版</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --panel-bg: #34495e;
+            --stick-color: #f1c40f;
+            --stick-head: #e74c3c;
+            --stick-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+            --ghost-color: rgba(255, 255, 255, 0.06);
+            --ghost-hover: rgba(255, 255, 255, 0.2);
+            --text-color: #ecf0f1;
+            --accent-color: #27ae60;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        h1 { margin: 10px 0 5px; font-weight: 300; letter-spacing: 1px; font-size: 1.6rem; }
+        
+        .rule-display {
+            background: rgba(0,0,0,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            color: #bdc3c7;
+            margin-bottom: 10px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .rule-highlight { color: #f39c12; font-weight: bold; }
+
+        .game-container {
+            width: 100%;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: visible;
+            margin: 10px 0;
+            min-height: 240px;
+        }
+
+        .board {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 40px 15px;
+            background: var(--panel-bg);
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            transition: transform 0.3s;
+        }
+        
+        .board.locked { opacity: 0.8; pointer-events: none; filter: grayscale(0.5); }
+
+        /* 字符盒子 */
+        .char-box { position: relative; width: 64px; height: 130px; flex-shrink: 0; }
+        /* 符号盒子稍微宽一点，防止误触 */
+        .sym-box { position: relative; width: 50px; height: 130px; flex-shrink: 0; }
+
+        /* 火柴样式 */
+        .stick {
+            position: absolute;
+            background-color: var(--stick-color);
+            border-radius: 6px;
+            box-shadow: var(--stick-shadow);
+            cursor: pointer;
+            z-index: 10;
+            transition: all 0.2s;
+        }
+        .stick::after {
+            content: ''; position: absolute; background-color: var(--stick-head); border-radius: 50%;
+        }
+
+        /* 横竖尺寸 */
+        .s-h { width: 44px; height: 10px; left: 10px; }
+        .s-h::after { width: 10px; height: 10px; right: 0; top: 0; }
+        
+        .s-v { width: 10px; height: 44px; }
+        .s-v::after { width: 10px; height: 10px; top: 0; left: 0; }
+
+        /* 数字位置 (7段数码管布局) */
+        .p-0 { top: 0; } /* 上 */
+        .p-1 { top: 10px; left: 0; } /* 左上 */
+        .p-2 { top: 10px; right: 0; } /* 右上 */
+        .p-3 { top: 60px; } /* 中 */
+        .p-4 { top: 70px; left: 0; } /* 左下 */
+        .p-5 { top: 70px; right: 0; } /* 右下 */
+        .p-6 { bottom: 0; } /* 下 */
+
+        /* 符号位置 - 加减号组 */
+        /* 竖线 (加号用) */
+        .sym-cross-v { top: 40px; left: 20px; height: 50px; } 
+        /* 横线 (加减号共用) */
+        .sym-cross-h { top: 60px; left: 0; width: 50px; }
+
+        /* 符号位置 - 等号组 */
+        .sym-eq-top { top: 50px; left: 0; width: 50px; }
+        .sym-eq-btm { top: 80px; left: 0; width: 50px; }
+
+        /* 幽灵火柴（空位） */
+        .stick.ghost {
+            background-color: var(--ghost-color);
+            box-shadow: none; z-index: 5;
+        }
+        .stick.ghost::after { display: none; }
+        
+        /* 交互状态 */
+        body.mode-add-remove .stick.ghost:hover { background-color: var(--ghost-hover); }
+        body.mode-move.holding .stick.ghost { animation: pulse 1s infinite; cursor: pointer; background-color: rgba(255,255,255,0.1); }
+        body.mode-move.holding .stick.active { opacity: 0.3; pointer-events: none; }
+
+        @keyframes pulse { 0% { opacity: 0.5; } 100% { opacity: 1; box-shadow: 0 0 10px rgba(255,255,255,0.3); } }
+
+        /* UI 控件 */
+        .msg-area { min-height: 40px; text-align: center; font-weight: bold; font-size: 1.1rem; padding: 10px; }
+        .success { color: #2ecc71; }
+        .error { color: #e74c3c; }
+        .normal { color: #f1c40f; }
+        
+        .controls { width: 90%; max-width: 500px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px;}
+        .btn-row { display: flex; gap: 10px; justify-content: center; }
+        
+        button {
+            padding: 12px 24px; border: none; border-radius: 8px; font-size: 16px;
+            font-weight: bold; cursor: pointer; color: white; transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        button:active { transform: translateY(3px); box-shadow: none; }
+        
+        .btn-next { background: var(--accent-color); width: 100%; display: none; animation: popIn 0.5s; }
+        .btn-reset { background: #7f8c8d; }
+        .btn-hint { background: #e67e22; }
+        .btn-custom { background: #2980b9; }
+
+        @keyframes popIn { from {transform: scale(0.8); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+
+        /* 自定义输入区 */
+        .custom-area {
+            background: rgba(0,0,0,0.2); padding: 15px; border-radius: 10px;
+            display: flex; gap: 10px; align-items: center; border: 1px dashed #555;
+        }
+        input {
+            flex: 1; padding: 10px; border-radius: 5px; border: none;
+            text-align: center; font-size: 1.2rem; font-family: monospace;
+        }
+
+    </style>
+</head>
+<body class="mode-move">
+
+    <h1>🔥 火柴棍数学</h1>
+    <div class="rule-display" id="ruleText">加载中...</div>
+    <div class="msg-area" id="msg"></div>
+
+    <div class="game-container">
+        <div class="board" id="board"></div>
+    </div>
+
+    <div class="controls">
+        <button class="btn-next" id="btnNext" onclick="nextLevel()">🎉 恭喜！下一关 ➡️</button>
+        
+        <div class="btn-row">
+            <button class="btn-reset" onclick="resetLevel()">↺ 重置本关</button>
+            <button class="btn-hint" id="btnHint" onclick="showHint()">💡 提示</button>
+        </div>
+
+        <div class="custom-area">
+            <input type="text" id="customInput" placeholder="输入算式 (如 6+4=4)">
+            <button class="btn-custom" onclick="loadCustom()">出题</button>
+        </div>
+    </div>
+
+<script>
+    // ================== 数据结构 ==================
+    // 0-9 的火柴棍定义 (1=有, 0=无) [上, 左上, 右上, 中, 左下, 右下, 下]
+    const DIGITS = {
+        0: [1, 1, 1, 0, 1, 1, 1], 1: [0, 0, 1, 0, 0, 1, 0], 2: [1, 0, 1, 1, 1, 0, 1],
+        3: [1, 0, 1, 1, 0, 1, 1], 4: [0, 1, 1, 1, 0, 1, 0], 5: [1, 1, 0, 1, 0, 1, 1],
+        6: [1, 1, 0, 1, 1, 1, 1], 7: [1, 0, 1, 0, 0, 1, 0], 8: [1, 1, 1, 1, 1, 1, 1],
+        9: [1, 1, 1, 1, 0, 1, 1]
+    };
+
+    // 关键修改：符号现在有“组”的概念，为了支持变换
+    const SYMBOLS_DATA = {
+        '+': { type: 'cross', sticks: [1, 1] }, // 竖, 横
+        '-': { type: 'cross', sticks: [0, 1] }, // 无竖, 横 (但也渲染竖位以便添加)
+        '=': { type: 'parallel', sticks: [1, 1] } // 上横, 下横
+    };
+
+    // 样式映射
+    const D_CLASSES = ['p-0 s-h', 'p-1 s-v', 'p-2 s-v', 'p-3 s-h', 'p-4 s-v', 'p-5 s-v', 'p-6 s-h'];
+    // 加减号组 (Cross Group): [Vertical, Horizontal]
+    const S_CROSS = ['sym-cross-v s-v', 'sym-cross-h s-h'];
+    // 等号组 (Parallel Group): [Top, Bottom]
+    const S_PARALLEL = ['sym-eq-top s-h', 'sym-eq-btm s-h'];
+
+    const MODE_ADD_REMOVE = 'add_remove'; 
+    const MODE_MOVE = 'move';            
+
+    // ================== 题库 (保持不变) ==================
+    const LEVELS = [
+        // --- 第一类：添/去 1 根 ---
+        { f: "8+1=3", m: MODE_ADD_REMOVE, h: "仔细观察... 8+1=9?" },
+        { f: "9-8=3", m: MODE_ADD_REMOVE, h: "9-6=3? 把8的一根去掉" },
+        { f: "5-4=9", m: MODE_ADD_REMOVE, h: "5+4=9 (减号变加号)" }, // 符号变换题
+        { f: "3+5=9", m: MODE_ADD_REMOVE, h: "3+5=8 (9变8)" },
+        { f: "1-4=3", m: MODE_ADD_REMOVE, h: "7-4=3" },
+        { f: "2+5=8", m: MODE_ADD_REMOVE, h: "3+5=8" },
+        { f: "12-6=8", m: MODE_ADD_REMOVE, h: "12-6=6? 14-6=8?" },
+        { f: "9+7=12", m: MODE_ADD_REMOVE, h: "5+7=12" },
+        { f: "13-6=8", m: MODE_ADD_REMOVE, h: "13-5=8" },
+        { f: "2+6=7", m: MODE_ADD_REMOVE, h: "2+5=7" },
+        { f: "5+72=17", m: MODE_ADD_REMOVE, h: "5+12=17 (7去头)" },
+        { f: "4+18=20", m: MODE_ADD_REMOVE, h: "4+16=20" },
+        { f: "3+3=8", m: MODE_ADD_REMOVE, h: "5+3=8" },
+        { f: "6+3+1=18", m: MODE_ADD_REMOVE, h: "6+3+1=10? 18中间去一根" },
+
+        // --- 第二类：移动 1 根 ---
+        { f: "7-1=2", m: MODE_MOVE, h: "试试1+1=2 (7变1, -变+)" }, // 符号变换题
+        { f: "9-5=8", m: MODE_MOVE, h: "6+3=9? 不对。试试9-5=4" },
+        { f: "6-4=9", m: MODE_MOVE, h: "5+4=9 (-变+, 6变5)" }, // 符号变换题
+        { f: "4+1=3", m: MODE_MOVE, h: "4-1=3 (+变-，竖移走)" }, // 符号变换题
+        { f: "7-1=8", m: MODE_MOVE, h: "1+1=2?" }, // 可能有误，经典是 1+1=2 或 9-1=8
+        { f: "5+1=9", m: MODE_MOVE, h: "6+3=9?" },
+        { f: "19-4=3", m: MODE_MOVE, h: "15-12=3" },
+        { f: "9+4=10", m: MODE_MOVE, h: "4变9? 9+? No. 6+4=10" },
+        { f: "6+3=3", m: MODE_MOVE, h: "0+3=3" },
+        { f: "14+7-4=11", m: MODE_MOVE, h: "观察加减号" },
+        { f: "12+4+7=11", m: MODE_MOVE, h: "把+变成-" },
+        { f: "14-5-1=18", m: MODE_MOVE, h: "减号变加号" },
+        { f: "6+5-3=6", m: MODE_MOVE, h: "5+3=8?" },
+        { f: "1+2+3=8", m: MODE_MOVE, h: "7+2-1=8? 3变5?" },
+        { f: "2+9=3+5", m: MODE_MOVE, h: "2+6=3+5? (9变6)" },
+        { f: "5+1=3-1", m: MODE_MOVE, h: "5-1=3+1" } 
+    ];
+
+    // ================== 游戏状态 ==================
+    let currentIdx = 0;
+    let currentMode = MODE_MOVE;
+    let gameState = []; 
+    // gameState Item Structure:
+    // { type: 'digit', val: 6, sticks: [...] }
+    // { type: 'symbol', group: 'cross'|'parallel', sticks: [...] }
+
+    let holding = null; 
+    let moveMade = false;
+
+    // ================== 核心逻辑 ==================
+
+    function init() {
+        loadLevel(0);
+        window.addEventListener('resize', autoScale);
+    }
+
+    function loadLevel(idx) {
+        currentIdx = idx;
+        const level = LEVELS[idx];
+        currentMode = level.m;
+        
+        document.body.className = `mode-${currentMode}`;
+        
+        let ruleDesc = currentMode === MODE_ADD_REMOVE 
+            ? "<span class='rule-highlight'>添上</span> 或 <span class='rule-highlight'>去掉</span> 1 根"
+            : "<span class='rule-highlight'>移动</span> 1 根 (总量不变)";
+            
+        document.getElementById('ruleText').innerHTML = `第 ${idx+1} 关 &nbsp;|&nbsp; 规则：${ruleDesc}`;
+        document.getElementById('msg').innerHTML = "";
+        document.getElementById('msg').className = "msg-area";
+        document.getElementById('btnNext').style.display = 'none';
+        document.getElementById('board').classList.remove('locked');
+        
+        parseFormula(level.f);
+        holding = null;
+        moveMade = false;
+        document.body.classList.remove('holding');
+    }
+
+    function loadCustom() {
+        const val = document.getElementById('customInput').value.replace(/\s/g, '');
+        if (!val || !val.includes('=')) return alert("请输入完整等式，例如 6+4=4");
+        
+        currentMode = MODE_MOVE; 
+        document.body.className = `mode-${currentMode}`;
+        document.getElementById('ruleText').innerHTML = `自定义关卡 &nbsp;|&nbsp; 规则：移动 1 根`;
+        document.getElementById('btnNext').style.display = 'none';
+        document.getElementById('msg').innerHTML = "";
+        document.getElementById('board').classList.remove('locked');
+        
+        parseFormula(val);
+        holding = null;
+        moveMade = false;
+        document.body.classList.remove('holding');
+    }
+
+    function parseFormula(str) {
+        gameState = [];
+        for (let char of str) {
+            if (/\d/.test(char)) {
+                gameState.push({ type: 'digit', val: parseInt(char), sticks: [...DIGITS[char]] });
+            } else if (SYMBOLS_DATA[char]) {
+                const sData = SYMBOLS_DATA[char];
+                // 关键：这里保存的是 group 类型，而不是死的 val
+                gameState.push({ 
+                    type: 'symbol', 
+                    group: sData.type, 
+                    sticks: [...sData.sticks] 
+                });
+            }
+        }
+        render();
+        setTimeout(autoScale, 10);
+    }
+
+    function render() {
+        const board = document.getElementById('board');
+        board.innerHTML = '';
+        
+        gameState.forEach((item, cIdx) => {
+            const box = document.createElement('div');
+            // 根据类型选择布局类
+            let layoutClasses = [];
+            
+            if (item.type === 'digit') {
+                box.className = 'char-box';
+                layoutClasses = D_CLASSES;
+            } else {
+                box.className = 'sym-box';
+                if (item.group === 'cross') layoutClasses = S_CROSS; // 加减号
+                else layoutClasses = S_PARALLEL; // 等号
+            }
+            
+            layoutClasses.forEach((cls, sIdx) => {
+                if (sIdx >= item.sticks.length) return;
+                
+                const hasStick = item.sticks[sIdx] === 1;
+                const el = document.createElement('div');
+                el.className = `stick ${cls} ${hasStick ? 'active' : 'ghost'}`;
+                el.onclick = (e) => handleClick(e, cIdx, sIdx, hasStick);
+                box.appendChild(el);
+            });
+            board.appendChild(box);
+        });
+    }
+
+    function handleClick(e, cIdx, sIdx, isActive) {
+        e.stopPropagation();
+        if (moveMade) return; 
+
+        // ====== 逻辑 A: 添/去一根 ======
+        if (currentMode === MODE_ADD_REMOVE) {
+            if (isActive) {
+                gameState[cIdx].sticks[sIdx] = 0;
+                showMessage("已去掉一根", "normal");
+            } else {
+                gameState[cIdx].sticks[sIdx] = 1;
+                showMessage("已添上一根", "normal");
+            }
+            moveMade = true;
+            render();
+            checkWin();
+            return;
+        }
+
+        // ====== 逻辑 B: 移动一根 (Move) ======
+        if (!holding) {
+            if (!isActive) return; 
+            
+            gameState[cIdx].sticks[sIdx] = 0; 
+            holding = { cIdx, sIdx };
+            document.body.classList.add('holding');
+            showMessage("已拿起，请选择放置位置...", "normal");
+            render();
+        } 
+        else {
+            if (isActive) {
+                if (cIdx === holding.cIdx && sIdx === holding.sIdx) {
+                    gameState[cIdx].sticks[sIdx] = 1;
+                    holding = null;
+                    document.body.classList.remove('holding');
+                    showMessage("已放回原处", "normal");
+                    render();
+                    return;
+                }
+                showMessage("这里已经有火柴了", "error");
+                return;
+            }
+
+            gameState[cIdx].sticks[sIdx] = 1;
+            holding = null;
+            document.body.classList.remove('holding');
+            moveMade = true;
+            render();
+            checkWin();
+        }
+    }
+
+    function checkWin() {
+        let expression = "";
+        let isValid = true;
+
+        for (let item of gameState) {
+            if (item.type === 'digit') {
+                const num = matchDigit(item.sticks);
+                if (num === -1) { isValid = false; break; }
+                expression += num;
+            } else {
+                // 动态判断符号
+                const s = item.sticks;
+                if (item.group === 'cross') {
+                    // [Vertical, Horizontal]
+                    if (s[0] === 1 && s[1] === 1) expression += "+";
+                    else if (s[0] === 0 && s[1] === 1) expression += "-";
+                    else { isValid = false; break; } // 不完整的符号
+                } else if (item.group === 'parallel') {
+                    // [Top, Bottom]
+                    if (s[0] === 1 && s[1] === 1) expression += "=";
+                    else if (s[0] === 0 && s[1] === 1) expression += "-"; // 等号变减号
+                    else if (s[0] === 1 && s[1] === 0) expression += "-"; // 等号变减号
+                    else { isValid = false; break; }
+                }
+            }
+        }
+
+        if (!isValid) {
+            fail("❌ 存在无效的数字或符号");
+            return;
+        }
+
+        const parts = expression.split('=');
+        // 支持 1+1=2=2 这种连等式有点复杂，暂只支持标准 A=B
+        if (parts.length !== 2 || !parts[0] || !parts[1]) {
+            // 如果所有的等号都变成减号了，这里就会报错
+            fail("❌ 等式结构不完整 (必须有等号)");
+            return;
+        }
+
+        try {
+            // eslint-disable-next-line no-new-func
+            const left = new Function(`return ${parts[0]}`)();
+            const right = new Function(`return ${parts[1]}`)();
+
+            if (left === right) {
+                success(`${expression} ✅ 挑战成功！`);
+                document.getElementById('board').classList.add('locked');
+                if (LEVELS[currentIdx+1]) {
+                    document.getElementById('btnNext').style.display = 'block';
+                }
+            } else {
+                fail(`${expression} ❌ 结果不相等`);
+            }
+        } catch (e) {
+            fail("❌ 算式无效");
+        }
+    }
+
+    function matchDigit(sticks) {
+        const key = sticks.join('');
+        for (let n in DIGITS) {
+            if (DIGITS[n].join('') === key) return n;
+        }
+        return -1;
+    }
+
+    function showMessage(text, type) {
+        const el = document.getElementById('msg');
+        el.innerText = text;
+        el.className = `msg-area ${type}`;
+    }
+
+    function success(text) {
+        showMessage(text, "success");
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    }
+
+    function fail(text) {
+        showMessage(text, "error");
+        document.getElementById('board').classList.add('locked');
+        if (navigator.vibrate) navigator.vibrate(200);
+    }
+
+    function resetLevel() {
+        if (currentMode === MODE_MOVE || currentMode === MODE_ADD_REMOVE) {
+            loadLevel(currentIdx);
+        } else {
+            loadCustom();
+        }
+    }
+
+    function nextLevel() {
+        if (currentIdx < LEVELS.length - 1) loadLevel(currentIdx + 1);
+    }
+
+    function showHint() {
+        alert(LEVELS[currentIdx]?.h || "仔细观察火柴的位置！");
+    }
+
+    function autoScale() {
+        const board = document.getElementById('board');
+        const container = document.querySelector('.game-container');
+        board.style.transform = 'scale(1)';
+        const w = board.offsetWidth;
+        const cW = container.offsetWidth;
+        if (w > cW - 20) {
+            board.style.transform = `scale(${(cW - 20) / w})`;
+        }
+    }
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>

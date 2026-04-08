@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { membershipService, type MembershipSnapshot, type PaymentOrderData } from '../../services/api'
 import { useTranslation } from '../../i18n/useTranslation'
 
@@ -99,7 +100,7 @@ export default function PaymentResult() {
   }
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="membership" />}>
+    <Layout sidebar={<TeacherSidebar activePage="membership" />} leftSidebar={<TeacherLeftSidebar activePage="membership" />}>
       <div className="panel-page max-w-2xl mx-auto">
         <section className="surface-card p-8">
           {/* Loading */}

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中心对称 - 交互式演示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #262626; /* 深色背景 */
+            font-family: "Times New Roman", serif; /* 数学风格字体 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #eee;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            cursor: default;
+        }
+
+        /* 简单的UI提示 */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            pointer-events: none;
+            text-align: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: normal;
+            color: #ddd;
+            letter-spacing: 1px;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            pointer-events: none;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>中心对称 (Central Symmetry)</h1>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        <div class="hint">拖动三角形顶点 (A,B,C) 或 黄色对称中心 (O) 进行探索</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 数据定义 ---
+
+        // 原始三角形 ABC
+        const points = [
+            { x: 200, y: 200, label: 'A', offsetX: -25, offsetY: -5 },
+            { x: 250, y: 500, label: 'B', offsetX: -25, offsetY: 10 },
+            { x: 450, y: 200, label: 'C', offsetX: 15, offsetY: -5 }
+        ];
+
+        // 对称中心
+        const center = { 
+            x: window.innerWidth / 2, 
+            y: window.innerHeight / 2, 
+            label: '对称中心',
+            color: '#f1c40f' // 黄色
+        };
+
+        // 交互状态
+        let dragTarget = null;
+
+        // --- 初始化与事件监听 ---
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // 重新居中对称中心 (仅在初次加载或必要时)
+            if (center.x === 0) {
+                center.x = canvas.width / 2;
+                center.y = canvas.height / 2;
+            }
+            draw();
+        }
+        window.addEventListener('resize', resize);
+        
+        // 鼠标/触摸事件封装
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function isHitting(pos, target) {
+            const dx = pos.x - target.x;
+            const dy = pos.y - target.y;
+            return (dx * dx + dy * dy) < 400; // 半径20的点击区域
+        }
+
+        function handleStart(e) {
+            const pos = getPos(e);
+            
+            // 1. 检查是否点击中心
+            if (isHitting(pos, center)) {
+                dragTarget = center;
+                return;
+            }
+
+            // 2. 检查是否点击顶点
+            for (let p of points) {
+                if (isHitting(pos, p)) {
+                    dragTarget = p;
+                    return;
+                }
+            }
+        }
+
+        function handleMove(e) {
+            const pos = getPos(e);
+
+            // 鼠标指针样式
+            let hover = isHitting(pos, center);
+            for(let p of points) { if(isHitting(pos, p)) hover = true; }
+            canvas.style.cursor = hover ? 'pointer' : 'default';
+
+            if (dragTarget) {
+                e.preventDefault(); // 防止触摸滚动
+                dragTarget.x = pos.x;
+                dragTarget.y = pos.y;
+                draw();
+            }
+        }
+
+        function handleEnd() {
+            dragTarget = null;
+        }
+
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('touchstart', handleStart, {passive: false});
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('touchmove', handleMove, {passive: false});
+        window.addEventListener('mouseup', handleEnd);
+        window.addEventListener('touchend', handleEnd);
+
+        // --- 核心计算逻辑 ---
+
+        // 计算关于中心对称的点: P' = 2*Center - P
+        function getSymmetricPoint(p, center) {
+            return {
+                x: 2 * center.x - p.x,
+                y: 2 * center.y - p.y,
+                label: p.label + "'"
+            };
+        }
+
+        // --- 绘图逻辑 ---
+
+        function drawPoint(p, color = '#ccc', isSolid = false, customRadius = 6) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, customRadius, 0, Math.PI * 2);
+            
+            if (isSolid) {
+                ctx.fillStyle = color;
+                ctx.fill();
+            } else {
+                ctx.fillStyle = 'rgba(255,255,255,0.2)'; // 半透明填充
+                ctx.fill();
+            }
+            
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+
+            // 绘制光晕增加可点击感
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 15, 0, Math.PI * 2);
+            ctx.fillStyle = color + '22'; // 很淡的颜色
+            ctx.fill();
+        }
+
+        function drawLabel(p, text, color = '#fff', offsetX = 0, offsetY = 0) {
+            ctx.font = "italic bold 24px Times New Roman";
+            ctx.fillStyle = color;
+            ctx.fillText(text, p.x + offsetX, p.y + offsetY);
+        }
+
+        function drawTriangle(pts, color) {
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            ctx.lineTo(pts[1].x, pts[1].y);
+            ctx.lineTo(pts[2].x, pts[2].y);
+            ctx.closePath();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+            // 极淡的填充
+            ctx.fillStyle = color + '11';
+            ctx.fill();
+        }
+
+        function drawDashedLine(p1, p2) {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]); // 虚线
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = '#666';
+            ctx.stroke();
+            ctx.setLineDash([]); // 恢复实线
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 计算对称点
+            const symPoints = points.map(p => getSymmetricPoint(p, center));
+
+            // 2. 绘制虚线连接 (从 P 到 P'，穿过 Center)
+            for (let i = 0; i < points.length; i++) {
+                drawDashedLine(points[i], symPoints[i]);
+            }
+
+            // 3. 绘制原始三角形
+            drawTriangle(points, '#e0e0e0');
+
+            // 4. 绘制对称三角形
+            drawTriangle(symPoints, '#e0e0e0');
+
+            // 5. 绘制点和标签 (原始)
+            points.forEach(p => {
+                drawPoint(p, '#fff');
+                drawLabel(p, p.label, '#fff', p.offsetX, p.offsetY);
+            });
+
+            // 6. 绘制点和标签 (对称)
+            symPoints.forEach((p, index) => {
+                drawPoint(p, '#fff');
+                // 对称点的标签位置稍微反向偏移一下，避免遮挡
+                const original = points[index];
+                drawLabel(p, p.label, '#fff', -original.offsetX, -original.offsetY);
+            });
+
+            // 7. 绘制对称中心
+            drawPoint(center, center.color, true, 8);
+            // 中心的文字稍微向下放一点
+            ctx.font = "16px Microsoft YaHei";
+            ctx.fillStyle = center.color;
+            ctx.textAlign = "center";
+            ctx.fillText(center.label, center.x, center.y + 30);
+            ctx.textAlign = "start"; // 恢复默认
+        }
+
+        // 启动
+        resize();
+
+        // 初始化中心位置在屏幕正中
+        center.x = window.innerWidth / 2;
+        center.y = window.innerHeight / 2;
+        draw();
+
+    </script>
+</body>
+</html>

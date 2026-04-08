@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跑道长度差异可视化（最终弧顶修正版）</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f8ff;
+        }
+        .track-container {
+            position: relative;
+            margin: 0 auto;
+            width: 100%;
+            max-width: 800px;
+        }
+        canvas {
+            background-color: #4CAF50;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        .control-panel {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .lane-info {
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+        }
+        .highlight {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="min-h-screen py-8">
+    <div class="container mx-auto px-4">
+        <h1 class="text-3xl font-bold text-center text-blue-800 mb-2">跑道长度差异可视化（最终弧顶修正版）</h1>
+        <p class="text-center text-gray-600 mb-8">标准400米跑道各跑道长度比较与起跑线确定</p>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <div class="track-container">
+                    <canvas id="runningTrack" width="800" height="500"></canvas>
+                </div>
+            </div>
+            
+            <div class="control-panel p-6">
+                <h2 class="text-xl font-bold text-blue-700 mb-4">跑道参数</h2>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2">选择跑道:</label>
+                    <div class="flex space-x-2 mb-4">
+                        <button data-lane="1" class="lane-btn px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">跑道1</button>
+                        <button data-lane="2" class="lane-btn px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">跑道2</button>
+                        <button data-lane="3" class="lane-btn px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">跑道3</button>
+                        <button data-lane="4" class="lane-btn px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600">跑道4</button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-gray-700 mb-2">跑道宽度: <span id="laneWidthValue">1.25</span> 米</label>
+                        <input type="range" id="laneWidth" min="1.0" max="1.5" step="0.05" value="1.25" class="w-full">
+                    </div>
+                    
+                    <button id="showStartBtn" class="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded mb-4">
+                        <i class="fas fa-flag-checkered mr-2"></i>显示起跑线差异
+                    </button>
+                    
+                    <button id="showLengthBtn" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded">
+                        <i class="fas fa-ruler-combined mr-2"></i>显示跑道长度
+                    </button>
+                </div>
+                
+                <div class="lane-info p-4">
+                    <h3 class="font-bold text-lg mb-2" id="selectedLaneTitle">跑道1信息</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <p class="text-sm text-gray-600">跑道长度:</p>
+                            <p class="font-bold" id="laneLength">400.00 米</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600">起跑线前移:</p>
+                            <p class="font-bold" id="startOffset">0.00 米</p>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <p class="text-sm text-gray-600">弯道半径:</p>
+                        <p class="font-bold" id="curveRadius">36.50 米</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">跑道长度差异原理</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">跑道组成</h3>
+                    <p class="text-gray-700 mb-4">标准400米跑道由两条84.39米的直道和两个半径为36.5米的半圆弯道组成。</p>
+                    <p class="text-gray-700">第一跑道长度计算:</p>
+                    <p class="bg-blue-50 p-3 rounded mt-2">
+                        2 × 直道长度 + 2 × π × 弯道半径<br>
+                        = 2 × 84.39 + 2 × 3.1416 × 36.5 ≈ 400米
+                    </p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-2">跑道长度差</h3>
+                    <p class="text-gray-700 mb-2">相邻跑道长度差 = 2 × π × 跑道宽度</p>
+                    <p class="bg-green-50 p-3 rounded mb-4">
+                        跑道宽度1.25米时:<br>
+                        2 × 3.1416 × 1.25 ≈ 7.85米
+                    </p>
+                    <p class="text-gray-700">因此外圈跑道的起跑线需要前移，确保所有运动员跑的距离相同。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const canvas = document.getElementById('runningTrack');
+            const ctx = canvas.getContext('2d');
+            const laneButtons = document.querySelectorAll('.lane-btn');
+            const laneWidthInput = document.getElementById('laneWidth');
+            const laneWidthValue = document.getElementById('laneWidthValue');
+            const showStartBtn = document.getElementById('showStartBtn');
+            const showLengthBtn = document.getElementById('showLengthBtn');
+            const laneInfoTitle = document.getElementById('selectedLaneTitle');
+            const laneLength = document.getElementById('laneLength');
+            const startOffset = document.getElementById('startOffset');
+            const curveRadius = document.getElementById('curveRadius');
+            
+            // 跑道参数
+            let laneWidth = 1.25;
+            let selectedLane = 1;
+            let showStartLines = false;
+            let showLengths = false;
+            
+            // 标准跑道参数
+            const straightLength = 84.39;
+            const firstLaneRadius = 36.50;
+            
+            // 更新跑道宽度显示
+            laneWidthInput.addEventListener('input', function() {
+                laneWidth = parseFloat(this.value);
+                laneWidthValue.textContent = laneWidth.toFixed(2);
+                drawTrack();
+            });
+            
+            // 选择跑道
+            laneButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    selectedLane = parseInt(this.dataset.lane);
+                    updateLaneInfo();
+                    drawTrack();
+                    
+                    // 更新按钮状态
+                    laneButtons.forEach(b => b.classList.remove('highlight'));
+                    this.classList.add('highlight');
+                });
+            });
+            
+            // 显示起跑线
+            showStartBtn.addEventListener('click', function() {
+                showStartLines = !showStartLines;
+                this.classList.toggle('bg-purple-600', showStartLines);
+                drawTrack();
+            });
+            
+            // 显示跑道长度
+            showLengthBtn.addEventListener('click', function() {
+                showLengths = !showLengths;
+                this.classList.toggle('bg-indigo-600', showLengths);
+                drawTrack();
+            });
+            
+            // 更新跑道信息
+            function updateLaneInfo() {
+                const laneRadius = firstLaneRadius + (selectedLane - 1) * laneWidth;
+                const laneLen = calculateLaneLength(selectedLane);
+                const offset = calculateStartOffset(selectedLane);
+                
+                laneInfoTitle.textContent = `跑道${selectedLane}信息`;
+                laneLength.textContent = `${laneLen.toFixed(2)} 米`;
+                startOffset.textContent = `${offset.toFixed(2)} 米`;
+                curveRadius.textContent = `${laneRadius.toFixed(2)} 米`;
+            }
+            
+            // 计算跑道长度
+            function calculateLaneLength(lane) {
+                const radius = firstLaneRadius + (lane - 1) * laneWidth;
+                return 2 * straightLength + 2 * Math.PI * radius;
+            }
+            
+            // 计算起跑线前移距离
+            function calculateStartOffset(lane) {
+                if (lane === 1) return 0;
+                return 2 * Math.PI * laneWidth * (lane - 1);
+            }
+            
+            // 绘制跑道（最终弧顶修正版）
+            function drawTrack() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制背景
+                ctx.fillStyle = '#4CAF50';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制跑道
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const scale = 3.5; // 缩放因子
+                
+                // 绘制直道
+                const straightWidth = 20;
+                const straightTop = centerY - straightWidth * 2;
+                const straightBottom = centerY + straightWidth * 2;
+                
+                // 绘制弯道（最终弧顶修正）
+                for (let lane = 1; lane <= 4; lane++) {
+                    const radius = firstLaneRadius + (lane - 1) * laneWidth;
+                    const scaledRadius = radius * scale;
+                    
+                    // 设置跑道颜色
+                    if (lane === 1) ctx.strokeStyle = '#d32f2f';
+                    else if (lane === 2) ctx.strokeStyle = '#1976D2';
+                    else if (lane === 3) ctx.strokeStyle = '#FFA000';
+                    else ctx.strokeStyle = '#388E3C';
+                    
+                    ctx.lineWidth = 5;
+                    
+                    // 左弯道（弧顶朝左） - 从π/2到-π/2顺时针绘制
+                    ctx.beginPath();
+                    ctx.arc(
+                        centerX - straightLength * scale / 2, 
+                        centerY, 
+                        scaledRadius, 
+                        Math.PI/2,    // 起始角度
+                        -Math.PI/2,   // 结束角度
+                        false         // 逆时针方向
+                    );
+                    ctx.stroke();
+                    
+                    // 右弯道（弧顶朝右） - 从-π/2到π/2顺时针绘制
+                    ctx.beginPath();
+                    ctx.arc(
+                        centerX + straightLength * scale / 2, 
+                        centerY, 
+                        scaledRadius, 
+                        -Math.PI/2,   // 起始角度
+                        Math.PI/2,    // 结束角度
+                        false         // 顺时针方向
+                    );
+                    ctx.stroke();
+                    
+                    // 上直道
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        centerX - straightLength * scale / 2, 
+                        centerY - scaledRadius
+                    );
+                    ctx.lineTo(
+                        centerX + straightLength * scale / 2, 
+                        centerY - scaledRadius
+                    );
+                    ctx.stroke();
+                    
+                    // 下直道
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        centerX - straightLength * scale / 2, 
+                        centerY + scaledRadius
+                    );
+                    ctx.lineTo(
+                        centerX + straightLength * scale / 2, 
+                        centerY + scaledRadius
+                    );
+                    ctx.stroke();
+                    
+                    // 显示跑道长度
+                    if (showLengths) {
+                        const len = calculateLaneLength(lane);
+                        ctx.fillStyle = 'white';
+                        ctx.font = 'bold 14px Arial';
+                        ctx.fillText(
+                            `${len.toFixed(1)}米`, 
+                            centerX + straightLength * scale / 2 + 20, 
+                            centerY - scaledRadius + (lane - 1) * 20 + 30  // 增加了30像素的垂直偏移，确保第一条跑道的文本不被压住
+                        );
+                    }
+                    
+                    // 高亮选中的跑道
+                    if (lane === selectedLane) {
+                        ctx.strokeStyle = 'white';
+                        ctx.setLineDash([5, 5]);
+                        ctx.lineWidth = 2;
+                        
+                        // 左弯道
+                        ctx.beginPath();
+                        ctx.arc(
+                            centerX - straightLength * scale / 2, 
+                            centerY, 
+                            scaledRadius, 
+                            Math.PI/2, 
+                            -Math.PI/2,
+                            false
+                        );
+                        ctx.stroke();
+                        
+                        // 右弯道
+                        ctx.beginPath();
+                        ctx.arc(
+                            centerX + straightLength * scale / 2, 
+                            centerY, 
+                            scaledRadius, 
+                            -Math.PI/2, 
+                            Math.PI/2,
+                            false
+                        );
+                        ctx.stroke();
+                        
+                        // 上直道
+                        ctx.beginPath();
+                        ctx.moveTo(
+                            centerX - straightLength * scale / 2, 
+                            centerY - scaledRadius
+                        );
+                        ctx.lineTo(
+                            centerX + straightLength * scale / 2, 
+                            centerY - scaledRadius
+                        );
+                        ctx.stroke();
+                        
+                        // 下直道
+                        ctx.beginPath();
+                        ctx.moveTo(
+                            centerX - straightLength * scale / 2, 
+                            centerY + scaledRadius
+                        );
+                        ctx.lineTo(
+                            centerX + straightLength * scale / 2, 
+                            centerY + scaledRadius
+                        );
+                        ctx.stroke();
+                        
+                        ctx.setLineDash([]);
+                    }
+                }
+                
+                // 绘制起跑线
+                if (showStartLines) {
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2;
+                    
+                    for (let lane = 1; lane <= 4; lane++) {
+                        const radius = firstLaneRadius + (lane - 1) * laneWidth;
+                        const scaledRadius = radius * scale;
+                        const offset = calculateStartOffset(lane);
+                        const angle = (offset / (2 * Math.PI * radius)) * Math.PI;
+                        
+                        // 左弯道起跑线
+                        const startX = centerX - straightLength * scale / 2 - Math.sin(angle) * scaledRadius;
+                        const startY = centerY - Math.cos(angle) * scaledRadius;
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(
+                            startX + Math.cos(angle) * 20,
+                            startY + Math.sin(angle) * 20
+                        );
+                        ctx.stroke();
+                        
+                        // 标记起跑线前移距离
+                        if (lane > 1) {
+                            ctx.fillStyle = 'white';
+                            ctx.font = '12px Arial';
+                            // 根据跑道编号调整标签位置，避免重叠
+                            ctx.fillText(
+                                `前移${offset.toFixed(1)}米`, 
+                                startX - 50, 
+                                startY - 10 - (lane - 2) * 20 // 根据跑道编号垂直错开标签
+                            );
+                        }
+                    }
+                }
+                
+                // 绘制终点线
+                ctx.strokeStyle = '#FFD700';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(
+                    centerX + straightLength * scale / 2, 
+                    centerY - (firstLaneRadius + 3 * laneWidth) * scale
+                );
+                ctx.lineTo(
+                    centerX + straightLength * scale / 2, 
+                    centerY + (firstLaneRadius + 3 * laneWidth) * scale
+                );
+                ctx.stroke();
+                
+                // 添加终点线文字
+                ctx.fillStyle = '#FFD700';
+                ctx.font = 'bold 16px Arial';
+                ctx.fillText('终点线', centerX + straightLength * scale / 2 + 10, centerY);
+            }
+            
+            // 初始化
+            updateLaneInfo();
+            drawTrack();
+            document.querySelector('.lane-btn[data-lane="1"]').classList.add('highlight');
+        });
+    </script>
+</body>
+</html>

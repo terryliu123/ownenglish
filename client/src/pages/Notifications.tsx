@@ -4,6 +4,7 @@ import Layout from '../components/layout/Layout'
 import { notificationService, type Notification } from '../services/api'
 import { useTranslation } from '../i18n/useTranslation'
 import { TeacherSidebar } from '../components/layout/Layout'
+import TeacherLeftSidebar from '../components/layout/TeacherLeftSidebar'
 import { useAppStore } from '../stores/app-store'
 
 function formatTime(dateString: string) {
@@ -78,7 +79,7 @@ export default function Notifications() {
   const sidebar = user?.role === 'teacher' ? <TeacherSidebar activePage="" /> : undefined
 
   return (
-    <Layout sidebar={sidebar}>
+    <Layout sidebar={sidebar} leftSidebar={user?.role === 'teacher' ? <TeacherLeftSidebar activePage="" /> : undefined}>
       <div className="panel-page max-w-3xl mx-auto">
         <section className="surface-card">
           <div className="surface-head flex items-center justify-between">

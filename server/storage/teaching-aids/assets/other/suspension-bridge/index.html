@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>悬索桥受力原理演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: #263238; /* 深空灰背景，突出主体 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #fff;
+            margin: 0;
+        }
+
+        h2 { margin-bottom: 10px; color: #eceff1; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .subtitle { color: #b0bec5; font-size: 14px; margin-bottom: 20px; }
+
+        .main-container {
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 900px;
+            color: #333;
+            position: relative;
+        }
+
+        canvas {
+            border-radius: 8px;
+            background: linear-gradient(to bottom, #e3f2fd 0%, #bbdefb 80%, #90caf9 100%); /* 天空背景 */
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .controls-area {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .slider-group {
+            flex: 1;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 8px;
+            background: #cfd8dc;
+            border-radius: 5px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #f44336;
+            border-radius: 50%;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .dashboard {
+            display: flex;
+            gap: 15px;
+        }
+
+        .dash-card {
+            background: white;
+            padding: 10px 15px;
+            border-radius: 6px;
+            border-left: 5px solid #ccc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            min-width: 120px;
+        }
+        
+        .dash-card.tension { border-left-color: #d32f2f; } /* 红色代表拉力 */
+        .dash-card.compression { border-left-color: #1976d2; } /* 蓝色代表压力 */
+
+        .val { font-size: 20px; font-weight: bold; color: #333; display: block; }
+        .lbl { font-size: 12px; color: #78909c; }
+
+        .annotation {
+            background: #fff3e0;
+            border: 1px solid #ffe0b2;
+            color: #e65100;
+            padding: 10px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>悬索桥 (Suspension Bridge)</h2>
+    <div class="subtitle">利用巨大的缆索将桥面“吊”在空中，适合超大跨度</div>
+
+    <div class="main-container">
+        <canvas id="simCanvas" width="860" height="480"></canvas>
+
+        <div class="controls-area">
+            <div class="slider-group">
+                <label style="font-weight:bold; display:flex; justify-content:space-between; margin-bottom:8px;">
+                    <span>车辆载重 (Load)</span>
+                    <span id="loadText" style="color:#d32f2f">0 吨</span>
+                </label>
+                <input type="range" id="loadSlider" min="0" max="100" value="0">
+                <div style="font-size:12px; color:#999; display:flex; justify-content:space-between; margin-top:5px;">
+                    <span>空载</span>
+                    <span>满载 (桥面微沉)</span>
+                </div>
+            </div>
+
+            <div class="dashboard">
+                <div class="dash-card tension">
+                    <span class="val" id="valTension">0 MN</span>
+                    <span class="lbl">主缆拉力 (Tension)</span>
+                </div>
+                <div class="dash-card compression">
+                    <span class="val" id="valComp">0 MN</span>
+                    <span class="lbl">塔柱压力 (Compression)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="annotation">
+            <strong>💡 观察指南：</strong>
+            <ul style="margin: 5px 0 0 20px; padding:0;">
+                <li><strong>主缆 (Main Cable)：</strong> 随着载重增加，缆绳变红、变直（受拉力剧增）。</li>
+                <li><strong>锚碇 (Anchorage)：</strong> 画面最两侧的混凝土块。注意看红色箭头，它们必须像“拔河”一样死死拉住缆绳，否则桥就塌了。</li>
+                <li><strong>吊索 (Suspenders)：</strong> 竖直的细线，将桥面的重量“提”给主缆。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // --- 场景参数 ---
+        const groundY = 400; // 水面/地面高度
+        const deckY = 320;   // 桥面高度
+        const towerH = 220;  // 塔顶高度 (Canvas Y坐标，越小越高)
+        
+        const width = canvas.width;
+        const centerX = width / 2;
+        
+        const towerSpan = 500; // 两塔间距
+        const towerLeftX = centerX - towerSpan / 2;
+        const towerRightX = centerX + towerSpan / 2;
+        
+        const anchorLeftX = 40;  // 左锚碇位置
+        const anchorRightX = width - 40; // 右锚碇位置
+
+        // 状态
+        let load = 0; // 0-100
+        let waveOffset = 0;
+
+        function loop() {
+            waveOffset += 0.05;
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, canvas.height);
+
+            drawEnvironment();
+            drawAnchorages(); // 锚碇
+            drawTowers();     // 桥塔
+            drawCablesAndDeck(); // 主缆、吊索、桥面
+            drawForces();     // 力箭头
+        }
+
+        function drawEnvironment() {
+            // 水面
+            ctx.fillStyle = "#81d4fa";
+            ctx.fillRect(0, groundY, width, canvas.height - groundY);
+            
+            // 波浪
+            ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            for(let x=0; x<width; x+=20) {
+                let y = groundY + Math.sin(x/40 + waveOffset)*5;
+                ctx.moveTo(x, y);
+                ctx.lineTo(x+15, y);
+            }
+            ctx.stroke();
+
+            // 远景山脉
+            ctx.fillStyle = "#cfd8dc";
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(100, groundY - 80);
+            ctx.lineTo(250, groundY - 30);
+            ctx.lineTo(400, groundY - 120);
+            ctx.lineTo(600, groundY - 50);
+            ctx.lineTo(width, groundY - 90);
+            ctx.lineTo(width, groundY);
+            ctx.fill();
+        }
+
+        function drawAnchorages() {
+            // 锚碇是巨大的混凝土块，用来固定缆绳
+            ctx.fillStyle = "#5d4037"; // 土色/混凝土色
+            
+            // 左锚
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(anchorLeftX + 40, groundY);
+            ctx.lineTo(anchorLeftX + 20, deckY - 20); // 顶部
+            ctx.lineTo(0, deckY - 20);
+            ctx.fill();
+            // 文字
+            ctx.fillStyle = "#fff";
+            ctx.font = "12px Arial";
+            ctx.fillText("锚碇 Anchorage", 10, groundY - 10);
+
+            // 右锚
+            ctx.fillStyle = "#5d4037";
+            ctx.beginPath();
+            ctx.moveTo(width, groundY);
+            ctx.lineTo(anchorRightX - 40, groundY);
+            ctx.lineTo(anchorRightX - 20, deckY - 20);
+            ctx.lineTo(width, deckY - 20);
+            ctx.fill();
+        }
+
+        function drawTowers() {
+            ctx.fillStyle = "#455a64"; // 深灰色钢/混塔
+            const tWidth = 30;
+
+            // 左塔
+            ctx.fillRect(towerLeftX - tWidth/2, towerH, tWidth, groundY - towerH);
+            // 右塔
+            ctx.fillRect(towerRightX - tWidth/2, towerH, tWidth, groundY - towerH);
+
+            // 塔基
+            ctx.fillStyle = "#37474f";
+            ctx.fillRect(towerLeftX - 25, groundY - 20, 50, 30);
+            ctx.fillRect(towerRightX - 25, groundY - 20, 50, 30);
+        }
+
+        function drawCablesAndDeck() {
+            // 计算垂度 (Sag): 载重越大，垂度越深（为了视觉夸张，我们让缆绳绷紧时反而更红，
+            // 但物理上这里我们模拟缆绳稍微被拉长导致下垂，或者简化为单纯位置变化）
+            // *修正逻辑*：实际上，对于演示教具，载重增加 -> 缆绳张力增加 -> 缆绳实际上会伸长一点点 -> 桥面下沉。
+            const baseSag = (deckY - towerH) * 0.8; 
+            const sag = baseSag + (load / 100) * 15; // 桥面下沉量
+            
+            // 缆绳最低点 Y
+            const cableLowY = towerH + sag;
+            
+            // 缆绳颜色：压力越大越红
+            let r = 60 + load * 1.9;
+            let cableColor = `rgb(${r}, 60, 60)`;
+            
+            // --- 1. 绘制主缆 (Main Cable) ---
+            ctx.beginPath();
+            ctx.strokeStyle = cableColor;
+            ctx.lineWidth = 4 + load/40; // 受力变粗
+            
+            // 左边跨 (锚 -> 塔顶)
+            ctx.moveTo(anchorLeftX, deckY); // 锚点
+            ctx.lineTo(towerLeftX, towerH); // 塔顶
+            
+            // 中间跨 (塔顶 -> 抛物线 -> 塔顶)
+            // 使用二次贝塞尔曲线模拟抛物线
+            // 控制点 X = centerX, Y = 2 * lowY - topY (近似)
+            // 为了更精确画吊索，我们还是用点来画线比较好
+            ctx.moveTo(towerLeftX, towerH);
+            for (let x = towerLeftX; x <= towerRightX; x+=5) {
+                // 抛物线公式: y = a(x-h)^2 + k
+                // 顶点 (centerX, cableLowY)
+                // 过点 (towerRightX, towerH)
+                // towerH = a(towerRightX - centerX)^2 + cableLowY
+                // a = (towerH - cableLowY) / (span/2)^2
+                let a = (towerH - cableLowY) / Math.pow(towerSpan/2, 2);
+                let y = a * Math.pow(x - centerX, 2) + cableLowY;
+                ctx.lineTo(x, y);
+            }
+
+            // 右边跨 (塔顶 -> 锚)
+            ctx.lineTo(anchorRightX, deckY);
+            ctx.stroke();
+
+            // --- 2. 绘制吊索 (Suspenders) ---
+            ctx.strokeStyle = "#78909c";
+            ctx.lineWidth = 2;
+            const suspenderCount = 12; // 吊索数量
+            const step = towerSpan / (suspenderCount + 1);
+            
+            // 计算抛物线参数 a (同上)
+            let a = (towerH - cableLowY) / Math.pow(towerSpan/2, 2);
+
+            ctx.beginPath();
+            for(let i=1; i<=suspenderCount; i++) {
+                let x = towerLeftX + i * step;
+                // 计算该位置主缆高度
+                let cableY = a * Math.pow(x - centerX, 2) + cableLowY;
+                
+                // 桥面随重物下沉
+                let currentDeckY = deckY + (load/100)*15; // 简单模拟桥面弯曲
+
+                ctx.moveTo(x, cableY);
+                ctx.lineTo(x, currentDeckY);
+            }
+            ctx.stroke();
+
+            // --- 3. 绘制桥面 (Deck) ---
+            let currentDeckY = deckY + (load/100)*15;
+            ctx.fillStyle = "#90a4ae";
+            ctx.fillRect(anchorLeftX, currentDeckY, anchorRightX - anchorLeftX, 12);
+            
+            // 绘制车 (如果在载重状态)
+            if(load > 0) {
+                drawTruck(centerX, currentDeckY);
+            }
+        }
+
+        function drawTruck(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            
+            // 车身
+            ctx.fillStyle = "#d32f2f";
+            ctx.fillRect(-30, -35, 60, 25);
+            ctx.fillStyle = "#b71c1c";
+            ctx.fillRect(-30, -35, 40, 25); // 车头区分
+            
+            // 轮子
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.arc(-20, -10, 8, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(20, -10, 8, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+            
+            // 重力箭头
+            drawArrow(x, y+10, x, y+40+load, "#d32f2f", 4, "G");
+        }
+
+        function drawForces() {
+            if(load < 5) return;
+
+            const forceScale = load / 100;
+
+            // 1. 锚碇处的拉力 (Anchorage Tension)
+            // 主缆拉锚碇(向中上)，锚碇拉主缆(向外下)。这里画锚碇受到的拉力(或者锚碇的反作用力)
+            // 画锚碇“拉住”缆绳的力：向左下
+            drawArrow(anchorLeftX + 30, deckY - 30, anchorLeftX - 20, deckY + 10, "#d32f2f", 4, "拉力");
+            drawArrow(anchorRightX - 30, deckY - 30, anchorRightX + 20, deckY + 10, "#d32f2f", 4, "拉力");
+
+            // 2. 塔顶受力分解
+            // 主缆给塔顶一个巨大的向下压力
+            // 左塔
+            drawArrow(towerLeftX, towerH - 10, towerLeftX, towerH + 60 * forceScale + 20, "#1976d2", 5, "压力");
+            // 右塔
+            drawArrow(towerRightX, towerH - 10, towerRightX, towerH + 60 * forceScale + 20, "#1976d2", 5, "压力");
+        }
+
+        function drawArrow(x1, y1, x2, y2, color, w, label) {
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = w;
+            
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            let ang = Math.atan2(y2-y1, x2-x1);
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - 12*Math.cos(ang-Math.PI/6), y2 - 12*Math.sin(ang-Math.PI/6));
+            ctx.lineTo(x2 - 12*Math.cos(ang+Math.PI/6), y2 - 12*Math.sin(ang+Math.PI/6));
+            ctx.fill();
+            
+            if(label) {
+                ctx.font = "bold 14px Arial";
+                // 避免文字重叠
+                let textY = y2 > y1 ? y2 + 20 : y2 - 10;
+                ctx.fillText(label, x2 - 15, textY);
+            }
+            ctx.restore();
+        }
+
+        // 交互
+        const slider = document.getElementById('loadSlider');
+        slider.addEventListener('input', (e) => {
+            load = parseInt(e.target.value);
+            document.getElementById('loadText').innerText = load + " 吨";
+            
+            // 简单模拟数值
+            // 拉力 = 水平分力 / cos(theta)
+            let tension = (load * 5 + 200).toFixed(0); // 基础张力 + 载重
+            let comp = (load * 4 + 150).toFixed(0);    // 压力
+            
+            document.getElementById('valTension').innerText = tension + " MN";
+            document.getElementById('valComp').innerText = comp + " MN";
+        });
+
+        // 启动
+        draw();
+        loop(); // 开启波浪循环
+
+    </script>
+</body>
+</html>

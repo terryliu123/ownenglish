@@ -4,11 +4,18 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 
 from app.core.config import get_settings
 from app.db.session import init_db
 from app.db.session import async_session_maker
-from app.api.v1 import auth, classes, study_packs, live, live_challenges, audio, reports, free_practice, live_analytics, images, notifications, admin, membership, media, experiments
+from app.api.v1 import auth, classes, class_ai_settings, study_packs, live, live_challenges, audio, reports, free_practice, live_analytics, images, notifications, admin, membership, media, experiments, teaching_aids, bigscreen_activities, whiteboard_ai, student_ai, danmu
 from app.services.membership import ensure_all_teacher_memberships, ensure_membership_plans
 from app.services.system_settings import load_runtime_settings
 
@@ -34,6 +41,8 @@ os.makedirs(os.path.join(UPLOADS_DIR, "audio"), exist_ok=True)
 os.makedirs(os.path.join(UPLOADS_DIR, "images"), exist_ok=True)
 os.makedirs(os.path.join(UPLOADS_DIR, "media"), exist_ok=True)
 os.makedirs(os.path.join(UPLOADS_DIR, "experiments"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "storage", "teaching-aids", "assets"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "storage", "teaching-aids", "manifests"), exist_ok=True)
 
 
 @asynccontextmanager
@@ -72,6 +81,7 @@ app.add_middleware(
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(classes.router, prefix="/api/v1")
+app.include_router(class_ai_settings.router, prefix="/api/v1")
 app.include_router(study_packs.router, prefix="/api/v1")
 app.include_router(live_challenges.router, prefix="/api/v1")
 app.include_router(live.router, prefix="/api/v1")
@@ -85,9 +95,19 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(membership.router, prefix="/api/v1")
 app.include_router(media.router, prefix="/api/v1")
 app.include_router(experiments.router, prefix="/api/v1")
+app.include_router(teaching_aids.router, prefix="/api/v1")
+app.include_router(teaching_aids.teacher_router, prefix="/api/v1")
+app.include_router(bigscreen_activities.router, prefix="/api/v1")
+app.include_router(whiteboard_ai.router, prefix="/api/v1")
+app.include_router(student_ai.router, prefix="/api/v1")
+app.include_router(danmu.router, prefix="/api/v1")
 
 # Serve uploaded audio files
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+# Serve teaching aids assets (covers and diagrams)
+TEACHING_AIDS_ASSETS_DIR = os.path.join(BASE_DIR, "storage", "teaching-aids", "assets")
+app.mount("/teaching-aids-assets", StaticFiles(directory=TEACHING_AIDS_ASSETS_DIR), name="teaching_aids_assets")
 
 
 @app.get("/")

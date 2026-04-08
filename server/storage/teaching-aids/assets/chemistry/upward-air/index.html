@@ -1,0 +1,110 @@
+<meta charset="utf-8">
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 玻璃光泽 -->
+    <linearGradient id="glassSheen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:white;stop-opacity:0.1" />
+      <stop offset="20%" style="stop-color:white;stop-opacity:0.05" />
+      <stop offset="50%" style="stop-color:white;stop-opacity:0" />
+      <stop offset="80%" style="stop-color:white;stop-opacity:0.05" />
+      <stop offset="100%" style="stop-color:white;stop-opacity:0.2" />
+    </linearGradient>
+
+    <!-- 气体渐变 (密度大，沉积在底部) -->
+    <linearGradient id="gasGradient" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" style="stop-color:#4db6ac;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#b2dfdb;stop-opacity:0.6" />
+    </linearGradient>
+
+    <!-- 瓶身剪切路径 -->
+    <clipPath id="bottleShape">
+      <path d="M300,180 L300,420 L500,420 L500,180 L460,150 L340,150 Z" />
+    </clipPath>
+
+    <!-- 箭头标记 -->
+    <marker id="arrowIn" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#4db6ac" />
+    </marker>
+    <marker id="arrowOut" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#cfd8dc" />
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="100%" height="100%" fill="#37474f" />
+
+  <!-- ================= 标题区域 (顶部留白优化) ================= -->
+  <text x="400" y="50" text-anchor="middle" font-family="'Microsoft YaHei', Arial" font-size="26" fill="#eceff1" font-weight="bold">向上排空气法</text>
+  <text x="400" y="80" text-anchor="middle" font-family="'Microsoft YaHei', Arial" font-size="16" fill="#b0bec5">原理：气体密度 > 空气密度 (如 $CO_2, O_2$)</text>
+
+  <!-- ================= 装置主体 (下移以避免重叠) ================= -->
+  <g transform="translate(0, 20)">
+    
+    <!-- 1. 瓶内气体动画 -->
+    <g clip-path="url(#bottleShape)">
+      <!-- 初始背景(空气) -->
+      <rect x="300" y="150" width="200" height="270" fill="#455a64" fill-opacity="0.3" />
+      
+      <!-- 进气填充动画 -->
+      <rect x="300" y="420" width="200" height="0" fill="url(#gasGradient)">
+        <animate attributeName="height" from="0" to="270" dur="8s" repeatCount="indefinite" fill="freeze" />
+        <animate attributeName="y" from="420" to="150" dur="8s" repeatCount="indefinite" fill="freeze" />
+      </rect>
+    </g>
+
+    <!-- 2. 瓶身结构 -->
+    <!-- 轮廓 -->
+    <path d="M300,180 L300,420 L500,420 L500,180 L460,150 L340,150 Z" 
+          fill="url(#glassSheen)" stroke="#cfd8dc" stroke-width="3" />
+    <!-- 瓶塞 -->
+    <rect x="340" y="130" width="120" height="20" fill="#78909c" stroke="#546e7a" />
+
+    <!-- 3. 导管系统 (向两侧延伸，避免与标题打架) -->
+    
+    <!-- 右侧：进气管 (长管 - 伸入底部) -->
+    <!-- 路径：从右侧远处 -> 进入 -> 到底部 -->
+    <polyline points="680,110 440,110 440,400" fill="none" stroke="#4db6ac" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+    
+    <!-- 进气粒子流 -->
+    <circle r="3" fill="#fff">
+       <animateMotion path="M680,110 L440,110 L440,400" dur="2s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- 左侧：排气管 (短管 - 只在顶部) -->
+    <!-- 路径：从顶部 -> 出去 -> 左侧远处 -->
+    <polyline points="360,160 360,110 120,110" fill="none" stroke="#b0bec5" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+
+    <!-- 排气粒子流 (延迟触发) -->
+    <circle r="3" fill="#90a4ae" opacity="0">
+       <animate attributeName="opacity" values="0;1;1" keyTimes="0;0.2;1" dur="2s" begin="2s" repeatCount="indefinite" />
+       <animateMotion path="M360,160 L360,110 L120,110" dur="2s" begin="2s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- 4. 标签与箭头 (布局优化) -->
+    
+    <!-- 进气标签 (位于右管上方) -->
+    <text x="600" y="95" text-anchor="middle" fill="#4db6ac" font-size="16" font-weight="bold">气体进</text>
+    <text x="600" y="135" text-anchor="middle" fill="#4db6ac" font-size="12" opacity="0.8">长管进</text>
+    <line x1="640" y1="110" x2="600" y2="110" stroke="#4db6ac" stroke-width="2" marker-end="url(#arrowIn)" /> <!-- 箭头叠加在管子上 -->
+
+    <!-- 排气标签 (位于左管上方) -->
+    <text x="200" y="95" text-anchor="middle" fill="#b0bec5" font-size="16">空气出</text>
+    <text x="200" y="135" text-anchor="middle" fill="#b0bec5" font-size="12" opacity="0.8">短管出</text>
+    <line x1="160" y1="110" x2="120" y2="110" stroke="#b0bec5" stroke-width="2" marker-end="url(#arrowOut)" /> <!-- 箭头叠加在管子上 -->
+
+    <!-- 气体标签 (随液面上升) -->
+    <text x="400" y="400" text-anchor="middle" fill="#fff" font-weight="bold" font-size="20" opacity="0" style="text-shadow: 1px 1px 2px black;">
+      $O_2 / CO_2$
+      <animate attributeName="opacity" values="0;1;1;0" dur="8s" repeatCount="indefinite" />
+      <animate attributeName="y" values="400;280;280;400" dur="8s" repeatCount="indefinite" />
+    </text>
+
+  </g>
+  
+  <!-- 底部提示条 -->
+  <rect x="0" y="470" width="800" height="30" fill="#263238" />
+  <text x="400" y="490" text-anchor="middle" fill="#78909c" font-size="12" font-family="Arial">
+    提示：若收集密度比空气小的气体（如氢气），则装置需倒置或“短进长出”
+  </text>
+
+</svg>

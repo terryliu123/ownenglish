@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能教室分贝监测系统</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            color: #fff;
+            min-height: 100vh;
+        }
+        @keyframes gradientBG {
+            0% {background-position: 0% 50%;}
+            50% {background-position: 100% 50%;}
+            100% {background-position: 0% 50%;}
+        }
+        .card-glass {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        .noise-level-indicator {
+            width: 100%;
+            height: 30px;
+            border-radius: 15px;
+            background: linear-gradient(to right, #4CAF50, #FFEB3B, #FF5722);
+            position: relative;
+            overflow: hidden;
+        }
+        .noise-level-pointer {
+            position: absolute;
+            width: 2px;
+            height: 40px;
+            background: #fff;
+            top: -5px;
+            transform: translateX(-50%);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+        .sound-wave {
+            position: relative;
+            height: 100px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .wave-bar {
+            position: absolute;
+            bottom: 0;
+            width: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 5px 5px 0 0;
+            transform-origin: bottom;
+        }
+        h1, h2, h3 {
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 text-white drop-shadow-lg">智能教室分贝监测系统</h1>
+            <p class="text-xl opacity-90">实时监测教室噪音水平，营造最佳学习环境</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+            <!-- 实时分贝显示 -->
+            <div class="card-glass p-6 col-span-1">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-semibold">当前噪音水平</h2>
+                    <div class="text-3xl">
+                        <i class="fas fa-volume-up"></i>
+                    </div>
+                </div>
+                <div class="text-center mb-6">
+                    <div class="text-6xl font-bold mb-2" id="currentDb">--</div>
+                    <div class="text-xl" id="noiseLevelText">正在检测...</div>
+                </div>
+                <div class="noise-level-indicator mb-4">
+                    <div class="noise-level-pointer" id="dbPointer"></div>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span>安静</span>
+                    <span>适中</span>
+                    <span>吵闹</span>
+                </div>
+            </div>
+
+            <!-- 声波可视化 -->
+            <div class="card-glass p-6 col-span-1 lg:col-span-2">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-semibold">声波可视化</h2>
+                    <div class="text-3xl">
+                        <i class="fas fa-wave-square"></i>
+                    </div>
+                </div>
+                <div class="sound-wave" id="soundWave"></div>
+            </div>
+        </div>
+
+        <!-- 历史数据图表 -->
+        <div class="card-glass p-6 mb-10">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold">噪音历史数据</h2>
+                <div class="text-3xl">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+            <div id="historyChart" style="height: 400px;"></div>
+        </div>
+
+        <!-- 噪音等级说明 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <div class="card-glass p-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center mr-4">
+                        <i class="fas fa-volume-off text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold">30-40 dB</h3>
+                </div>
+                <p class="opacity-90">安静环境，适合专注学习</p>
+            </div>
+            <div class="card-glass p-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-12 h-12 rounded-full bg-yellow-400 flex items-center justify-center mr-4">
+                        <i class="fas fa-volume-down text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold">40-60 dB</h3>
+                </div>
+                <p class="opacity-90">正常讨论，适度学习交流</p>
+            </div>
+            <div class="card-glass p-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center mr-4">
+                        <i class="fas fa-volume-up text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold">60-75 dB</h3>
+                </div>
+                <p class="opacity-90">较为吵闹，影响学习效果</p>
+            </div>
+            <div class="card-glass p-6">
+                <div class="flex items-center mb-3">
+                    <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center mr-4">
+                        <i class="fas fa-volume-high text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold">75+ dB</h3>
+                </div>
+                <p class="opacity-90">非常吵闹，需要立即干预</p>
+            </div>
+        </div>
+
+        <!-- 控制面板 -->
+        <div class="card-glass p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold">监测控制</h2>
+                <div class="text-3xl">
+                    <i class="fas fa-sliders-h"></i>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label class="block mb-2">监测灵敏度</label>
+                    <input type="range" min="1" max="100" value="50" class="w-full" id="sensitivitySlider">
+                </div>
+                <div>
+                    <label class="block mb-2">警报阈值 (dB)</label>
+                    <input type="number" min="30" max="100" value="75" class="w-full p-2 rounded bg-white bg-opacity-20 text-white" id="alertThreshold">
+                </div>
+                <div class="flex items-end">
+                    <button id="toggleMonitoring" class="w-full py-3 px-6 bg-blue-500 hover:bg-blue-600 rounded-lg transition-all flex items-center justify-center">
+                        <i class="fas fa-play mr-2"></i> 开始监测
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 初始化变量
+        let isMonitoring = false;
+        let audioContext;
+        let analyser;
+        let microphone;
+        let animationId;
+        let dbHistory = [];
+        const maxHistoryPoints = 30;
+        
+        // 初始化图表
+        const historyChart = Highcharts.chart('historyChart', {
+            chart: {
+                type: 'spline',
+                backgroundColor: 'transparent',
+                style: {
+                    fontFamily: "'Noto Sans SC', sans-serif"
+                }
+            },
+            title: {
+                text: null
+            },
+            xAxis: {
+                type: 'datetime',
+                labels: {
+                    style: {
+                        color: 'rgba(255,255,255,0.7)'
+                    }
+                },
+                gridLineColor: 'rgba(255,255,255,0.1)'
+            },
+            yAxis: {
+                title: {
+                    text: '分贝 (dB)',
+                    style: {
+                        color: 'rgba(255,255,255,0.7)'
+                    }
+                },
+                min: 30,
+                max: 100,
+                labels: {
+                    style: {
+                        color: 'rgba(255,255,255,0.7)'
+                    }
+                },
+                gridLineColor: 'rgba(255,255,255,0.1)',
+                plotLines: [{
+                    value: 75,
+                    color: 'rgba(255, 87, 34, 0.5)',
+                    width: 2,
+                    dashStyle: 'dash',
+                    label: {
+                        text: '警报阈值',
+                        style: {
+                            color: 'rgba(255,255,255,0.7)'
+                        }
+                    }
+                }]
+            },
+            legend: {
+                enabled: false
+            },
+            tooltip: {
+                shared: true,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+                style: {
+                    color: '#fff'
+                }
+            },
+            series: [{
+                name: '噪音水平',
+                data: [],
+                color: '#4CAF50',
+                marker: {
+                    symbol: 'circle',
+                    lineWidth: 0
+                }
+            }],
+            credits: {
+                enabled: false
+            },
+            plotOptions: {
+                series: {
+                    marker: {
+                        enabled: false
+                    }
+                }
+            }
+        });
+
+        // 创建声波条
+        const soundWave = document.getElementById('soundWave');
+        const waveBars = [];
+        for (let i = 0; i < 50; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'wave-bar';
+            bar.style.left = `${i * (100 / 50)}%`;
+            bar.style.height = '0px';
+            soundWave.appendChild(bar);
+            waveBars.push(bar);
+        }
+
+        // 开始/停止监测
+        document.getElementById('toggleMonitoring').addEventListener('click', async function() {
+            if (isMonitoring) {
+                stopMonitoring();
+                this.innerHTML = '<i class="fas fa-play mr-2"></i> 开始监测';
+                this.classList.remove('bg-red-500', 'hover:bg-red-600');
+                this.classList.add('bg-blue-500', 'hover:bg-blue-600');
+            } else {
+                try {
+                    await startMonitoring();
+                    this.innerHTML = '<i class="fas fa-stop mr-2"></i> 停止监测';
+                    this.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                    this.classList.add('bg-red-500', 'hover:bg-red-600');
+                } catch (error) {
+                    console.error('Error starting monitoring:', error);
+                    alert('无法访问麦克风: ' + error.message);
+                }
+            }
+        });
+
+        // 开始监测
+        async function startMonitoring() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                isMonitoring = true;
+                updateNoiseLevel();
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // 停止监测
+        function stopMonitoring() {
+            if (microphone && microphone.mediaStream) {
+                microphone.mediaStream.getTracks().forEach(track => track.stop());
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+            cancelAnimationFrame(animationId);
+            isMonitoring = false;
+            
+            // 重置显示
+            document.getElementById('currentDb').textContent = '--';
+            document.getElementById('noiseLevelText').textContent = '监测已停止';
+            document.getElementById('dbPointer').style.left = '0%';
+            
+            waveBars.forEach(bar => {
+                bar.style.height = '0px';
+            });
+        }
+
+        // 更新噪音水平
+        function updateNoiseLevel() {
+            if (!isMonitoring) return;
+            
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+            
+            // 计算平均分贝值 (模拟)
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / bufferLength;
+            const dbValue = Math.min(100, Math.max(30, 30 + (average / 255) * 70));
+            
+            // 更新当前分贝显示
+            document.getElementById('currentDb').textContent = Math.round(dbValue);
+            
+            // 更新指针位置
+            const pointerPosition = ((dbValue - 30) / 70) * 100;
+            document.getElementById('dbPointer').style.left = `${pointerPosition}%`;
+            
+            // 更新噪音等级文本
+            let noiseLevelText = '';
+            let textColor = 'text-white';
+            if (dbValue < 40) {
+                noiseLevelText = '非常安静';
+                textColor = 'text-green-300';
+            } else if (dbValue < 60) {
+                noiseLevelText = '适中';
+                textColor = 'text-yellow-300';
+            } else if (dbValue < 75) {
+                noiseLevelText = '较为吵闹';
+                textColor = 'text-orange-300';
+            } else {
+                noiseLevelText = '非常吵闹!';
+                textColor = 'text-red-300';
+                
+                // 触发警报效果
+                if (dbValue > document.getElementById('alertThreshold').value) {
+                    triggerAlert();
+                }
+            }
+            const noiseTextElement = document.getElementById('noiseLevelText');
+            noiseTextElement.textContent = noiseLevelText;
+            noiseTextElement.className = `text-xl ${textColor}`;
+            
+            // 更新声波可视化
+            for (let i = 0; i < waveBars.length; i++) {
+                const barIndex = Math.floor(i * (bufferLength / waveBars.length));
+                const barHeight = (dataArray[barIndex] / 255) * 100;
+                waveBars[i].style.height = `${barHeight}px`;
+                
+                // 根据频率设置颜色
+                if (barIndex < bufferLength / 3) {
+                    waveBars[i].style.background = 'rgba(76, 175, 80, 0.7)';
+                } else if (barIndex < (2 * bufferLength) / 3) {
+                    waveBars[i].style.background = 'rgba(255, 235, 59, 0.7)';
+                } else {
+                    waveBars[i].style.background = 'rgba(255, 87, 34, 0.7)';
+                }
+            }
+            
+            // 更新历史数据
+            const now = new Date();
+            dbHistory.push({
+                x: now.getTime(),
+                y: dbValue
+            });
+            
+            if (dbHistory.length > maxHistoryPoints) {
+                dbHistory.shift();
+            }
+            
+            historyChart.series[0].setData(dbHistory);
+            
+            // 继续动画循环
+            animationId = requestAnimationFrame(updateNoiseLevel);
+        }
+
+        // 触发警报效果
+        function triggerAlert() {
+            // 闪烁效果
+            gsap.to("body", {
+                backgroundColor: "rgba(255,0,0,0.3)",
+                duration: 0.3,
+                yoyo: true,
+                repeat: 3,
+                ease: "power1.inOut"
+            });
+            
+            // 震动效果
+            gsap.to("#currentDb", {
+                x: -10,
+                duration: 0.05,
+                yoyo: true,
+                repeat: 10,
+                ease: "power1.inOut"
+            });
+            
+            // 播放警报声
+            const alarm = new Audio();
+            alarm.src = "data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU..."; // 简短的警报声
+            alarm.volume = 0.3;
+            alarm.play().catch(e => console.log("无法播放警报声:", e));
+        }
+
+        // 灵敏度控制
+        document.getElementById('sensitivitySlider').addEventListener('input', function() {
+            // 在实际应用中，这里可以调整分析器的灵敏度
+            console.log("灵敏度设置为:", this.value);
+        });
+
+        // 警报阈值控制
+        document.getElementById('alertThreshold').addEventListener('change', function() {
+            historyChart.yAxis[0].update({
+                plotLines: [{
+                    value: parseInt(this.value),
+                    color: 'rgba(255, 87, 34, 0.5)',
+                    width: 2,
+                    dashStyle: 'dash',
+                    label: {
+                        text: '警报阈值',
+                        style: {
+                            color: 'rgba(255,255,255,0.7)'
+                        }
+                    }
+                }]
+            });
+        });
+
+        // 模拟数据用于演示
+        if (window.location.href.includes('demo')) {
+            let demoDb = 35;
+            setInterval(() => {
+                if (!isMonitoring) {
+                    demoDb = 35 + Math.random() * 50;
+                    if (Math.random() > 0.9) demoDb += 20; // 偶尔有噪音峰值
+                    
+                    document.getElementById('currentDb').textContent = Math.round(demoDb);
+                    
+                    // 更新指针位置
+                    const pointerPosition = ((demoDb - 30) / 70) * 100;
+                    document.getElementById('dbPointer').style.left = `${pointerPosition}%`;
+                    
+                    // 更新噪音等级文本
+                    let noiseLevelText = '';
+                    let textColor = 'text-white';
+                    if (demoDb < 40) {
+                        noiseLevelText = '非常安静';
+                        textColor = 'text-green-300';
+                    } else if (demoDb < 60) {
+                        noiseLevelText = '适中';
+                        textColor = 'text-yellow-300';
+                    } else if (demoDb < 75) {
+                        noiseLevelText = '较为吵闹';
+                        textColor = 'text-orange-300';
+                    } else {
+                        noiseLevelText = '非常吵闹!';
+                        textColor = 'text-red-300';
+                    }
+                    document.getElementById('noiseLevelText').textContent = noiseLevelText;
+                    document.getElementById('noiseLevelText').className = `text-xl ${textColor}`;
+                    
+                    // 更新声波可视化
+                    waveBars.forEach((bar, i) => {
+                        const barHeight = (Math.sin(i / 3 + Date.now() / 300) * 0.5 + 0.5) * 100 * (demoDb / 100);
+                        bar.style.height = `${barHeight}px`;
+                        
+                        if (i < waveBars.length / 3) {
+                            bar.style.background = 'rgba(76, 175, 80, 0.7)';
+                        } else if (i < (2 * waveBars.length) / 3) {
+                            bar.style.background = 'rgba(255, 235, 59, 0.7)';
+                        } else {
+                            bar.style.background = 'rgba(255, 87, 34, 0.7)';
+                        }
+                    });
+                    
+                    // 更新历史数据
+                    const now = new Date();
+                    dbHistory.push({
+                        x: now.getTime(),
+                        y: demoDb
+                    });
+                    
+                    if (dbHistory.length > maxHistoryPoints) {
+                        dbHistory.shift();
+                    }
+                    
+                    historyChart.series[0].setData(dbHistory);
+                }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>

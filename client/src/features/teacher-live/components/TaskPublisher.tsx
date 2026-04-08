@@ -24,14 +24,16 @@ interface TaskPublisherProps {
 
 const getTaskTypeIcon = (type: string) => {
   const defaultIcons: Record<string, string> = {
-    single_choice: '📝',
-    multiple_choice: '📝',
-    true_false: '✅',
-    fill_blank: '📝',
-    matching: '🔗',
-    reading: '📖',
+    single_choice: 'A',
+    multiple_choice: 'M',
+    true_false: 'TF',
+    fill_blank: 'B',
+    matching: '↔',
+    sorting: '⇅',
+    image_understanding: 'IMG',
+    reading: 'R',
   }
-  return getTaskTypeConfig(type)?.icon || defaultIcons[type] || '❓'
+  return getTaskTypeConfig(type)?.icon || defaultIcons[type] || '?'
 }
 
 export const TaskPublisher: React.FC<TaskPublisherProps> = ({
@@ -71,39 +73,39 @@ export const TaskPublisher: React.FC<TaskPublisherProps> = ({
       style={{ border: selectedGroup ? '2px solid rgba(56, 189, 248, 0.3)' : undefined }}
     >
       <div className="surface-head">
-        <h3>📂 {selectedGroup.title}</h3>
+        <h3>{selectedGroup.title}</h3>
         {selectedGroup.tasks && selectedGroup.tasks.length > 0 && (
           <div className="flex items-center gap-3">
             <span>
-              {tWithParams('teacherLive.groupTaskCount', { count: selectedGroup.tasks?.length || 0 })}
+              {tWithParams('teacherLive.groupTaskCount', { count: selectedGroup.tasks.length })}
             </span>
             <button
               className="ghost-button py-2 px-4 text-sm"
               onClick={onShowSingleQuestionDuelModal}
               disabled={!canStartSingleQuestionDuel || challengeCandidates.length < 2}
             >
-              {t('challenge.startSingleQuestionDuel')}
+              {t('teacherLive.startSingleQuestionDuel')}
             </button>
             <button
               className="ghost-button py-2 px-4 text-sm"
               onClick={onShowDuelModal}
               disabled={!canStartStandardChallenge || challengeCandidates.length < 2}
             >
-              {t('challenge.startDuel')}
+              {t('teacherLive.startDuel')}
             </button>
             <button
               className="ghost-button py-2 px-4 text-sm"
               onClick={onStartClassChallenge}
               disabled={!canStartStandardChallenge || challengeCandidates.length < 1}
             >
-              {t('challenge.startClassChallenge')}
+              {t('teacherLive.startClassChallenge')}
             </button>
             <button
               className="solid-button py-2 px-4 text-sm"
               onClick={onPublish}
               disabled={wsStatus !== 'connected' || hasActiveChallenge}
             >
-              {t('teacherLive.publishAll')}
+              {t('teacherLive.publishTask')}
             </button>
           </div>
         )}
@@ -124,7 +126,8 @@ export const TaskPublisher: React.FC<TaskPublisherProps> = ({
             </span>
             <div className="flex-1 min-w-0">
               <p className="truncate">
-                {getTaskTypeIcon(task.type)} {getTaskQuestionText(task.question) || `${t('task.question')} ${idx + 1}`}
+                {getTaskTypeIcon(task.type)}{' '}
+                {getTaskQuestionText(task.question) || `${t('task.question')} ${idx + 1}`}
               </p>
             </div>
           </div>
@@ -138,7 +141,7 @@ export const TaskPublisher: React.FC<TaskPublisherProps> = ({
             style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)' }}
           >
             <p className="text-sm flex items-center gap-2">
-              <span>📢</span>
+              <span>i</span>
               <span style={{ color: '#0369a1' }}>
                 {tWithParams('teacherLive.publishSummary', {
                   className: currentClassName,
@@ -167,7 +170,9 @@ export const TaskPublisher: React.FC<TaskPublisherProps> = ({
               style={{ background: 'rgba(248, 113, 113, 0.08)', border: '1px solid rgba(248, 113, 113, 0.22)' }}
             >
               <p className="text-sm" style={{ color: '#b91c1c' }}>
-                {tWithParams('challenge.unsupportedTypesInline', { types: unsupportedChallengeLabels.join('、') })}
+                {tWithParams('challenge.unsupportedTypesInline', {
+                  types: unsupportedChallengeLabels.join('、'),
+                })}
               </p>
             </div>
           )}

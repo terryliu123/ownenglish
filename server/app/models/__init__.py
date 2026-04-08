@@ -120,6 +120,50 @@ class SystemSetting(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
+class TeachingAid(Base):
+    __tablename__ = "teaching_aids"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(200), nullable=False)
+    slug = Column(String(120), unique=True, index=True, nullable=False)
+    category_code = Column(String(50), nullable=False, index=True)
+    category_label = Column(String(100), nullable=False)
+    summary = Column(Text, nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
+    diagram_image_url = Column(String(500), nullable=True)
+    entry_file = Column(String(255), nullable=False, default="index.html")
+    storage_path = Column(String(500), nullable=False)
+    source_filename = Column(String(255), nullable=True)
+    status = Column(String(50), nullable=False, default="draft")  # draft, active, archived
+    tags = Column(JSON, nullable=False, default=list)
+    source_type = Column(String(50), nullable=False, default="batch_import")  # manual_import, batch_import, ai_generated
+    teacher_id = Column(String(36), ForeignKey("users.id"), nullable=True, index=True)  # 创建者教师ID
+    share_code = Column(String(16), unique=True, nullable=True, index=True)  # 分享码
+    is_public = Column(Boolean, nullable=False, default=False)  # 是否公开到公共库（教师创建的不公开）
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    sessions = relationship("TeachingAidSession", back_populates="teaching_aid", cascade="all, delete-orphan")
+    teacher = relationship("User")
+
+
+class TeachingAidSession(Base):
+    __tablename__ = "teaching_aid_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    teaching_aid_id = Column(String(36), ForeignKey("teaching_aids.id"), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    live_session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=True, index=True)  # 关联课堂会话
+    session_token = Column(String(64), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    last_accessed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    teaching_aid = relationship("TeachingAid", back_populates="sessions")
+    user = relationship("User")
+    live_session = relationship("LiveSession")
+
+
 class StudentProfile(Base):
     __tablename__ = "student_profiles"
 
@@ -160,6 +204,7 @@ class Class(Base):
     status = Column(String(50), default="active")  # active, completed, archived
     start_time = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=text("NOW()"))
+    ai_settings = Column(JSON, nullable=True)  # 学生端 AI 助手设置
 
     # Relationships
     course = relationship("Course", back_populates="classes")
@@ -293,16 +338,26 @@ class LiveSession(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     class_id = Column(String(36), ForeignKey("classes.id"), nullable=False)
+    teacher_id = Column(String(36), ForeignKey("teacher_profiles.user_id"), nullable=True)  # 冗余但有用
     group_id = Column(String(36), ForeignKey("live_task_groups.id"), nullable=True)  # 关联的任务组
     topic = Column(String(200), nullable=True)
-    status = Column(String(50), default="active")  # active, ended
+    title = Column(String(200), nullable=True)  # 课堂标题
+    entry_mode = Column(String(50), nullable=True)  # whiteboard, interaction_management, bigscreen_activity
+    status = Column(String(50), default="active")  # active, ended, cancelled
+    duration_seconds = Column(Integer, nullable=True)  # 课堂时长（秒）
+    summary_json = Column(JSON, nullable=True)  # 课堂摘要统计
+    danmu_config = Column(JSON, nullable=True)  # 弹幕配置 {enabled, speed, area, ...}
     started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     ended_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     class_ = relationship("Class", back_populates="live_sessions")
+    teacher = relationship("TeacherProfile")
     tasks = relationship("LiveTask", back_populates="session", cascade="all, delete-orphan")
     group_submissions = relationship("LiveTaskGroupSubmission", back_populates="session", cascade="all, delete-orphan")
+    events = relationship("LiveSessionEvent", back_populates="session", cascade="all, delete-orphan")
 
 
 class LiveSubmission(Base):
@@ -319,6 +374,20 @@ class LiveSubmission(Base):
 
     # Relationships
     task = relationship("LiveTask", back_populates="submissions")
+
+
+class LiveSessionEvent(Base):
+    """课堂会话事件 - 记录课堂内关键事件"""
+    __tablename__ = "live_session_events"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    live_session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False)  # session_started, task_published, challenge_started, etc.
+    payload_json = Column(JSON, nullable=True)  # 事件详细数据
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Relationships
+    session = relationship("LiveSession", back_populates="events")
 
 
 class LiveTaskGroupSubmission(Base):
@@ -349,6 +418,7 @@ class LiveChallengeSession(Base):
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     class_id = Column(String(36), ForeignKey("classes.id"), nullable=False, index=True)
     task_group_id = Column(String(36), ForeignKey("live_task_groups.id"), nullable=False, index=True)
+    live_session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=True, index=True)  # 关联课堂会话
     mode = Column(String(50), nullable=False)  # duel, class_challenge
     title = Column(String(200), nullable=False)
     participant_ids = Column(JSON, nullable=False, default=list)
@@ -360,6 +430,7 @@ class LiveChallengeSession(Base):
 
     class_ = relationship("Class", back_populates="challenge_sessions")
     task_group = relationship("LiveTaskGroup", back_populates="challenge_sessions")
+    live_session = relationship("LiveSession")
 
 
 class VerificationCode(Base):
@@ -462,3 +533,89 @@ class ActivityLog(Base):
 
     # Relationships
     user = relationship("User")
+
+
+class BigscreenContentAsset(Base):
+    __tablename__ = "bigscreen_content_assets"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    teacher_id = Column(String(36), ForeignKey("teacher_profiles.user_id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    content_type = Column(String(50), nullable=False, index=True)
+    payload = Column(JSON, nullable=False)
+    difficulty = Column(String(50), nullable=True)
+    tags = Column(JSON, nullable=False, default=list)
+    supports_device_interaction = Column(Boolean, default=False)
+    supports_bigscreen_interaction = Column(Boolean, default=True)
+    supports_competition = Column(Boolean, default=True)
+    source_type = Column(String(50), nullable=False, default="manual")
+    status = Column(String(50), nullable=False, default="draft")  # draft, active, archived
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    teacher = relationship("TeacherProfile")
+
+
+class BigscreenActivityPack(Base):
+    __tablename__ = "bigscreen_activity_packs"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    teacher_id = Column(String(36), ForeignKey("teacher_profiles.user_id"), nullable=False, index=True)
+    title = Column(String(200), nullable=False)
+    activity_type = Column(String(50), nullable=False, index=True)
+    participant_mode = Column(String(50), nullable=False)
+    content_asset_refs = Column(JSON, nullable=False, default=list)
+    round_count = Column(Integer, nullable=False, default=1)
+    time_limit_seconds = Column(Integer, nullable=True)
+    scoring_rule = Column(String(100), nullable=False, default="round_wins_then_time")
+    win_rule = Column(String(100), nullable=False, default="highest_score_then_time")
+    status = Column(String(50), nullable=False, default="draft")  # draft, active, archived
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    teacher = relationship("TeacherProfile")
+    sessions = relationship("BigscreenActivitySession", back_populates="activity_pack", cascade="all, delete-orphan")
+
+
+class BigscreenActivitySession(Base):
+    __tablename__ = "bigscreen_activity_sessions"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    teacher_id = Column(String(36), ForeignKey("teacher_profiles.user_id"), nullable=False, index=True)
+    class_id = Column(String(36), ForeignKey("classes.id"), nullable=False, index=True)
+    activity_pack_id = Column(String(36), ForeignKey("bigscreen_activity_packs.id"), nullable=False, index=True)
+    live_session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=True, index=True)  # 关联课堂会话
+    activity_type = Column(String(50), nullable=False, index=True)
+    status = Column(String(50), nullable=False, default="pending")  # pending, running, paused, ended, cancelled
+    participant_sides = Column(JSON, nullable=False, default=list)
+    current_round = Column(Integer, nullable=False, default=1)
+    current_asset_id = Column(String(36), ForeignKey("bigscreen_content_assets.id"), nullable=True)
+    scoreboard = Column(JSON, nullable=False, default=list)
+    result_summary = Column(JSON, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    ended_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    teacher = relationship("TeacherProfile")
+    class_ = relationship("Class")
+    activity_pack = relationship("BigscreenActivityPack", back_populates="sessions")
+    current_asset = relationship("BigscreenContentAsset")
+    live_session = relationship("LiveSession")
+
+
+class DanmuRecord(Base):
+    """弹幕记录"""
+    __tablename__ = "danmu_records"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=False, index=True)
+    class_id = Column(String(36), ForeignKey("classes.id"), nullable=False, index=True)
+    sender_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    sender_name = Column(String(100), nullable=False)
+    content = Column(String(200), nullable=False)
+    is_preset = Column(Boolean, nullable=False, default=False)  # 是否预设弹幕
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    session = relationship("LiveSession")
+    sender = relationship("User")

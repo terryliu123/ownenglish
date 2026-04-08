@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR星空：聚散离合终极版</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Courier, monospace; }
+        #input-video { display: none; }
+        #output-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; transform: scaleX(-1); }
+        
+        /* 沉浸式蒙版 */
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; background: radial-gradient(circle, rgba(0, 0, 0, 0) 40%, rgba(0, 10, 20, 0.9) 100%); }
+        
+        /* 扫描线与噪点 */
+        .scanlines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03)); background-size: 100% 3px, 3px 100%; }
+        
+        /* UI 层 */
+        .ui-layer { position: absolute; width: 100%; height: 100%; z-index: 4; pointer-events: none; color: #fff; text-shadow: 0 0 5px #0ff; transition: opacity 0.5s; }
+        .mode-label {
+            position: absolute;
+            bottom: 60px;
+            width: 100%;
+            text-align: center;
+            font-size: 36px;
+            font-weight: 900;
+            letter-spacing: 8px;
+            opacity: 0.9;
+            text-shadow: 0 0 20px currentColor;
+        }
+        .status-bar {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.6);
+            border-left: 2px solid #0ff;
+            padding-left: 10px;
+        }
+        .instruction-box {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: right;
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+        }
+        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #0ff; font-size: 20px; z-index: 10; background: rgba(0,0,0,0.9); padding: 40px; border: 1px solid #0ff; letter-spacing: 2px; }
+    </style>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+    <div id="loading" class="loading">SYSTEM INITIALIZING...</div>
+    <video id="input-video"></video>
+    <canvas id="output-canvas"></canvas>
+    
+    <div class="overlay"></div>
+    <div class="scanlines"></div>
+    
+    <div class="ui-layer">
+        <div class="status-bar">
+            PARTICLES: <span id="p-count">2000</span><br>
+            FPS: <span id="fps-count">60</span>
+        </div>
+        <div class="instruction-box">
+            🔥 三指 - 烈焰<br>
+            ⚡ V字 - 雷电<br>
+            🌧️ 电话手势 - 数据雨<br>
+            ❤️ 比心 - 聚爱<br>
+            ✊ 握拳 - 坍缩
+        </div>
+        <div id="mode-text" class="mode-label">STAR FIELD</div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input-video');
+        const canvasElement = document.getElementById('output-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const modeText = document.getElementById('mode-text');
+        
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvasElement.width = width;
+        canvasElement.height = height;
+
+        // 状态
+        let currentMode = 'NEBULA'; 
+        let gestureCenter = { x: width/2, y: height/2 }; 
+        let secondaryTarget = { x: width/2, y: height/2 };
+        
+        // 增加粒子数量以强化星空效果
+        const PARTICLE_COUNT = 1800; 
+        const particles = [];
+
+        // 粒子类
+        class Particle {
+            constructor() {
+                this.initHome(); // 初始化“家”的位置
+                this.x = this.homeX;
+                this.y = this.homeY;
+                
+                this.vx = 0;
+                this.vy = 0;
+                this.size = Math.random() * 2 + 0.5;
+                this.baseColor = `rgba(180, 220, 255, ${Math.random() * 0.4 + 0.1})`; // 星空蓝白
+                this.color = this.baseColor;
+                
+                // 属性
+                this.angle = Math.random() * Math.PI * 2; 
+                this.offset = Math.random() * 100;
+                this.life = 1;
+            }
+
+            initHome() {
+                // 随机分布在全屏，作为星空状态下的“家”
+                this.homeX = Math.random() * width;
+                this.homeY = Math.random() * height;
+            }
+
+            update() {
+                const cx = gestureCenter.x;
+                const cy = gestureCenter.y;
+                const t = Date.now() * 0.002;
+
+                // 目标位置
+                let targetX, targetY;
+                let ease = 0.05; // 默认平滑度
+                let randomJitter = 1; // 默认噪点
+
+                // --- 状态机 ---
+
+                if (currentMode === 'NEBULA') {
+                    // 🌟 星空模式：回到全屏分布的“家”
+                    
+                    // 加上一点点漂浮感 (Perlin Noise模拟)
+                    targetX = this.homeX + Math.sin(t + this.offset) * 15;
+                    targetY = this.homeY + Math.cos(t * 0.8 + this.offset) * 15;
+                    
+                    this.color = this.baseColor;
+                    ease = 0.03; // 回归星空时慢一点，显得优雅
+                    
+                    // 如果离鼠标/手太近，产生一点点互动排斥（可选）
+                    // 这里为了纯净星空，暂时不加斥力，只做漂浮
+                } 
+                else if (currentMode === 'FIRE') {
+                    // 🔥 烈焰
+                    if (this.life <= 0 || Math.random() < 0.08) {
+                        this.x = cx + (Math.random()-0.5) * 50;
+                        this.y = cy + 20;
+                        this.life = 1;
+                        this.vx = (Math.random()-0.5)*3;
+                        this.vy = -3 - Math.random()*3;
+                    }
+                    this.vy -= 0.1; // 上升力
+                    this.x += Math.sin(this.y * 0.1 + t) * 1;
+                    this.y += this.vy;
+                    this.x += this.vx;
+                    this.life -= 0.02;
+                    
+                    const r = 255; 
+                    const g = Math.floor(this.life * 200);
+                    this.color = `rgba(${r},${g},0,${this.life})`;
+                    return; // 火焰模式拥有独特的物理，跳过通用缓动
+                }
+                else if (currentMode === 'RAIN') {
+                    // 🌧️ 数据雨
+                    this.vy = 15 + Math.random() * 10;
+                    this.y += this.vy;
+                    
+                    // 伞碰撞
+                    const dx = this.x - cx;
+                    const dy = this.y - cy;
+                    if (Math.sqrt(dx*dx+dy*dy) < 120 && this.y < cy) {
+                        this.vx = dx * 0.3;
+                        this.y = cy - Math.sqrt(120*120 - dx*dx); // 贴在伞面
+                    }
+                    this.x += this.vx;
+                    this.vx *= 0.9; // 阻尼
+
+                    if (this.y > height) { this.y = -10; this.x = Math.random() * width; }
+                    this.color = '#0f5';
+                    return;
+                }
+                else if (currentMode === 'LIGHTNING') {
+                    // ⚡ 雷电
+                    const sx = secondaryTarget.x;
+                    const sy = secondaryTarget.y;
+                    const progress = Math.random();
+                    const lx = cx + (sx - cx) * progress;
+                    const ly = cy + (sy - cy) * progress;
+                    targetX = lx + (Math.random()-0.5) * 100; // 强噪点
+                    targetY = ly + (Math.random()-0.5) * 100;
+                    ease = 0.4; // 极速
+                    this.color = `rgba(180, 230, 255, ${Math.random()})`;
+                }
+                else if (currentMode === 'HEART') {
+                    // ❤️ 爱心
+                    const scale = 12;
+                    const hx = 16 * Math.pow(Math.sin(this.angle), 3);
+                    const hy = -(13 * Math.cos(this.angle) - 5 * Math.cos(2 * this.angle) - 2 * Math.cos(3 * this.angle) - Math.cos(4 * this.angle));
+                    targetX = cx + hx * scale;
+                    targetY = cy + hy * scale;
+                    this.color = '#f05';
+                    randomJitter = 10;
+                }
+                else if (currentMode === 'HOLE') {
+                    // ✊ 黑洞
+                    const r = Math.random() * 40;
+                    targetX = cx + Math.cos(this.angle) * r;
+                    targetY = cy + Math.sin(this.angle) * r;
+                    ease = 0.15;
+                    this.color = '#fb0';
+                }
+                else if (currentMode === 'SHIELD') {
+                    // 🙏 护盾
+                    targetX = cx + Math.cos(this.angle + t) * 250;
+                    targetY = cy + Math.sin(this.angle + t) * 250;
+                    this.color = '#fe8';
+                }
+
+                // 通用缓动物理 (Soft Body Physics)
+                let dx = targetX - this.x;
+                let dy = targetY - this.y;
+                
+                this.vx += dx * ease * 0.1; // 弹簧系数
+                this.vy += dy * ease * 0.1;
+                
+                this.vx *= 0.9; // 摩擦力
+                this.vy *= 0.9;
+                
+                // 叠加随机扰动
+                this.vx += (Math.random() - 0.5) * randomJitter * 0.1;
+                this.vy += (Math.random() - 0.5) * randomJitter * 0.1;
+
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            draw() {
+                canvasCtx.fillStyle = this.color;
+                
+                if (currentMode === 'RAIN') {
+                    canvasCtx.fillRect(this.x, this.y, 2, 20);
+                } else if (currentMode === 'NEBULA') {
+                    // 星空模式下，根据速度拉伸一点点，或者闪烁
+                    const alpha = Math.random() * 0.5 + 0.3;
+                    canvasCtx.globalAlpha = alpha;
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    canvasCtx.fill();
+                    canvasCtx.globalAlpha = 1.0;
+                } else {
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    canvasCtx.fill();
+                }
+            }
+        }
+
+        // 初始化
+        for(let i=0; i<PARTICLE_COUNT; i++) particles.push(new Particle());
+
+        // --- 视觉识别逻辑 ---
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 1280, height: 720
+        });
+        camera.start().then(() => document.getElementById('loading').style.display = 'none');
+
+        // 辅助计算
+        function dist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+        function isExtended(lm, tip, pip, wrist=0) { return dist(lm[tip], lm[wrist]) > dist(lm[pip], lm[wrist]); }
+
+        // FPS
+        let lastTime = 0;
+        
+        function onResults(results) {
+            // FPS Counter
+            const now = performance.now();
+            if (now - lastTime > 1000) {
+                // document.getElementById('fps-count').innerText = ...; // 简单略过
+                lastTime = now;
+            }
+
+            // 1. 绘制背景
+            canvasCtx.clearRect(0, 0, width, height);
+            canvasCtx.save();
+            // 绘制原始视频但调暗
+            canvasCtx.filter = 'brightness(50%) contrast(120%) grayscale(30%)'; 
+            canvasCtx.drawImage(results.image, 0, 0, width, height);
+            canvasCtx.restore();
+
+            // 2. 检测手势
+            let detected = 'NEBULA';
+            let label = "";
+            let color = "#fff";
+
+            const h = results.multiHandLandmarks;
+
+            if (h && h.length > 0) {
+                // 双手交互
+                if (h.length === 2) {
+                    const h1 = h[0]; const h2 = h[1];
+                    gestureCenter.x = (h1[9].x + h2[9].x) / 2 * width;
+                    gestureCenter.y = (h1[9].y + h2[9].y) / 2 * height;
+                    
+                    if (dist(h1[4], h2[4]) < 0.1 && dist(h1[8], h2[8]) < 0.15) {
+                        detected = 'HEART'; label = "HEART FORMATION"; color="#f05";
+                    } else if (dist(h1[0], h2[0]) < 0.2) {
+                        detected = 'SHIELD'; label = "SHIELD ACTIVE"; color="#fe8";
+                    }
+                }
+                
+                // 单手交互 (若未触发双手)
+                if (detected === 'NEBULA') {
+                    const hand = h[0]; // 优先用第一只手
+                    const cx = hand[9].x * width;
+                    const cy = hand[9].y * height;
+                    
+                    // 平滑移动中心点
+                    gestureCenter.x += (cx - gestureCenter.x) * 0.2;
+                    gestureCenter.y += (cy - gestureCenter.y) * 0.2;
+
+                    const i = isExtended(hand, 8, 6);
+                    const m = isExtended(hand, 12, 10);
+                    const r = isExtended(hand, 16, 14);
+                    const p = isExtended(hand, 20, 18);
+                    const t = isExtended(hand, 4, 3);
+
+                    if (i && m && r && !p) { // 三指
+                        detected = 'FIRE'; label = "PYRO IGNITION"; color="#f50";
+                        gestureCenter.y = hand[0].y * height; // 火源在掌根
+                    } else if (i && m && !r && !p) { // V字
+                        detected = 'LIGHTNING'; label = "HIGH VOLTAGE"; color="#8cf";
+                        gestureCenter.x = hand[8].x * width; gestureCenter.y = hand[8].y * height;
+                        secondaryTarget.x = hand[12].x * width; secondaryTarget.y = hand[12].y * height;
+                    } else if (t && p && !i && !m && !r) { // 666
+                        detected = 'RAIN'; label = "MATRIX RAIN"; color="#0f5";
+                    } else if (!i && !m && !r && !p) { // 握拳
+                        detected = 'HOLE'; label = "GRAVITY WELL"; color="#fb0";
+                    }
+                }
+            }
+
+            // 状态切换逻辑
+            currentMode = detected;
+            
+            // UI 更新
+            if (currentMode === 'NEBULA') {
+                modeText.style.opacity = '0'; // 隐藏文字，享受纯净星空
+            } else {
+                modeText.innerText = label;
+                modeText.style.color = color;
+                modeText.style.textShadow = `0 0 30px ${color}`;
+                modeText.style.opacity = '1';
+                // 绘制骨架
+                for (const landmarks of h) {
+                    drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: 'rgba(255,255,255,0.2)', lineWidth: 1});
+                }
+            }
+
+            // 3. 粒子渲染
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+        }
+        
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvasElement.width = width;
+            canvasElement.height = height;
+            // 重置星空分布
+            particles.forEach(p => p.initHome());
+        });
+
+    </script>
+</body>
+</html>

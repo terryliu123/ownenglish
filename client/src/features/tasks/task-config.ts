@@ -1,4 +1,4 @@
-export type TaskMode = 'objective' | 'reading'
+export type TaskMode = 'objective' | 'reading' | 'experiment'
 
 export type TaskAnswerMode =
   | 'choice'
@@ -22,6 +22,7 @@ export interface TaskTypeConfigItem {
   supportsPrompt?: boolean
   supportsHtmlUpload?: boolean
   supportsExternalUrl?: boolean
+  supportsTeachingAid?: boolean
   supportsAnswerRequiredToggle?: boolean
   supportsReferenceAnswer?: boolean
 }
@@ -111,7 +112,7 @@ export const TASK_TYPE_CONFIG: Record<string, TaskTypeConfigItem> = {
     icon: 'EXP',
     answerMode: 'text',
     mode: 'objective',
-    supportsExternalUrl: true,
+    supportsTeachingAid: true,
     supportsAnswerRequiredToggle: true,
     supportsReferenceAnswer: true,
   },
@@ -189,4 +190,8 @@ export function isExperimentTask(task: { type?: string } | null | undefined): bo
 
 export function taskSupportsExternalUrl(type?: string | null) {
   return Boolean(getTaskTypeConfig(type || undefined)?.supportsExternalUrl)
+}
+
+export function taskSupportsTeachingAid(type?: string | null) {
+  return Boolean(getTaskTypeConfig(type || undefined)?.supportsTeachingAid)
 }

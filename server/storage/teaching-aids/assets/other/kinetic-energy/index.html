@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>动能的影响因素 - 自适应演示版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: #2c3e50; /* 深色背景衬托实验台 */
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* 禁止滚动条 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 缩放容器：作为所有内容的父级 */
+        #app-stage {
+            position: relative;
+            width: 960px;   /* 设计稿宽度 */
+            height: 540px;  /* 设计稿高度 */
+            background: linear-gradient(to bottom, #e3f2fd 0%, #ffffff 70%, #cfd8dc 100%);
+            border-radius: 12px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            overflow: hidden;
+            transform-origin: center center; /* 从中心缩放 */
+        }
+
+        /* 画布 */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 左上角：数据面板 */
+        .data-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            width: 240px;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+            border-radius: 8px;
+            border: 1px solid #bbdefb;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            max-height: 220px;
+        }
+
+        .data-header {
+            padding: 10px;
+            background: #2196f3;
+            color: white;
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .data-content {
+            overflow-y: auto;
+            flex: 1;
+            font-size: 12px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        
+        tr:nth-child(even) { background-color: #f8f9fa; }
+
+        /* 底部：控制栏 */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 12px 30px;
+            border-radius: 40px;
+            display: flex;
+            gap: 25px;
+            align-items: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            white-space: nowrap;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #455a64;
+        }
+
+        /* 滑块美化 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100px;
+            height: 6px;
+            background: #cfd8dc;
+            border-radius: 3px;
+            outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #2196f3;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .val-badge {
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 35px;
+            text-align: center;
+        }
+
+        /* 按钮 */
+        button {
+            padding: 8px 24px;
+            font-size: 14px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #btn-start {
+            background: linear-gradient(135deg, #4caf50, #43a047);
+            color: white;
+        }
+        #btn-start:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(76,175,80,0.3); }
+        #btn-start:disabled { background: #cfd8dc; cursor: not-allowed; transform: none; box-shadow: none;}
+
+        #btn-reset {
+            background: linear-gradient(135deg, #ff9800, #fb8c00);
+            color: white;
+        }
+        #btn-reset:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(255,152,0,0.3); }
+
+        /* 装饰性刻度 */
+        .ruler-bg {
+            position: absolute;
+            bottom: 150px;
+            left: 0;
+            width: 100%;
+            height: 20px;
+            background-image: linear-gradient(90deg, transparent 98%, #ccc 98%);
+            background-size: 50px 100%;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 缩放容器：无论屏幕多大，这个容器都会等比缩放以适应屏幕 -->
+    <div id="app-stage">
+        <canvas id="simCanvas" width="960" height="540"></canvas>
+        
+        <!-- 地面刻度装饰 -->
+        <div class="ruler-bg"></div>
+
+        <!-- 数据面板 -->
+        <div class="data-panel">
+            <div class="data-header">实验数据记录</div>
+            <div class="data-content">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>次数</th>
+                            <th>质量(g)</th>
+                            <th>高度(cm)</th>
+                            <th>距离(cm)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-body">
+                        <!-- 数据由JS生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 底部控制栏 -->
+        <div class="controls">
+            <div class="control-group">
+                <label>小球质量 m</label>
+                <input type="range" id="mass" min="10" max="50" step="10" value="20">
+                <span class="val-badge" id="mass-val">20g</span>
+            </div>
+            <div class="control-group">
+                <label>释放高度 h</label>
+                <input type="range" id="height" min="2" max="10" step="1" value="5">
+                <span class="val-badge" id="height-val">5cm</span>
+            </div>
+            <button id="btn-start">开始实验</button>
+            <button id="btn-reset">重置</button>
+        </div>
+    </div>
+
+<script>
+    // --- 1. 屏幕自适应缩放逻辑 ---
+    const stage = document.getElementById('app-stage');
+    const DESIGN_WIDTH = 960;
+    const DESIGN_HEIGHT = 540;
+
+    function resizeStage() {
+        const winW = window.innerWidth;
+        const winH = window.innerHeight;
+        
+        // 计算缩放比例：取宽比和高比中较小的一个，确保完全显示且保持比例
+        // 减去40px是为了留出一点边距，看起来更舒服
+        const scaleX = (winW - 40) / DESIGN_WIDTH;
+        const scaleY = (winH - 40) / DESIGN_HEIGHT;
+        const scale = Math.min(scaleX, scaleY);
+
+        // 应用缩放
+        stage.style.transform = `scale(${scale})`;
+    }
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', resizeStage);
+    // 初始化调用
+    resizeStage();
+
+
+    // --- 2. 物理仿真逻辑 ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 场景参数
+    const groundY = 400; // 地面高度
+    const rampStartX = 50;
+    const rampEndX = 350;
+    const rampTopY = 100;
+    
+    // 实验参数
+    let ball = { x: 0, y: 0, r: 15, color: '#d32f2f' }; // 深红色球
+    let block = { x: 360, y: groundY - 50, w: 50, h: 50, color: '#d4a373' }; // 木块
+    
+    let state = 'idle'; // idle, rolling, sliding, finished
+    let runCount = 0;
+    let slideDist = 0;
+    let currentSlide = 0;
+    let velocity = 0;
+    let animationFrame;
+
+    // 控件
+    const inputM = document.getElementById('mass');
+    const inputH = document.getElementById('height');
+    const valM = document.getElementById('mass-val');
+    const valH = document.getElementById('height-val');
+    const btnStart = document.getElementById('btn-start');
+    const btnReset = document.getElementById('btn-reset');
+    const tableBody = document.getElementById('data-body');
+
+    // 初始化
+    function init() {
+        updateParams();
+        draw();
+    }
+
+    // 更新参数
+    function updateParams() {
+        if (state !== 'idle') return;
+
+        const m = parseInt(inputM.value);
+        const h = parseInt(inputH.value);
+
+        valM.textContent = m + 'g';
+        valH.textContent = h + 'cm';
+
+        // 小球大小随质量变化
+        ball.r = 12 + (m - 10) * 0.25;
+
+        // 小球位置随高度变化 (高度1-10 对应 斜坡比例 0.1-1.0)
+        const ratio = h / 10;
+        // 简单的斜坡插值
+        const x = rampStartX + (rampEndX - rampStartX) * (1 - ratio);
+        const y = groundY - (groundY - rampTopY) * ratio;
+        
+        // 修正小球切点
+        // 斜面角度
+        const slopeAngle = Math.atan2(groundY - rampTopY, rampEndX - rampStartX);
+        ball.x = x - ball.r * Math.sin(slopeAngle);
+        ball.y = y - ball.r * Math.cos(slopeAngle);
+
+        // 重置木块
+        block.x = 370; // 放在斜坡底端稍后一点
+
+        draw();
+    }
+
+    // 绘图循环
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制斜坡和地面
+        ctx.fillStyle = '#e0e0e0';
+        ctx.strokeStyle = '#9e9e9e';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.moveTo(rampStartX, rampTopY);
+        ctx.lineTo(rampEndX, groundY);
+        ctx.lineTo(960, groundY); // 延伸到尽头
+        ctx.lineTo(960, groundY + 20);
+        ctx.lineTo(rampStartX, groundY + 20);
+        ctx.closePath();
+        
+        // 创建渐变填充，增加立体感
+        const grad = ctx.createLinearGradient(0, rampTopY, 0, groundY);
+        grad.addColorStop(0, '#f5f5f5');
+        grad.addColorStop(1, '#cfcfcf');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.stroke();
+
+        // 2. 绘制高度虚线 (仅静止时)
+        if (state === 'idle') {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#d32f2f';
+            ctx.moveTo(ball.x, ball.y);
+            ctx.lineTo(ball.x, groundY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // 文字标注
+            ctx.fillStyle = '#d32f2f';
+            ctx.font = 'bold 14px Arial';
+            ctx.fillText(`h`, ball.x + 5, (ball.y + groundY)/2);
+        }
+
+        // 3. 绘制木块
+        drawBlock();
+
+        // 4. 绘制小球
+        drawBall();
+    }
+
+    function drawBall() {
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+        // 径向渐变让球更有质感
+        const grad = ctx.createRadialGradient(ball.x - ball.r/3, ball.y - ball.r/3, ball.r/5, ball.x, ball.y, ball.r);
+        grad.addColorStop(0, '#ff8a80'); // 高光
+        grad.addColorStop(1, '#b71c1c'); // 阴影
+        ctx.fillStyle = grad;
+        ctx.fill();
+        
+        // 滚动时的旋转效果 (画个十字)
+        if (state === 'rolling') {
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(ball.x - ball.r, ball.y);
+            ctx.lineTo(ball.x + ball.r, ball.y);
+            ctx.moveTo(ball.x, ball.y - ball.r);
+            ctx.lineTo(ball.x, ball.y + ball.r);
+            ctx.stroke();
+        }
+    }
+
+    function drawBlock() {
+        // 3D 立体块绘制
+        const b = block;
+        const depth = 10;
+        
+        // 正面
+        ctx.fillStyle = '#d4a373';
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = '#8d6e63';
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+
+        // 顶面
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x + depth, b.y - depth);
+        ctx.lineTo(b.x + b.w + depth, b.y - depth);
+        ctx.lineTo(b.x + b.w, b.y);
+        ctx.closePath();
+        ctx.fillStyle = '#faedcd';
+        ctx.fill();
+        ctx.stroke();
+
+        // 侧面
+        ctx.beginPath();
+        ctx.moveTo(b.x + b.w, b.y);
+        ctx.lineTo(b.x + b.w + depth, b.y - depth);
+        ctx.lineTo(b.x + b.w + depth, b.y + b.h - depth);
+        ctx.lineTo(b.x + b.w, b.y + b.h);
+        ctx.closePath();
+        ctx.fillStyle = '#a98467';
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // 动画
+    function loop() {
+        if (state === 'rolling') {
+            const slopeAngle = Math.atan2(groundY - rampTopY, rampEndX - rampStartX);
+            velocity += 0.8; // 加速
+            
+            ball.x += velocity * Math.cos(slopeAngle);
+            ball.y += velocity * Math.sin(slopeAngle);
+
+            // 撞击检测
+            if (ball.x + ball.r >= block.x) {
+                // 修正位置
+                ball.y = groundY - ball.r;
+                ball.x = block.x - ball.r;
+                
+                state = 'sliding';
+                
+                // 计算滑行距离 S = k * m * h
+                // 系数调整确保不出屏幕：最大m=50, h=10 -> 500. 屏幕宽960. 370起始.
+                // 500 * k + 370 < 900. k < 1. 
+                const m = parseInt(inputM.value);
+                const h = parseInt(inputH.value);
+                slideDist = m * h * 0.8; 
+                currentSlide = 0;
+                velocity = 10; // 撞击后的初速度
+            }
+        } else if (state === 'sliding') {
+            // 减速滑行
+            const remaining = slideDist - currentSlide;
+            // 缓动公式：快 -> 慢
+            const step = Math.max(0.5, remaining * 0.08);
+            
+            if (remaining < 0.5) {
+                // 停止
+                state = 'finished';
+                addRecord();
+                btnStart.textContent = "重新开始";
+                btnStart.disabled = false;
+                inputM.disabled = false;
+                inputH.disabled = false;
+                return; // 结束循环
+            }
+
+            block.x += step;
+            ball.x += step;
+            currentSlide += step;
+        }
+
+        draw();
+        animationFrame = requestAnimationFrame(loop);
+    }
+
+    function addRecord() {
+        runCount++;
+        const m = inputM.value;
+        const h = inputH.value;
+        const s = Math.round(slideDistanceToCm(slideDist)); // 转换成显示的数值
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${runCount}</td><td>${m}</td><td>${h}</td><td>${s}</td>`;
+        tableBody.appendChild(tr);
+        
+        // 自动滚动到底部
+        document.querySelector('.data-content').scrollTop = 10000;
+    }
+
+    // 将像素距离转换为一个合理的“厘米”读数，方便教学
+    function slideDistanceToCm(px) {
+        return px / 5; 
+    }
+
+    // 事件绑定
+    inputM.addEventListener('input', updateParams);
+    inputH.addEventListener('input', updateParams);
+
+    btnStart.addEventListener('click', () => {
+        if (state === 'finished') {
+            updateParams(); // 复位
+        }
+        
+        state = 'rolling';
+        velocity = 0;
+        btnStart.disabled = true;
+        inputM.disabled = true;
+        inputH.disabled = true;
+        
+        loop();
+    });
+
+    btnReset.addEventListener('click', () => {
+        cancelAnimationFrame(animationFrame);
+        state = 'idle';
+        
+        inputM.disabled = false;
+        inputH.disabled = false;
+        btnStart.disabled = false;
+        btnStart.textContent = "开始实验";
+        
+        // 清空数据
+        tableBody.innerHTML = '';
+        runCount = 0;
+        
+        updateParams();
+    });
+
+    // 启动
+    init();
+</script>
+</body>
+</html>

@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>月历中的数学 - 交互式教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #fcdcb3; /* 图片中的暖橙色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* 主容器卡片 */
+        .calendar-card {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(139, 69, 19, 0.1);
+            width: 500px;
+            text-align: center;
+            position: relative;
+        }
+
+        h2 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-size: 22px;
+        }
+
+        /* 星期表头 */
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            margin-bottom: 10px;
+            color: #666;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* 日期网格 */
+        .days-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px; /* 格子间距 */
+        }
+
+        .day-cell {
+            height: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #eee;
+            font-size: 18px;
+            color: #333;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s, color 0.2s;
+            border-radius: 4px;
+        }
+
+        /* 上月和下月的日期显示淡色 */
+        .day-cell.other-month {
+            color: #ccc;
+            background-color: #fafafa;
+        }
+
+        /* 悬停预览效果 */
+        .day-cell.hover-cross {
+            background-color: rgba(0, 0, 0, 0.05);
+        }
+
+        /* 蓝色框图样式 */
+        .day-cell.blue-active {
+            background-color: #8ecbf9 !important; /* 图片中的蓝色 */
+            color: #004d80 !important;
+            border-color: #6eb5ed;
+            font-weight: bold;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+        }
+
+        /* 红色框图样式 */
+        .day-cell.red-active {
+            background-color: #ffb3b3 !important; /* 图片中的红色 */
+            color: #800000 !important;
+            border-color: #ff9999;
+            font-weight: bold;
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+        }
+
+        /* 底部控制栏 */
+        .controls {
+            margin-top: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            color: #555;
+        }
+
+        .ctrl-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        button {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #666;
+            padding: 5px 10px;
+            transition: color 0.2s;
+        }
+        button:hover { color: #000; background-color: #f0f0f0; border-radius: 5px; }
+
+        .display-text {
+            font-size: 18px;
+            font-weight: bold;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* 开关样式 */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* 数据面板 */
+        #info-panel {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px dashed #ddd;
+            font-size: 14px;
+            text-align: left;
+            color: #555;
+            display: none; /* 默认隐藏，选中后显示 */
+        }
+        .math-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .blue-text { color: #0066cc; font-weight: bold; }
+        .red-text { color: #cc0000; font-weight: bold; }
+        
+        .tips {
+            position: absolute;
+            bottom: -40px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 13px;
+            color: #7d5a44;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="calendar-card">
+        <h2>月历中的数学</h2>
+
+        <div class="weekdays">
+            <div>周日</div><div>周一</div><div>周二</div><div>周三</div>
+            <div>周四</div><div>周五</div><div>周六</div>
+        </div>
+
+        <div class="days-grid" id="daysGrid">
+            <!-- JS 动态生成 -->
+        </div>
+
+        <div class="controls">
+            <!-- 年份控制 -->
+            <div class="ctrl-group">
+                <button onclick="changeMonth(-12)">‹</button>
+                <span id="yearDisplay" class="display-text">2023</span>
+                <button onclick="changeMonth(12)">›</button>
+            </div>
+
+            <!-- 模式开关 -->
+            <div class="switch-container">
+                <span>选定框图</span>
+                <label class="switch">
+                    <input type="checkbox" id="modeToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <!-- 月份控制 -->
+            <div class="ctrl-group">
+                <button onclick="changeMonth(-1)">‹</button>
+                <span id="monthDisplay" class="display-text">6 月</span>
+                <button onclick="changeMonth(1)">›</button>
+            </div>
+        </div>
+
+        <!-- 数学信息展示 -->
+        <div id="info-panel">
+            <div class="math-row" id="blue-math" style="display:none;">
+                <span class="blue-text">蓝色框</span>
+                <span>中心数: <span id="blue-center"></span></span>
+                <span>和: <span id="blue-sum"></span> (5 × 中心数)</span>
+            </div>
+            <div class="math-row" id="red-math" style="display:none;">
+                <span class="red-text">红色框</span>
+                <span>中心数: <span id="red-center"></span></span>
+                <span>和: <span id="red-sum"></span> (5 × 中心数)</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tips">提示：左键放置蓝色框图，右键放置红色框图</div>
+
+    <script>
+        let currentDate = new Date();
+        let currentYear = currentDate.getFullYear();
+        let currentMonth = currentDate.getMonth(); // 0-11
+
+        // 存储被选中的中心点索引 (null 表示未选中)
+        let blueCenterIdx = 11; // 初始默认选中一个位置
+        let redCenterIdx = 23;  // 初始默认选中一个位置
+
+        const grid = document.getElementById('daysGrid');
+        const yearDisplay = document.getElementById('yearDisplay');
+        const monthDisplay = document.getElementById('monthDisplay');
+        const modeToggle = document.getElementById('modeToggle');
+        const infoPanel = document.getElementById('info-panel');
+        const blueMath = document.getElementById('blue-math');
+        const redMath = document.getElementById('red-math');
+
+        // 初始化
+        renderCalendar();
+
+        function renderCalendar() {
+            grid.innerHTML = '';
+            yearDisplay.innerText = currentYear;
+            monthDisplay.innerText = (currentMonth + 1) + " 月";
+
+            // 获取当月第一天是周几
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            // 获取当月总天数
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            // 获取上个月总天数
+            const daysInPrevMonth = new Date(currentYear, currentMonth, 0).getDate();
+
+            // 生成 6行7列 = 42个格子
+            const totalCells = 42;
+            
+            // 1. 填充上个月的日期
+            for (let i = firstDay - 1; i >= 0; i--) {
+                createCell(daysInPrevMonth - i, 'other-month', -1);
+            }
+
+            // 2. 填充当月日期
+            for (let i = 1; i <= daysInMonth; i++) {
+                createCell(i, '', 0);
+            }
+
+            // 3. 填充下个月的日期
+            const filledCells = firstDay + daysInMonth;
+            const remainingCells = totalCells - filledCells;
+            for (let i = 1; i <= remainingCells; i++) {
+                createCell(i, 'other-month', 1);
+            }
+
+            // 渲染选中的框图
+            updateShapes();
+        }
+
+        function createCell(number, className, monthOffset) {
+            const div = document.createElement('div');
+            div.className = `day-cell ${className}`;
+            div.innerText = number;
+            
+            // 存储真实数据用于计算
+            // monthOffset: -1(上月), 0(当月), 1(下月)
+            div.dataset.value = number;
+            div.dataset.monthOffset = monthOffset;
+            
+            // 获取当前格子的索引 (0-41)
+            const index = grid.children.length;
+            div.dataset.index = index;
+
+            // 事件监听
+            div.addEventListener('mouseenter', () => handleHover(index));
+            div.addEventListener('mouseleave', () => clearHover());
+            div.addEventListener('click', () => handleClick(index, 'blue'));
+            div.addEventListener('contextmenu', (e) => {
+                e.preventDefault(); // 阻止右键菜单
+                handleClick(index, 'red');
+            });
+
+            grid.appendChild(div);
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            // 处理年份跨越
+            const newDate = new Date(currentYear, currentMonth, 1);
+            currentYear = newDate.getFullYear();
+            currentMonth = newDate.getMonth();
+            
+            // 翻页时重置选框，防止位置错乱 (或者保留索引，看需求，这里重置比较安全)
+            // blueCenterIdx = null;
+            // redCenterIdx = null;
+            
+            renderCalendar();
+        }
+
+        // --- 框图逻辑 ---
+
+        // 获取十字形的所有索引：中心, 上, 下, 左, 右
+        function getCrossIndices(centerIdx) {
+            if (centerIdx === null || centerIdx === undefined) return [];
+            const indices = [];
+            const col = centerIdx % 7;
+            const row = Math.floor(centerIdx / 7);
+
+            // 中心
+            indices.push(centerIdx);
+            // 上 (row > 0)
+            if (row > 0) indices.push(centerIdx - 7);
+            // 下 (row < 5)
+            if (row < 5) indices.push(centerIdx + 7);
+            // 左 (col > 0)
+            if (col > 0) indices.push(centerIdx - 1);
+            // 右 (col < 6)
+            if (col < 6) indices.push(centerIdx + 1);
+
+            return indices;
+        }
+
+        function handleHover(index) {
+            if (!modeToggle.checked) return;
+            
+            // 清除旧的 hover
+            clearHover();
+
+            const indices = getCrossIndices(index);
+            const cells = grid.children;
+            
+            indices.forEach(idx => {
+                if (cells[idx]) cells[idx].classList.add('hover-cross');
+            });
+        }
+
+        function clearHover() {
+            const cells = document.querySelectorAll('.hover-cross');
+            cells.forEach(cell => cell.classList.remove('hover-cross'));
+        }
+
+        function handleClick(index, type) {
+            if (!modeToggle.checked) return;
+
+            if (type === 'blue') {
+                // 如果点击已存在的位置，取消选择？或者只是移动。这里设为移动。
+                blueCenterIdx = index;
+                // 如果红蓝重叠，为了视觉清晰，可以将红移除或允许重叠(CSS层叠)
+                if (blueCenterIdx === redCenterIdx) redCenterIdx = null;
+            } else if (type === 'red') {
+                redCenterIdx = index;
+                if (redCenterIdx === blueCenterIdx) blueCenterIdx = null;
+            }
+
+            updateShapes();
+        }
+
+        function updateShapes() {
+            const cells = grid.children;
+            
+            // 清除所有高亮
+            for (let cell of cells) {
+                cell.classList.remove('blue-active', 'red-active');
+            }
+
+            // 渲染蓝色
+            const blueIndices = getCrossIndices(blueCenterIdx);
+            let blueSum = 0;
+            let blueVal = 0;
+            
+            if (blueIndices.length === 5) { // 只有完整的十字才显示? 或者都显示。日历边缘可能不完整，这里假设都显示
+                blueIndices.forEach(idx => {
+                    const cell = cells[idx];
+                    cell.classList.add('blue-active');
+                    blueSum += parseInt(cell.dataset.value);
+                });
+                blueVal = parseInt(cells[blueCenterIdx].dataset.value);
+                
+                // 更新面板
+                infoPanel.style.display = 'block';
+                blueMath.style.display = 'flex';
+                document.getElementById('blue-center').innerText = blueVal;
+                document.getElementById('blue-sum').innerText = blueSum;
+            } else {
+                 blueMath.style.display = 'none';
+            }
+
+            // 渲染红色
+            const redIndices = getCrossIndices(redCenterIdx);
+            let redSum = 0;
+            let redVal = 0;
+
+            if (redIndices.length === 5) {
+                redIndices.forEach(idx => {
+                    const cell = cells[idx];
+                    // 如果重叠，红色盖在蓝色上面（CSS顺序决定，或者加!important）
+                    cell.classList.add('red-active');
+                    redSum += parseInt(cell.dataset.value);
+                });
+                redVal = parseInt(cells[redCenterIdx].dataset.value);
+
+                infoPanel.style.display = 'block';
+                redMath.style.display = 'flex';
+                document.getElementById('red-center').innerText = redVal;
+                document.getElementById('red-sum').innerText = redSum;
+            } else {
+                redMath.style.display = 'none';
+            }
+        }
+        
+        // 监听开关，关闭时清除所有选择
+        modeToggle.addEventListener('change', (e) => {
+            if(!e.target.checked) {
+                blueCenterIdx = null;
+                redCenterIdx = null;
+                updateShapes();
+                infoPanel.style.display = 'none';
+            }
+        })
+
+    </script>
+</body>
+</html>

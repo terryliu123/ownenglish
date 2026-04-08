@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>花卉时钟游戏</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #5f6caf;
+            --secondary-color: #d4a373;
+            --accent-color: #e8c07d;
+            --light-bg: #f9f3e9;
+            --card-bg: #ffffff;
+            --text-color: #333;
+            --light-text: #666;
+        }
+        
+        * {
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        
+        body {
+            font-family: 'Noto Serif SC', serif;
+            display: flex;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--light-bg);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+        
+        .flower-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+            background: linear-gradient(135deg, rgba(248,249,250,0.9) 0%, rgba(233,236,239,0.9) 100%);
+            overflow-y: auto;
+        }
+        
+        .clock-container {
+            flex: 0 0 450px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #e8f4f8 0%, #d1e7f0 100%);
+            box-shadow: -5px 0 15px rgba(0,0,0,0.05);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .clock {
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            background-color: var(--card-bg);
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border: 12px solid var(--secondary-color);
+        }
+        
+        .hour-marks {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+        
+        .hour-mark {
+            position: absolute;
+            width: 3px;
+            height: 18px;
+            background: var(--text-color);
+            left: 50%;
+            top: 10px;
+            transform-origin: 50% 150px;
+            margin-left: -1.5px;
+        }
+        
+        .hour-hand, .minute-hand {
+            position: absolute;
+            left: 50%;
+            bottom: 50%;
+            transform-origin: 50% 100%;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: transform;
+        }
+        
+        .hour-hand {
+            width: 8px;
+            height: 90px;
+            background: var(--text-color);
+            margin-left: -4px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 3;
+        }
+        
+        .minute-hand {
+            width: 5px;
+            height: 130px;
+            background: var(--primary-color);
+            margin-left: -2.5px;
+            border-radius: 3px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            cursor: default;
+            z-index: 2;
+        }
+        
+        .center-circle {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: var(--secondary-color);
+            border-radius: 50%;
+            left: 50%;
+            top: 50%;
+            margin-left: -12px;
+            margin-top: -12px;
+            z-index: 10;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+        
+        .current-time {
+            margin-top: 25px;
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+        
+        .flower-card {
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 2.5rem;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+            max-width: 550px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        .flower-title {
+            color: var(--primary-color);
+            font-size: 2.2rem;
+            margin-bottom: 1.2rem;
+            border-bottom: 2px solid rgba(212, 163, 115, 0.3);
+            padding-bottom: 0.6rem;
+            font-weight: 700;
+            text-shadow: 0 2px 3px rgba(0,0,0,0.1);
+        }
+        
+        .flower-image-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            margin-bottom: 1.5rem;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+        }
+        
+        .flower-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .flower-properties {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            text-align: left;
+            margin-top: 1.5rem;
+        }
+        
+        .flower-property {
+            margin-bottom: 0.8rem;
+            padding: 0.8rem;
+            background: rgba(248, 249, 250, 0.7);
+            border-radius: 10px;
+        }
+        
+        .property-title {
+            font-weight: bold;
+            color: var(--secondary-color);
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.95rem;
+        }
+        
+        .property-value {
+            color: var(--text-color);
+            font-size: 1.05rem;
+        }
+        
+        #flowerTime {
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+        
+        .instructions {
+            margin-top: 25px;
+            font-size: 1rem;
+            color: var(--light-text);
+            text-align: center;
+            max-width: 320px;
+            line-height: 1.5;
+        }
+        
+        .game-instructions {
+            background-color: rgba(255,255,255,0.95);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+            max-width: 550px;
+            width: 100%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .success-notification {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255,255,255,0.95);
+            padding: 15px 30px;
+            border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            z-index: 1000;
+            display: none;
+            animation: bounce 0.5s ease;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateX(-50%) translateY(0); }
+            50% { transform: translateX(-50%) translateY(-10px); }
+        }
+        
+        .falling-flower {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: 100;
+            animation: falling linear forwards;
+            pointer-events: none;
+        }
+        
+        @keyframes falling {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0;
+            }
+        }
+        
+        .countdown {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            background-color: rgba(255,255,255,0.8);
+            padding: 8px 16px;
+            border-radius: 20px;
+            display: none;
+            z-index: 1000;
+        }
+        
+        .clock-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+        }
+        
+        .clock-number {
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            text-align: center;
+            line-height: 28px;
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-color);
+            transform-origin: 14px 14px;
+        }
+        
+        .current-time-display {
+            position: absolute;
+            width: 80px;
+            height: 40px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 20px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, 60px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--primary-color);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .countdown-animation {
+            display: inline-block;
+            width: 1.2em;
+            height: 1.2em;
+            line-height: 1.2em;
+            text-align: center;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            margin-right: 0.5em;
+            animation: countdown-pulse 1s infinite;
+        }
+        
+        @keyframes countdown-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .falling-emoji {
+            position: absolute;
+            font-size: 24px;
+            z-index: 100;
+            animation: falling-rotate linear forwards;
+            pointer-events: none;
+        }
+        
+        @keyframes falling-rotate {
+            0% { transform: translateY(-50px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        
+        .bud-image {
+            filter: grayscale(30%) brightness(0.9);
+            opacity: 0.8;
+            transform: scale(0.95);
+        }
+        
+        .bloom-image {
+            filter: none;
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @media (max-width: 900px) {
+            body {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            
+            .clock-container {
+                flex: 0 0 auto;
+                width: 100%;
+                padding: 1.5rem;
+            }
+            
+            .flower-container {
+                padding: 1.5rem;
+            }
+            
+            .clock {
+                width: 280px;
+                height: 280px;
+            }
+            
+            .hour-hand {
+                height: 80px;
+            }
+            
+            .minute-hand {
+                height: 120px;
+            }
+            
+            .hour-mark {
+                transform-origin: 50% 140px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="flower-container">
+        <div class="game-instructions">
+            <h2>🌸 花卉时钟游戏 🌸</h2>
+            <p>将右侧时钟调整到花朵开放的正确时间，回答正确后花朵会美丽绽放！</p>
+        </div>
+        
+        <div class="flower-card" id="flowerCard">
+            <h2 class="flower-title" id="flowerName">花卉名称</h2>
+            <div class="flower-image-container">
+                <img src="" alt="花卉图片" class="flower-image bud-image" id="flowerImage">
+            </div>
+            <div class="flower-properties">
+                <div class="flower-property">
+                    <span class="property-title">特点</span>
+                    <span class="property-value" id="flowerFeatures">花卉特点描述</span>
+                </div>
+                <div class="flower-property">
+                    <span class="property-title">开放时间</span>
+                    <span class="property-value" id="flowerTime">？？？？？</span>
+                </div>
+                <div class="flower-property">
+                    <span class="property-title">花语</span>
+                    <span class="property-value" id="flowerMeaning">花语描述</span>
+                </div>
+                <div class="flower-property">
+                    <span class="property-title">科普知识</span>
+                    <span class="property-value" id="flowerSymbol">象征意义</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="clock-container">
+        <div class="success-notification" id="successNotification">回答正确！</div>
+        <div class="countdown" id="countdown">5秒后进入下一朵花</div>
+        
+        <div class="clock">
+            <div class="clock-face" id="clockNumbers"></div>
+            <div class="hour-marks" id="hourMarks"></div>
+            <div class="hour-hand" id="hourHand"></div>
+            <div class="minute-hand" id="minuteHand"></div>
+            <div class="center-circle"></div>
+            <div class="current-time-display" id="currentTime">0:00</div>
+        </div>
+        <div class="instructions">长按时针拖动调整到花朵开放的时间</div>
+    </div>
+
+    <script>
+        // 花卉数据（1-12点）
+        const flowerData = [
+            {
+                name: "蛇床花",
+                features: "凌晨开放，伞形科植物",
+                time: 1,
+                meaning: "神秘与守护",
+                symbol: "喜湿润环境，花期5-6月，夏季开花。",
+                budImage: "https://copyright.bdstatic.com/vcg/creative/957f52978e0870c7913f0d80d2d8c06e.jpg@h_1280",
+                bloomImage: "https://img0.baidu.com/it/u=1126941201,1915938975&fm=253&fmt=auto&app=138&f=JPEG?w=972&h=505"
+            },
+            {
+                name: "牵牛花",
+                features: "日出前开放",
+                time: 2,
+                meaning: "依恋与牵挂",
+                symbol: "夏秋开花，花色多样，古称朝颜。",
+                budImage: "https://t8.baidu.com/it/u=4094522233,506835514&fm=193",
+                bloomImage: "https://img1.baidu.com/it/u=1392506101,1428617467&fm=253&fmt=auto?w=1422&h=800"
+            },
+            {
+                name: "向日葵",
+                features: "日出开花",
+                time: 3,
+                meaning: "阳光与活力",
+                symbol: "菊科一年生，头状花序随日转向",
+                budImage: "https://t7.baidu.com/it/u=3954382182,4165463379&fm=193",
+                bloomImage: "https://imagepphcloud.thepaper.cn/pph/image/277/54/73.gif"
+            },
+            {
+                name: "芍药花 ",
+                features: "晨光中盛开",
+                time: 4,
+                meaning: "美丽与繁荣",
+                symbol: "芍药科宿根草本，花大色艳，有花相美誉",
+                budImage: "https://copyright.bdstatic.com/vcg/edit/52abbedd4f4dd6ffc59c9b657e8ac55e.jpg@h_1280",
+                bloomImage: "https://pic.rmb.bdstatic.com/bjh/down/ee426a871a391e7532cd3412dbd6ff9f.gif"
+            },
+            {
+                name: "半枝莲",
+                features: "午前开放",
+                time: 5,
+                meaning: "简单的幸福",
+                symbol: "唇形科草本，茎四棱，花单侧轮生",
+                budImage: "https://img0.baidu.com/it/u=1058511829,822228611&fm=253&fmt=auto&app=138&f=JPEG?w=440&h=657",
+                bloomImage: "https://p8.itc.cn/images01/20210506/c17c0a16079b4ae89cbb72532d41ecb6.jpeg"
+            },
+            {
+                name: "鹅肠菜",
+                features: "午时展开",
+                time: 6,
+                meaning: "无私的奉献",
+                symbol: "长50-80厘米，花期5-8月，果期6-9月",
+                budImage: "https://q0.itc.cn/q_70/images01/20240730/535c0828df07469084289aa92c8a0e21.jpeg",
+                bloomImage: "https://bkimg.cdn.bcebos.com/pic/dcc451da81cb39dbdafe365dda160924ab1830fa"
+            },
+            {
+                name: "万寿菊",
+                features: "午后绽放",
+                time: 7,
+                meaning: "长寿与吉祥",
+                symbol: "菊科一年生，头状花序橙黄色，含叶黄素",
+                budImage: "https://img.redocn.com/sheying/20160614/wanshoujuhuabao_6480506.jpg.285.jpg",
+                bloomImage: "https://bkimg.cdn.bcebos.com/pic/09fa513d269759eef21b0838b5fb43166c22dffe"
+            },
+            {
+                name: "紫茉莉",
+                features: "花午后开放",
+                time: 8,
+                meaning: "纯洁与圣洁",
+                symbol: "倒圆锥形，花期6-10月，果期8-11月",
+                budImage: "https://img2.baidu.com/it/u=1621347662,2268076720&fm=253&fmt=auto&app=138&f=PNG?w=656&h=500",
+                bloomImage: "https://img1.baidu.com/it/u=1819850910,2447760822&fm=253&fmt=auto&app=138&f=JPEG?w=764&h=500"
+            },
+            {
+                name: "月光花",
+                features: "日落开放",
+                time: 9,
+                meaning: "永远的爱与守候",
+                symbol: "长10-20厘米，花果期7—10个月",
+                budImage: "https://pics6.baidu.com/feed/b219ebc4b74543a977e7603d85303588b8011471.png?token=77fda588757a808ab3b002d0d354b336",
+                bloomImage: "https://b0.bdstatic.com/23692cc0cbdde1d43b76ab09911bd79a.jpg@h_1280"
+            },
+            {
+                name: "夜来香",
+                features: "夜间开放",
+                time: 10,
+                meaning: "神秘与诱惑",
+                symbol: "萝藦科藤本，含生物碱，不宜室内久放。热带植物，花香含挥发性物质吸引夜行昆虫。",
+                budImage: "https://img1.baidu.com/it/u=2143327485,944565024&fm=253&fmt=auto&app=138&f=JPEG?w=507&h=760",
+                bloomImage: "https://5b0988e595225.cdn.sohucs.com/images/20190326/f55d68faaa574decbe13e3712f5cc471.gif"
+            },
+            {
+                name: "昙花",
+                features: "夜间盛开",
+                time: 11,
+                meaning: "刹那的美丽",
+                symbol: "花享有月下美人之誉。当花渐渐展开后，过1-2小时又慢慢地枯萎了，整个过程仅4个小时左右。故有昙花一现之说",
+                budImage: "https://b0.bdstatic.com/9ae5d28c15f86ebe876fc384b81f5a0b.jpg@h_1280",
+                bloomImage: "https://f.sinaimg.cn/spider20241027/738/w422h316/20241027/01b7-gif394ebc01650d562a7f02c733b2d86b68.gif"
+            },
+        ];
+
+        // 初始化时钟数字（0-22，间隔2小时）
+        function initClockNumbers() {
+            const clockNumbers = document.getElementById('clockNumbers');
+            clockNumbers.innerHTML = '';
+            
+            const numbers = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+            const radius = 120;
+            const center = 145;
+            
+            numbers.forEach((num, index) => {
+                const numberElem = document.createElement('div');
+                numberElem.className = 'clock-number';
+                numberElem.textContent = num;
+                
+                const angle = (index * 30 - 90) * (Math.PI / 180);
+                const x = center + radius * Math.cos(angle) - 12;
+                const y = center + radius * Math.sin(angle) - 12;
+                
+                numberElem.style.left = `${x}px`;
+                numberElem.style.top = `${y}px`;
+                clockNumbers.appendChild(numberElem);
+            });
+        }
+
+        // 获取DOM元素
+        const hourHand = document.getElementById('hourHand');
+        const minuteHand = document.getElementById('minuteHand');
+        const currentTimeDisplay = document.getElementById('currentTime');
+        const flowerName = document.getElementById('flowerName');
+        const flowerImage = document.getElementById('flowerImage');
+        const flowerFeatures = document.getElementById('flowerFeatures');
+        const flowerTime = document.getElementById('flowerTime');
+        const flowerMeaning = document.getElementById('flowerMeaning');
+        const flowerSymbol = document.getElementById('flowerSymbol');
+        const successNotification = document.getElementById('successNotification');
+        const countdown = document.getElementById('countdown');
+
+        // 游戏状态
+        let currentFlowerIndex = 0;
+        let currentFlower = null;
+        let hours = 0; // 0-23
+        let minutes = 0;
+        let isAnswered = false;
+        let countdownInterval = null;
+
+        // 初始化游戏
+        function initGame() {
+            initClockNumbers();
+            
+            // 随机选择一朵花
+            const newIndex = Math.floor(Math.random() * flowerData.length);
+            currentFlowerIndex = newIndex !== currentFlowerIndex ? newIndex : (newIndex + 1) % flowerData.length;
+            currentFlower = flowerData[currentFlowerIndex];
+            
+            // 重置时间
+            hours = 0;
+            minutes = 0;
+            isAnswered = false;
+            
+            // 更新花卉信息
+            updateFlowerInfo();
+            
+            // 更新时钟
+            updateClock();
+        }
+
+        // 更新花卉信息
+        function updateFlowerInfo() {
+            flowerName.textContent = currentFlower.name;
+            flowerFeatures.textContent = currentFlower.features;
+            flowerTime.textContent = "？？？？？";
+            flowerMeaning.textContent = currentFlower.meaning;
+            flowerSymbol.textContent = currentFlower.symbol;
+            flowerImage.src = currentFlower.budImage;
+            flowerImage.classList.add('bud-image');
+            flowerImage.classList.remove('bloom-image');
+        }
+
+        // 更新时钟显示（24小时制）
+        function updateClock() {
+            const hourDegrees = hours * 15; // 每小时15度
+            const minuteDegrees = minutes * 6;
+            
+            hourHand.style.transform = `rotate(${hourDegrees}deg)`;
+            minuteHand.style.transform = `rotate(${minuteDegrees}deg)`;
+            
+            // 显示时间（24小时制）
+            currentTimeDisplay.textContent = `${hours}:${minutes < 10 ? '0' + minutes : minutes}`;
+            
+            if (!isAnswered) {
+                checkAnswer();
+            }
+        }
+
+        // 检查答案（将花卉1-12点映射到2-24点）
+        function checkAnswer() {
+            // 花卉时间映射：1→2, 2→4,...,12→24
+            const flowerTime24 = currentFlower.time * 2;
+            
+            if (hours === flowerTime24 && minutes === 0) {
+                // 回答正确
+                isAnswered = true;
+                
+                // 1. 显示开花时间（转换为24小时制）
+                const displayTime = currentFlower.time * 2;
+                flowerTime.textContent = `${displayTime}:00`;
+                flowerImage.src = currentFlower.bloomImage;
+                flowerImage.classList.remove('bud-image');
+                flowerImage.classList.add('bloom-image');
+                
+                // 2. 显示表盘上方的提醒
+                successNotification.style.display = 'block';
+                
+                // 3. 创建全屏飘落的emoji小花
+                createFallingEmojis();
+                
+                // 4. 显示倒计时
+                countdown.style.display = 'block';
+                
+                // 5. 开始5秒倒计时
+                let secondsLeft = 5;
+                updateCountdownDisplay(secondsLeft);
+                
+                clearInterval(countdownInterval);
+                countdownInterval = setInterval(() => {
+                    secondsLeft--;
+                    updateCountdownDisplay(secondsLeft);
+                    
+                    if (secondsLeft <= 0) {
+                        clearInterval(countdownInterval);
+                        nextFlower();
+                    }
+                }, 1000);
+            }
+        }
+        
+        // 更新倒计时显示
+        function updateCountdownDisplay(seconds) {
+            countdown.innerHTML = `<span class="countdown-animation">${seconds}</span>秒后进入下一朵花`;
+        }
+
+        // 创建飘落的emoji小花
+        function createFallingEmojis() {
+            const flowerEmojis = ['🌸', '🌹', '🌺', '🌻', '🌼', '🌷', '💐', '🏵️', '🌱', '🌿'];
+            
+            for (let i = 0; i < 50; i++) {
+                const emoji = document.createElement('div');
+                emoji.className = 'falling-emoji';
+                
+                // 随机选择小花emoji
+                const randomEmoji = flowerEmojis[Math.floor(Math.random() * flowerEmojis.length)];
+                emoji.textContent = randomEmoji;
+                
+                // 随机位置和大小
+                emoji.style.left = `${Math.random() * 100}%`;
+                emoji.style.top = '-50px';
+                emoji.style.fontSize = `${Math.random() * 20 + 20}px`;
+                
+                // 随机动画时长和延迟
+                const duration = Math.random() * 5 + 3;
+                emoji.style.animationDuration = `${duration}s`;
+                emoji.style.animationDelay = `${Math.random() * 2}s`;
+                
+                document.body.appendChild(emoji);
+                
+                // 动画结束后移除
+                setTimeout(() => {
+                    emoji.remove();
+                }, duration * 1000);
+            }
+        }
+
+        // 进入下一朵花
+        function nextFlower() {
+            // 隐藏提示和倒计时
+            successNotification.style.display = 'none';
+            countdown.style.display = 'none';
+            
+            // 初始化下一朵花
+            initGame();
+        }
+
+        // 拖动功能
+        let isDragging = false;
+        let startAngle = 0;
+        let startHourDegrees = 0;
+
+        function getAngle(event, element) {
+            const rect = element.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const x = event.clientX - centerX;
+            const y = event.clientY - centerY;
+            return Math.atan2(y, x) * 180 / Math.PI;
+        }
+
+        function handleMouseDown(event) {
+            if (event.target === hourHand && !isAnswered) {
+                isDragging = true;
+                startAngle = getAngle(event, document.querySelector('.clock'));
+                
+                // 记录初始角度
+                startHourDegrees = hours * 15;
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+                document.addEventListener('mouseleave', handleMouseUp);
+            }
+        }
+
+        function handleMouseMove(event) {
+            if (!isDragging || isAnswered) return;
+            
+            const angle = getAngle(event, document.querySelector('.clock'));
+            const angleDiff = angle - startAngle;
+            
+            let degrees = startHourDegrees + angleDiff;
+            if (degrees < 0) degrees += 360;
+            
+            hours = Math.floor(degrees / 15) % 24;
+            minutes = 0; // 固定分钟为0
+            
+            updateClock();
+        }
+
+        function handleMouseUp() {
+            if (isDragging) {
+                isDragging = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                document.removeEventListener('mouseleave', handleMouseUp);
+            }
+        }
+
+        // 添加事件监听器
+        hourHand.addEventListener('mousedown', handleMouseDown);
+        
+        // 触摸支持
+        hourHand.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (e.target === hourHand && !isAnswered) {
+                isDragging = true;
+                const touch = e.touches[0];
+                startAngle = getAngle({
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                }, document.querySelector('.clock'));
+                startHourDegrees = hours * 15;
+            }
+        }, { passive: false });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging && !isAnswered) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const angle = getAngle({
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                }, document.querySelector('.clock'));
+                const angleDiff = angle - startAngle;
+                
+                let degrees = startHourDegrees + angleDiff;
+                if (degrees < 0) degrees += 360;
+                
+                hours = Math.floor(degrees / 15) % 24;
+                minutes = 0; // 固定分钟为0
+                
+                updateClock();
+            }
+        }, { passive: false });
+        
+        document.addEventListener('touchend', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                handleMouseUp();
+            }
+        }, { passive: false });
+
+        // 初始化游戏
+        initGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Starship Mechazilla Catch - Precision Fix</title>
+    <style>
+        /* 日间高亮风格 */
+        body { margin: 0; overflow: hidden; background-color: #bfd1e5; font-family: 'Segoe UI', Roboto, sans-serif; color: #333; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+
+        /* 仪表盘 */
+        .glass-panel {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+        #telemetry { top: 20px; left: 20px; width: 240px; border-left: 5px solid #2980b9; }
+        
+        .label { font-size: 12px; color: #555; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+        .value { font-size: 28px; font-family: 'Courier New', monospace; font-weight: 900; color: #2c3e50; }
+        .unit { font-size: 14px; color: #7f8c8d; }
+
+        /* 状态大字 */
+        #stage-msg {
+            position: absolute; top: 15%; width: 100%; text-align: center;
+            font-size: 60px; font-weight: 900; color: #2c3e50;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 1);
+            opacity: 0; transition: opacity 0.5s; letter-spacing: 2px;
+        }
+
+        /* 控制按钮 */
+        #controls {
+            position: absolute; bottom: 50px; width: 100%; text-align: center; pointer-events: auto;
+            display: flex; justify-content: center; gap: 20px;
+        }
+        button {
+            background: #2c3e50; color: #fff; border: none; padding: 16px 45px;
+            font-size: 18px; font-weight: 800; border-radius: 50px; cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); transition: all 0.2s; text-transform: uppercase;
+        }
+        button:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.4); background: #34495e; }
+        #catchBtn { background: #c0392b; }
+        #catchBtn:hover { background: #d35400; }
+
+        /* 3D 标签 */
+        .marker {
+            position: absolute; font-size: 13px; font-weight: bold; padding: 6px 12px;
+            border-radius: 4px; color: #fff; pointer-events: none; opacity: 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); transition: opacity 0.2s;
+        }
+        .marker::after {
+            content: ''; position: absolute; left: 50%; top: 100%;
+            width: 2px; height: 20px; background: rgba(0,0,0,0.5);
+        }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <div id="telemetry" class="glass-panel">
+            <div class="label">Altitude / 高度</div>
+            <div><span id="altVal" class="value">0.00</span> <span class="unit">m</span></div>
+            <div class="label" style="margin-top:15px;">Phase / 阶段</div>
+            <div id="phaseVal" style="font-weight:bold; color:#e67e22; font-size:18px; margin-top:5px;">READY</div>
+            <div class="label" style="margin-top:15px;">Catch Status</div>
+            <div id="catchStatus" style="font-size:14px; color:#27ae60;">Waiting...</div>
+        </div>
+        <div id="stage-msg">SYSTEM READY</div>
+        
+        <!-- 关键标签 -->
+        <div id="label-pins" class="marker" style="background:#e74c3c;">Catch Points (挂点)</div>
+        <div id="label-arms" class="marker" style="background:#2980b9;">Chopsticks (筷子)</div>
+    </div>
+
+    <div id="controls">
+        <button id="launchBtn">🚀 Launch</button>
+        <button id="catchBtn">🧲 Quick Catch</button>
+        <button id="resetBtn" style="background:#7f8c8d;">↺ Reset</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- 配置参数 ---
+        const BOOSTER_H = 70;
+        const BOOSTER_R = 4.5;
+        const PIN_OFFSET_Y = 66; // 挂点距离助推器底部的距离
+        const TOWER_ARM_Y = 130; // 机械臂在世界坐标的高度
+        // 目标悬停高度 = 机械臂高度 - 挂点偏移量
+        // 这样挂点正好对齐机械臂
+        const CATCH_ALTITUDE = TOWER_ARM_Y - PIN_OFFSET_Y; 
+
+        // --- 1. 场景 ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xbfd1e5); 
+        scene.fog = new THREE.FogExp2(0xbfd1e5, 0.001);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 50000);
+        camera.position.set(120, 80, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.body.appendChild(renderer.domElement);
+
+        // 灯光
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+        scene.add(hemiLight);
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
+        sunLight.position.set(150, 300, 100);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.set(2048, 2048);
+        scene.add(sunLight);
+
+        // 地面
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), new THREE.MeshStandardMaterial({ color: 0xddeeff }));
+        ground.rotation.x = -Math.PI/2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // --- 2. 模型构建 ---
+        const matSteel = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.7 });
+        const matDark = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const matTower = new THREE.MeshStandardMaterial({ color: 0x8899aa });
+        const matArm = new THREE.MeshStandardMaterial({ color: 0x555555 });
+
+        const towerGroup = new THREE.Group(); scene.add(towerGroup);
+        const rocketGroup = new THREE.Group(); scene.add(rocketGroup); // 这个Group的Y=0代表火箭底部
+        const boosterGroup = new THREE.Group(); rocketGroup.add(boosterGroup);
+        const shipGroup = new THREE.Group(); rocketGroup.add(shipGroup);
+
+        // === 发射塔 (Mechazilla) ===
+        const TOWER_X = 40;
+        const tower = new THREE.Mesh(new THREE.BoxGeometry(18, 160, 18), matTower);
+        tower.position.set(TOWER_X, 80, 0);
+        tower.castShadow = true;
+        towerGroup.add(tower);
+
+        // 机械臂组 (Chopsticks)
+        const armGroup = new THREE.Group();
+        // 机械臂安装高度
+        armGroup.position.set(TOWER_X - 10, TOWER_ARM_Y, 0); 
+        towerGroup.add(armGroup);
+
+        // 左臂
+        const armGeo = new THREE.BoxGeometry(28, 3, 4);
+        // 几何中心偏移，方便旋转/移动
+        armGeo.translate(-14, 0, 0); 
+        
+        const armL = new THREE.Mesh(armGeo, matArm);
+        armL.position.z = 15; // 初始张开
+        armL.castShadow = true;
+        armGroup.add(armL);
+        
+        // 右臂
+        const armR = armL.clone();
+        armR.position.z = -15;
+        armR.scale.z = -1; // 镜像
+        armGroup.add(armR);
+
+        // 发射台
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(15, 20, 12, 32), matTower);
+        pad.position.y = 6;
+        pad.receiveShadow = true;
+        scene.add(pad);
+
+        // === 助推器 ===
+        // Cylinder center is at height/2.
+        // If booster height is 70, center is 35.
+        const boosterBody = new THREE.Mesh(new THREE.CylinderGeometry(BOOSTER_R, BOOSTER_R, BOOSTER_H, 48), matSteel);
+        boosterBody.position.y = BOOSTER_H / 2; 
+        boosterBody.castShadow = true;
+        boosterGroup.add(boosterBody);
+
+        // 栅格舵 (Grid Fins) - 位于顶部附近
+        const finGeo = new THREE.BoxGeometry(0.4, 4, 2.5);
+        for(let i=0; i<4; i++) {
+            const f = new THREE.Mesh(finGeo, matDark);
+            f.position.y = 68; // 接近顶部
+            const rad = (Math.PI/2)*i;
+            f.position.x = Math.cos(rad)*BOOSTER_R;
+            f.position.z = Math.sin(rad)*BOOSTER_R;
+            f.lookAt(0, 68, 0);
+            boosterGroup.add(f);
+        }
+
+        // **挂点 (Catch Pins)** - 关键修改
+        // 位于栅格舵下方，正好对应 PIN_OFFSET_Y (66m)
+        const pinGeo = new THREE.CylinderGeometry(0.5, 0.5, 3);
+        const matPin = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // 红色高亮
+        const pinL = new THREE.Mesh(pinGeo, matPin);
+        pinL.rotation.z = Math.PI/2;
+        pinL.position.set(BOOSTER_R, PIN_OFFSET_Y, 0); // 朝向塔的一侧
+        boosterGroup.add(pinL);
+
+        const pinR = pinL.clone();
+        pinR.position.set(-BOOSTER_R, PIN_OFFSET_Y, 0); // 对侧
+        boosterGroup.add(pinR);
+
+        // === 飞船 ===
+        shipGroup.position.y = BOOSTER_H; // 放在助推器顶端
+        const sBody = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 30, 48), matSteel);
+        sBody.position.y = 15;
+        sBody.castShadow = true;
+        shipGroup.add(sBody);
+        const sNose = new THREE.Mesh(new THREE.ConeGeometry(4.5, 15, 48), matSteel);
+        sNose.position.y = 37.5;
+        sNose.castShadow = true;
+        shipGroup.add(sNose);
+        
+        // 火焰
+        const flameGeo = new THREE.ConeGeometry(3.5, 60, 16, 1, true);
+        flameGeo.translate(0, -30, 0);
+        const flameMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+        const bFlame = new THREE.Mesh(flameGeo, flameMat);
+        boosterGroup.add(bFlame);
+
+        // --- 3. 逻辑控制 ---
+
+        const ui = {
+            alt: document.getElementById('altVal'),
+            phase: document.getElementById('phaseVal'),
+            status: document.getElementById('catchStatus'),
+            msg: document.getElementById('stage-msg'),
+            launchBtn: document.getElementById('launchBtn'),
+            catchBtn: document.getElementById('catchBtn'),
+            resetBtn: document.getElementById('resetBtn')
+        };
+
+        let state = { phase: 'PAD', time: 0, alt: 12, vel: 0, posX: 0, posZ: 0 }; // alt 12 = on pad
+        let armProgress = 0;
+
+        function showMsg(text) {
+            ui.msg.innerText = text;
+            ui.msg.style.opacity = 1;
+            setTimeout(() => ui.msg.style.opacity = 0, 3000);
+        }
+
+        function resetSim() {
+            state = { phase: 'PAD', time: 0, alt: 12, vel: 0, posX: 0, posZ: 0 };
+            armProgress = 0;
+            
+            rocketGroup.position.set(0, 12, 0);
+            rocketGroup.rotation.set(0, 0, 0);
+            boosterGroup.rotation.set(0, 0, 0);
+            shipGroup.position.set(0, 70, 0);
+            shipGroup.rotation.set(0, 0, 0);
+            
+            // 机械臂复位 (Z = +/- 15)
+            armL.position.z = 15;
+            armR.position.z = -15;
+            
+            bFlame.material.opacity = 0;
+            
+            ui.launchBtn.disabled = false;
+            ui.catchBtn.disabled = false;
+            ui.phase.innerText = "READY";
+            ui.status.innerText = "Waiting...";
+            
+            camera.position.set(120, 80, 120);
+            camera.lookAt(0, 50, 0);
+        }
+
+        function update(dt) {
+            state.time += dt;
+
+            if (state.phase === 'LIFTOFF') {
+                state.vel += 15 * dt; 
+                state.alt += state.vel * dt;
+                bFlame.material.opacity = 0.8;
+                if(state.alt > 800) {
+                    state.phase = 'SEPARATION';
+                    ui.phase.innerText = "SEPARATION";
+                    showMsg("STAGE SEPARATION");
+                }
+            }
+            else if (state.phase === 'SEPARATION') {
+                bFlame.material.opacity = 0;
+                shipGroup.position.y += 50 * dt;
+                // 助推器翻转
+                boosterGroup.rotation.x += 0.8 * dt;
+                if(boosterGroup.rotation.x > 2.5) {
+                    state.phase = 'BOOSTBACK';
+                    ui.phase.innerText = "BOOSTBACK";
+                }
+            }
+            else if (state.phase === 'BOOSTBACK') {
+                bFlame.material.opacity = 0.8;
+                // 归位
+                state.posX = THREE.MathUtils.lerp(state.posX, 20, dt); // 靠近塔 X=40, 臂长~20, 目标X~20
+                state.alt = THREE.MathUtils.lerp(state.alt, 300, dt*0.5);
+                boosterGroup.rotation.x = THREE.MathUtils.lerp(boosterGroup.rotation.x, 0, dt);
+
+                if(Math.abs(state.alt - 300) < 10) {
+                    state.phase = 'LANDING_BURN';
+                    ui.phase.innerText = "LANDING";
+                    showMsg("LANDING BURN");
+                }
+            }
+            else if (state.phase === 'LANDING_BURN') {
+                // 目标对齐：塔在X=40。机械臂伸出。
+                // 我们希望火箭表面贴合机械臂末端？不，是挂点挂在机械臂上。
+                // 机械臂根部 X=30. 长度24. 末端 X=6.
+                // 理想位置：火箭中心 X = 20.
+                // 这样火箭右侧(X+4.5) = 24.5. 接近臂的抓取点。
+                const TARGET_X = 20; 
+                
+                state.vel = -15; // 匀速下降
+                state.alt += state.vel * dt;
+                bFlame.material.opacity = 0.9;
+
+                // 修正位置
+                state.posX += (TARGET_X - state.posX) * 3.0 * dt;
+                state.posZ += (0 - state.posZ) * 3.0 * dt;
+                boosterGroup.rotation.x = 0;
+
+                // 关键：当挂点高度 (alt + 66) 接近 机械臂高度 (130) 时
+                // 即 alt 接近 64
+                if (state.alt <= CATCH_ALTITUDE) { 
+                    state.phase = 'CATCH';
+                    ui.phase.innerText = "CATCH";
+                    showMsg("MECHAZILLA CATCH!");
+                }
+            }
+            else if (state.phase === 'CATCH') {
+                state.vel = 0;
+                state.alt = CATCH_ALTITUDE; // 强制锁定高度 = 64
+                state.posX = 20; // 强制锁定水平
+                
+                bFlame.material.opacity = 0.4;
+                ui.status.innerText = "Closing Arms...";
+
+                // 机械臂闭合动画
+                // 目标：贴合火箭半径 4.5
+                // 初始 Z = 15
+                armProgress = Math.min(armProgress + dt * 1.5, 1);
+                const currentZ = 15 - armProgress * (15 - 4.8); // 留一点余量 4.8
+                
+                armL.position.z = currentZ;
+                armR.position.z = -currentZ;
+
+                if (armProgress >= 1) {
+                    bFlame.material.opacity = 0;
+                    ui.status.innerText = "SECURED";
+                    ui.status.style.color = "#27ae60";
+                }
+            }
+
+            // 应用位置 (Y轴偏移 12 是为了Pad高度)
+            if (state.phase !== 'PAD') {
+                rocketGroup.position.set(state.posX, state.alt, state.posZ);
+            }
+
+            // UI更新
+            ui.alt.innerText = state.alt.toFixed(1);
+            updateLabels();
+        }
+
+        function updateLabels() {
+            // 挂点标签
+            const pinPos = new THREE.Vector3(4.5, PIN_OFFSET_Y, 0);
+            pinPos.applyMatrix4(rocketGroup.matrixWorld); // 使用 rocketGroup 变换
+            moveLabel(pinPos, 'label-pins');
+
+            // 机械臂标签
+            const armPos = new THREE.Vector3(TOWER_X - 20, TOWER_ARM_Y, 15);
+            moveLabel(armPos, 'label-arms');
+        }
+
+        function moveLabel(vec, id) {
+            const el = document.getElementById(id);
+            const v = vec.clone().project(camera);
+            if(v.z > 1) { el.style.opacity = 0; return; }
+            const x = (v.x * .5 + .5) * window.innerWidth;
+            const y = (v.y * -.5 + .5) * window.innerHeight;
+            el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+            el.style.opacity = 1;
+        }
+
+        // --- 交互 ---
+        ui.launchBtn.onclick = () => {
+            state.phase = 'LIFTOFF';
+            ui.launchBtn.disabled = true;
+            ui.catchBtn.disabled = true;
+        };
+        ui.catchBtn.onclick = () => {
+            // 快进到降落前
+            state.phase = 'LANDING_BURN';
+            state.alt = 200; // 距离捕获点 (64m) 很近了
+            state.vel = -20;
+            state.posX = 15;
+            state.posZ = 2;
+            
+            // 移除飞船
+            shipGroup.position.set(100, 500, 0);
+            
+            // 重置姿态
+            rocketGroup.rotation.set(0,0,0);
+            boosterGroup.rotation.set(0,0,0);
+            
+            ui.launchBtn.disabled = true;
+            ui.catchBtn.disabled = true;
+        };
+        ui.resetBtn.onclick = resetSim;
+
+        // --- 渲染循环 ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = clock.getDelta();
+            update(dt);
+
+            // 相机逻辑
+            if(state.phase === 'LIFTOFF') {
+                 camera.position.lerp(new THREE.Vector3(100, state.alt+50, 140), 0.1);
+                 camera.lookAt(0, state.alt+20, 0);
+            }
+            else if (state.phase === 'LANDING_BURN' || state.phase === 'CATCH') {
+                // 特写捕获区
+                // 目标看 TOWER_ARM_Y (130)
+                const targetPos = new THREE.Vector3(80, TOWER_ARM_Y + 20, 80);
+                camera.position.lerp(targetPos, 0.05);
+                camera.lookAt(20, TOWER_ARM_Y, 0);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

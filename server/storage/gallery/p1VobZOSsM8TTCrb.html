@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>刚架桥受力原理演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: #f4f6f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        h2 { color: #2c3e50; margin-bottom: 5px; }
+        .subtitle { color: #7f8c8d; font-size: 14px; margin-bottom: 20px; }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 850px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            border: 1px solid #ecf0f1;
+            border-radius: 8px;
+            background: radial-gradient(circle at center, #ffffff 0%, #f0f4f8 100%);
+        }
+
+        .controls {
+            width: 100%;
+            margin-top: 20px;
+            padding: 20px;
+            background: #eef2f3;
+            border-radius: 8px;
+            display: flex;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .slider-group {
+            flex: 1;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: #e74c3c;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            min-width: 400px;
+        }
+
+        .metric-box {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #bdc3c7;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .metric-box.thrust { border-left-color: #e67e22; }
+        .metric-box.moment { border-left-color: #8e44ad; }
+
+        .val { font-size: 18px; font-weight: bold; display: block; color: #2c3e50; }
+        .label { font-size: 12px; color: #7f8c8d; }
+
+        .info-panel {
+            margin-top: 15px;
+            background: #fff8e1;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1.6;
+            border: 1px solid #ffe0b2;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .highlight { color: #d35400; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>刚架桥 (Rigid Frame Bridge)</h2>
+    <div class="subtitle">梁柱刚性连接：既像梁受弯，又像柱受压，还有拱的推力</div>
+
+    <div class="container">
+        <canvas id="bridgeCanvas" width="800" height="450"></canvas>
+
+        <div class="controls">
+            <div class="slider-group">
+                <label style="font-weight:bold; display:flex; justify-content:space-between;">
+                    <span>竖向荷载 (Load)</span>
+                    <span id="loadDisplay" style="color:#e74c3c">0 kN</span>
+                </label>
+                <input type="range" id="loadSlider" min="0" max="100" value="0">
+            </div>
+
+            <div class="metrics">
+                <div class="metric-box thrust">
+                    <span class="val" id="valThrust">0 kN</span>
+                    <span class="label">水平推力 (Thrust)</span>
+                </div>
+                <div class="metric-box moment">
+                    <span class="val" id="valMoment">0 kNm</span>
+                    <span class="label">节点负弯矩 (Corner Moment)</span>
+                </div>
+                <div class="metric-box">
+                    <span class="val" id="valSpanMoment">0 kNm</span>
+                    <span class="label">跨中正弯矩 (Mid-Span)</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <strong>结构特点解析：</strong>
+            <ul style="margin: 5px 0 0 20px; padding:0;">
+                <li><strong>刚性节点 (Rigid Joint)：</strong> 观察横梁和立柱的转角处。当横梁向下弯曲时，它像杠杆一样“强行”带动立柱向内弯曲。</li>
+                <li><strong>内力重分布：</strong> 这种刚性连接把本来完全由横梁承担的弯矩，分了一部分给立柱（节点负弯矩）。结果是：<span class="highlight">梁的跨中弯矩变小了</span>，梁就可以做得更薄。</li>
+                <li><strong>有推力结构：</strong> 观察柱脚的箭头。立柱倾向于向外张开，因此基础必须提供向内的水平反力。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('bridgeCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 几何参数 ---
+        const cx = canvas.width / 2;
+        const groundY = 380;
+        const height = 200; // 柱高
+        const span = 400;   // 跨度
+        const beamThick = 25;
+        const colThick = 30; // 柱子稍微粗一点
+
+        // 初始坐标 (未变形)
+        const L_Foot_X = cx - span/2;
+        const R_Foot_X = cx + span/2;
+        const Top_Y = groundY - height;
+
+        let load = 0; // 0 - 100
+
+        function loop() {
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 绘制环境
+            drawEnvironment();
+
+            // 2. 计算变形
+            // 刚架桥变形逻辑：
+            // - 梁跨中下沉 (dy)
+            // - 节点处转角 (theta) -> 导致柱子弯曲
+            // - 假设柱脚固定 (Fixed) 或 铰接 (Hinged)，这里模拟固接或双铰，重点展示柱身弯曲
+            
+            const maxDeflection = 60; // 最大下挠像素
+            const currentDeflection = (load / 100) * maxDeflection;
+            
+            // 节点位置 (略微下沉，刚架桥柱子会有压缩，但主要体现梁的下挠)
+            const cornerDrop = currentDeflection * 0.1; 
+            const cornerY = Top_Y + cornerDrop;
+
+            // 柱子弯曲控制点：
+            // 梁下弯导致节点转动，迫使柱子向外鼓出或向内收缩？
+            // 在竖向荷载下，门式刚架的柱脚有向外的趋势。
+            // 柱子形状会呈现出向外的凸起（如果柱脚铰接）或S形（如果柱脚固接）。
+            // 为了教学直观，我们模拟柱子稍微向外“鼓”一点，表现受压和弯矩。
+            const bulge = (load / 100) * 15; 
+
+            // 3. 绘制刚架 (Rigid Frame)
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            // 颜色：受力越大越深
+            const stressColor = `rgb(${50 + load*1.5}, ${60}, ${80 + load*0.5})`;
+            ctx.fillStyle = stressColor;
+            ctx.strokeStyle = "#2c3e50";
+            ctx.lineWidth = 2;
+
+            ctx.beginPath();
+            
+            // --- 外轮廓 ---
+            // 左柱脚外侧
+            ctx.moveTo(L_Foot_X - colThick/2, groundY);
+            // 左柱外侧曲线 (向左鼓)
+            ctx.quadraticCurveTo(L_Foot_X - colThick/2 - bulge, (groundY + cornerY)/2, L_Foot_X - colThick/2, cornerY);
+            // 左上节点外侧 -> 梁上缘 -> 右上节点外侧
+            // 梁上缘下凹
+            ctx.quadraticCurveTo(cx, cornerY + currentDeflection, R_Foot_X + colThick/2, cornerY);
+            // 右柱外侧曲线 (向右鼓)
+            ctx.quadraticCurveTo(R_Foot_X + colThick/2 + bulge, (groundY + cornerY)/2, R_Foot_X + colThick/2, groundY);
+            
+            // --- 内轮廓 (闭合路径) ---
+            // 右柱脚内侧
+            ctx.lineTo(R_Foot_X - colThick/2, groundY);
+            // 右柱内侧曲线
+            ctx.quadraticCurveTo(R_Foot_X - colThick/2 + bulge, (groundY + cornerY)/2, R_Foot_X - colThick/2, cornerY + beamThick);
+            // 梁下缘 (下凹更多)
+            ctx.quadraticCurveTo(cx, cornerY + beamThick + currentDeflection, L_Foot_X + colThick/2, cornerY + beamThick);
+            // 左柱内侧曲线
+            ctx.quadraticCurveTo(L_Foot_X + colThick/2 - bulge, (groundY + cornerY)/2, L_Foot_X + colThick/2, groundY);
+            
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 4. 绘制节点刚性示意 (Corner Reinforcement)
+            // 在角落画个虚线框或加深颜色，强调这里是连在一起的
+            drawRigidCorner(L_Foot_X, cornerY, load);
+            drawRigidCorner(R_Foot_X, cornerY, load);
+
+            // 5. 绘制荷载
+            if (load > 0) {
+                drawTruck(cx, cornerY + currentDeflection);
+                drawForceArrow(cx, cornerY + currentDeflection, load, 'load');
+            }
+
+            // 6. 绘制受力图示 (Forces & Moments)
+            if (load > 5) {
+                drawReactions(L_Foot_X, R_Foot_X, groundY, load);
+                drawCornerMoments(L_Foot_X, R_Foot_X, cornerY, load);
+            }
+        }
+
+        // 绘制环境 (地面)
+        function drawEnvironment() {
+            // 地面
+            ctx.fillStyle = "#bdc3c7";
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            
+            // 基础块
+            ctx.fillStyle = "#7f8c8d";
+            ctx.fillRect(L_Foot_X - 40, groundY, 80, 40);
+            ctx.fillRect(R_Foot_X - 40, groundY, 80, 40);
+
+            // 标尺线 (未变形的梁顶位置)
+            ctx.beginPath();
+            ctx.strokeStyle = "#ccc";
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(0, Top_Y);
+            ctx.lineTo(canvas.width, Top_Y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 绘制刚性节点高亮
+        function drawRigidCorner(x, y, mag) {
+            // 在梁柱交接处画一个加深的区域，表示应力集中
+            ctx.save();
+            ctx.fillStyle = `rgba(231, 76, 60, ${mag/200})`; // 红色透明度随载重增加
+            ctx.beginPath();
+            ctx.arc(x, y + beamThick/2, 40, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 绘制反力和弯矩
+        function drawReactions(lx, rx, y, mag) {
+            const scale = mag / 2;
+            
+            // 1. 垂直反力 (向上) - 柱子承压
+            drawArrow(lx, y + 60, lx, y, "#2980b9", "N");
+            drawArrow(rx, y + 60, rx, y, "#2980b9", "N");
+
+            // 2. 水平推力 (向内) - 抵抗柱脚外移
+            // 刚架桥是有推力结构
+            drawArrow(lx - 10 - scale, y - 10, lx - 10, y - 10, "#e67e22", "H");
+            drawArrow(rx + 10 + scale, y - 10, rx + 10, y - 10, "#e67e22", "H");
+        }
+
+        // 绘制节点弯矩 (Curved Arrows)
+        function drawCornerMoments(lx, rx, y, mag) {
+            const radius = 30;
+            ctx.strokeStyle = "#8e44ad"; // 紫色表示弯矩
+            ctx.lineWidth = 3;
+            
+            // 左节点弯矩 (逆时针抵抗)
+            ctx.beginPath();
+            // 画一段圆弧
+            ctx.arc(lx, y + 20, radius, Math.PI, 1.5 * Math.PI);
+            ctx.stroke();
+            // 箭头
+            drawArrowHead(lx, y + 20 - radius, 0, "#8e44ad");
+
+            // 右节点弯矩 (顺时针抵抗)
+            ctx.beginPath();
+            ctx.arc(rx, y + 20, radius, 1.5 * Math.PI, 2 * Math.PI);
+            ctx.stroke();
+            // 箭头
+            drawArrowHead(rx + radius, y + 20, Math.PI/2, "#8e44ad");
+            
+            // 标注
+            ctx.fillStyle = "#8e44ad";
+            ctx.font = "bold 14px Arial";
+            ctx.fillText("M", lx - 35, y);
+            ctx.fillText("M", rx + 25, y);
+        }
+
+        // 通用箭头绘制
+        function drawArrow(x1, y1, x2, y2, color, label) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // 箭头头
+            let angle = Math.atan2(y2 - y1, x2 - x1);
+            drawArrowHead(x2, y2, angle, color);
+
+            if (label) {
+                ctx.font = "bold 14px Arial";
+                ctx.fillText(label, x1 + (x2-x1)/2 + 10, y1 + (y2-y1)/2);
+            }
+        }
+
+        function drawArrowHead(x, y, angle, color) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-10, -5);
+            ctx.lineTo(-10, 5);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawForceArrow(x, y, mag, type) {
+            const len = mag * 1.5;
+            drawArrow(x, y, x, y + 30 + len, "#e74c3c", "Load");
+        }
+
+        function drawTruck(x, y) {
+            ctx.save();
+            ctx.translate(x, y - 5); // 放在梁面上
+            // 简单的卡车形状
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(-20, -20, 40, 15); // 车身
+            ctx.fillStyle = "#333";
+            ctx.beginPath(); ctx.arc(-15, -5, 5, 0, Math.PI*2); ctx.fill(); // 轮
+            ctx.beginPath(); ctx.arc(15, -5, 5, 0, Math.PI*2); ctx.fill(); // 轮
+            ctx.restore();
+        }
+
+        // 交互事件
+        const slider = document.getElementById('loadSlider');
+        slider.addEventListener('input', (e) => {
+            load = parseInt(e.target.value);
+            document.getElementById('loadDisplay').innerText = (load * 10) + " kN";
+            
+            // 模拟数值
+            // 推力 H
+            let H = (load * 5).toFixed(0);
+            document.getElementById('valThrust').innerText = H + " kN";
+
+            // 节点弯矩 M_corner (负弯矩)
+            // 刚架桥节点分担了弯矩
+            let M_corner = (load * 8).toFixed(0);
+            document.getElementById('valMoment').innerText = "-" + M_corner + " kNm";
+
+            // 跨中弯矩 M_span (正弯矩)
+            // 假如是简支梁，M_span 会很大 (例如 load * 12)
+            // 因为有刚性节点，M_span 减小了
+            let M_span = (load * 4).toFixed(0); 
+            document.getElementById('valSpanMoment').innerText = "+" + M_span + " kNm";
+        });
+
+        // 启动
+        loop();
+
+    </script>
+</body>
+</html>

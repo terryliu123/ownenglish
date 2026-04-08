@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f8ff;
+        }
+        .problem-container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .scenarios {
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        .scenario {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .road {
+            width: 100%;
+            height: 40px;
+            background-color: #d2b48c;
+            position: relative;
+            margin: 40px 0 20px;
+            border-radius: 10px;
+            border: 3px solid #8b4513;
+        }
+        .circular-container {
+            width: 200px;
+            height: 200px;
+            position: relative;
+            margin: 20px auto;
+        }
+        .circular-road {
+            width: 100%;
+            height: 100%;
+            background-color: #d2b48c;
+            border-radius: 50%;
+            border: 3px solid #8b4513;
+            position: relative;
+        }
+        .tree {
+            position: absolute;
+            width: 30px;
+            height: 50px;
+            bottom: 10px;
+            transform: translateX(-50%);
+            transition: all 0.5s ease-in-out;
+            opacity: 0;
+        }
+        .circular-tree {
+            position: absolute;
+            width: 30px;
+            height: 50px;
+            transform-origin: center bottom;
+            transition: all 0.5s ease-in-out;
+            opacity: 0;
+        }
+        .tree-icon {
+            width: 100%;
+            height: 100%;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="%23008000" d="M50 10L20 60h10l-10 30h80L70 60h10z"/><circle cx="50" cy="10" r="8" fill="%23ff6347"/></svg>');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+        }
+        .marker {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+        }
+        .calculation {
+            background-color: #e1f7d5;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border: 2px dashed #4caf50;
+            width: 100%;
+        }
+        .highlight {
+            color: #e91e63;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #388e3c;
+        }
+        h2 {
+            color: #2e7d32;
+            text-align: center;
+        }
+        h3 {
+            color: #2e7d32;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+        .comparison {
+            background-color: #fff9c4;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            border: 2px solid #ffd600;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="problem-container">
+        <h2>🌳 植树问题对比 🌳</h2>
+        <p>同学们在全长100m的小路植树，每隔5m栽一棵，比较两种情况：</p>
+        
+        <div class="scenarios">
+            <div class="scenario">
+                <h3>直线道路（两端都栽）</h3>
+                <div class="road" id="straightRoad"></div>
+                <div class="calculation" id="straightCalc">
+                    <p>间隔数：100 ÷ 5 = <span class="highlight">20个</span></p>
+                    <p>树的数量 = 间隔数 + 1 = <span class="highlight">21棵</span></p>
+                </div>
+            </div>
+            
+            <div class="scenario">
+                <h3>环形道路</h3>
+                <div class="circular-container">
+                    <div class="circular-road" id="circularRoad"></div>
+                </div>
+                <div class="calculation" id="circularCalc">
+                    <p>间隔数：100 ÷ 5 = <span class="highlight">20个</span></p>
+                    <p>树的数量 = 间隔数 = <span class="highlight">20棵</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">开始演示</button>
+            <button id="resetBtn">重置</button>
+        </div>
+        
+        <div class="comparison" id="comparison">
+            <h3>对比分析</h3>
+            <p>直线道路：首尾各需要1棵树，所以树数 = 间隔数 + 1</p>
+            <p>环形道路：首尾共用1棵树，所以树数 = 间隔数</p>
+            <p><strong>关键区别：环形道路没有真正的"两端"！</strong></p>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const straightRoad = document.getElementById('straightRoad');
+        const circularRoad = document.getElementById('circularRoad');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const straightCalc = document.getElementById('straightCalc');
+        const circularCalc = document.getElementById('circularCalc');
+        const comparison = document.getElementById('comparison');
+        
+        // 参数设置
+        const roadLength = 100; // 100米
+        const interval = 5; // 5米间隔
+        const straightTreeCount = roadLength / interval + 1; // 直线21棵
+        const circularTreeCount = roadLength / interval; // 环形20棵
+        
+        // 初始隐藏计算过程和对比
+        straightCalc.style.display = 'none';
+        circularCalc.style.display = 'none';
+        comparison.style.display = 'none';
+        
+        // 创建直线道路树木
+        function createStraightTrees() {
+            straightRoad.innerHTML = '';
+            for (let i = 0; i < straightTreeCount; i++) {
+                const position = (i * interval) / roadLength * 100;
+                
+                const tree = document.createElement('div');
+                tree.className = 'tree';
+                tree.style.left = `${position}%`;
+                
+                const treeIcon = document.createElement('div');
+                treeIcon.className = 'tree-icon';
+                tree.appendChild(treeIcon);
+                
+                // 每隔20米显示标记
+                if (i % 4 === 0 || i === straightTreeCount - 1) {
+                    const marker = document.createElement('div');
+                    marker.className = 'marker';
+                    marker.textContent = `${i * interval}m`;
+                    tree.appendChild(marker);
+                }
+                
+                straightRoad.appendChild(tree);
+            }
+        }
+        
+        // 创建环形道路树木
+        function createCircularTrees() {
+            circularRoad.innerHTML = '';
+            const containerWidth = 200; // 容器宽度
+            const containerHeight = 200; // 容器高度
+            const roadWidth = 30; // 道路宽度
+            const treeRadius = 100; // 树木分布半径 - 调整为圆形道路的半径
+            
+            for (let i = 0; i < circularTreeCount; i++) {
+                const angle = (i / circularTreeCount) * 2 * Math.PI;
+                // 计算树木中心位置
+                const x = containerWidth/2 + treeRadius * Math.cos(angle - Math.PI/2);
+                const y = containerHeight/2 + treeRadius * Math.sin(angle - Math.PI/2)-8;
+                
+                const tree = document.createElement('div');
+                tree.className = 'circular-tree';
+                tree.style.left = `${x - 15}px`; // 调整15px（树宽的一半）使树干位于圆上
+                tree.style.top = `${y - 40}px`; // 调整为40px，使树木向上移动更多
+                // 让树木垂直于道路方向
+                tree.style.transform = `rotate(${angle}rad)`;
+                
+                const treeIcon = document.createElement('div');
+                treeIcon.className = 'tree-icon';
+                tree.appendChild(treeIcon);
+                
+                circularRoad.appendChild(tree);
+            }
+        }
+        
+        // 动画显示直线树木
+        function animateStraightTrees() {
+            const trees = straightRoad.querySelectorAll('.tree');
+            let delay = 0;
+            
+            trees.forEach((tree, index) => {
+                setTimeout(() => {
+                    tree.style.opacity = '1';
+                    tree.style.transform = 'translateX(-50%) translateY(-10px)';
+                    
+                    setTimeout(() => {
+                        tree.style.transform = 'translateX(-50%)';
+                    }, 300);
+                    
+                    // 如果是最后一棵树，显示计算过程
+                    if (index === trees.length - 1) {
+                        setTimeout(() => {
+                            straightCalc.style.display = 'block';
+                            straightCalc.style.animation = 'fadeIn 1s';
+                        }, 500);
+                    }
+                }, delay);
+                
+                delay += 200; // 每棵树间隔200毫秒出现
+            });
+            
+            return delay + 500; // 返回动画总时长
+        }
+        
+        // 动画显示环形树木
+        function animateCircularTrees(startDelay) {
+            const trees = circularRoad.querySelectorAll('.circular-tree');
+            let delay = startDelay || 0;
+            
+            trees.forEach((tree, index) => {
+                setTimeout(() => {
+                    tree.style.opacity = '1';
+                    const currentTransform = tree.style.transform;
+                    tree.style.transform = currentTransform + ' scale(1.2)';
+                    
+                    setTimeout(() => {
+                        tree.style.transform = currentTransform;
+                    }, 300);
+                    
+                    // 如果是最后一棵树，显示计算过程和对比
+                    if (index === trees.length - 1) {
+                        setTimeout(() => {
+                            circularCalc.style.display = 'block';
+                            circularCalc.style.animation = 'fadeIn 1s';
+                            
+                            setTimeout(() => {
+                                comparison.style.display = 'block';
+                                comparison.style.animation = 'fadeIn 1s';
+                            }, 500);
+                        }, 500);
+                    }
+                }, delay);
+                
+                delay += 200; // 每棵树间隔200毫秒出现
+            });
+        }
+        
+        // 重置演示
+        function resetAnimation() {
+            // 直线道路
+            const straightTrees = straightRoad.querySelectorAll('.tree');
+            straightTrees.forEach(tree => {
+                tree.style.opacity = '0';
+                tree.style.transform = 'translateX(-50%)';
+            });
+            straightCalc.style.display = 'none';
+            
+            // 环形道路
+            const circularTrees = circularRoad.querySelectorAll('.circular-tree');
+            circularTrees.forEach(tree => {
+                tree.style.opacity = '0';
+                tree.style.transform = tree.style.transform.replace(/scale\([^)]*\)/, '');
+            });
+            circularCalc.style.display = 'none';
+            comparison.style.display = 'none';
+        }
+        
+        // 初始化
+        createStraightTrees();
+        createCircularTrees();
+        
+        // 事件监听
+        startBtn.addEventListener('click', () => {
+            resetAnimation();
+            const straightDuration = animateStraightTrees();
+            setTimeout(() => animateCircularTrees(), straightDuration);
+        });
+        
+        resetBtn.addEventListener('click', resetAnimation);
+    </script>
+</body>
+</html>

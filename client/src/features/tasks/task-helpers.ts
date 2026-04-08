@@ -13,8 +13,9 @@ const HIDDEN_TASK_TYPES = new Set(['sorting', 'image_understanding', 'error_corr
 export function getTaskTypesForMode(mode: TaskMode) {
   return TASK_TYPES.filter((item) => {
     if (mode === 'reading') return item.id === 'reading'
+    if (mode === 'experiment') return item.id === 'experiment'
     if (HIDDEN_TASK_TYPES.has(item.id)) return false
-    return item.id !== 'reading'
+    return item.id !== 'reading' && item.id !== 'experiment'
   })
 }
 

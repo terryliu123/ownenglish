@@ -14,6 +14,7 @@ interface HistoryListProps {
   formatHistoryItemTime: (item: TaskHistoryItem) => string | null
   compareHistoryItems: (a: TaskHistoryItem, b: TaskHistoryItem) => number
   getHistoryItemKey: (item: TaskHistoryItem) => string
+  isHistoryItemViewable: (item: TaskHistoryItem) => boolean
   t: (key: string) => string
   tWithParams: (key: string, params: Record<string, string | number>) => string
 }
@@ -31,6 +32,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
   formatHistoryItemTime,
   compareHistoryItems,
   getHistoryItemKey,
+  isHistoryItemViewable,
   t,
   tWithParams,
 }) => {
@@ -71,7 +73,9 @@ export const HistoryList: React.FC<HistoryListProps> = ({
           />
         </div>
         <div className="space-y-3 max-h-96 overflow-y-auto">
-          {filteredHistory.map((item, index) => (
+          {filteredHistory.map((item, index) => {
+            const viewable = isHistoryItemViewable(item)
+            return (
             <div
               key={getHistoryItemKey(item)}
               className="p-4 rounded-xl"
@@ -130,7 +134,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                       className="solid-button py-1.5 px-3 text-sm"
                       onClick={() => onEnterActiveTask(item)}
                     >
-                      {t('teacherLive.enterClass')}
+                      {t('teacherLive.viewActiveTask')}
                     </button>
                   )}
                   {item.status === 'active' && (
@@ -146,6 +150,7 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                       {onViewAnalysis && (
                         <button
                           className="ghost-button py-1.5 px-3 text-sm"
+                          disabled={!viewable}
                           onClick={() => onViewAnalysis(item)}
                         >
                           {t('teacherLive.viewAnalysis')}
@@ -154,17 +159,24 @@ export const HistoryList: React.FC<HistoryListProps> = ({
                       {onViewDetails && (
                         <button
                           className="solid-button py-1.5 px-3 text-sm"
+                          disabled={!viewable}
                           onClick={() => onViewDetails(item)}
                         >
                           {t('teacherLive.viewDetails')}
                         </button>
+                      )}
+                      {!viewable && (
+                        <span className="text-xs" style={{ color: 'var(--muted)' }}>
+                          {t('teacherLive.noSubmissionData')}
+                        </span>
                       )}
                     </>
                   )}
                 </div>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </section>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>广义相对论：时空弯曲模拟</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Arial', sans-serif; }
+        
+        /* UI 面板 */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #00ffcc;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #00ffcc;
+            padding: 20px;
+            border-radius: 8px;
+            pointer-events: auto;
+            width: 280px;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.2);
+        }
+
+        h1 {
+            margin: 0 0 15px 0;
+            font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .control-group { margin-bottom: 15px; }
+        label { display: block; font-size: 12px; margin-bottom: 5px; color: #aaa; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        
+        .info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        /* 简单的辉光文字 */
+        .glow-text {
+            text-shadow: 0 0 5px #00ffcc;
+        }
+    </style>
+    <!-- 引入 Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="ui-panel">
+        <h1>🌌 General Relativity</h1>
+        
+        <div class="control-group">
+            <label>中心质量 (时空曲率深度)</label>
+            <input type="range" id="massSlider" min="0" max="100" value="50">
+        </div>
+
+        <div class="control-group">
+            <label>行星速度 (Time Scale)</label>
+            <input type="range" id="speedSlider" min="0" max="100" value="30">
+        </div>
+
+        <div class="info">
+            <p><strong>视觉原理：</strong></p>
+            <p>1. <strong>网格 (Grid)</strong> 代表时空。大质量物体导致网格凹陷（弯曲）。</p>
+            <p>2. <strong>小球</strong> 沿着网格的“测地线”滚动，形成了我们看到的椭圆轨道。</p>
+            <p>拖动鼠标旋转视角，滚轮缩放。</p>
+        </div>
+        <div style="margin-top:10px; text-align:center;">
+            <button onclick="resetPlanet()" style="background:#00ffcc; border:none; padding:5px 15px; cursor:pointer; font-weight:bold;">重置行星位置</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 1. 场景初始化 ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000000, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 30, 40); // 俯视角度
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.autoRotate = false;
+
+        // --- 2. 创建物体 ---
+
+        // A. 中心天体 (Massive Star / Black Hole)
+        const starGeo = new THREE.SphereGeometry(2, 32, 32);
+        const starMat = new THREE.MeshBasicMaterial({ 
+            color: 0xffaa00, 
+            transparent: true, 
+            opacity: 0.9 
+        });
+        const star = new THREE.Mesh(starGeo, starMat);
+        scene.add(star);
+
+        // 添加发光效果 (Glow Sprite)
+        const spriteMat = new THREE.SpriteMaterial({ 
+            map: new THREE.TextureLoader().load('https://threejs.org/examples/textures/sprites/glow.png'), 
+            color: 0xffaa00, 
+            transparent: true, 
+            blending: THREE.AdditiveBlending
+        });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.scale.set(15, 15, 1);
+        star.add(sprite);
+
+        // B. 时空网格 (Spacetime Fabric)
+        // 使用 PlaneGeometry，我们将在每一帧动态修改它的顶点高度
+        const SEGMENTS = 60; // 网格密度
+        const SIZE = 60;
+        const planeGeo = new THREE.PlaneGeometry(SIZE, SIZE, SEGMENTS, SEGMENTS);
+        
+        // 旋转平面使其水平
+        planeGeo.rotateX(-Math.PI / 2);
+
+        // 创建线框材质
+        const planeMat = new THREE.MeshBasicMaterial({ 
+            color: 0x0088ff, 
+            wireframe: true,
+            transparent: true,
+            opacity: 0.3
+        });
+        const spacetime = new THREE.Mesh(planeGeo, planeMat);
+        scene.add(spacetime);
+
+        // 保存原始顶点位置以便计算
+        const originalPositions = planeGeo.attributes.position.array.slice();
+
+        // C. 行星 (Planet)
+        const planetGeo = new THREE.SphereGeometry(0.8, 16, 16);
+        const planetMat = new THREE.MeshBasicMaterial({ color: 0x00ff88 });
+        const planet = new THREE.Mesh(planetGeo, planetMat);
+        scene.add(planet);
+
+        // 行星轨迹线
+        const trailSize = 100;
+        const trailGeo = new THREE.BufferGeometry();
+        const trailPos = new Float32Array(trailSize * 3);
+        trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPos, 3));
+        const trailMat = new THREE.LineBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.5 });
+        const trail = new THREE.Line(trailGeo, trailMat);
+        scene.add(trail);
+
+        // --- 3. 物理变量 ---
+        let massStrength = 50; // 由滑块控制
+        let simSpeed = 0.3;    // 时间流速
+
+        // 行星物理状态
+        let pos = new THREE.Vector3(15, 0, 0);
+        let vel = new THREE.Vector3(0, 0, 1.8); // 初始切向速度
+        const G = 0.5; // 模拟引力常数
+
+        // --- 4. 核心计算逻辑 ---
+
+        // 更新时空网格曲率
+        function updateSpacetime() {
+            const positions = spacetime.geometry.attributes.position.array;
+            
+            // 遍历所有顶点
+            for (let i = 0; i < originalPositions.length; i += 3) {
+                const x = originalPositions[i];
+                const z = originalPositions[i + 2];
+                
+                // 计算距离中心的距离 (平面距离)
+                const dist = Math.sqrt(x * x + z * z);
+                
+                // 相对论核心形象化：距离越近，空间下陷越深
+                // 使用负指数或反比例函数来模拟引力势井 -mass / dist
+                // 为了避免除以0，加一个 clamp
+                const effectiveDist = Math.max(dist, 1.5); 
+                const depression = -(massStrength * 0.5) / effectiveDist;
+
+                // 更新 Y 轴高度
+                positions[i + 1] = depression;
+            }
+            spacetime.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // 更新行星物理
+        function updatePlanet() {
+            // 1. 计算引力 (牛顿近似，但在曲面背景下看起来像广义相对论)
+            const distSq = pos.x * pos.x + pos.z * pos.z;
+            const dist = Math.sqrt(distSq);
+            
+            // 引力方向：指向中心
+            const forceDir = pos.clone().normalize().negate();
+            
+            // 引力大小 F = G * M / r^2
+            // 这里 M = massStrength
+            const forceMag = (G * massStrength) / distSq;
+            
+            const acc = forceDir.multiplyScalar(forceMag);
+
+            // 2. 更新速度和位置 (Euler Integration)
+            vel.add(acc.multiplyScalar(simSpeed));
+            const stepMove = vel.clone().multiplyScalar(simSpeed);
+            pos.add(stepMove);
+
+            // 3. 映射到弯曲的时空表面
+            // 我们需要计算行星当前位置对应的时空“深度”
+            const effectiveDist = Math.max(dist, 1.5);
+            const depression = -(massStrength * 0.5) / effectiveDist;
+            
+            planet.position.set(pos.x, depression, pos.z);
+
+            // 4. 如果太近被吞噬
+            if (dist < 2.5) {
+                resetPlanet();
+            }
+
+            updateTrail();
+        }
+
+        // 更新轨迹线
+        let trailIdx = 0;
+        function updateTrail() {
+            const positions = trail.geometry.attributes.position.array;
+            // 移动数组数据，形成拖尾
+            for (let i = 0; i < (trailSize - 1) * 3; i++) {
+                positions[i] = positions[i+3]; // 向前移位
+            }
+            // 设置最后一个点为当前位置
+            positions[(trailSize - 1) * 3] = planet.position.x;
+            positions[(trailSize - 1) * 3 + 1] = planet.position.y + 0.2; // 稍微抬高防止穿模
+            positions[(trailSize - 1) * 3 + 2] = planet.position.z;
+            
+            trail.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // 全局重置函数
+        window.resetPlanet = function() {
+            pos.set(15 + Math.random()*5, 0, 0);
+            // 赋予一个足以对抗引力的切向速度
+            const startDist = pos.length();
+            // v = sqrt(GM/r) 是圆轨道速度，稍微加一点点随机性变成椭圆
+            const orbitalVel = Math.sqrt((G * massStrength) / startDist);
+            vel.set(0, 0, orbitalVel * (0.8 + Math.random() * 0.4));
+            
+            // 清空轨迹
+            const positions = trail.geometry.attributes.position.array;
+            for(let i=0; i<positions.length; i++) positions[i] = 9999; 
+        }
+
+        // --- 5. 事件监听 ---
+        const massSlider = document.getElementById('massSlider');
+        const speedSlider = document.getElementById('speedSlider');
+
+        massSlider.addEventListener('input', (e) => {
+            massStrength = parseFloat(e.target.value);
+            // 质量改变颜色也改变，增强反馈
+            const hue = 0.1 + (massStrength / 200); // 橙色 -> 红色
+            star.material.color.setHSL(hue, 1, 0.5);
+            sprite.material.color.setHSL(hue, 1, 0.5);
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            simSpeed = parseFloat(e.target.value) / 100;
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 6. 动画循环 ---
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            updateSpacetime();
+            updatePlanet();
+
+            // 中心天体自转
+            star.rotation.y += 0.005;
+
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+    </script>
+</body>
+</html>

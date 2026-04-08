@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D 城市无人机模拟器</title>
+    <style>
+        :root {
+            --bg-color: #000;
+            --panel-bg: rgba(30, 30, 30, 0.85); /* 半透明面板 */
+            --text-color: #00ffcc;
+            --accent: #ff0055;
+        }
+
+        body { margin: 0; overflow: hidden; background: var(--bg-color); color: var(--text-color); font-family: 'Segoe UI', monospace; display: flex; height: 100vh; }
+
+        /* === 布局 === */
+        .sidebar {
+            width: 240px;
+            background: var(--panel-bg);
+            border-right: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            z-index: 10;
+            backdrop-filter: blur(5px); /* 毛玻璃特效 */
+        }
+        
+        .right-sidebar {
+            border-right: none;
+            border-left: 1px solid #333;
+        }
+
+        .viewport {
+            flex: 1;
+            position: relative;
+            background: #000;
+        }
+
+        h3 { border-bottom: 1px solid #444; padding-bottom: 5px; margin-top: 0; font-size: 14px; color: #888; letter-spacing: 1px; }
+
+        /* === 仪表盘组件 === */
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .val { color: #fff; font-weight: bold; }
+
+        .motor-bars { display: flex; gap: 10px; height: 120px; align-items: flex-end; padding: 10px 0; border-bottom: 1px solid #333; margin-bottom: 15px;}
+        .motor-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; }
+        .bar-track { width: 100%; flex: 1; background: #333; position: relative; border-radius: 2px; overflow: hidden; }
+        .bar-fill { position: absolute; bottom: 0; width: 100%; background: linear-gradient(to top, #00ffcc, #0088ff); transition: height 0.1s; }
+        .motor-name { margin-top: 5px; font-size: 10px; color: #888; }
+
+        .attitude-box {
+            width: 100%; height: 100px; background: #000; border: 1px solid #444;
+            position: relative; overflow: hidden; margin-bottom: 15px;
+        }
+        .horizon-line {
+            width: 150%; height: 2px; background: #00ffcc;
+            position: absolute; top: 50%; left: -25%;
+            transform-origin: center;
+        }
+        .center-cross {
+            position: absolute; top: 50%; left: 50%; width: 40px; height: 40px;
+            transform: translate(-50%, -50%);
+            border: 2px solid var(--accent); border-radius: 50%;
+        }
+        .center-dot {
+            width: 4px; height: 4px; background: var(--accent);
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        }
+
+        #overlay-help {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            text-align: center; color: rgba(255,255,255,0.8); font-size: 13px;
+            background: rgba(0,0,0,0.6); padding: 15px 30px; border-radius: 30px; pointer-events: none;
+            border: 1px solid #444;
+        }
+        kbd { background: #444; border: 1px solid #666; border-radius: 3px; padding: 2px 6px; color: #fff; margin: 0 2px;}
+
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h3>动力系统 (RPM)</h3>
+        <div class="motor-bars">
+            <div class="motor-col"><div class="bar-track"><div class="bar-fill" id="bar-m4"></div></div><div class="motor-name">M4</div></div>
+            <div class="motor-col"><div class="bar-track"><div class="bar-fill" id="bar-m1"></div></div><div class="motor-name">M1</div></div>
+            <div class="motor-col"><div class="bar-track"><div class="bar-fill" id="bar-m2"></div></div><div class="motor-name">M2</div></div>
+            <div class="motor-col"><div class="bar-track"><div class="bar-fill" id="bar-m3"></div></div><div class="motor-name">M3</div></div>
+        </div>
+        
+        <h3>状态监测</h3>
+        <div class="data-row"><span>油门 (THR):</span> <span class="val" id="val-thr">0%</span></div>
+        <div class="data-row"><span>G-Force:</span> <span class="val" id="val-force">0.0 G</span></div>
+    </div>
+
+    <div class="viewport" id="canvas-container">
+        <div id="overlay-help">
+            <div style="margin-bottom:8px; font-weight:bold; color:#00ffcc; letter-spacing:1px;">CITY DRONE SIM</div>
+            <div>升降: <kbd>↑</kbd> <kbd>↓</kbd> &nbsp;&nbsp; 转向: <kbd>←</kbd> <kbd>→</kbd></div>
+            <div style="margin-top:5px;">俯仰: <kbd>W</kbd> <kbd>S</kbd> &nbsp;&nbsp; 横滚: <kbd>A</kbd> <kbd>D</kbd></div>
+            <div style="margin-top:5px; color:#aaa; font-size:11px;">提示：大楼有碰撞体积，小心飞行！</div>
+        </div>
+    </div>
+
+    <div class="sidebar right-sidebar">
+        <h3>姿态仪 (Horizon)</h3>
+        <div class="attitude-box">
+            <div class="horizon-line" id="hud-horizon"></div>
+            <div class="center-cross"><div class="center-dot"></div></div>
+        </div>
+
+        <div class="data-row"><span>横滚 (Roll):</span> <span class="val" id="val-roll">0.0°</span></div>
+        <div class="data-row"><span>俯仰 (Pitch):</span> <span class="val" id="val-pitch">0.0°</span></div>
+        <div class="data-row"><span>偏航 (Yaw):</span> <span class="val" id="val-yaw">0.0°</span></div>
+        
+        <h3 style="margin-top:20px;">GPS / 高度</h3>
+        <div class="data-row"><span>相对高度:</span> <span class="val" style="color:var(--accent)" id="val-alt">0.00 m</span></div>
+        <div class="data-row"><span>垂直速度:</span> <span class="val" id="val-vs">0.0 m/s</span></div>
+    </div>
+
+    <script>
+        // === 1. 场景初始化 ===
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        // 城市迷雾颜色
+        const fogColor = 0x101520; 
+        scene.background = new THREE.Color(fogColor);
+        // 雾的浓度，遮挡远处未渲染区域，营造氛围
+        scene.fog = new THREE.FogExp2(fogColor, 0.012);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        camera.position.set(0, 5, 10);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        // === 2. 灯光系统 (城市夜景) ===
+        const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+        scene.add(ambientLight);
+
+        // 月光/城市主光
+        const dirLight = new THREE.DirectionalLight(0xaaccff, 0.8);
+        dirLight.position.set(50, 100, 50);
+        dirLight.castShadow = true;
+        // 扩大阴影范围以覆盖城市
+        dirLight.shadow.camera.top = 100;
+        dirLight.shadow.camera.bottom = -100;
+        dirLight.shadow.camera.left = -100;
+        dirLight.shadow.camera.right = 100;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        // 点光源 (起飞点高亮)
+        const startLight = new THREE.PointLight(0x00ffcc, 1, 20);
+        startLight.position.set(0, 2, 0);
+        scene.add(startLight);
+
+        // === 3. 城市生成系统 ===
+        
+        // 地面
+        const planeGeo = new THREE.PlaneGeometry(1000, 1000);
+        const planeMat = new THREE.MeshStandardMaterial({ 
+            color: 0x050505, 
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        // 起飞坪
+        const padGeo = new THREE.CylinderGeometry(3, 3, 0.2, 32);
+        const padMat = new THREE.MeshStandardMaterial({ color: 0x222, emissive: 0x111 });
+        const pad = new THREE.Mesh(padGeo, padMat);
+        pad.position.y = 0.1;
+        pad.receiveShadow = true;
+        scene.add(pad);
+        
+        // 环形灯带
+        const ringGeo = new THREE.TorusGeometry(2.8, 0.1, 8, 64);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.y = 0.21;
+        scene.add(ring);
+
+        // 建筑物生成器 (InstancedMesh)
+        const cityBuildings = []; // 用于碰撞检测的数据
+        
+        function createCity() {
+            const buildingCount = 400;
+            const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
+            // 建筑材质：深蓝灰色
+            const buildingMat = new THREE.MeshStandardMaterial({ 
+                color: 0x334455, 
+                roughness: 0.3,
+                metalness: 0.1
+            });
+
+            const instancedMesh = new THREE.InstancedMesh(buildingGeo, buildingMat, buildingCount);
+            instancedMesh.castShadow = true;
+            instancedMesh.receiveShadow = true;
+
+            const dummy = new THREE.Object3D();
+            const blockSize = 15; // 街区大小
+            const safeZone = 20;  // 中心安全区半径
+
+            let index = 0;
+            // 简单的网格城市布局
+            for (let x = -10; x <= 10; x++) {
+                for (let z = -10; z <= 10; z++) {
+                    if (index >= buildingCount) break;
+
+                    // 计算实际坐标
+                    const posX = x * blockSize + (Math.random() - 0.5) * 5;
+                    const posZ = z * blockSize + (Math.random() - 0.5) * 5;
+
+                    // 避开起飞区
+                    const dist = Math.sqrt(posX*posX + posZ*posZ);
+                    if (dist < safeZone) continue;
+
+                    // 随机高度和宽度
+                    const height = Math.random() * Math.random() * 60 + 5; // 5m - 65m
+                    const width = Math.random() * 5 + 5; // 5m - 10m 宽
+                    const depth = Math.random() * 5 + 5;
+
+                    dummy.position.set(posX, height / 2, posZ);
+                    dummy.rotation.y = Math.random() * 0.2; // 轻微旋转增加自然感
+                    dummy.scale.set(width, height, depth);
+                    dummy.updateMatrix();
+
+                    instancedMesh.setMatrixAt(index, dummy.matrix);
+                    
+                    // 存储简化的碰撞盒数据 (x, z, width, depth, height)
+                    cityBuildings.push({
+                        x: posX, z: posZ, 
+                        w: width, d: depth, h: height
+                    });
+
+                    index++;
+                }
+            }
+
+            scene.add(instancedMesh);
+        }
+
+        createCity();
+
+        // === 4. 无人机模型 ===
+        const droneGroup = new THREE.Group();
+        const propMeshes = [];
+
+        function createDrone() {
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 });
+            const armMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+            const propMat = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
+            const ledMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc }); // 尾灯
+
+            // 机身
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 1.5), bodyMat);
+            body.castShadow = true;
+            droneGroup.add(body);
+
+            // 尾灯
+            const tailLight = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.05, 0.1), ledMat);
+            tailLight.position.set(0, 0, 0.75);
+            droneGroup.add(tailLight);
+
+            // 机臂
+            const armGeo = new THREE.BoxGeometry(3.5, 0.1, 0.2);
+            const arm1 = new THREE.Mesh(armGeo, armMat);
+            arm1.rotation.y = Math.PI / 4;
+            const arm2 = new THREE.Mesh(armGeo, armMat);
+            arm2.rotation.y = -Math.PI / 4;
+            droneGroup.add(arm1, arm2);
+
+            // 电机位置
+            const positions = [
+                { x: -1.2, z: -1.2, dir: 1 }, { x: 1.2, z: -1.2, dir: -1 },
+                { x: 1.2, z: 1.2, dir: 1 },   { x: -1.2, z: 1.2, dir: -1 }
+            ];
+
+            positions.forEach(pos => {
+                const motor = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.3), armMat);
+                motor.position.set(pos.x, 0.1, pos.z);
+                droneGroup.add(motor);
+
+                const prop = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.02, 0.15), propMat);
+                prop.position.y = 0.2;
+                motor.add(prop);
+                propMeshes.push(prop);
+            });
+
+            droneGroup.position.y = 0.2; // 初始停在垫子上
+            scene.add(droneGroup);
+        }
+        createDrone();
+
+        // === 5. 物理与控制 ===
+        const physics = {
+            pos: new THREE.Vector3(0, 0.2, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            roll: 0, pitch: 0, yaw: 0,
+            gravity: 15.0,
+            thrustCoeff: 40.0,
+            drag: 0.97,
+            groundLimit: 0.2,
+            motors: [0,0,0,0],
+            crashed: false
+        };
+
+        const input = { thrust: 0, pitch: 0, roll: 0, yaw: 0 };
+        const keys = {};
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if(e.code === 'Space') resetGame();
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function resetGame() {
+            physics.pos.set(0, 0.2, 0);
+            physics.vel.set(0, 0, 0);
+            physics.roll = physics.pitch = physics.yaw = 0;
+            input.thrust = 0;
+            physics.crashed = false;
+            droneGroup.visible = true;
+        }
+
+        function checkCollisions() {
+            if(physics.crashed) return;
+
+            // 地面碰撞
+            if (physics.pos.y < physics.groundLimit) {
+                physics.pos.y = physics.groundLimit;
+                physics.vel.y = 0;
+                physics.vel.x *= 0.8;
+                physics.vel.z *= 0.8;
+            }
+
+            // 建筑碰撞 (AABB 简化检测)
+            // 只有当高度小于建筑物高度时才检测
+            const droneRad = 1.5; // 无人机半径
+            
+            for (let b of cityBuildings) {
+                // 高度判定
+                if (physics.pos.y < b.h) {
+                    // 水平判定
+                    const minX = b.x - b.w/2 - droneRad;
+                    const maxX = b.x + b.w/2 + droneRad;
+                    const minZ = b.z - b.d/2 - droneRad;
+                    const maxZ = b.z + b.d/2 + droneRad;
+
+                    if (physics.pos.x > minX && physics.pos.x < maxX && 
+                        physics.pos.z > minZ && physics.pos.z < maxZ) {
+                        // 发生碰撞
+                        physics.crashed = true;
+                        physics.vel.set(0,0,0);
+                        input.thrust = 0;
+                        alert("撞击建筑物！按空格键重置。");
+                    }
+                }
+            }
+        }
+
+        function updatePhysics(dt) {
+            if(physics.crashed) return;
+
+            // 输入平滑
+            if (keys['ArrowUp']) input.thrust = Math.min(input.thrust + 0.02, 1);
+            if (keys['ArrowDown']) input.thrust = Math.max(input.thrust - 0.02, 0);
+            
+            const targetP = (keys['KeyW'] ? -0.6 : (keys['KeyS'] ? 0.6 : 0));
+            const targetR = (keys['KeyA'] ? 0.6 : (keys['KeyD'] ? -0.6 : 0));
+            const targetY = (keys['ArrowLeft'] ? 0.04 : (keys['ArrowRight'] ? -0.04 : 0));
+
+            physics.pitch += (targetP - physics.pitch) * 0.1;
+            physics.roll += (targetR - physics.roll) * 0.1;
+            physics.yaw += targetY;
+
+            // 动力学
+            const lift = input.thrust * physics.thrustCoeff;
+            const liftVec = new THREE.Vector3(0, 1, 0);
+            liftVec.applyEuler(new THREE.Euler(physics.pitch, physics.yaw, physics.roll, 'YXZ'));
+            liftVec.multiplyScalar(lift);
+
+            const gravityVec = new THREE.Vector3(0, -physics.gravity, 0);
+            const accel = new THREE.Vector3().addVectors(liftVec, gravityVec);
+
+            physics.vel.add(accel.multiplyScalar(dt));
+            physics.vel.multiplyScalar(physics.drag);
+            physics.pos.add(physics.vel.clone().multiplyScalar(dt));
+
+            checkCollisions();
+
+            // 同步模型
+            droneGroup.position.copy(physics.pos);
+            droneGroup.rotation.order = 'YXZ';
+            droneGroup.rotation.x = physics.pitch;
+            droneGroup.rotation.y = physics.yaw;
+            droneGroup.rotation.z = physics.roll;
+
+            // 模拟电机数据
+            const rpmBase = input.thrust * 100;
+            physics.motors[0] = rpmBase + physics.pitch*30 + physics.roll*30;
+            physics.motors[1] = rpmBase + physics.pitch*30 - physics.roll*30;
+            physics.motors[2] = rpmBase - physics.pitch*30 - physics.roll*30;
+            physics.motors[3] = rpmBase - physics.pitch*30 + physics.roll*30;
+
+            // 桨叶动画
+            const speed = input.thrust * 20 + 0.5;
+            propMeshes.forEach((p, i) => {
+                const dir = (i % 2 === 0) ? 1 : -1;
+                p.rotation.y += speed * dir;
+            });
+        }
+
+        // === 6. 相机跟随 ===
+        function updateCamera() {
+            const offset = new THREE.Vector3(0, 2, 5); // 追尾视角
+            offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), physics.yaw);
+            const targetPos = physics.pos.clone().add(offset);
+            
+            // 相机稍微滞后，增加速度感
+            camera.position.lerp(targetPos, 0.1);
+            camera.lookAt(physics.pos.clone().add(new THREE.Vector3(0, 0.5, 0)));
+        }
+
+        // === 7. UI ===
+        function updateUI() {
+            const toDeg = rad => (rad * 180 / Math.PI).toFixed(1);
+            document.getElementById('val-roll').innerText = toDeg(physics.roll) + '°';
+            document.getElementById('val-pitch').innerText = toDeg(physics.pitch) + '°';
+            document.getElementById('val-yaw').innerText = (toDeg(physics.yaw)%360) + '°';
+            document.getElementById('val-alt').innerText = (physics.pos.y - 0.2).toFixed(1) + ' m';
+            document.getElementById('val-vs').innerText = physics.vel.y.toFixed(1) + ' m/s';
+            
+            document.getElementById('val-thr').innerText = Math.floor(input.thrust*100) + '%';
+            document.getElementById('val-force').innerText = (input.thrust * physics.thrustCoeff / physics.gravity).toFixed(2) + ' G';
+
+            // 电机条
+            for(let i=0; i<4; i++) {
+                const h = Math.min(100, Math.max(0, physics.motors[i]));
+                document.getElementById(`bar-m${i+1}`).style.height = h + '%';
+            }
+
+            // 姿态仪
+            const horiz = document.getElementById('hud-horizon');
+            horiz.style.transform = `translateY(${physics.pitch * 100}px) rotate(${-physics.roll}rad)`;
+        }
+
+        // === 循环 ===
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.1);
+            
+            updatePhysics(dt);
+            updateCamera();
+            updateUI();
+            
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分数学习互动课件</title>
+
+    <style>
+        /* 分数学习互动课件样式 */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 10px auto;
+            padding: 15px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 2rem;
+        }
+
+        h2 {
+            color: #3498db;
+            margin-bottom: 12px;
+            font-size: 1.3rem;
+        }
+
+        /* 模式切换样式 */
+        .mode-switch {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .mode-button {
+            padding: 10px 20px;
+            font-size: 1rem;
+            background-color: #ecf0f1;
+            color: #333;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-button:hover {
+            background-color: #3498db;
+            color: white;
+            border-color: #2980b9;
+        }
+
+        .mode-button.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #2980b9;
+        }
+
+        /* 操作说明区域样式 */
+        .instruction-box {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #dee2e6;
+        }
+
+        .instruction-box p {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .instruction-box ul {
+            list-style-type: disc;
+            margin-left: 16px;
+        }
+
+        .instruction-box li {
+            margin-bottom: 4px;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+
+        /* 分数显示样式 */
+        .fraction-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 15px auto;
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #e74c3c;
+            width: 100px;
+            position: relative;
+        }
+
+        .fraction-line {
+            width: 100%;
+            height: 4px;
+            background-color: #e74c3c;
+            margin: 5px 0;
+        }
+
+        /* 可视化区域样式 */
+        .visualization-container {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .visualization-section {
+            width: 48%;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .fraction-visual {
+            height: 200px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 8px;
+            margin-top: 8px;
+            position: relative;
+        }
+
+        /* 圆形表示样式 */
+        #circle-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .circle-part {
+            position: absolute;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            overflow: hidden;
+        }
+
+        .circle-segment {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            /* 移除固定的clip-path，将在JS中动态设置 */
+            /* clip-path: polygon(50% 50%, 50% 0, 100% 0, 100% 100%, 50% 100%); */
+            transform-origin: center center;
+            background-color: #ecf0f1;
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+
+        .circle-segment.active {
+            background-color: #e24f0b;
+
+        }
+
+        .circle-segment:hover {
+            background-color: #bdc3c7;
+        }
+
+        .circle-segment.active:hover {
+            background-color: #2980b9;
+        }
+
+        /* 条形表示样式 */
+        #bar-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .bar-part {
+            width: 90%;
+            height: 50px;
+            border: 2px solid #333;
+            display: flex;
+            margin: 0 auto;
+        }
+
+        .bar-segment {
+            flex: 1;
+            height: 100%;
+            border-right: 1px solid #333;
+            background-color: #ecf0f1;
+            transition: background-color 0.3s;
+            cursor: pointer;
+        }
+
+        .bar-segment:last-child {
+            border-right: none;
+        }
+
+        .bar-segment.active {
+            background-color: #3498db;
+        }
+
+        .bar-segment:hover {
+            background-color: #bdc3c7;
+        }
+
+        .bar-segment.active:hover {
+            background-color: #2980b9;
+        }
+
+        /* 控制区域样式 */
+        .controls {
+            margin-top: 20px;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        /* 确认按钮样式 */
+        #confirm-button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #confirm-button:hover {
+            background-color: #218838;
+        }
+
+        /* 自定义弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 300px;
+        }
+
+        #modal-message {
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        #modal-emoji {
+            font-size: 5em;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modal-close {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        #modal-close:hover {
+            background-color: #2980b9;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        label {
+            margin-right: 10px;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            margin: 0 10px;
+        }
+
+        #denominator-value {
+            font-weight: bold;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #c0392b;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .visualization-section {
+                width: 100%;
+                margin-bottom: 20px;
+            }
+
+            .fraction-display {
+                font-size: 2.5rem;
+            }
+
+            .slider-container {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            input[type="range"] {
+                width: 100%;
+                margin: 10px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>分数学习互动课件</h1>
+
+        <div class="instruction-box">
+            <div class="teaching-mode-instructions">
+                <p>教学模式操作说明：</p>
+                <ul>
+                    <li>使用下方滑动条调整分母（总份数）</li>
+                    <li>点击或拖动色块来改变分子（选中的份数）</li>
+                    <li>观察圆形和条形两种不同的分数表示方式</li>
+                </ul>
+            </div>
+            <div class="quiz-mode-instructions" style="display: none;">
+                <p>测验模式操作说明：</p>
+                <ul>
+                    <li>观察题目要求的分数，在圆形或条形图中选择对应数量的分块</li>
+                    <li>点击拖动分块可以选中单个或多个分块，选中的分块会变成蓝色</li>
+                    <li>确认分数选择无误后，点击下方绿色的"确认答案"按钮提交</li>
+                    <li>系统会立即判断答案是否正确，并给出相应提示</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 自定义弹窗 -->
+        <div class="modal">
+            <div class="modal-content">
+                <div id="modal-message"></div>
+                <div id="modal-emoji"></div>
+                <button id="modal-close">确定</button>
+            </div>
+        </div>
+
+        <div class="mode-switch">
+            <button class="mode-button active" data-mode="teaching">教学模式</button>
+            <button class="mode-button" data-mode="quiz">测验模式</button>
+        </div>
+
+        <div class="fraction-display">
+            <span id="numerator">0</span>
+            <span class="fraction-line"></span>
+            <span id="denominator">4</span>
+        </div>
+
+        <div class="visualization-container">
+            <div class="visualization-section">
+                <h2>圆形表示</h2>
+                <div id="circle-container" class="fraction-visual"></div>
+            </div>
+
+            <div class="visualization-section">
+                <h2>条形表示</h2>
+                <div id="bar-container" class="fraction-visual"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="slider-container">
+                <label for="denominator-slider">分母（总份数）：</label>
+                <input type="range" id="denominator-slider" min="2" max="10" value="4" step="1">
+                <span id="denominator-value">4</span>
+            </div>
+
+            <button id="reset-button">重置</button>
+            <button id="confirm-button" style="display: none;">确认答案</button>
+        </div>
+    </div>
+
+    <script>
+        // 分数学习互动课件脚本
+
+        // 等待DOM加载完成
+        document.addEventListener('DOMContentLoaded', function () {
+            // 当前模式（教学/测验）
+            let currentMode = 'teaching';
+            let quizAnswer = null;
+
+            // 获取自定义弹窗元素
+            const modal = document.querySelector('.modal');
+            const modalMessage = document.getElementById('modal-message');
+            const modalEmoji = document.getElementById('modal-emoji');
+            const modalClose = document.getElementById('modal-close');
+            const confirmButton = document.getElementById('confirm-button');
+
+            // 显示自定义弹窗
+            function showModal(message, isCorrect) {
+                modalMessage.textContent = message;
+                const modalEmoji = document.getElementById('modal-emoji');
+                modalEmoji.textContent = isCorrect ? '😊' : '😭';
+                modal.style.display = 'block';
+            }
+
+            // 隐藏自定义弹窗
+            function hideModal() {
+                modal.style.display = 'none';
+            }
+
+            // 关闭按钮点击事件
+            modalClose.addEventListener('click', function () {
+                hideModal();
+                if (currentMode === 'quiz' && selectedSegments.size === quizAnswer) {
+                    generateQuiz();
+                }
+            });
+
+            // 确认按钮点击事件
+            confirmButton.addEventListener('click', function () {
+                if (currentMode === 'quiz') {
+                    if (selectedSegments.size === quizAnswer) {
+                        showModal('恭喜你答对了！让我们继续下一题。', true);
+                        modalClose.addEventListener('click', function once() {
+                            generateQuiz();
+                            modalClose.removeEventListener('click', once);
+                        });
+                    } else {
+                        showModal('再试一次吧！提示：需要选择 ' + quizAnswer + ' 份。', false);
+                    }
+                }
+            });
+
+            // 获取模式切换按钮
+            const modeButtons = document.querySelectorAll('.mode-button');
+
+            // 模式切换处理
+            modeButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const mode = this.dataset.mode;
+                    if (mode !== currentMode) {
+                        // 更新按钮状态
+                        modeButtons.forEach(btn => btn.classList.remove('active'));
+                        this.classList.add('active');
+
+                        // 切换模式
+                        currentMode = mode;
+
+                        // 控制重置按钮和操作说明显示状态
+                        resetButton.style.display = mode === 'quiz' ? 'none' : 'inline-block';
+                        document.querySelector('.teaching-mode-instructions').style.display = mode === 'teaching' ? 'block' : 'none';
+                        document.querySelector('.quiz-mode-instructions').style.display = mode === 'quiz' ? 'block' : 'none';
+
+                        // 重置并根据模式初始化
+                        if (mode === 'quiz') {
+                            generateQuiz();
+                        } else {
+                            reset();
+                        }
+                    }
+                });
+            });
+
+            // 生成随机测验题目
+            function generateQuiz() {
+                // 随机生成分母（2-10）
+                denominator = Math.floor(Math.random() * 9) + 2;
+                denominatorSlider.value = denominator;
+
+                // 随机生成分子（1到分母-1）
+                quizAnswer = Math.floor(Math.random() * (denominator - 1)) + 1;
+                numerator = 0;
+
+                // 更新显示
+                updateFractionDisplay();
+                createCircleVisualization();
+                createBarVisualization();
+
+                // 禁用分母滑块，显示确认按钮
+                denominatorSlider.disabled = true;
+                confirmButton.style.display = 'inline-block';
+
+                // 清除所有选择
+                selectedSegments.clear();
+                document.querySelectorAll('.circle-segment, .bar-segment').forEach(seg => {
+                    seg.classList.remove('active');
+                });
+            }
+
+            // 获取DOM元素
+            const numeratorElement = document.getElementById('numerator');
+            const denominatorElement = document.getElementById('denominator');
+            const denominatorValue = document.getElementById('denominator-value');
+            const denominatorSlider = document.getElementById('denominator-slider');
+            const resetButton = document.getElementById('reset-button');
+            const circleContainer = document.getElementById('circle-container');
+            const barContainer = document.getElementById('bar-container');
+
+            // 初始化分数值
+            let numerator = 0;
+            let denominator = parseInt(denominatorSlider.value);
+
+            // 更新分数显示
+            function updateFractionDisplay() {
+                // 在测验模式下显示目标分数，在教学模式下显示当前选择的分数
+                numeratorElement.textContent = currentMode === 'quiz' ? quizAnswer : numerator;
+                denominatorElement.textContent = denominator;
+                denominatorValue.textContent = denominator;
+            }
+
+            // 创建圆形可视化
+            function createCircleVisualization() {
+                // 清空容器
+                circleContainer.innerHTML = '';
+
+                // 创建圆形容器
+                const circlePart = document.createElement('div');
+                circlePart.className = 'circle-part';
+                circleContainer.appendChild(circlePart);
+
+                // 计算每个扇形的角度
+                const segmentAngle = 360 / denominator;
+
+                // 创建扇形段
+                for (let i = 0; i < denominator; i++) {
+                    const segment = document.createElement('div');
+                    segment.className = 'circle-segment';
+                    segment.dataset.index = i;
+
+                    // 设置扇形的旋转角度和裁剪路径
+                    const startAngle = i * segmentAngle;
+                    const endAngle = (i + 1) * segmentAngle;
+
+                    // 计算扇形的裁剪路径
+                    // 使用多个点来更精确地描述圆弧
+                    let clipPath = 'polygon(50% 50%';
+
+                    // 添加起始点
+                    const startX = 50 + 50 * Math.sin(startAngle * Math.PI / 180);
+                    const startY = 50 - 50 * Math.cos(startAngle * Math.PI / 180);
+                    clipPath += `, ${startX}% ${startY}%`;
+
+                    // 在起始角度和结束角度之间添加多个点，使圆弧更平滑
+                    const steps = 10; // 圆弧上的点数
+                    for (let j = 1; j < steps; j++) {
+                        const angle = startAngle + (endAngle - startAngle) * (j / steps);
+                        const x = 50 + 50 * Math.sin(angle * Math.PI / 180);
+                        const y = 50 - 50 * Math.cos(angle * Math.PI / 180);
+                        clipPath += `, ${x}% ${y}%`;
+                    }
+
+                    // 添加结束点
+                    const endX = 50 + 50 * Math.sin(endAngle * Math.PI / 180);
+                    const endY = 50 - 50 * Math.cos(endAngle * Math.PI / 180);
+                    clipPath += `, ${endX}% ${endY}%`;
+
+                    // 完成多边形
+                    clipPath += ')';
+
+                    // 设置裁剪路径
+                    segment.style.clipPath = clipPath;
+
+                    // 不再需要旋转，因为我们直接通过裁剪路径定义了扇形
+                    // segment.style.transform = `rotate(${i * segmentAngle}deg)`;
+
+                    // 如果当前段小于分子，则激活
+                    if (i < numerator) {
+                        segment.classList.add('active');
+                    }
+
+                    // 添加点击事件
+                    segment.addEventListener('click', function (e) {
+                        toggleSegment(this);
+                    });
+
+                    // 触摸事件
+                    segment.addEventListener('touchstart', function (e) {
+                        e.preventDefault(); // 防止页面滚动
+                        toggleSegment(this);
+                    });
+
+                    circlePart.appendChild(segment);
+                }
+            }
+
+            // 创建条形可视化
+            function createBarVisualization() {
+                // 清空容器
+                barContainer.innerHTML = '';
+
+                // 创建条形容器
+                const barPart = document.createElement('div');
+                barPart.className = 'bar-part';
+                barContainer.appendChild(barPart);
+
+                // 创建条形段
+                for (let i = 0; i < denominator; i++) {
+                    const segment = document.createElement('div');
+                    segment.className = 'bar-segment';
+                    segment.dataset.index = i;
+
+                    // 如果当前段小于分子，则激活
+                    if (i < numerator) {
+                        segment.classList.add('active');
+                    }
+
+                    // 添加点击事件
+                    segment.addEventListener('click', function (e) {
+                        toggleSegment(this);
+                    });
+
+                    // 触摸事件
+                    segment.addEventListener('touchstart', function (e) {
+                        e.preventDefault(); // 防止页面滚动
+                        toggleSegment(this);
+                    });
+
+                    barPart.appendChild(segment);
+                }
+            }
+
+            // 拖拽状态变量
+            let isDragging = false;
+            let selectedSegments = new Set();
+
+            // 切换段的激活状态
+            function toggleSegment(segment, isFromDrag = false) {
+                const index = parseInt(segment.dataset.index);
+                const isActive = segment.classList.contains('active');
+
+                if (currentMode === 'quiz') {
+                    if (!isActive) {
+                        // 激活当前选中的段
+                        selectedSegments.add(index);
+                        document.querySelectorAll(`.circle-segment[data-index="${index}"], .bar-segment[data-index="${index}"]`).forEach(seg => {
+                            seg.classList.add('active');
+                        });
+                    } else {
+                        // 取消选中当前段
+                        selectedSegments.delete(index);
+                        document.querySelectorAll(`.circle-segment[data-index="${index}"], .bar-segment[data-index="${index}"]`).forEach(seg => {
+                            seg.classList.remove('active');
+                        });
+                    }
+                } else {
+                    // 教学模式下的原有逻辑
+                    if (isActive) {
+                        // 更新圆形和条形可视化
+                        document.querySelectorAll('.circle-segment, .bar-segment').forEach(function (seg) {
+                            if (parseInt(seg.dataset.index) >= index) {
+                                seg.classList.remove('active');
+                            }
+                        });
+                        numerator = index;
+                    } else {
+                        // 更新圆形和条形可视化
+                        document.querySelectorAll('.circle-segment, .bar-segment').forEach(function (seg) {
+                            if (parseInt(seg.dataset.index) <= index) {
+                                seg.classList.add('active');
+                            }
+                        });
+                        numerator = index + 1;
+                    }
+                }
+
+                // 更新分数显示
+                updateFractionDisplay();
+            }
+
+            // 重置函数
+            function reset() {
+                numerator = 0;
+                if (currentMode === 'teaching') {
+                    // 教学模式下启用分母滑块，隐藏确认按钮
+                    denominatorSlider.disabled = false;
+                    confirmButton.style.display = 'none';
+                    denominator = parseInt(denominatorSlider.value);
+                }
+                updateFractionDisplay();
+                createCircleVisualization();
+                createBarVisualization();
+            }
+
+            // 分母滑动条事件
+            denominatorSlider.addEventListener('input', function () {
+                denominator = parseInt(this.value);
+                // 如果分子大于新的分母，则将分子设为0
+                if (numerator > denominator) {
+                    numerator = 0;
+                }
+                updateFractionDisplay();
+                createCircleVisualization();
+                createBarVisualization();
+            });
+
+            // 重置按钮事件
+            resetButton.addEventListener('click', reset);
+
+            // 初始化
+            updateFractionDisplay();
+            createCircleVisualization();
+            createBarVisualization();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>华容道 - 标注版</title>
+    <style>
+        :root {
+            --board-bg: #8e44ad;
+            --floor-bg: #f39c12;
+            --grid-line: rgba(0,0,0,0.1);
+            --grid-text: rgba(0,0,0,0.2);
+            --cc-color: #e74c3c;
+            --gy-color: #f1c40f;
+            --zf-color: #3498db;
+            --zu-color: #2ecc71;
+            --border-color: rgba(255,255,255,0.3);
+        }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: #2c3e50;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            height: 100vh;
+            overflow: hidden; touch-action: none;
+        }
+
+        .header {
+            display: flex; gap: 15px; margin-bottom: 20px; z-index: 10;
+        }
+
+        select, button {
+            padding: 10px 15px; border-radius: 8px; border: none;
+            font-size: 16px; font-weight: bold; outline: none;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        select { background: #ecf0f1; color: #333; }
+        button { background: #e67e22; color: white; }
+        button:active { transform: translateY(4px); box-shadow: none; }
+
+        .game-wrapper {
+            position: relative;
+            width: 90vw; max-width: 360px;
+            aspect-ratio: 4/5;
+            background: var(--board-bg);
+            padding: 8px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .board-inner {
+            position: relative;
+            width: 100%; height: 100%;
+            background: var(--floor-bg);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        /* --- 新增：背景网格层 --- */
+        .grid-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* 关键：让点击穿透到底层，不影响拖拽 */
+            z-index: 0;
+        }
+        .grid-cell {
+            position: absolute;
+            box-sizing: border-box;
+            border: 1px dashed var(--grid-line);
+            display: flex; justify-content: center; align-items: center;
+            font-size: 20px; font-weight: bold;
+            color: var(--grid-text);
+        }
+
+        /* --- 棋子样式 --- */
+        .block {
+            position: absolute;
+            box-sizing: border-box;
+            border-radius: 6px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px; font-weight: bold;
+            color: rgba(0,0,0,0.4);
+            border: 2px solid var(--border-color);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 2px 2px 5px rgba(0,0,0,0.2);
+            will-change: transform;
+            touch-action: none;
+            cursor: grab;
+            z-index: 10; /* 保证棋子在网格之上 */
+        }
+        .block:active { cursor: grabbing; filter: brightness(1.1); z-index: 100; }
+        .block::after {
+            content: ''; position: absolute;
+            top: 4px; left: 4px; right: 4px; bottom: 4px;
+            border: 1px dashed rgba(255,255,255,0.3);
+            border-radius: 4px; pointer-events: none;
+        }
+        
+        .animate-transition { transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+        .exit-label {
+            position: absolute; bottom: -25px; left: 50%;
+            transform: translateX(-50%);
+            color: #bdc3c7; font-size: 14px;
+        }
+
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            z-index: 999;
+        }
+        .modal.show { opacity: 1; pointer-events: auto; }
+        .modal h2 { color: #f1c40f; font-size: 2.5rem; margin-bottom: 20px; }
+        .btn-large { padding: 15px 40px; font-size: 1.2rem; background: #27ae60; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <select id="levelSelect" onchange="resetGame()">
+            <option value="0">难度1: 一路顺风</option>
+            <option value="1">难度2: 捷足先登</option>
+            <option value="2" selected>难度3: 横刀立马</option>
+            <option value="3">难度4: 层层设防</option>
+            <option value="4">难度5: 水泄不通</option>
+        </select>
+        <button onclick="resetGame()">重置</button>
+    </div>
+
+    <div class="game-wrapper">
+        <div class="board-inner" id="board">
+            <!-- 棋子和网格将在这里生成 -->
+        </div>
+        <div class="exit-label">⬇️ 出口 ⬇️</div>
+    </div>
+
+    <div class="modal" id="winModal">
+        <h2>🎉 逃出生天!</h2>
+        <button class="btn-large" onclick="nextLevel()">挑战下一关</button>
+    </div>
+
+<script>
+    const TYPES = {
+        'cc': { w: 2, h: 2, bg: 'var(--cc-color)', name: '曹操' },
+        'v':  { w: 1, h: 2, bg: 'var(--zf-color)', name: '将' },
+        'h':  { w: 2, h: 1, bg: 'var(--gy-color)', name: '关羽' },
+        's':  { w: 1, h: 1, bg: 'var(--zu-color)', name: '卒' }
+    };
+
+    const LEVELS = [
+        [{t:'cc',x:0,y:0}, {t:'v',x:2,y:0}, {t:'v',x:3,y:0}, {t:'s',x:0,y:2}, {t:'s',x:1,y:2}, {t:'s',x:2,y:2}, {t:'s',x:3,y:2}, {t:'h',x:1,y:3}],
+        [{t:'cc',x:0,y:0}, {t:'v',x:2,y:0}, {t:'v',x:3,y:0}, {t:'v',x:0,y:2}, {t:'h',x:1,y:2}, {t:'v',x:3,y:2}, {t:'s',x:0,y:4}, {t:'s',x:1,y:4}, {t:'s',x:2,y:3}, {t:'s',x:3,y:4}],
+        [{t:'v',x:0,y:0}, {t:'cc',x:1,y:0}, {t:'v',x:3,y:0}, {t:'v',x:0,y:2}, {t:'h',x:1,y:2}, {t:'v',x:3,y:2}, {t:'s',x:0,y:4}, {t:'s',x:1,y:3}, {t:'s',x:2,y:3}, {t:'s',x:3,y:4}],
+        [{t:'v',x:0,y:0}, {t:'cc',x:1,y:0}, {t:'v',x:3,y:0}, {t:'v',x:0,y:2}, {t:'h',x:1,y:2}, {t:'v',x:3,y:2}, {t:'s',x:1,y:3}, {t:'s',x:2,y:3}, {t:'s',x:0,y:4}, {t:'s',x:3,y:4}],
+        [{t:'v',x:0,y:0}, {t:'cc',x:1,y:0}, {t:'v',x:3,y:0}, {t:'v',x:0,y:2}, {t:'h',x:1,y:2}, {t:'v',x:3,y:2}, {t:'s',x:1,y:3}, {t:'s',x:2,y:3}, {t:'s',x:0,y:4}, {t:'s',x:3,y:4}]
+    ];
+
+    let blocks = [];
+    let grid = [];
+    let cellW = 0, cellH = 0;
+    const boardEl = document.getElementById('board');
+    const modalEl = document.getElementById('winModal');
+
+    function init() {
+        resetGame();
+        window.addEventListener('resize', () => {
+            updateMetrics();
+            drawBlocks(false);
+        });
+    }
+
+    function resetGame() {
+        modalEl.classList.remove('show');
+        boardEl.innerHTML = '';
+        
+        // 1. 先绘制背景网格 (1-20)
+        drawBackgroundGrid();
+
+        // 2. 再绘制棋子
+        const levelIdx = document.getElementById('levelSelect').value;
+        const data = JSON.parse(JSON.stringify(LEVELS[levelIdx]));
+        
+        blocks = data.map((b, i) => ({
+            id: i, t: b.t, x: b.x, y: b.y,
+            w: TYPES[b.t].w, h: TYPES[b.t].h,
+            bg: TYPES[b.t].bg, name: TYPES[b.t].name, el: null
+        }));
+
+        blocks.forEach(createBlockElement);
+        updateMetrics();
+        updateGrid();
+        drawBlocks(false);
+    }
+
+    // 新增：绘制背景网格函数
+    function drawBackgroundGrid() {
+        const layer = document.createElement('div');
+        layer.className = 'grid-layer';
+        
+        let count = 1;
+        for(let row=0; row<5; row++) {
+            for(let col=0; col<4; col++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                cell.style.width = '25%';
+                cell.style.height = '20%';
+                cell.style.left = (col * 25) + '%';
+                cell.style.top = (row * 20) + '%';
+                cell.innerText = count++; // 显示 1-20
+                layer.appendChild(cell);
+            }
+        }
+        boardEl.appendChild(layer);
+    }
+
+    function createBlockElement(b) {
+        const el = document.createElement('div');
+        el.className = 'block animate-transition';
+        el.style.backgroundColor = b.bg;
+        el.innerText = b.name;
+        el.addEventListener('touchstart', (e) => handleStart(e, b), { passive: false });
+        el.addEventListener('mousedown', (e) => handleStart(e, b));
+        boardEl.appendChild(el);
+        b.el = el;
+    }
+
+    function updateMetrics() {
+        const rect = boardEl.getBoundingClientRect();
+        cellW = rect.width / 4;
+        cellH = rect.height / 5;
+    }
+
+    function updateGrid() {
+        grid = Array(5).fill(0).map(() => Array(4).fill(0));
+        blocks.forEach(b => {
+            for(let i=0; i<b.h; i++) {
+                for(let j=0; j<b.w; j++) {
+                    grid[b.y+i][b.x+j] = 1;
+                }
+            }
+        });
+    }
+
+    function drawBlocks(animate = true) {
+        blocks.forEach(b => {
+            if (!animate) b.el.classList.remove('animate-transition');
+            else b.el.classList.add('animate-transition');
+            
+            b.el.style.width = (b.w * cellW - 4) + 'px';
+            b.el.style.height = (b.h * cellH - 4) + 'px';
+            const posX = b.x * cellW + 2;
+            const posY = b.y * cellH + 2;
+            b.el.style.transform = `translate3d(${posX}px, ${posY}px, 0)`;
+            
+            if (!animate) void b.el.offsetWidth; 
+        });
+    }
+
+    // --- 拖拽逻辑 (保持上一版丝滑逻辑) ---
+    let isDragging = false;
+    let dragBlock = null;
+    let startX = 0, startY = 0;
+    let initialBlockX = 0, initialBlockY = 0;
+    let moveConstraints = { minX:0, maxX:0, minY:0, maxY:0 };
+
+    function handleStart(e, block) {
+        e.preventDefault();
+        if (isDragging) return;
+        
+        block.el.classList.remove('animate-transition');
+        isDragging = true;
+        dragBlock = block;
+        
+        const point = e.touches ? e.touches[0] : e;
+        startX = point.clientX;
+        startY = point.clientY;
+        initialBlockX = block.x * cellW + 2;
+        initialBlockY = block.y * cellH + 2;
+
+        calculateConstraints(block);
+
+        document.addEventListener('touchmove', handleMove, { passive: false });
+        document.addEventListener('touchend', handleEnd);
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+    }
+
+    function calculateConstraints(b) {
+        for(let i=0; i<b.h; i++) for(let j=0; j<b.w; j++) grid[b.y+i][b.x+j] = 0;
+
+        let canLeft = true;
+        if (b.x > 0) {
+            for(let i=0; i<b.h; i++) if (grid[b.y+i][b.x-1] === 1) canLeft = false;
+        } else canLeft = false;
+
+        let canRight = true;
+        if (b.x + b.w < 4) {
+            for(let i=0; i<b.h; i++) if (grid[b.y+i][b.x+b.w] === 1) canRight = false;
+        } else canRight = false;
+
+        let canTop = true;
+        if (b.y > 0) {
+            for(let j=0; j<b.w; j++) if (grid[b.y-1][b.x+j] === 1) canTop = false;
+        } else canTop = false;
+
+        let canBottom = true;
+        if (b.y + b.h < 5) {
+            for(let j=0; j<b.w; j++) if (grid[b.y+b.h][b.x+j] === 1) canBottom = false;
+        } else canBottom = false;
+
+        moveConstraints = {
+            minX: canLeft ? -cellW : 0, maxX: canRight ? cellW : 0,
+            minY: canTop ? -cellH : 0, maxY: canBottom ? cellH : 0
+        };
+    }
+
+    function handleMove(e) {
+        if (!isDragging || !dragBlock) return;
+        e.preventDefault();
+        const point = e.touches ? e.touches[0] : e;
+        const dx = point.clientX - startX;
+        const dy = point.clientY - startY;
+
+        let moveX = 0, moveY = 0;
+        if (Math.abs(dx) > Math.abs(dy)) {
+            moveX = Math.max(moveConstraints.minX, Math.min(dx, moveConstraints.maxX));
+        } else {
+            moveY = Math.max(moveConstraints.minY, Math.min(dy, moveConstraints.maxY));
+        }
+
+        dragBlock.el.style.transform = `translate3d(${initialBlockX + moveX}px, ${initialBlockY + moveY}px, 0)`;
+        dragBlock.lastMoveX = moveX;
+        dragBlock.lastMoveY = moveY;
+    }
+
+    function handleEnd() {
+        if (!isDragging) return;
+        dragBlock.el.classList.add('animate-transition');
+
+        const threshold = 0.4;
+        let finalDx = 0, finalDy = 0;
+        if (Math.abs(dragBlock.lastMoveX) > cellW * threshold) finalDx = dragBlock.lastMoveX > 0 ? 1 : -1;
+        if (Math.abs(dragBlock.lastMoveY) > cellH * threshold) finalDy = dragBlock.lastMoveY > 0 ? 1 : -1;
+
+        dragBlock.x += finalDx;
+        dragBlock.y += finalDy;
+
+        document.removeEventListener('touchmove', handleMove);
+        document.removeEventListener('touchend', handleEnd);
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleEnd);
+
+        updateGrid();
+        drawBlocks(true);
+        
+        if (dragBlock.t === 'cc' && dragBlock.x === 1 && dragBlock.y === 3) {
+            setTimeout(() => modalEl.classList.add('show'), 300);
+        }
+        isDragging = false;
+        dragBlock = null;
+    }
+
+    function nextLevel() {
+        const sel = document.getElementById('levelSelect');
+        if (sel.selectedIndex < sel.options.length - 1) sel.selectedIndex++;
+        resetGame();
+    }
+
+    init();
+
+</script>
+</body>
+</html>

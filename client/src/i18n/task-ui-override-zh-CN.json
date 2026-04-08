@@ -196,5 +196,8 @@
     "addPair": "添加配对",
     "addBlank": "添加空格",
     "addPair": "添加配对"
+  },
+  "whiteboard": {
+    "previewFullscreen": "全屏预览"
   }
 }

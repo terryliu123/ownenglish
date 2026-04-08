@@ -1,0 +1,460 @@
+<!-- 
+设计思路:
+1. 解决类名冲突问题，使用唯一的类名
+2. 彻底解决游戏区域不显示的问题，确保游戏板正确渲染
+3. 简化CSS样式，避免复杂的样式冲突
+4. 使用更直接的布局方式确保游戏区域可见
+5. 移除可能导致显示问题的动画和复杂效果
+6. 确保在所有设备上都能正确显示游戏区域
+7. 保持游戏核心功能完整性和易用性
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字华容道</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .control-panel {
+            flex: 1;
+            min-width: 300px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .game-area {
+            flex: 2;
+            min-width: 300px;
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 500px;
+        }
+        
+        .game-board {
+            display: grid;
+            gap: 10px;
+            margin: 20px auto;
+            background: #0f172a;
+            border-radius: 8px;
+            padding: 15px;
+            max-width: 400px;
+        }
+        
+        .game-tile {
+            background: #3b82f6;
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .game-tile:hover {
+            background: #2563eb;
+        }
+        
+        .empty-tile {
+            background: #334155;
+            cursor: default;
+        }
+        
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        
+        .btn:hover {
+            background: #2563eb;
+        }
+        
+        .btn.active {
+            background: #1d4ed8;
+        }
+        
+        .stats {
+            font-size: 20px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        
+        #win-message {
+            text-align: center;
+            padding: 20px;
+            background: #166534;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部信息区 -->
+        <div class="header">
+            <h1><i class="fas fa-puzzle-piece"></i> 数字华容道</h1>
+            <p>挑战你的逻辑思维能力</p>
+        </div>
+        
+        <!-- 主要内容区 -->
+        <div class="main-content">
+            <!-- 左侧: 游戏控制 -->
+            <div class="control-panel">
+                <h2><i class="fas fa-sliders-h"></i> 游戏难度</h2>
+                <div>
+                    <button id="easy-btn" class="btn active">简单 (3×3)</button>
+                    <button id="medium-btn" class="btn">中等 (4×4)</button>
+                    <button id="hard-btn" class="btn">困难 (5×5)</button>
+                </div>
+                
+                <h2 style="margin-top: 20px;"><i class="fas fa-gamepad"></i> 游戏控制</h2>
+                <div>
+                    <button id="new-game-btn" class="btn"><i class="fas fa-redo"></i> 新游戏</button>
+                    <button id="reset-btn" class="btn"><i class="fas fa-sync-alt"></i> 重置</button>
+                </div>
+                
+                <h2 style="margin-top: 20px;"><i class="fas fa-info-circle"></i> 游戏统计</h2>
+                <div class="stats">步数: <span id="steps">0</span></div>
+                <div class="stats">时间: <span id="timer">00:00</span></div>
+                
+                <h2 style="margin-top: 20px;"><i class="fas fa-question-circle"></i> 游戏说明</h2>
+                <ul style="text-align: left; margin-top: 10px;">
+                    <li>• 点击数字方块移动到空白位置</li>
+                    <li>• 按顺序排列数字1到N即获胜</li>
+                    <li>• 选择不同难度挑战自己</li>
+                </ul>
+            </div>
+            
+            <!-- 右侧: 游戏区域 -->
+            <div class="game-area">
+                <h2><i class="fas fa-th"></i> 游戏区域</h2>
+                
+                <div id="game-container" style="text-align: center;">
+                    <div id="game-board" class="game-board"></div>
+                </div>
+                
+                <div id="win-message" class="hidden">
+                    <h3 style="color: #86efac; font-size: 24px;">恭喜通关！</h3>
+                    <p style="font-size: 18px;">你用了 <span id="win-steps" style="font-weight: bold;"></span> 步，耗时 <span id="win-time" style="font-weight: bold;"></span></p>
+                    <button id="play-again-btn" class="btn" style="margin-top: 15px;"><i class="fas fa-play"></i> 再玩一次</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 使用立即执行函数避免全局命名冲突
+        (function() {
+            // 数字华容道游戏类 - 使用唯一类名
+            class DigitalPuzzleGame {
+                constructor() {
+                    this.size = 3; // 默认3x3
+                    this.board = [];
+                    this.emptyRow = 0;
+                    this.emptyCol = 0;
+                    this.steps = 0;
+                    this.startTime = null;
+                    this.timerInterval = null;
+                    this.isGameWon = false;
+                    
+                    this.initElements();
+                    this.initEventListeners();
+                    this.newGame();
+                }
+                
+                initElements() {
+                    this.gameBoard = document.getElementById('game-board');
+                    this.stepsEl = document.getElementById('steps');
+                    this.timerEl = document.getElementById('timer');
+                    this.winMessage = document.getElementById('win-message');
+                    this.winSteps = document.getElementById('win-steps');
+                    this.winTime = document.getElementById('win-time');
+                    
+                    // 难度按钮
+                    this.easyBtn = document.getElementById('easy-btn');
+                    this.mediumBtn = document.getElementById('medium-btn');
+                    this.hardBtn = document.getElementById('hard-btn');
+                    
+                    // 控制按钮
+                    this.newGameBtn = document.getElementById('new-game-btn');
+                    this.resetBtn = document.getElementById('reset-btn');
+                    this.playAgainBtn = document.getElementById('play-again-btn');
+                }
+                
+                initEventListeners() {
+                    // 难度选择
+                    this.easyBtn.addEventListener('click', () => this.setDifficulty(3));
+                    this.mediumBtn.addEventListener('click', () => this.setDifficulty(4));
+                    this.hardBtn.addEventListener('click', () => this.setDifficulty(5));
+                    
+                    // 游戏控制
+                    this.newGameBtn.addEventListener('click', () => this.newGame());
+                    this.resetBtn.addEventListener('click', () => this.resetGame());
+                    this.playAgainBtn.addEventListener('click', () => this.newGame());
+                }
+                
+                setDifficulty(size) {
+                    // 更新按钮状态
+                    [this.easyBtn, this.mediumBtn, this.hardBtn].forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+                    
+                    if (size === 3) this.easyBtn.classList.add('active');
+                    else if (size === 4) this.mediumBtn.classList.add('active');
+                    else this.hardBtn.classList.add('active');
+                    
+                    this.size = size;
+                    this.newGame();
+                }
+                
+                // 生成初始状态
+                generateBoard() {
+                    const totalTiles = this.size * this.size;
+                    const tiles = [];
+                    
+                    // 创建有序数组
+                    for (let i = 1; i < totalTiles; i++) {
+                        tiles.push(i);
+                    }
+                    tiles.push(0); // 0表示空格
+                    
+                    // 随机打乱
+                    for (let i = tiles.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+                    }
+                    
+                    // 确保可解性
+                    while (!this.isSolvable(tiles)) {
+                        // 如果不可解，继续打乱
+                        for (let i = tiles.length - 1; i > 0; i--) {
+                            const j = Math.floor(Math.random() * (i + 1));
+                            [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+                        }
+                    }
+                    
+                    // 转换为二维数组
+                    this.board = [];
+                    for (let i = 0; i < this.size; i++) {
+                        this.board[i] = [];
+                        for (let j = 0; j < this.size; j++) {
+                            const value = tiles[i * this.size + j];
+                            this.board[i][j] = value;
+                            if (value === 0) {
+                                this.emptyRow = i;
+                                this.emptyCol = j;
+                            }
+                        }
+                    }
+                }
+                
+                // 检查是否可解
+                isSolvable(tiles) {
+                    let inversions = 0;
+                    const gridSize = this.size;
+                    const totalTiles = gridSize * gridSize;
+                    
+                    for (let i = 0; i < totalTiles - 1; i++) {
+                        for (let j = i + 1; j < totalTiles; j++) {
+                            if (tiles[i] && tiles[j] && tiles[i] > tiles[j]) {
+                                inversions++;
+                            }
+                        }
+                    }
+                    
+                    // 对于奇数尺寸，逆序对为偶数时可解
+                    if (gridSize % 2 === 1) {
+                        return inversions % 2 === 0;
+                    }
+                    
+                    // 对于偶数尺寸，需要考虑空格所在行
+                    const emptyRowFromBottom = gridSize - Math.floor(tiles.indexOf(0) / gridSize);
+                    if (emptyRowFromBottom % 2 === 1) {
+                        return inversions % 2 === 0;
+                    } else {
+                        return inversions % 2 === 1;
+                    }
+                }
+                
+                // 渲染游戏板
+                renderBoard() {
+                    this.gameBoard.innerHTML = '';
+                    this.gameBoard.style.gridTemplateColumns = `repeat(${this.size}, 1fr)`;
+                    
+                    // 根据难度设置方块大小
+                    let tileSize;
+                    if (this.size === 3) {
+                        tileSize = 'height: 100px; width: 100px; font-size: 28px;';
+                    } else if (this.size === 4) {
+                        tileSize = 'height: 75px; width: 75px; font-size: 22px;';
+                    } else {
+                        tileSize = 'height: 60px; width: 60px; font-size: 18px;';
+                    }
+                    
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            const value = this.board[i][j];
+                            const tile = document.createElement('div');
+                            tile.className = 'game-tile';
+                            tile.style.cssText = tileSize;
+                            
+                            if (value === 0) {
+                                tile.classList.add('empty-tile');
+                            } else {
+                                tile.textContent = value;
+                                tile.addEventListener('click', () => this.moveTile(i, j));
+                            }
+                            
+                            this.gameBoard.appendChild(tile);
+                        }
+                    }
+                }
+                
+                // 移动方块
+                moveTile(row, col) {
+                    if (this.isGameWon) return;
+                    
+                    // 检查是否可以移动
+                    const isAdjacent = 
+                        (row === this.emptyRow && Math.abs(col - this.emptyCol) === 1) ||
+                        (col === this.emptyCol && Math.abs(row - this.emptyRow) === 1);
+                    
+                    if (isAdjacent) {
+                        // 开始计时
+                        if (this.steps === 0) {
+                            this.startTimer();
+                        }
+                        
+                        // 交换位置
+                        [this.board[this.emptyRow][this.emptyCol], this.board[row][col]] = 
+                        [this.board[row][col], this.board[this.emptyRow][this.emptyCol]];
+                        
+                        this.emptyRow = row;
+                        this.emptyCol = col;
+                        this.steps++;
+                        this.stepsEl.textContent = this.steps;
+                        
+                        this.renderBoard();
+                        this.checkWin();
+                    }
+                }
+                
+                // 检查是否获胜
+                checkWin() {
+                    let expected = 1;
+                    for (let i = 0; i < this.size; i++) {
+                        for (let j = 0; j < this.size; j++) {
+                            if (i === this.size - 1 && j === this.size - 1) {
+                                if (this.board[i][j] !== 0) return false;
+                            } else {
+                                if (this.board[i][j] !== expected) return false;
+                                expected++;
+                            }
+                        }
+                    }
+                    
+                    this.winGame();
+                    return true;
+                }
+                
+                // 获胜处理
+                winGame() {
+                    this.isGameWon = true;
+                    this.stopTimer();
+                    
+                    this.winSteps.textContent = this.steps;
+                    this.winTime.textContent = this.timerEl.textContent;
+                    this.winMessage.classList.remove('hidden');
+                }
+                
+                // 开始计时
+                startTimer() {
+                    this.startTime = new Date();
+                    this.timerInterval = setInterval(() => {
+                        const elapsed = Math.floor((new Date() - this.startTime) / 1000);
+                        const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+                        const seconds = (elapsed % 60).toString().padStart(2, '0');
+                        this.timerEl.textContent = `${minutes}:${seconds}`;
+                    }, 1000);
+                }
+                
+                // 停止计时
+                stopTimer() {
+                    if (this.timerInterval) {
+                        clearInterval(this.timerInterval);
+                        this.timerInterval = null;
+                    }
+                }
+                
+                // 新游戏
+                newGame() {
+                    this.stopTimer();
+                    this.steps = 0;
+                    this.stepsEl.textContent = '0';
+                    this.timerEl.textContent = '00:00';
+                    this.isGameWon = false;
+                    this.winMessage.classList.add('hidden');
+                    
+                    this.generateBoard();
+                    this.renderBoard();
+                }
+                
+                // 重置游戏（保持当前难度）
+                resetGame() {
+                    this.newGame();
+                }
+            }
+            
+            // 初始化游戏
+            document.addEventListener('DOMContentLoaded', () => {
+                window.digitalPuzzleGame = new DigitalPuzzleGame();
+            });
+        })();
+    </script>
+</body>
+</html>

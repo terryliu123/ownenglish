@@ -27,11 +27,11 @@ export default function HomePage() {
 
   const features = [
     { icon: '⚡', title: t('homepageV2.featureCards.liveTitle'), desc: t('homepageV2.featureCards.liveDesc'), color: 'from-blue-500 to-cyan-400', border: 'border-blue-500/30', glow: 'rgba(59,130,246,0.15)' },
-    { icon: '📖', title: t('homepageV2.featureCards.readingTitle'), desc: t('homepageV2.featureCards.readingDesc'), color: 'from-violet-500 to-purple-400', border: 'border-violet-500/30', glow: 'rgba(139,92,246,0.15)' },
-    { icon: '📊', title: t('homepageV2.featureCards.analyticsTitle'), desc: t('homepageV2.featureCards.analyticsDesc'), color: 'from-pink-500 to-rose-400', border: 'border-pink-500/30', glow: 'rgba(236,72,153,0.15)' },
-    { icon: '🎙️', title: t('homepageV2.featureCards.speakingTitle'), desc: t('homepageV2.featureCards.speakingDesc'), color: 'from-emerald-500 to-green-400', border: 'border-emerald-500/30', glow: 'rgba(52,211,153,0.15)' },
-    { icon: '📦', title: t('homepageV2.featureCards.packTitle'), desc: t('homepageV2.featureCards.packDesc'), color: 'from-amber-500 to-orange-400', border: 'border-amber-500/30', glow: 'rgba(245,158,11,0.15)' },
-    { icon: '🔒', title: t('homepageV2.featureCards.securityTitle'), desc: t('homepageV2.featureCards.securityDesc'), color: 'from-slate-400 to-slate-300', border: 'border-slate-400/30', glow: 'rgba(148,163,184,0.12)' },
+    { icon: '🎮', title: t('homepageV2.featureCards.bigscreenTitle'), desc: t('homepageV2.featureCards.bigscreenDesc'), color: 'from-violet-500 to-purple-400', border: 'border-violet-500/30', glow: 'rgba(139,92,246,0.15)' },
+    { icon: '🧰', title: t('homepageV2.featureCards.teachingAidsTitle'), desc: t('homepageV2.featureCards.teachingAidsDesc'), color: 'from-emerald-500 to-green-400', border: 'border-emerald-500/30', glow: 'rgba(52,211,153,0.15)' },
+    { icon: '📝', title: t('homepageV2.featureCards.taskTitle'), desc: t('homepageV2.featureCards.taskDesc'), color: 'from-amber-500 to-orange-400', border: 'border-amber-500/30', glow: 'rgba(245,158,11,0.15)' },
+    { icon: '📊', title: t('homepageV2.featureCards.reviewTitle'), desc: t('homepageV2.featureCards.reviewDesc'), color: 'from-pink-500 to-rose-400', border: 'border-pink-500/30', glow: 'rgba(236,72,153,0.15)' },
+    { icon: '🌐', title: t('homepageV2.featureCards.zeroTitle'), desc: t('homepageV2.featureCards.zeroDesc'), color: 'from-slate-400 to-slate-300', border: 'border-slate-400/30', glow: 'rgba(148,163,184,0.12)' },
   ]
 
   const steps = [
@@ -49,8 +49,8 @@ export default function HomePage() {
   const stats = [
     { value: '10+', label: '题型支持' },
     { value: '<1s', label: '实时延迟' },
-    { value: 'AI', label: '智能评测' },
-    { value: '∞', label: '无设备限制' },
+    { value: '0', label: '安装门槛' },
+    { value: '100%', label: '浏览器运行' },
   ]
 
   return (
@@ -269,6 +269,62 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===== INTERACTION MODES ===== */}
+      <section className="py-28 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-950/15 to-transparent" />
+        <div className="max-w-6xl mx-auto relative">
+          <div className="text-center mb-16">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-cyan-500/10 text-cyan-400 text-sm font-semibold mb-4 border border-cyan-500/20">{t('homepageV2.interactionSection.badge')}</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">{t('homepageV2.interactionSection.title')}</h2>
+            <p className="text-slate-500 text-lg max-w-xl mx-auto">{t('homepageV2.interactionSection.subtitle')}</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* 平板互动 */}
+            <div className="group relative rounded-2xl bg-gradient-to-br from-blue-500/[0.08] to-transparent border border-blue-500/20 p-8 hover:border-blue-500/40 transition-all duration-500">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-2xl shadow-lg shadow-blue-500/20">📱</div>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">{t('homepageV2.interactionSection.tabletTitle')}</h3>
+                </div>
+              </div>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">{t('homepageV2.interactionSection.tabletDesc')}</p>
+              <ul className="space-y-3">
+                {[t('homepageV2.interactionSection.tabletFeature1'), t('homepageV2.interactionSection.tabletFeature2'), t('homepageV2.interactionSection.tabletFeature3')].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-slate-300 text-sm">
+                    <div className="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    </div>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* 大屏互动 */}
+            <div className="group relative rounded-2xl bg-gradient-to-br from-violet-500/[0.08] to-transparent border border-violet-500/20 p-8 hover:border-violet-500/40 transition-all duration-500">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-2xl shadow-lg shadow-violet-500/20">🖥️</div>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">{t('homepageV2.interactionSection.bigscreenTitle')}</h3>
+                </div>
+              </div>
+              <p className="text-slate-400 text-sm leading-relaxed mb-6">{t('homepageV2.interactionSection.bigscreenDesc')}</p>
+              <ul className="space-y-3">
+                {[t('homepageV2.interactionSection.bigscreenFeature1'), t('homepageV2.interactionSection.bigscreenFeature2'), t('homepageV2.interactionSection.bigscreenFeature3')].map((feature) => (
+                  <li key={feature} className="flex items-center gap-3 text-slate-300 text-sm">
+                    <div className="w-5 h-5 rounded-md bg-violet-500/20 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-3 h-3 text-violet-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                    </div>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== HOW IT WORKS ===== */}
       <section className="py-28 px-6">
         <div className="max-w-5xl mx-auto">
@@ -317,7 +373,7 @@ export default function HomePage() {
                 </div>
               </div>
               <ul className="space-y-3">
-                {[t('homepageV2.teacherFeatures.prepare'), t('homepageV2.teacherFeatures.live'), t('homepageV2.teacherFeatures.analytics'), t('homepageV2.teacherFeatures.ai')].map((feature) => (
+                {[t('homepageV2.teacherFeatures.prepare'), t('homepageV2.teacherFeatures.live'), t('homepageV2.teacherFeatures.bigscreen'), t('homepageV2.teacherFeatures.teachingAids'), t('homepageV2.teacherFeatures.review')].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-slate-300 text-sm">
                     <div className="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center flex-shrink-0">
                       <svg className="w-3 h-3 text-blue-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
@@ -338,7 +394,7 @@ export default function HomePage() {
                 </div>
               </div>
               <ul className="space-y-3">
-                {[t('homepageV2.studentFeatures.join'), t('homepageV2.studentFeatures.submit'), t('homepageV2.studentFeatures.pack'), t('homepageV2.studentFeatures.report')].map((feature) => (
+                {[t('homepageV2.studentFeatures.join'), t('homepageV2.studentFeatures.submit'), t('homepageV2.studentFeatures.bigscreen'), t('homepageV2.studentFeatures.share'), t('homepageV2.studentFeatures.danmu')].map((feature) => (
                   <li key={feature} className="flex items-center gap-3 text-slate-300 text-sm">
                     <div className="w-5 h-5 rounded-md bg-violet-500/20 flex items-center justify-center flex-shrink-0">
                       <svg className="w-3 h-3 text-violet-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>

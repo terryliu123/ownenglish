@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>俄罗斯方块</title>
+    <style>
+        body {
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #game-container {
+            display: flex;
+            gap: 20px;
+        }
+
+        #game-board {
+            border: 2px solid #333;
+            background-color: #fff;
+        }
+
+        #info-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .info-box {
+            background-color: #fff;
+            padding: 15px;
+            border: 2px solid #333;
+            text-align: center;
+        }
+
+        #next-piece {
+            width: 120px;
+            height: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-board" width="300" height="600"></canvas>
+        <div id="info-panel">
+            <div class="info-box">
+                <h3>下一个方块</h3>
+                <canvas id="next-piece" width="120" height="120"></canvas>
+            </div>
+            <div class="info-box">
+                <h3>得分</h3>
+                <p id="score">0</p>
+            </div>
+            <div class="info-box">
+                <h3>等级</h3>
+                <p id="level">1</p>
+            </div>
+            <button id="start-btn">开始游戏</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-board');
+        const ctx = canvas.getContext('2d');
+        const nextPieceCanvas = document.getElementById('next-piece');
+        const nextPieceCtx = nextPieceCanvas.getContext('2d');
+        const BLOCK_SIZE = 30;
+        const BOARD_WIDTH = 10;
+        const BOARD_HEIGHT = 20;
+
+        const SHAPES = [
+            [[1, 1, 1, 1]], // I
+            [[1, 1], [1, 1]], // O
+            [[1, 1, 1], [0, 1, 0]], // T
+            [[1, 1, 1], [1, 0, 0]], // L
+            [[1, 1, 1], [0, 0, 1]], // J
+            [[1, 1, 0], [0, 1, 1]], // S
+            [[0, 1, 1], [1, 1, 0]]  // Z
+        ];
+
+        const COLORS = [
+            '#00f0f0', // cyan
+            '#f0f000', // yellow
+            '#a000f0', // purple
+            '#f0a000', // orange
+            '#0000f0', // blue
+            '#00f000', // green
+            '#f00000'  // red
+        ];
+
+        class Game {
+            constructor() {
+                this.board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+                this.currentPiece = null;
+                this.nextPiece = null;
+                this.score = 0;
+                this.level = 1;
+                this.gameLoop = null;
+                this.gameOver = false;
+                
+                document.addEventListener('keydown', this.handleKeyPress.bind(this));
+                document.getElementById('start-btn').addEventListener('click', () => this.startGame());
+            }
+
+            startGame() {
+                this.resetGame();
+                this.spawnNewPiece();
+                this.gameLoop = setInterval(() => this.update(), 1000 / this.level);
+            }
+
+            resetGame() {
+                this.board = Array(BOARD_HEIGHT).fill().map(() => Array(BOARD_WIDTH).fill(0));
+                this.score = 0;
+                this.level = 1;
+                this.gameOver = false;
+                document.getElementById('score').textContent = '0';
+                document.getElementById('level').textContent = '1';
+            }
+
+            spawnNewPiece() {
+                this.currentPiece = this.nextPiece || new Piece();
+                this.nextPiece = new Piece();
+                this.drawNextPiece();
+            }
+
+            drawNextPiece() {
+                nextPieceCtx.clearRect(0, 0, nextPieceCanvas.width, nextPieceCanvas.height);
+                this.nextPiece.draw(nextPieceCtx, 2, 2);
+            }
+
+            update() {
+                if (!this.currentPiece.move(0, 1)) {
+                    this.mergePiece();
+                    this.checkLines();
+                    this.spawnNewPiece();
+                    if (this.checkCollision(this.currentPiece, 0, 0)) {
+                        this.gameOver = true;
+                        clearInterval(this.gameLoop);
+                        alert('游戏结束！得分: ' + this.score);
+                    }
+                }
+                this.draw();
+            }
+
+            mergePiece() {
+                this.currentPiece.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            this.board[y + this.currentPiece.y][x + this.currentPiece.x] = 
+                                this.currentPiece.colorIndex + 1;
+                        }
+                    });
+                });
+            }
+
+            checkLines() {
+                let linesCleared = 0;
+                for (let y = BOARD_HEIGHT - 1; y >= 0; y--) {
+                    if (this.board[y].every(cell => cell !== 0)) {
+                        this.board.splice(y, 1);
+                        this.board.unshift(Array(BOARD_WIDTH).fill(0));
+                        linesCleared++;
+                        y++;
+                    }
+                }
+                if (linesCleared > 0) {
+                    this.score += linesCleared * 100 * this.level;
+                    document.getElementById('score').textContent = this.score;
+                    if (this.score >= this.level * 1000) {
+                        this.level++;
+                        document.getElementById('level').textContent = this.level;
+                        clearInterval(this.gameLoop);
+                        this.gameLoop = setInterval(() => this.update(), 1000 / this.level);
+                    }
+                }
+            }
+
+            draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制棋盘
+                this.board.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            ctx.fillStyle = COLORS[value - 1];
+                            ctx.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, 
+                                      BLOCK_SIZE - 1, BLOCK_SIZE - 1);
+                        }
+                    });
+                });
+
+                // 绘制当前方块
+                this.currentPiece.draw(ctx, this.currentPiece.x, this.currentPiece.y);
+            }
+
+            handleKeyPress(e) {
+                if (this.gameOver) return;
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        this.currentPiece.move(-1, 0);
+                        break;
+                    case 'ArrowRight':
+                        this.currentPiece.move(1, 0);
+                        break;
+                    case 'ArrowDown':
+                        this.currentPiece.move(0, 1);
+                        break;
+                    case 'ArrowUp':
+                        this.currentPiece.rotate();
+                        break;
+                }
+                this.draw();
+            }
+
+            checkCollision(piece, offsetX, offsetY) {
+                return piece.shape.some((row, y) => 
+                    row.some((value, x) => {
+                        const newX = piece.x + x + offsetX;
+                        const newY = piece.y + y + offsetY;
+                        return value && (
+                            newX < 0 || 
+                            newX >= BOARD_WIDTH ||
+                            newY >= BOARD_HEIGHT ||
+                            (newY >= 0 && this.board[newY][newX])
+                        );
+                    })
+                );
+            }
+        }
+
+        class Piece {
+            constructor() {
+                this.shapeIndex = Math.floor(Math.random() * SHAPES.length);
+                this.shape = SHAPES[this.shapeIndex];
+                this.colorIndex = this.shapeIndex;
+                this.x = Math.floor(BOARD_WIDTH/2) - Math.floor(this.shape[0].length/2);
+                this.y = 0;
+            }
+
+            move(offsetX, offsetY) {
+                if (!game.checkCollision(this, offsetX, offsetY)) {
+                    this.x += offsetX;
+                    this.y += offsetY;
+                    return true;
+                }
+                return false;
+            }
+
+            rotate() {
+                const rotated = this.shape[0].map((_, i) =>
+                    this.shape.map(row => row[i]).reverse()
+                );
+                const previousShape = this.shape;
+                this.shape = rotated;
+                if (game.checkCollision(this, 0, 0)) {
+                    this.shape = previousShape;
+                }
+            }
+
+            draw(context, offsetX, offsetY) {
+                context.fillStyle = COLORS[this.colorIndex];
+                this.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            context.fillRect(
+                                (x + this.x) * BLOCK_SIZE + offsetX,
+                                (y + this.y) * BLOCK_SIZE + offsetY,
+                                BLOCK_SIZE - 1,
+                                BLOCK_SIZE - 1
+                            );
+                        }
+                    });
+                });
+            }
+        }
+
+        const game = new Game();
+    </script>
+</body>
+</html>

@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.models import (
     Class,
     LiveSession,
+    LiveSessionEvent,
     LiveTask,
     LiveTaskGroup,
     LiveTaskGroupSubmission,
@@ -240,26 +241,45 @@ async def get_task_group_analytics(
     )
     all_submissions = result.all()
 
+    # 如果按 session_id 查询不到数据，尝试查询所有提交（兼容白板模式历史数据）
     if session_id and not all_submissions:
-        legacy_count = await db.scalar(
-            select(func.count(LiveTaskGroupSubmission.id)).where(
-                LiveTaskGroupSubmission.group_id == group_id,
-                LiveTaskGroupSubmission.session_id.is_not(None),
+        fallback_query = (
+            select(LiveTaskGroupSubmission, User.name.label("student_name"))
+            .join(User, LiveTaskGroupSubmission.student_id == User.id)
+            .where(LiveTaskGroupSubmission.group_id == group_id)
+            .order_by(
+                LiveTaskGroupSubmission.student_id,
+                LiveTaskGroupSubmission.task_id,
+                LiveTaskGroupSubmission.submitted_at.desc(),
             )
         )
-        if not legacy_count:
-            fallback_query = (
-                select(LiveTaskGroupSubmission, User.name.label("student_name"))
-                .join(User, LiveTaskGroupSubmission.student_id == User.id)
-                .where(LiveTaskGroupSubmission.group_id == group_id)
-                .order_by(
-                    LiveTaskGroupSubmission.student_id,
-                    LiveTaskGroupSubmission.task_id,
-                    LiveTaskGroupSubmission.submitted_at.desc(),
+        result = await db.execute(fallback_query)
+        all_submissions = result.all()
+
+    # 如果提供了 session_id，根据 student_joined 事件过滤学生
+    if session_id:
+        joined_events_result = await db.execute(
+            select(LiveSessionEvent)
+            .where(
+                and_(
+                    LiveSessionEvent.live_session_id == session_id,
+                    LiveSessionEvent.event_type == "student_joined"
                 )
             )
-            result = await db.execute(fallback_query)
-            all_submissions = result.all()
+        )
+        joined_events = joined_events_result.scalars().all()
+        joined_student_ids = set()
+        for event in joined_events:
+            student_id = event.payload_json.get("student_id") if event.payload_json else None
+            if student_id:
+                joined_student_ids.add(student_id)
+
+        # 过滤提交：只保留在当前 session 加入过的学生
+        if joined_student_ids:
+            all_submissions = [
+                (sub, name) for sub, name in all_submissions
+                if sub.student_id in joined_student_ids
+            ]
 
     submissions_map = {}
     for submission, student_name in all_submissions:

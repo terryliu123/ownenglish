@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关于坐标轴对称 - 交互式教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f9f9f9;
+            user-select: none;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            cursor: grab;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        /* 右侧控制面板 */
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 160px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            backdrop-filter: blur(5px);
+        }
+
+        .group-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            margin-bottom: 2px;
+        }
+
+        button {
+            padding: 8px 12px;
+            border: 1px solid #eee;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            transition: all 0.2s;
+            text-align: left;
+            position: relative;
+        }
+
+        button:hover {
+            background: #f0f7ff;
+            color: #007bff;
+            border-color: #cce5ff;
+        }
+
+        button.active {
+            background: #007bff;
+            color: white;
+            border-color: #0069d9;
+            font-weight: bold;
+        }
+
+        /* 选中指示器 */
+        button.active::after {
+            content: '●';
+            position: absolute;
+            right: 10px;
+            font-size: 10px;
+            color: white;
+        }
+
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        
+        <div id="controls">
+            <div class="group-label">选择图形</div>
+            <button class="shape-btn active" onclick="setShape('point')">点</button>
+            <button class="shape-btn" onclick="setShape('segment')">线段</button>
+            <button class="shape-btn" onclick="setShape('triangle')">三角形</button>
+
+            <div class="group-label" style="margin-top: 15px;">对称方式</div>
+            <button class="sym-btn active" onclick="setSymmetry('x')">关于 x 轴对称</button>
+            <button class="sym-btn" onclick="setSymmetry('y')">关于 y 轴对称</button>
+            <button class="sym-btn" onclick="setSymmetry('origin')">关于原点对称</button>
+        </div>
+
+        <div id="hint">左键拖动红点 | 滚轮缩放 | 右键平移画布</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 状态管理 ---
+        const state = {
+            zoom: 40, // 1个单位 = 40像素
+            offsetX: 0, // 画布中心偏移 X
+            offsetY: 0, // 画布中心偏移 Y
+            shapeType: 'point', // point, segment, triangle
+            symmetryType: 'x', // x, y, origin
+            points: [ // 初始点 (世界坐标)
+                {x: -3, y: 2, color: '#ff5722'}
+            ]
+        };
+
+        // 预设图形的点位
+        const shapes = {
+            point: [{x: -3, y: 2, color: '#ff5722'}],
+            segment: [{x: -3, y: -2, color: '#ff5722'}, {x: -1, y: 3, color: '#ff5722'}],
+            triangle: [{x: -3, y: -2, color: '#ff5722'}, {x: -2, y: 2, color: '#ff5722'}, {x: -5, y: 1, color: '#ff5722'}]
+        };
+
+        // --- 初始化 ---
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('wheel', handleWheel);
+            // 禁用右键菜单以便用于平移
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            
+            // 初始化图形
+            setShape('triangle'); // 默认三角形展示效果最好
+            draw();
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        }
+
+        // --- 坐标转换 ---
+        // 世界坐标 -> 屏幕坐标
+        function toScreen(x, y) {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+            return {
+                x: cx + x * state.zoom,
+                y: cy - y * state.zoom // Y轴向上为正，Canvas向下为正，需取反
+            };
+        }
+
+        // 屏幕坐标 -> 世界坐标
+        function toWorld(sx, sy) {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+            return {
+                x: (sx - cx) / state.zoom,
+                y: -(sy - cy) / state.zoom
+            };
+        }
+
+        // --- 核心绘图逻辑 ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawGrid();
+            drawAxes();
+            
+            // 计算对称点
+            const reflectedPoints = state.points.map(p => getReflection(p));
+
+            // 1. 绘制连线 (虚线)
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.strokeStyle = '#2196F3'; // 蓝色虚线
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < state.points.length; i++) {
+                const p1 = toScreen(state.points[i].x, state.points[i].y);
+                const p2 = toScreen(reflectedPoints[i].x, reflectedPoints[i].y);
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 2. 绘制形状 (实线)
+            if (state.shapeType !== 'point') {
+                // 原图
+                drawPolygon(state.points, 'rgba(255, 87, 34, 0.1)', '#ff5722');
+                // 镜像图
+                drawPolygon(reflectedPoints, 'rgba(76, 175, 80, 0.1)', '#4CAF50');
+            }
+
+            // 3. 绘制点和坐标标签
+            // 原点
+            state.points.forEach(p => {
+                const sc = toScreen(p.x, p.y);
+                drawPoint(sc.x, sc.y, p.color);
+                drawLabel(sc.x, sc.y, `(${Math.round(p.x*10)/10}, ${Math.round(p.y*10)/10})`, 'top');
+            });
+
+            // 镜像点
+            reflectedPoints.forEach(p => {
+                const sc = toScreen(p.x, p.y);
+                drawPoint(sc.x, sc.y, '#4CAF50'); // 绿色
+                drawLabel(sc.x, sc.y, `(${Math.round(p.x*10)/10}, ${Math.round(p.y*10)/10})`, 'bottom');
+            });
+        }
+
+        function drawGrid() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2 + state.offsetX;
+            const cy = h / 2 + state.offsetY;
+            const step = state.zoom;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+
+            // 垂直线
+            // 从中心向两边画
+            const startX = cx % step;
+            for (let x = startX; x < w; x += step) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, h);
+            }
+            
+            // 水平线
+            const startY = cy % step;
+            for (let y = startY; y < h; y += step) {
+                ctx.moveTo(0, y); ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+        }
+
+        function drawAxes() {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 2;
+
+            // X轴
+            ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
+            // Y轴
+            ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
+            ctx.stroke();
+
+            // 箭头
+            drawArrow(canvas.width, cy, 'right');
+            drawArrow(cx, 0, 'up');
+
+            // 轴标签
+            ctx.fillStyle = '#333';
+            ctx.font = 'italic bold 16px Arial';
+            ctx.fillText('x', canvas.width - 20, cy + 20);
+            ctx.fillText('y', cx - 20, 20);
+
+            // 数字刻度
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#666';
+            const step = state.zoom;
+            
+            // X轴数字
+            for (let x = cx + step, i=1; x < canvas.width; x += step, i++) {
+                ctx.fillText(i, x - 3, cy + 15);
+            }
+            for (let x = cx - step, i=-1; x > 0; x -= step, i--) {
+                ctx.fillText(i, x - 5, cy + 15);
+            }
+            // Y轴数字
+            for (let y = cy - step, i=1; y > 0; y -= step, i++) {
+                ctx.fillText(i, cx + 5, y + 4);
+            }
+            for (let y = cy + step, i=-1; y < canvas.height; y += step, i--) {
+                ctx.fillText(i, cx + 5, y + 4);
+            }
+            // 原点
+            ctx.fillText('O', cx - 15, cy + 15);
+        }
+
+        function drawArrow(x, y, dir) {
+            ctx.beginPath();
+            if(dir === 'right') {
+                ctx.moveTo(x, y); ctx.lineTo(x-10, y-5); ctx.lineTo(x-10, y+5);
+            } else {
+                ctx.moveTo(x, y); ctx.lineTo(x-5, y+10); ctx.lineTo(x+5, y+10);
+            }
+            ctx.fillStyle = '#444';
+            ctx.fill();
+        }
+
+        function drawPoint(x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // 选中光晕
+            ctx.beginPath();
+            ctx.arc(x, y, 12, 0, Math.PI * 2);
+            ctx.fillStyle = color + '33'; // 透明
+            ctx.fill();
+        }
+
+        function drawLabel(x, y, text, pos) {
+            ctx.fillStyle = '#333';
+            ctx.font = '14px Arial';
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+            ctx.lineWidth = 3;
+            const offset = pos === 'top' ? -15 : 25;
+            ctx.strokeText(text, x - 15, y + offset);
+            ctx.fillText(text, x - 15, y + offset);
+        }
+
+        function drawPolygon(points, fill, stroke) {
+            if (points.length < 2) return;
+            ctx.beginPath();
+            const s = toScreen(points[0].x, points[0].y);
+            ctx.moveTo(s.x, s.y);
+            for(let i=1; i<points.length; i++) {
+                const p = toScreen(points[i].x, points[i].y);
+                ctx.lineTo(p.x, p.y);
+            }
+            if (state.shapeType === 'triangle') ctx.closePath();
+            
+            ctx.fillStyle = fill;
+            ctx.fill();
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // --- 逻辑计算 ---
+        function getReflection(p) {
+            const type = state.symmetryType;
+            if (type === 'x') return {x: p.x, y: -p.y};
+            if (type === 'y') return {x: -p.x, y: p.y};
+            if (type === 'origin') return {x: -p.x, y: -p.y};
+            return {x: p.x, y: p.y};
+        }
+
+        // --- 交互事件处理 ---
+        let isDragging = false;
+        let dragTarget = -1;
+        let isPanning = false;
+        let lastMouseX, lastMouseY;
+
+        function handleMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // 1. 检查是否点击了点
+            for (let i = 0; i < state.points.length; i++) {
+                const s = toScreen(state.points[i].x, state.points[i].y);
+                const dist = Math.hypot(s.x - mx, s.y - my);
+                if (dist < 15) { // 点击判定半径
+                    isDragging = true;
+                    dragTarget = i;
+                    canvas.style.cursor = 'grabbing';
+                    return;
+                }
+            }
+
+            // 2. 检查是否右键平移
+            if (e.button === 2 || e.button === 1) { // 右键或中键
+                isPanning = true;
+                lastMouseX = mx;
+                lastMouseY = my;
+                canvas.style.cursor = 'move';
+            }
+        }
+
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // 鼠标悬停效果
+            let hovering = false;
+            for (let i = 0; i < state.points.length; i++) {
+                const s = toScreen(state.points[i].x, state.points[i].y);
+                if (Math.hypot(s.x - mx, s.y - my) < 15) hovering = true;
+            }
+            if(!isDragging && !isPanning) canvas.style.cursor = hovering ? 'pointer' : 'default';
+
+            if (isDragging && dragTarget !== -1) {
+                const w = toWorld(mx, my);
+                // 智能吸附：如果靠近整数点 (0.15范围)，则吸附
+                let finalX = w.x;
+                let finalY = w.y;
+                if (Math.abs(finalX - Math.round(finalX)) < 0.2) finalX = Math.round(finalX);
+                if (Math.abs(finalY - Math.round(finalY)) < 0.2) finalY = Math.round(finalY);
+
+                state.points[dragTarget].x = finalX;
+                state.points[dragTarget].y = finalY;
+                draw();
+            }
+
+            if (isPanning) {
+                state.offsetX += mx - lastMouseX;
+                state.offsetY += my - lastMouseY;
+                lastMouseX = mx;
+                lastMouseY = my;
+                draw();
+            }
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            isPanning = false;
+            dragTarget = -1;
+            canvas.style.cursor = 'default';
+        }
+
+        function handleWheel(e) {
+            e.preventDefault();
+            const scaleAmount = 1.1;
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            
+            // 缩放中心计算
+            // Zoom logic keeps the mouse point stable
+            const oldZoom = state.zoom;
+            if (e.deltaY < 0) {
+                state.zoom *= scaleAmount;
+            } else {
+                state.zoom /= scaleAmount;
+            }
+            state.zoom = Math.max(10, Math.min(200, state.zoom)); // 限制缩放范围
+
+            // 调整 Offset 使得鼠标指向的世界坐标不变
+            // 这一步略复杂，为了简便，这里只根据中心缩放
+            // 如果需要以鼠标为中心缩放，需要更复杂的矩阵计算
+            // 这里简单处理：
+            draw();
+        }
+
+        // --- UI 控制 ---
+        function setShape(type) {
+            state.shapeType = type;
+            // 深拷贝预设点
+            state.points = JSON.parse(JSON.stringify(shapes[type]));
+            
+            // 更新按钮样式
+            document.querySelectorAll('.shape-btn').forEach(btn => btn.classList.remove('active'));
+            const index = ['point', 'segment', 'triangle'].indexOf(type);
+            document.querySelectorAll('.shape-btn')[index].classList.add('active');
+            draw();
+        }
+
+        function setSymmetry(type) {
+            state.symmetryType = type;
+            
+            // 更新按钮样式
+            document.querySelectorAll('.sym-btn').forEach(btn => btn.classList.remove('active'));
+            const index = ['x', 'y', 'origin'].indexOf(type);
+            document.querySelectorAll('.sym-btn')[index].classList.add('active');
+            draw();
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>

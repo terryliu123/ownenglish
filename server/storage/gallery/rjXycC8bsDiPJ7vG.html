@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🧩 拼图游戏 (支持触屏)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            /* 防止移动端长按弹出菜单 */
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f3e7f3 0%, #fce4ec 100%);
+            min-height: 100vh;
+            padding: 10px;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 850px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-content {
+            padding: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #374151;
+        }
+
+        .upload-button {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            background: #f9fafb;
+            color: #6b7280;
+            cursor: pointer;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .radio-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .button {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        /* 拼图区域自适应 */
+        .puzzle-area {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 420px;
+            margin: 0 auto;
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9fafb;
+            position: relative;
+        }
+
+        .puzzle-grid {
+            display: grid;
+            gap: 2px;
+            width: 100%;
+            height: 100%;
+            background: #ccc;
+            padding: 5px;
+            border-radius: 8px;
+            touch-action: none; /* 关键：禁止触屏滚动，允许自定义拖拽 */
+        }
+
+        .puzzle-piece {
+            border: 1px solid #eee;
+            cursor: move;
+            position: relative;
+            overflow: hidden;
+            background-color: #fff;
+            touch-action: none;
+        }
+
+        .puzzle-piece.dragging {
+            opacity: 0.6;
+            transform: scale(1.05);
+            z-index: 100;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .puzzle-piece.correct {
+            border: 2px solid #10b981;
+        }
+
+        .puzzle-piece img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            pointer-events: none; /* 防止图片干扰触摸事件 */
+        }
+
+        .success-message {
+            background: #dcfce7;
+            border: 1px solid #bbf7d0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            color: #166534;
+            margin-top: 10px;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧩 拼图游戏</h1>
+            <p>点击选择图片，支持手机拖拽！</p>
+        </div>
+
+        <div class="game-layout">
+            <div class="card">
+                <div class="card-header"><div class="card-title">📤 游戏设置</div></div>
+                <div class="card-content">
+                    <div class="form-group">
+                        <input type="file" id="imageInput" accept="image/*" class="hidden">
+                        <div class="upload-button" onclick="document.getElementById('imageInput').click()">
+                            选择或拍摄照片
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">难度</label>
+                        <div class="radio-group">
+                            <label><input type="radio" name="gridSize" value="3"> 3×3</label>
+                            <label><input type="radio" name="gridSize" value="4" checked> 4×4</label>
+                            <label><input type="radio" name="gridSize" value="5"> 5×5</label>
+                            <label><input type="radio" name="gridSize" value="6"> 6×6</label>
+                        </div>
+                    </div>
+                    <button class="button" id="resetButton" onclick="resetPuzzle()" style="display: none;">🔄 重新洗牌</button>
+                    <div id="successMessage" class="success-message" style="display: none;">
+                        <h3>🎉 挑战成功！</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header"><div class="card-title">拼图区域</div></div>
+                <div class="card-content">
+                    <div id="puzzleContainer" class="puzzle-area">
+                        <p style="color:#999">请先上传图片</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="hiddenCanvas" class="hidden"></canvas>
+
+    <script>
+        let uploadedImage = null;
+        let gridSize = 4;
+        let puzzlePieces = [];
+        let isCompleted = false;
+        
+        // 拖拽状态追踪
+        let draggedElement = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        const emojis = ["🎉", "✨", "🌟", "🏆"];
+
+        document.getElementById('imageInput').addEventListener('change', handleImageUpload);
+        document.querySelectorAll('input[name="gridSize"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                gridSize = parseInt(e.target.value);
+                if (uploadedImage) createPuzzlePieces();
+            });
+        });
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    uploadedImage = e.target.result;
+                    isCompleted = false;
+                    document.getElementById('successMessage').style.display = 'none';
+                    createPuzzlePieces();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function createPuzzlePieces() {
+            const container = document.getElementById('puzzleContainer');
+            container.innerHTML = '加载中...';
+
+            const img = new Image();
+            img.onload = function() {
+                const canvas = document.getElementById('hiddenCanvas');
+                const ctx = canvas.getContext('2d');
+                const size = 600; // 使用固定基准大小进行切割
+                canvas.width = size;
+                canvas.height = size;
+                ctx.drawImage(img, 0, 0, size, size);
+
+                const pieceSize = size / gridSize;
+                puzzlePieces = [];
+                
+                for (let row = 0; row < gridSize; row++) {
+                    for (let col = 0; col < gridSize; col++) {
+                        const pieceCanvas = document.createElement('canvas');
+                        pieceCanvas.width = pieceSize;
+                        pieceCanvas.height = pieceSize;
+                        const pCtx = pieceCanvas.getContext('2d');
+                        pCtx.drawImage(canvas, col * pieceSize, row * pieceSize, pieceSize, pieceSize, 0, 0, pieceSize, pieceSize);
+
+                        const id = row * gridSize + col;
+                        puzzlePieces.push({
+                            id: id,
+                            currentPosition: id,
+                            correctPosition: id,
+                            imageData: pieceCanvas.toDataURL()
+                        });
+                    }
+                }
+                shufflePuzzle();
+                renderPuzzle();
+                document.getElementById('resetButton').style.display = 'block';
+            };
+            img.src = uploadedImage;
+        }
+
+        function shufflePuzzle() {
+            for (let i = puzzlePieces.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const temp = puzzlePieces[i].currentPosition;
+                puzzlePieces[i].currentPosition = puzzlePieces[j].currentPosition;
+                puzzlePieces[j].currentPosition = temp;
+            }
+            // 确保不会直接洗出完成状态
+            if(puzzlePieces.every(p => p.currentPosition === p.correctPosition)) shufflePuzzle();
+        }
+
+        function renderPuzzle() {
+            const container = document.getElementById('puzzleContainer');
+            container.innerHTML = '';
+            
+            const grid = document.createElement('div');
+            grid.className = 'puzzle-grid';
+            grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+
+            // 按 currentPosition 排序显示
+            const sortedPieces = [...puzzlePieces].sort((a, b) => a.currentPosition - b.currentPosition);
+
+            sortedPieces.forEach(piece => {
+                const el = document.createElement('div');
+                el.className = 'puzzle-piece';
+                if (piece.currentPosition === piece.correctPosition) el.classList.add('correct');
+                
+                el.dataset.id = piece.id;
+                el.dataset.pos = piece.currentPosition;
+                
+                const img = document.createElement('img');
+                img.src = piece.imageData;
+                el.appendChild(img);
+
+                // 鼠标事件
+                el.draggable = true;
+                el.addEventListener('dragstart', handleDragStart);
+                el.addEventListener('dragover', e => e.preventDefault());
+                el.addEventListener('drop', handleDrop);
+
+                // 触摸事件
+                el.addEventListener('touchstart', handleTouchStart, {passive: false});
+                el.addEventListener('touchmove', handleTouchMove, {passive: false});
+                el.addEventListener('touchend', handleTouchEnd);
+
+                grid.appendChild(el);
+            });
+
+            container.appendChild(grid);
+            checkCompletion();
+        }
+
+        // --- 核心逻辑：处理拖拽和交换 ---
+
+        function swap(pos1, pos2) {
+            const p1 = puzzlePieces.find(p => p.currentPosition === parseInt(pos1));
+            const p2 = puzzlePieces.find(p => p.currentPosition === parseInt(pos2));
+            if (p1 && p2) {
+                const temp = p1.currentPosition;
+                p1.currentPosition = p2.currentPosition;
+                p2.currentPosition = temp;
+                renderPuzzle();
+            }
+        }
+
+        // 鼠标拖拽
+        function handleDragStart(e) {
+            draggedElement = e.currentTarget;
+            e.dataTransfer.setData('text/plain', draggedElement.dataset.pos);
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const fromPos = e.dataTransfer.getData('text/plain');
+            const toPos = e.currentTarget.dataset.pos;
+            swap(fromPos, toPos);
+        }
+
+        // 触摸操作实现
+        function handleTouchStart(e) {
+            // e.preventDefault(); // 可能会阻止某些浏览器的默认点击行为，慎用
+            draggedElement = e.currentTarget;
+            draggedElement.classList.add('dragging');
+            const touch = e.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+        }
+
+        function handleTouchMove(e) {
+            if (!draggedElement) return;
+            e.preventDefault(); // 阻止滚动
+            
+            // 简单的位移反馈（可选）
+            const touch = e.touches[0];
+            const dx = touch.clientX - touchStartX;
+            const dy = touch.clientY - touchStartY;
+            draggedElement.style.transform = `translate(${dx}px, ${dy}px) scale(1.05)`;
+        }
+
+        function handleTouchEnd(e) {
+            if (!draggedElement) return;
+            
+            draggedElement.classList.remove('dragging');
+            draggedElement.style.transform = '';
+
+            const touch = e.changedTouches[0];
+            // 获取松开手指位置下的元素
+            const targetEl = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetPiece = targetEl ? targetEl.closest('.puzzle-piece') : null;
+
+            if (targetPiece && targetPiece !== draggedElement) {
+                swap(draggedElement.dataset.pos, targetPiece.dataset.pos);
+            }
+            
+            draggedElement = null;
+        }
+
+        // --- 游戏状态 ---
+
+        function checkCompletion() {
+            const win = puzzlePieces.every(p => p.currentPosition === p.correctPosition);
+            if (win && !isCompleted && puzzlePieces.length > 0) {
+                isCompleted = true;
+                document.getElementById('successMessage').style.display = 'block';
+                createFallingEmojis();
+            }
+        }
+
+        function resetPuzzle() {
+            isCompleted = false;
+            document.getElementById('successMessage').style.display = 'none';
+            shufflePuzzle();
+            renderPuzzle();
+        }
+
+        function createFallingEmojis() {
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const div = document.createElement('div');
+                    div.style.position = 'fixed';
+                    div.style.left = Math.random() * 100 + 'vw';
+                    div.style.top = '-20px';
+                    div.style.fontSize = '24px';
+                    div.style.zIndex = '1000';
+                    div.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                    div.animate([
+                        { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+                        { transform: `translateY(100vh) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+                    ], { duration: 3000, fill: 'forwards' });
+                    document.body.appendChild(div);
+                    setTimeout(() => div.remove(), 3000);
+                }, i * 150);
+            }
+        }
+    </script>
+</body>
+</html>

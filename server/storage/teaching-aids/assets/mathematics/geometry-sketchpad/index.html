@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>几何画板 Pro - 角度显示版</title>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --measure: #8b5cf6;
+            --toolbar-bg: rgba(255, 255, 255, 0.98);
+            --border: #e5e7eb;
+            --danger: #ef4444;
+            --select: #f59e0b;
+            --3d-color: #059669;
+            --info-bg: rgba(31, 41, 55, 0.9);
+            --text-white: #f9fafb;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #f3f4f6;
+            height: 100vh;
+            display: flex; flex-direction: column;
+            overflow: hidden; touch-action: none; user-select: none;
+        }
+
+        .statusbar {
+            height: 40px;
+            background: #ffffff;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 15px; font-size: 12px; color: #6b7280;
+            z-index: 90; flex-shrink: 0;
+        }
+
+        #canvas-container {
+            flex: 1; position: relative;
+            background-color: white; overflow: hidden; cursor: crosshair;
+        }
+        canvas { display: block; }
+
+        /* 右上角信息面板 */
+        #info-panel {
+            position: absolute; top: 10px; right: 10px;
+            width: 200px;
+            background: var(--info-bg);
+            backdrop-filter: blur(4px);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-white);
+            font-size: 12px;
+            display: none; /* 默认隐藏，选中时显示 */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 85;
+            pointer-events: none; /* 让鼠标事件穿透 */
+        }
+        #info-panel h3 { margin: 10px 0 6px 0; font-size: 13px; color: #fbbf24; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px; }
+        #info-panel h3:first-child { margin-top: 0; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px; }
+        #info-panel .prop-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        #info-panel .prop-val { font-family: monospace; font-weight: bold; }
+
+        .toolbar {
+            height: 64px;
+            background: var(--toolbar-bg);
+            border-top: 1px solid var(--border);
+            display: flex; align-items: center;
+            padding: 0 10px; gap: 8px;
+            box-shadow: 0 -4px 10px rgba(0,0,0,0.03);
+            z-index: 100; overflow-x: auto; white-space: nowrap; flex-shrink: 0;
+            padding-bottom: env(safe-area-inset-bottom); 
+            height: calc(64px + env(safe-area-inset-bottom));
+            box-sizing: border-box;
+        }
+        .toolbar::-webkit-scrollbar { display: none; }
+
+        .btn {
+            width: 44px; height: 44px; flex-shrink: 0;
+            border: 1px solid transparent; background: transparent;
+            border-radius: 10px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; color: #4b5563; transition: all 0.2s;
+            position: relative;
+        }
+        .btn:active { transform: scale(0.95); }
+        .btn.active { background: #eff6ff; color: var(--primary); border-color: #bfdbfe; }
+        .btn.delete-btn { color: var(--danger); }
+        
+        .btn.style-btn.active { background: #f3f4f6; color: #000; border: 1px solid #d1d5db; }
+        .style-indicator {
+            position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+            width: 20px; height: 2px; background: #4b5563;
+        }
+        .btn.style-btn.dashed .style-indicator {
+            background: transparent; border-bottom: 2px dashed #4b5563;
+        }
+
+        .divider { width: 1px; height: 20px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+        
+        #float-actions {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 8px 16px; border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: none; gap: 10px; z-index: 80;
+        }
+        #float-actions.visible { display: flex; animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #float-actions button {
+            background: var(--3d-color); color: white; border: none;
+            padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+        }
+        
+        @keyframes popUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        
+        .shift-indicator {
+            display: none; position: absolute; top: 10px; right: 10px;
+            background: #10b981; color: white; font-size: 10px;
+            padding: 4px 8px; border-radius: 4px; pointer-events: none;
+        }
+        .shift-indicator.show { display: block; }
+
+    </style>
+</head>
+<body>
+
+    <div class="statusbar">
+        <span id="status-text">模式：选择</span>
+        <div>
+            <span id="shift-status" style="color:#10b981; display:none; margin-right:10px; font-weight:bold;">ORTHO</span>
+            <span id="coord-text">x:0, y:0</span>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="geoCanvas"></canvas>
+        <div id="info-panel">
+            <!-- 动态内容 -->
+        </div>
+        <div id="ortho-tip" class="shift-indicator">Shift 直角模式</div>
+        <div id="float-actions">
+            <button onclick="toggleUnfold()">📦 展开 / 折叠</button>
+        </div>
+    </div>
+
+    <div class="toolbar">
+        <button class="btn active" id="tool-select" title="选择 (V)" onclick="setMode('select')">👆</button>
+        <div class="divider"></div>
+        <button class="btn style-btn" id="btn-linestyle" title="切换实线/虚线" onclick="toggleLineStyle()">
+            <span style="font-size:14px; font-weight:bold;">━ / ┄</span>
+            <div class="style-indicator"></div>
+        </button>
+        <div class="divider"></div>
+        <button class="btn" id="tool-line" title="线段" onclick="setMode('line')">➖</button>
+        <button class="btn" id="tool-rect" title="矩形" onclick="setMode('rect')">⬜</button>
+        <button class="btn" id="tool-circle" title="圆形" onclick="setMode('circle')">⭕</button>
+        <button class="btn" id="tool-triangle" title="多边形" onclick="setMode('triangle')">🔺</button>
+        <div class="divider"></div>
+        <button class="btn" id="tool-cube" title="正方体" onclick="setMode('cube')">🧊</button>
+        <button class="btn" id="tool-cuboid" title="长方体" onclick="setMode('cuboid')">🧱</button>
+        <button class="btn" id="tool-cylinder" title="圆柱体" onclick="setMode('cylinder')">🛢️</button>
+        <div class="divider"></div>
+        <button class="btn" id="tool-area" title="面积标记" onclick="setMode('area')">🟥</button>
+        <button class="btn" id="tool-perimeter" title="周长标记" onclick="setMode('perimeter')">🔄</button>
+        <div class="divider"></div>
+        <button class="btn delete-btn" title="删除选中" onclick="deleteSelected()">❌</button>
+        <button class="btn" title="保存" onclick="saveImage()">📷</button>
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('status-text');
+    const coordText = document.getElementById('coord-text');
+    const floatActions = document.getElementById('float-actions');
+    const btnLineStyle = document.getElementById('btn-linestyle');
+    const infoPanel = document.getElementById('info-panel');
+
+    let shapes = []; 
+    let points = []; 
+    let labelIndex = 0; 
+    let viewOffset = { x: 0, y: 0 }; 
+    let mode = 'select';
+    let tempPoints = []; 
+    
+    let isPointerDown = false;
+    let lastPointerPos = { x: 0, y: 0 }; 
+    let dragTarget = null; 
+    let selectedObject = null; 
+    let isPanning = false; 
+    let isShiftDown = false;
+    let isDashedMode = false;
+    let isAnimating = false;
+
+    const dist = (p1, p2) => Math.hypot(p1.x - p2.x, p1.y - p2.y);
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const lerpPoint = (p1, p2, t) => ({ x: lerp(p1.x, p2.x, t), y: lerp(p1.y, p2.y, t) });
+    const pointToSegmentDist = (p, a, b) => {
+        const l2 = (a.x - b.x)**2 + (a.y - b.y)**2;
+        if (l2 === 0) return dist(p, a);
+        let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+        t = Math.max(0, Math.min(1, t));
+        return dist(p, { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) });
+    };
+
+    // Shoelace Formula for Area
+    const getPolygonArea = (pts) => {
+        let area = 0;
+        for (let i = 0; i < pts.length; i++) {
+            let j = (i + 1) % pts.length;
+            area += pts[i].x * pts[j].y;
+            area -= pts[j].x * pts[i].y;
+        }
+        return Math.abs(area / 2);
+    };
+
+    const getPolygonPerimeter = (pts) => {
+        let p = 0;
+        for(let i=0; i<pts.length; i++) {
+            p += dist(pts[i], pts[(i+1)%pts.length]);
+        }
+        return p;
+    };
+
+    // --- 图形类 ---
+
+    class Point {
+        constructor(x, y) {
+            this.x = x; this.y = y;
+            this.label = this.getNextLabel();
+            this.isHover = false;
+        }
+        getNextLabel() {
+            const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            if (labelIndex < labels.length) return labels[labelIndex++];
+            return "P" + (labelIndex++ - labels.length);
+        }
+        draw(ctx) {
+            const isSel = (selectedObject === this);
+            ctx.beginPath(); ctx.arc(this.x, this.y, (this.isHover || isSel) ? 8 : 5, 0, Math.PI * 2);
+            ctx.fillStyle = isSel ? '#f59e0b' : (this.isHover ? '#ef4444' : '#3b82f6'); ctx.fill();
+            if (isSel) {
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2; ctx.stroke();
+                ctx.beginPath(); ctx.arc(this.x, this.y, 12, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)'; ctx.stroke();
+            } else {
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+            }
+            ctx.fillStyle = '#374151'; ctx.font = 'bold 14px sans-serif';
+            ctx.fillText(this.label, this.x + 10, this.y - 10);
+        }
+        isHit(wx, wy) { return Math.hypot(this.x - wx, this.y - wy) < 15; }
+    }
+
+    class Segment {
+        constructor(p1, p2, dashed = false) { this.p1 = p1; this.p2 = p2; this.dashed = dashed; }
+        draw(ctx) {
+            ctx.beginPath(); ctx.moveTo(this.p1.x, this.p1.y); ctx.lineTo(this.p2.x, this.p2.y);
+            ctx.strokeStyle = selectedObject === this ? '#f59e0b' : '#4b5563'; 
+            ctx.lineWidth = selectedObject === this ? 4 : 2; 
+            if(this.dashed) ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]); 
+        }
+        isHit(wx, wy) { return pointToSegmentDist({x:wx, y:wy}, this.p1, this.p2) < 8; }
+        hasPoint(p) { return this.p1 === p || this.p2 === p; }
+        getLength() { return dist(this.p1, this.p2); }
+    }
+
+    class Rectangle {
+        constructor(p1, p2, dashed = false) { this.p1 = p1; this.p2 = p2; this.dashed = dashed; }
+        draw(ctx) {
+            const x = Math.min(this.p1.x, this.p2.x);
+            const y = Math.min(this.p1.y, this.p2.y);
+            const w = Math.abs(this.p1.x - this.p2.x);
+            const h = Math.abs(this.p1.y - this.p2.y);
+            
+            ctx.beginPath();
+            ctx.rect(x, y, w, h);
+            
+            ctx.fillStyle = selectedObject===this?'rgba(245, 158, 11, 0.1)':'rgba(59, 130, 246, 0.05)';
+            ctx.fill();
+            
+            ctx.strokeStyle = selectedObject === this ? '#f59e0b' : '#4b5563';
+            ctx.lineWidth = selectedObject === this ? 3 : 2;
+            if(this.dashed) ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        isHit(wx, wy) {
+            const x = Math.min(this.p1.x, this.p2.x);
+            const y = Math.min(this.p1.y, this.p2.y);
+            const w = Math.abs(this.p1.x - this.p2.x);
+            const h = Math.abs(this.p1.y - this.p2.y);
+            return (wx >= x - 5 && wx <= x + w + 5 && wy >= y - 5 && wy <= y + h + 5);
+        }
+        hasPoint(p) { return this.p1 === p || this.p2 === p; }
+        getArea() { return Math.abs(this.p1.x - this.p2.x) * Math.abs(this.p1.y - this.p2.y); }
+        getPerimeter() { return 2 * (Math.abs(this.p1.x - this.p2.x) + Math.abs(this.p1.y - this.p2.y)); }
+        getWidth() { return Math.abs(this.p1.x - this.p2.x); }
+        getHeight() { return Math.abs(this.p1.y - this.p2.y); }
+    }
+
+    class Circle {
+        constructor(c, e, dashed = false) { this.center = c; this.edge = e; this.dashed = dashed; }
+        draw(ctx) {
+            const r = dist(this.center, this.edge);
+            ctx.beginPath(); ctx.arc(this.center.x, this.center.y, r, 0, Math.PI*2);
+            ctx.strokeStyle = selectedObject === this ? '#f59e0b' : '#4b5563';
+            ctx.lineWidth = selectedObject === this ? 3 : 2; 
+            if(this.dashed) ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        isHit(wx, wy) { return Math.abs(dist(this.center, {x:wx, y:wy}) - dist(this.center, this.edge)) < 8; }
+        hasPoint(p) { return this.center === p || this.edge === p; }
+        getArea() { return Math.PI * (dist(this.center, this.edge)**2); }
+        getPerimeter() { return 2 * Math.PI * dist(this.center, this.edge); }
+        getRadius() { return dist(this.center, this.edge); }
+    }
+
+    class Polygon {
+        constructor(pts, dashed = false) { this.points = pts; this.dashed = dashed; }
+        draw(ctx) {
+            if(this.points.length<2) return;
+            ctx.beginPath(); ctx.moveTo(this.points[0].x, this.points[0].y);
+            for(let i=1;i<this.points.length;i++) ctx.lineTo(this.points[i].x, this.points[i].y);
+            ctx.closePath();
+            ctx.fillStyle = selectedObject===this?'rgba(245, 158, 11, 0.2)':'rgba(59, 130, 246, 0.1)';
+            ctx.fill();
+            ctx.strokeStyle = selectedObject===this?'#f59e0b':'#4b5563';
+            ctx.lineWidth = selectedObject===this?3:2; 
+            if(this.dashed) ctx.setLineDash([8, 8]); ctx.stroke(); ctx.setLineDash([]);
+        }
+        isHit(wx, wy) { 
+            let inside = false;
+            for (let i = 0, j = this.points.length - 1; i < this.points.length; j = i++) {
+                const xi = this.points[i].x, yi = this.points[i].y;
+                const xj = this.points[j].x, yj = this.points[j].y;
+                const intersect = ((yi > wy) !== (yj > wy)) && (wx < (xj - xi) * (wy - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            if(inside) return true;
+            for(let i=0; i<this.points.length; i++) if(pointToSegmentDist({x:wx,y:wy}, this.points[i], this.points[(i+1)%this.points.length]) < 8) return true;
+            return false;
+        }
+        hasPoint(p) { return this.points.includes(p); }
+        getArea() { return getPolygonArea(this.points); }
+        getPerimeter() { return getPolygonPerimeter(this.points); }
+        getCenter() {
+            let sx=0, sy=0;
+            this.points.forEach(p => { sx+=p.x; sy+=p.y; });
+            return {x: sx/this.points.length, y: sy/this.points.length};
+        }
+        getAngles() {
+            const angles = [];
+            const len = this.points.length;
+            for(let i=0; i<len; i++) {
+                const p = this.points[i];
+                const prev = this.points[(i - 1 + len) % len];
+                const next = this.points[(i + 1) % len];
+                
+                // Vectors pointing away from p
+                const v1 = {x: prev.x - p.x, y: prev.y - p.y};
+                const v2 = {x: next.x - p.x, y: next.y - p.y};
+                
+                const dot = v1.x * v2.x + v1.y * v2.y;
+                const m1 = Math.hypot(v1.x, v1.y);
+                const m2 = Math.hypot(v2.x, v2.y);
+                
+                if (m1 === 0 || m2 === 0) {
+                    angles.push({label: p.label, value: 0});
+                    continue;
+                }
+                
+                const angleRad = Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2))));
+                angles.push({label: p.label, value: (angleRad * 180 / Math.PI).toFixed(1)});
+            }
+            return angles;
+        }
+    }
+
+    class InfoMarker {
+        constructor(target, type) {
+            this.target = target;
+            this.type = type; // 'area' or 'perimeter'
+        }
+        draw(ctx) {
+            if(!shapes.includes(this.target)) return;
+            let val = 0;
+            let cx = 0, cy = 0;
+            let prefix = "";
+
+            if (this.target instanceof Circle) {
+                cx = this.target.center.x; cy = this.target.center.y;
+                val = this.type==='area' ? this.target.getArea() : this.target.getPerimeter();
+            } else if (this.target instanceof Polygon) {
+                const c = this.target.getCenter(); cx = c.x; cy = c.y;
+                val = this.type==='area' ? this.target.getArea() : this.target.getPerimeter();
+            } else if (this.target instanceof Rectangle) {
+                cx = (this.target.p1.x + this.target.p2.x)/2; cy = (this.target.p1.y + this.target.p2.y)/2;
+                val = this.type==='area' ? this.target.getArea() : this.target.getPerimeter();
+            } else if (this.target instanceof Cube) {
+                const s = Math.abs(this.target.sizePoint.x - this.target.center.x) * 2;
+                cx = this.target.center.x; cy = this.target.center.y;
+                val = this.type==='area' ? 6 * s * s : 12 * s; 
+            } else if (this.target instanceof Cuboid) {
+                 const w = Math.abs(this.target.cornerPoint.x - this.target.center.x) * 2;
+                 const h = Math.abs(this.target.cornerPoint.y - this.target.center.y) * 2;
+                 const d = Math.min(w, h) * 0.8;
+                 cx = this.target.center.x; cy = this.target.center.y;
+                 val = this.type==='area' ? 2*(w*h + w*d + h*d) : 4*(w+h+d);
+            } else if (this.target instanceof Cylinder) {
+                const r = Math.abs(this.target.edgePoint.x - this.target.center.x);
+                const h = Math.abs(this.target.edgePoint.y - this.target.center.y) * 2;
+                cx = this.target.center.x; cy = this.target.center.y;
+                val = this.type==='area' ? (2*Math.PI*r*r + 2*Math.PI*r*h) : (4*Math.PI*r);
+            } else { return; }
+
+            if (this.type === 'perimeter') cy += 20;
+            else cy -= 5;
+            prefix = this.type === 'area' ? "S=" : "C=";
+            
+            const txt = prefix + Math.round(val);
+            ctx.font = '12px system-ui';
+            const tm = ctx.measureText(txt);
+            const w = tm.width + 12;
+            
+            const isSel = selectedObject === this;
+            ctx.fillStyle = isSel ? '#f59e0b' : '#1f2937';
+            ctx.beginPath();
+            ctx.roundRect(cx - w/2, cy - 10, w, 20, 4);
+            ctx.fill();
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(txt, cx, cy);
+            
+            if (isSel) {
+                ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 1; ctx.stroke();
+            }
+        }
+        isHit(wx, wy) {
+            let cx=0, cy=0;
+            if(this.target.center) { cx=this.target.center.x; cy=this.target.center.y; }
+            else if (this.target.getCenter) { const c = this.target.getCenter(); cx=c.x; cy=c.y; }
+            else if (this.target.p1 && this.target.p2) { cx=(this.target.p1.x+this.target.p2.x)/2; cy=(this.target.p1.y+this.target.p2.y)/2; }
+            
+            if (this.type === 'perimeter') cy += 20; else cy -= 5;
+            return Math.abs(wx - cx) < 20 && Math.abs(wy - cy) < 10;
+        }
+        hasPoint(p) { return false; }
+    }
+
+    // --- 3D 类 ---
+    function drawQuad(ctx, p1, p2, p3, p4, stroke=true) {
+        ctx.beginPath(); 
+        ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
+        ctx.lineTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y);
+        ctx.closePath();
+        ctx.fill();
+        if(stroke) ctx.stroke();
+    }
+
+    class Cube {
+        constructor(center, sizePoint) {
+            this.center = center; this.sizePoint = sizePoint;
+            this.unfoldFactor = 0; this.targetUnfold = 0;
+        }
+        update() {
+            if (Math.abs(this.unfoldFactor - this.targetUnfold) > 0.005) {
+                this.unfoldFactor = lerp(this.unfoldFactor, this.targetUnfold, 0.08);
+                return true;
+            }
+            this.unfoldFactor = this.targetUnfold; return false;
+        }
+        draw(ctx) {
+            const hw = Math.abs(this.sizePoint.x - this.center.x); 
+            drawCuboidLogic(ctx, this, hw, hw, hw * 2);
+        }
+        isHit(wx, wy) { 
+            const s = Math.abs(this.sizePoint.x - this.center.x);
+            const scale = this.unfoldFactor > 0.1 ? 4 : 1.5;
+            return dist({x:wx, y:wy}, this.center) < s * scale; 
+        }
+        hasPoint(p) { return this.center === p || this.sizePoint === p; }
+        getSideLength() { return Math.abs(this.sizePoint.x - this.center.x) * 2; }
+    }
+
+    class Cuboid {
+        constructor(center, cornerPoint) {
+            this.center = center; this.cornerPoint = cornerPoint;
+            this.unfoldFactor = 0; this.targetUnfold = 0;
+        }
+        update() {
+            if (Math.abs(this.unfoldFactor - this.targetUnfold) > 0.005) {
+                this.unfoldFactor = lerp(this.unfoldFactor, this.targetUnfold, 0.08);
+                return true;
+            }
+            this.unfoldFactor = this.targetUnfold; return false;
+        }
+        draw(ctx) {
+            const hw = Math.abs(this.cornerPoint.x - this.center.x); 
+            const hh = Math.abs(this.cornerPoint.y - this.center.y); 
+            const hd = Math.min(hw, hh) * 0.8; 
+            drawCuboidLogic(ctx, this, hw, hh, hd);
+        }
+        isHit(wx, wy) {
+            const hw = Math.abs(this.cornerPoint.x - this.center.x);
+            const hh = Math.abs(this.cornerPoint.y - this.center.y);
+            const scale = this.unfoldFactor > 0.1 ? 3 : 1.2;
+            return Math.abs(wx - this.center.x) < hw*scale && Math.abs(wy - this.center.y) < hh*scale;
+        }
+        hasPoint(p) { return this.center === p || this.cornerPoint === p; }
+        getDimensions() {
+             const w = Math.abs(this.cornerPoint.x - this.center.x) * 2;
+             const h = Math.abs(this.cornerPoint.y - this.center.y) * 2;
+             const d = Math.min(w, h) * 0.8; 
+             return {w, h, d};
+        }
+    }
+
+    function drawCuboidLogic(ctx, obj, hw, hh, realDepth) {
+        const cx = obj.center.x, cy = obj.center.y;
+        const t = obj.unfoldFactor;
+        const isSel = selectedObject === obj;
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = isSel ? '#f59e0b' : '#059669';
+        ctx.fillStyle = isSel ? 'rgba(245, 158, 11, 0.15)' : 'rgba(5, 150, 105, 0.1)';
+        ctx.lineWidth = isSel ? 3 : 2;
+
+        const perspAngle = -Math.PI / 4; 
+        const perspScale = 0.5; 
+        const pVecX = Math.cos(perspAngle) * realDepth * perspScale;
+        const pVecY = Math.sin(perspAngle) * realDepth * perspScale;
+
+        const f_lt = {x: cx - hw, y: cy - hh};
+        const f_rt = {x: cx + hw, y: cy - hh};
+        const f_rb = {x: cx + hw, y: cy + hh};
+        const f_lb = {x: cx - hw, y: cy + hh};
+
+        const P = (start, end) => lerpPoint(start, end, t);
+
+        drawQuad(ctx, f_lt, f_rt, f_rb, f_lb);
+
+        const r_3d = [f_rt, {x: f_rt.x+pVecX, y: f_rt.y+pVecY}, {x: f_rb.x+pVecX, y: f_rb.y+pVecY}, f_rb];
+        const r_flat = [f_rt, {x: f_rt.x+realDepth, y: f_rt.y}, {x: f_rb.x+realDepth, y: f_rb.y}, f_rb];
+        const r_curr = [f_rt, P(r_3d[1], r_flat[1]), P(r_3d[2], r_flat[2]), f_rb]; 
+        drawQuad(ctx, r_curr[0], r_curr[1], r_curr[2], r_curr[3]);
+
+        const l_3d = [{x: f_lt.x+pVecX, y: f_lt.y+pVecY}, f_lt, f_lb, {x: f_lb.x+pVecX, y: f_lb.y+pVecY}];
+        const l_flat = [{x: f_lt.x-realDepth, y: f_lt.y}, f_lt, f_lb, {x: f_lb.x-realDepth, y: f_lb.y}];
+        const l_curr = [P(l_3d[0], l_flat[0]), f_lt, f_lb, P(l_3d[3], l_flat[3])];
+        drawQuad(ctx, l_curr[0], l_curr[1], l_curr[2], l_curr[3]);
+
+        const t_3d = [{x: f_lt.x+pVecX, y: f_lt.y+pVecY}, {x: f_rt.x+pVecX, y: f_rt.y+pVecY}, f_rt, f_lt];
+        const t_flat = [{x: f_lt.x, y: f_lt.y-realDepth}, {x: f_rt.x, y: f_rt.y-realDepth}, f_rt, f_lt];
+        const t_curr = [P(t_3d[0], t_flat[0]), P(t_3d[1], t_flat[1]), f_rt, f_lt];
+        drawQuad(ctx, t_curr[0], t_curr[1], t_curr[2], t_curr[3]);
+
+        const b_3d = [f_lb, f_rb, {x: f_rb.x+pVecX, y: f_rb.y+pVecY}, {x: f_lb.x+pVecX, y: f_lb.y+pVecY}];
+        const b_flat = [f_lb, f_rb, {x: f_rb.x, y: f_rb.y+realDepth}, {x: f_lb.x, y: f_lb.y+realDepth}];
+        const b_curr = [f_lb, f_rb, P(b_3d[2], b_flat[2]), P(b_3d[3], b_flat[3])];
+        drawQuad(ctx, b_curr[0], b_curr[1], b_curr[2], b_curr[3]);
+
+        const bk_3d_p1 = {x: f_lt.x+pVecX, y: f_lt.y+pVecY}; 
+        const bk_3d_p4 = {x: f_lb.x+pVecX, y: f_lb.y+pVecY}; 
+
+        const bk_flat_p2 = {x: f_rt.x + realDepth + 2*hw, y: f_rt.y}; 
+        const bk_flat_p3 = {x: f_rb.x + realDepth + 2*hw, y: f_rb.y}; 
+
+        const bk_curr_p1 = r_curr[1]; 
+        const bk_curr_p4 = r_curr[2]; 
+        
+        const bk_final_p2 = P(bk_3d_p1, bk_flat_p2); 
+        const bk_final_p3 = P(bk_3d_p4, bk_flat_p3); 
+
+        drawQuad(ctx, bk_curr_p1, bk_final_p2, bk_final_p3, bk_curr_p4);
+
+        if(t > 0.05) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)'; ctx.setLineDash([5, 5]); ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.strokeRect(f_lt.x, f_lt.y, 2*hw, 2*hh);
+            ctx.moveTo(r_curr[0].x, r_curr[0].y); ctx.lineTo(r_curr[3].x, r_curr[3].y);
+            ctx.stroke();
+            ctx.restore();
+        }
+        
+        if(isSel && t < 0.1) {
+             ctx.beginPath(); ctx.moveTo(obj.center.x, obj.center.y); 
+             if(obj.cornerPoint) ctx.lineTo(obj.cornerPoint.x, obj.cornerPoint.y);
+             else ctx.lineTo(obj.sizePoint.x, obj.sizePoint.y);
+             ctx.strokeStyle = '#9ca3af'; ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+        }
+    }
+
+    class Cylinder {
+        constructor(center, edgePoint) {
+            this.center = center; this.edgePoint = edgePoint;
+            this.unfoldFactor = 0; this.targetUnfold = 0;
+        }
+        update() {
+            if (Math.abs(this.unfoldFactor - this.targetUnfold) > 0.005) {
+                this.unfoldFactor = lerp(this.unfoldFactor, this.targetUnfold, 0.08);
+                return true;
+            }
+            this.unfoldFactor = this.targetUnfold; return false;
+        }
+        draw(ctx) {
+            const r = Math.max(10, Math.abs(this.edgePoint.x - this.center.x));
+            const h = Math.max(20, Math.abs(this.edgePoint.y - this.center.y) * 2);
+            const cx = this.center.x, cy = this.center.y, t = this.unfoldFactor;
+            
+            ctx.lineWidth = selectedObject === this ? 3 : 2;
+            ctx.strokeStyle = selectedObject === this ? '#f59e0b' : '#059669';
+            ctx.fillStyle = selectedObject === this ? 'rgba(245, 158, 11, 0.1)' : 'rgba(5, 150, 105, 0.05)';
+
+            const bodyW_3d = 2 * r;
+            const bodyW_flat = 2 * Math.PI * r;
+            const currentW = lerp(bodyW_3d, bodyW_flat, t);
+            const topY = cy - h/2, botY = cy + h/2;
+
+            ctx.beginPath(); ctx.rect(cx - currentW/2, topY, currentW, h); ctx.fill();
+            if (t > 0.1) ctx.stroke();
+            else {
+                ctx.beginPath(); ctx.moveTo(cx - r, topY); ctx.lineTo(cx - r, botY);
+                ctx.moveTo(cx + r, topY); ctx.lineTo(cx + r, botY); ctx.stroke();
+            }
+
+            const ellipseScale = lerp(0.3, 1, t);
+            const topCy = lerp(topY, topY - r, t);
+            const botCy = lerp(botY, botY + r, t);
+
+            ctx.beginPath(); ctx.ellipse(cx, topCy, r, r * ellipseScale, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+            ctx.beginPath(); ctx.ellipse(cx, botCy, r, r * ellipseScale, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+            if(selectedObject === this && t < 0.1) {
+                ctx.beginPath(); ctx.moveTo(this.center.x, this.center.y); ctx.lineTo(this.edgePoint.x, this.edgePoint.y);
+                ctx.strokeStyle = '#9ca3af'; ctx.setLineDash([4,4]); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+            }
+        }
+        isHit(wx, wy) {
+            const r = Math.abs(this.edgePoint.x - this.center.x);
+            const h = Math.abs(this.edgePoint.y - this.center.y) * 2;
+            const w = this.unfoldFactor > 0.5 ? r * 7 : r * 2.5;
+            const totalH = this.unfoldFactor > 0.5 ? h + 4*r : h + r;
+            return Math.abs(wx - this.center.x) < w/2 && Math.abs(wy - this.center.y) < totalH/2;
+        }
+        hasPoint(p) { return this.center === p || this.edgePoint === p; }
+        getDimensions() {
+             const r = Math.abs(this.edgePoint.x - this.center.x);
+             const h = Math.abs(this.edgePoint.y - this.center.y) * 2;
+             return {r, h};
+        }
+    }
+
+    function resize() {
+        canvas.width = document.getElementById('canvas-container').offsetWidth;
+        canvas.height = document.getElementById('canvas-container').offsetHeight;
+        render();
+    }
+    window.addEventListener('resize', resize);
+    setTimeout(resize, 10); 
+
+    function toWorld(sx, sy) { return { x: sx - viewOffset.x, y: sy - viewOffset.y }; }
+
+    function toggleLineStyle() {
+        isDashedMode = !isDashedMode;
+        if(isDashedMode) btnLineStyle.classList.add('dashed');
+        else btnLineStyle.classList.remove('dashed');
+        btnLineStyle.classList.toggle('active');
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Shift') { isShiftDown = true; document.getElementById('shift-status').style.display = 'inline'; document.getElementById('ortho-tip').classList.add('show'); if (isPointerDown) render(); }
+        if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+    });
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'Shift') { isShiftDown = false; document.getElementById('shift-status').style.display = 'none'; document.getElementById('ortho-tip').classList.remove('show'); if (isPointerDown) render(); }
+    });
+
+    function applyOrtho(currX, currY, baseX, baseY) {
+        if (!isShiftDown) return { x: currX, y: currY };
+        if (Math.abs(currX - baseX) > Math.abs(currY - baseY)) return { x: currX, y: baseY };
+        return { x: baseX, y: currY };
+    }
+
+    function startAnimationLoop() {
+        if (isAnimating) return;
+        isAnimating = true;
+        (function loop() {
+            let needUpdate = false;
+            shapes.forEach(s => { if (s.update && s.update()) needUpdate = true; });
+            if (needUpdate) { render(); requestAnimationFrame(loop); } else { isAnimating = false; }
+        })();
+    }
+
+    function toggleUnfold() {
+        if (selectedObject && selectedObject.targetUnfold !== undefined) {
+            selectedObject.targetUnfold = selectedObject.targetUnfold === 0 ? 1 : 0;
+            startAnimationLoop();
+        }
+    }
+
+    function render() {
+        ctx.setTransform(1, 0, 0, 1, 0, 0); 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Grid
+        const step = 50, w = canvas.width, h = canvas.height;
+        const sx = (viewOffset.x % step) - step, sy = (viewOffset.y % step) - step;
+        ctx.beginPath(); ctx.strokeStyle = '#f3f4f6'; ctx.lineWidth = 1;
+        for (let x = sx; x < w; x += step) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+        for (let y = sy; y < h; y += step) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+        ctx.stroke();
+
+        ctx.translate(viewOffset.x, viewOffset.y);
+
+        shapes.forEach(s => s.draw(ctx));
+
+        // 绘制拖拽过程中的辅助线
+        if (tempPoints.length > 0 && lastPointerPos) {
+            let wp = toWorld(lastPointerPos.x, lastPointerPos.y);
+            if (isShiftDown && tempPoints.length > 0) wp = applyOrtho(wp.x, wp.y, tempPoints[tempPoints.length-1].x, tempPoints[tempPoints.length-1].y);
+
+            ctx.beginPath(); ctx.strokeStyle = '#059669'; 
+            if(isDashedMode) ctx.setLineDash([8, 8]); else ctx.setLineDash([5, 5]);
+            
+            if (mode === 'cube' || mode === 'cuboid' || mode === 'cylinder' || mode === 'rect') {
+                 const p1 = tempPoints[0];
+                 if (mode === 'rect') {
+                     ctx.rect(p1.x, p1.y, wp.x - p1.x, wp.y - p1.y);
+                 } else {
+                     const r = Math.abs(wp.x - p1.x);
+                     const h_box = Math.abs(wp.y - p1.y);
+                     ctx.rect(p1.x - r, p1.y - h_box, r*2, h_box*2);
+                 }
+                 ctx.stroke();
+            } else if (mode === 'line' || mode === 'triangle') {
+                ctx.moveTo(tempPoints[tempPoints.length-1].x, tempPoints[tempPoints.length-1].y);
+                ctx.lineTo(wp.x, wp.y); ctx.stroke();
+            } else if (mode === 'circle') {
+                ctx.arc(tempPoints[0].x, tempPoints[0].y, dist(tempPoints[0], wp), 0, Math.PI*2); ctx.stroke();
+            }
+            ctx.setLineDash([]);
+        }
+
+        points.forEach(p => p.draw(ctx));
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+        updateInfoPanel();
+    }
+
+    // --- 右上角面板逻辑 ---
+    function updateInfoPanel() {
+        if (!selectedObject) {
+            infoPanel.style.display = 'none';
+            return;
+        }
+        
+        infoPanel.style.display = 'block';
+        let html = '';
+
+        const row = (label, val) => `<div class="prop-row"><span>${label}:</span><span class="prop-val">${val}</span></div>`;
+
+        if (selectedObject instanceof Point) {
+            html += `<h3>📌 顶点数据</h3>`;
+            html += row('标签', selectedObject.label);
+            html += row('X', Math.round(selectedObject.x));
+            html += row('Y', Math.round(selectedObject.y));
+        } 
+        else if (selectedObject instanceof Segment) {
+            html += `<h3>➖ 线段数据</h3>`;
+            html += row('长度', Math.round(selectedObject.getLength()));
+            html += row('端点1', selectedObject.p1.label);
+            html += row('端点2', selectedObject.p2.label);
+        }
+        else if (selectedObject instanceof Rectangle) {
+            html += `<h3>⬜ 矩形数据</h3>`;
+            html += row('宽度', Math.round(selectedObject.getWidth()));
+            html += row('高度', Math.round(selectedObject.getHeight()));
+            html += row('周长', Math.round(selectedObject.getPerimeter()));
+            html += row('面积', Math.round(selectedObject.getArea()));
+            // 矩形角度固定
+            html += `<h3>📐 内角数据</h3>`;
+            html += `<div style="text-align:right; color:#ddd; font-size:11px;">四个角均为 90.0°</div>`;
+        }
+        else if (selectedObject instanceof Circle) {
+            html += `<h3>⭕ 圆形数据</h3>`;
+            html += row('半径', Math.round(selectedObject.getRadius()));
+            html += row('周长', Math.round(selectedObject.getPerimeter()));
+            html += row('面积', Math.round(selectedObject.getArea()));
+        }
+        else if (selectedObject instanceof Polygon) {
+            html += `<h3>🔺 多边形数据</h3>`;
+            html += row('顶点数', selectedObject.points.length);
+            html += row('周长', Math.round(selectedObject.getPerimeter()));
+            html += row('面积', Math.round(selectedObject.getArea()));
+            
+            // 计算并显示角度
+            html += `<h3>📐 内角数据</h3>`;
+            const angles = selectedObject.getAngles();
+            angles.forEach(a => {
+                html += row(`∠${a.label}`, `${a.value}°`);
+            });
+        }
+        else if (selectedObject instanceof Cube) {
+            const s = selectedObject.getSideLength();
+            html += `<h3>🧊 正方体数据</h3>`;
+            html += row('边长', Math.round(s));
+            html += row('表面积', Math.round(6*s*s));
+            html += row('体积', Math.round(s*s*s));
+        }
+        else if (selectedObject instanceof Cuboid) {
+            const d = selectedObject.getDimensions();
+            html += `<h3>🧱 长方体数据</h3>`;
+            html += row('宽', Math.round(d.w));
+            html += row('高', Math.round(d.h));
+            html += row('深(模拟)', Math.round(d.d));
+            html += row('表面积', Math.round(2*(d.w*d.h + d.w*d.d + d.h*d.d)));
+            html += row('体积', Math.round(d.w*d.h*d.d));
+        }
+        else if (selectedObject instanceof Cylinder) {
+            const d = selectedObject.getDimensions();
+            html += `<h3>🛢️ 圆柱体数据</h3>`;
+            html += row('半径', Math.round(d.r));
+            html += row('高度', Math.round(d.h));
+            html += row('表面积', Math.round(2*Math.PI*d.r*d.r + 2*Math.PI*d.r*d.h));
+            html += row('体积', Math.round(Math.PI*d.r*d.r*d.h));
+        }
+        else if (selectedObject instanceof InfoMarker) {
+            html += `<h3>🏷️ 标记数据</h3>`;
+            html += row('类型', selectedObject.type === 'area' ? '面积' : '周长');
+            html += row('目标', '关联图形');
+        }
+
+        infoPanel.innerHTML = html;
+    }
+
+    function findHit(wx, wy) {
+        for (let i = points.length - 1; i >= 0; i--) if (points[i].isHit(wx, wy)) return points[i];
+        if (mode === 'select' || mode === 'area' || mode === 'perimeter') {
+            for (let i = shapes.length - 1; i >= 0; i--) if (shapes[i].isHit(wx, wy)) return shapes[i];
+        }
+        return null;
+    }
+
+    function getOrCreatePoint(wx, wy) {
+        const hit = findHit(wx, wy);
+        if (hit instanceof Point) return hit;
+        const p = new Point(wx, wy);
+        points.push(p);
+        return p;
+    }
+
+    let dragStart = null;
+
+    canvas.addEventListener('pointerdown', e => {
+        isPointerDown = true;
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+        lastPointerPos = { x: sx, y: sy };
+        const wp = toWorld(sx, sy);
+        
+        if (mode === 'area' || mode === 'perimeter') {
+            const hit = findHit(wp.x, wp.y);
+            if (hit && !(hit instanceof Point) && !(hit instanceof Segment) && !(hit instanceof InfoMarker)) {
+                const exists = shapes.some(s => s instanceof InfoMarker && s.target === hit && s.type === mode);
+                if (!exists) {
+                    shapes.push(new InfoMarker(hit, mode));
+                }
+            }
+            render();
+            return;
+        }
+
+        const hit = findHit(wp.x, wp.y);
+
+        if (mode === 'select') {
+            selectedObject = hit;
+            if (hit instanceof Point) {
+                dragTarget = hit; dragStart = {x:hit.x, y:hit.y}; isPanning = false;
+            } else if (hit) {
+                dragTarget = null; isPanning = false;
+            } else {
+                isPanning = true; canvas.style.cursor = 'grabbing';
+            }
+            if (selectedObject && selectedObject.targetUnfold !== undefined) floatActions.classList.add('visible');
+            else floatActions.classList.remove('visible');
+        } else {
+            let effX = wp.x, effY = wp.y;
+            if (isShiftDown && tempPoints.length > 0) {
+                 const lp = tempPoints[tempPoints.length-1];
+                 const c = applyOrtho(effX, effY, lp.x, lp.y);
+                 effX = c.x; effY = c.y;
+            }
+            handleAddLogic(effX, effY);
+        }
+        render();
+    });
+
+    canvas.addEventListener('pointermove', e => {
+        const rect = canvas.getBoundingClientRect();
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+        let wp = toWorld(sx, sy);
+
+        if (isPointerDown) {
+            if (dragTarget && mode === 'select') {
+                if (isShiftDown && dragStart) {
+                    const c = applyOrtho(wp.x, wp.y, dragStart.x, dragStart.y);
+                    dragTarget.x = c.x; dragTarget.y = c.y;
+                } else {
+                    dragTarget.x = wp.x; dragTarget.y = wp.y;
+                }
+            } else if (isPanning) {
+                viewOffset.x += sx - lastPointerPos.x;
+                viewOffset.y += sy - lastPointerPos.y;
+                wp = toWorld(sx, sy);
+            }
+        }
+
+        const hit = findHit(wp.x, wp.y);
+        points.forEach(p => p.isHover = false);
+        if (hit instanceof Point) hit.isHover = true;
+
+        coordText.innerText = `W: ${Math.round(wp.x)}, ${Math.round(wp.y)}`;
+        lastPointerPos = {x:sx, y:sy};
+        render();
+    });
+
+    canvas.addEventListener('pointerup', () => {
+        isPointerDown = false; dragTarget = null; dragStart = null; isPanning = false;
+        canvas.style.cursor = mode==='select'?'default':'crosshair';
+        render();
+    });
+
+    function handleAddLogic(x, y) {
+        if (['cube', 'cuboid', 'cylinder'].includes(mode)) {
+            const p = getOrCreatePoint(x, y); tempPoints.push(p);
+            if (tempPoints.length === 2) {
+                if (tempPoints[0] !== tempPoints[1]) {
+                    if (mode === 'cube') shapes.push(new Cube(tempPoints[0], tempPoints[1]));
+                    else if (mode === 'cuboid') shapes.push(new Cuboid(tempPoints[0], tempPoints[1]));
+                    else shapes.push(new Cylinder(tempPoints[0], tempPoints[1]));
+                }
+                tempPoints = []; setMode('select');
+            }
+        }
+        else if (mode === 'rect') {
+            const p = getOrCreatePoint(x, y); tempPoints.push(p);
+            if (tempPoints.length === 2) {
+                shapes.push(new Rectangle(tempPoints[0], tempPoints[1], isDashedMode));
+                tempPoints = [];
+            }
+        }
+        else if (mode === 'line') {
+            const p = getOrCreatePoint(x, y); tempPoints.push(p);
+            if (tempPoints.length === 2) {
+                shapes.push(new Segment(tempPoints[0], tempPoints[1], isDashedMode));
+                tempPoints = [];
+            }
+        }
+        else if (mode === 'circle') {
+            const p = getOrCreatePoint(x, y); tempPoints.push(p);
+            if (tempPoints.length === 2) {
+                shapes.push(new Circle(tempPoints[0], tempPoints[1], isDashedMode));
+                tempPoints = [];
+            }
+        }
+        else if (mode === 'triangle') {
+            const p = getOrCreatePoint(x, y);
+            if (tempPoints.length>0 && tempPoints[tempPoints.length-1]===p) return;
+            tempPoints.push(p);
+            if (tempPoints.length === 3) {
+                shapes.push(new Polygon([...tempPoints], isDashedMode));
+                tempPoints = [];
+            }
+        }
+    }
+
+    function deleteSelected() {
+        if (!selectedObject) return;
+        
+        let objToDelete = selectedObject;
+        let markersToDelete = shapes.filter(s => s instanceof InfoMarker && s.target === objToDelete);
+        let pointsToCheck = [];
+
+        if (objToDelete instanceof Segment || objToDelete instanceof Rectangle) {
+            pointsToCheck = [objToDelete.p1, objToDelete.p2];
+        } else if (objToDelete instanceof Circle) {
+            pointsToCheck = [objToDelete.center, objToDelete.edge];
+        } else if (objToDelete instanceof Polygon) {
+            pointsToCheck = [...objToDelete.points];
+        } else if (objToDelete instanceof Cube || objToDelete instanceof Cuboid || objToDelete instanceof Cylinder) {
+             if(objToDelete.center) pointsToCheck.push(objToDelete.center);
+             if(objToDelete.sizePoint) pointsToCheck.push(objToDelete.sizePoint);
+             if(objToDelete.cornerPoint) pointsToCheck.push(objToDelete.cornerPoint);
+             if(objToDelete.edgePoint) pointsToCheck.push(objToDelete.edgePoint);
+        } else if (objToDelete instanceof Point) {
+            pointsToCheck = [objToDelete];
+            const dependentShapes = shapes.filter(s => s.hasPoint && s.hasPoint(objToDelete));
+            dependentShapes.forEach(ds => {
+                const subMarkers = shapes.filter(m => m instanceof InfoMarker && m.target === ds);
+                markersToDelete = [...markersToDelete, ...subMarkers];
+            });
+            shapes = shapes.filter(s => s !== objToDelete && !dependentShapes.includes(s) && !markersToDelete.includes(s));
+            points = points.filter(p => p !== objToDelete);
+            selectedObject = null;
+            infoPanel.style.display = 'none';
+            render();
+            return;
+        }
+
+        shapes = shapes.filter(s => s !== objToDelete && !markersToDelete.includes(s));
+
+        pointsToCheck.forEach(pt => {
+            const isUsed = shapes.some(s => s.hasPoint && s.hasPoint(pt));
+            if (!isUsed) {
+                points = points.filter(p => p !== pt);
+            }
+        });
+
+        selectedObject = null; 
+        floatActions.classList.remove('visible');
+        infoPanel.style.display = 'none';
+        render();
+    }
+
+    function setMode(m) {
+        mode = m; tempPoints = []; selectedObject = null;
+        floatActions.classList.remove('visible');
+        infoPanel.style.display = 'none';
+        document.querySelectorAll('.toolbar .btn').forEach(b => {
+            if (!b.classList.contains('style-btn')) b.classList.remove('active');
+        });
+        const btn = document.getElementById('tool-' + m);
+        if(btn) btn.classList.add('active');
+        canvas.style.cursor = m==='select'?'default':'crosshair';
+        statusText.innerText = getStatusTip(m);
+        render();
+    }
+
+    function getStatusTip(m) {
+        const tips = {
+            'select': '选择模式：点击查看右上角详情。Delete键删除。',
+            'cube': '正方体：中心 -> 顶点。',
+            'cuboid': '长方体：中心 -> 顶点。',
+            'cylinder': '圆柱体：底面中心 -> 边缘。',
+            'rect': '矩形：点击对角线两点确定。',
+            'line': '线段：连接两点。',
+            'circle': '圆形：圆心 -> 半径。',
+            'triangle': '多边形：三点确定。',
+            'area': '面积标记：点击图形显示。',
+            'perimeter': '周长标记：点击图形显示。'
+        };
+        return tips[m] || m;
+    }
+
+    function saveImage() {
+        const link = document.createElement('a');
+        link.download = 'geometry-pro-final.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+
+    render();
+</script>
+</body>
+</html>

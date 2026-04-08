@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>埃舍尔密铺生成器 v3.7 (触控 & 全屏无缝版)</title>
+    <style>
+        :root {
+            --primary: #5a5cec;
+            --primary-hover: #4345c9;
+            --bg-color: #f3f5f9;
+            --panel-bg: #ffffff;
+            --text-main: #2d3748;
+            --text-muted: #718096;
+            --border-color: #e2e8f0;
+            --red-dot: #f56565;
+            --blue-dot: #4299e1;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            touch-action: none; /* 禁止浏览器默认手势 */
+        }
+
+        .app-container { display: flex; width: 100%; height: 100%; }
+
+        /* 侧边栏 */
+        .sidebar {
+            width: 320px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.03);
+            z-index: 10;
+        }
+
+        .header h1 { font-size: 20px; margin: 0; color: var(--primary); }
+        .header p { margin: 5px 0 0 0; font-size: 12px; color: var(--text-muted); }
+
+        .card { background: #fafbfc; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; }
+        .card-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 5px; }
+
+        .btn {
+            width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 500; text-align: center; transition: all 0.2s;
+            margin-bottom: 8px;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-outline { background: white; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background: #f1f5f9; }
+
+        .num-control { display: flex; align-items: center; gap: 3px; background: white; border: 1px solid var(--border-color); border-radius: 4px; }
+        .num-control button { border: none; background: #f1f5f9; width: 30px; height: 30px; cursor: pointer; font-weight: bold; }
+        .num-control input { width: 35px; border: none; text-align: center; font-size: 13px; outline: none; }
+        
+        .row-flex { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 8px;}
+        .col-flex { display: flex; flex-direction: column; gap: 3px; }
+
+        .color-palette { display: flex; gap: 8px; margin-top: 5px; }
+        .color-picker { flex: 1; height: 36px; border: none; border-radius: 4px; padding: 0; cursor: pointer; }
+
+        /* 编辑区 */
+        .editor-area {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px; background: white; position: relative; min-width: 420px;
+        }
+        #editCanvas { 
+            background: #f8f9fa; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); 
+            border: 1px solid var(--border-color); touch-action: none;
+        }
+
+        /* 预览区 */
+        .preview-area {
+            flex: 1.5; background: #e2e8f0; position: relative; overflow: hidden;
+            border-left: 1px solid var(--border-color);
+        }
+        #patternCanvas { position: absolute; top:0; left:0; width: 100%; height: 100%; }
+        .area-label { 
+            position: absolute; top: 15px; left: 15px; z-index: 10;
+            background: rgba(255,255,255,0.9); padding: 5px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 600; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="sidebar">
+        <div class="header">
+            <h1>🎨 埃舍尔生成器</h1>
+            <p>v3.7 - 自定义宽高/触控版</p>
+        </div>
+
+        <div class="card">
+            <div class="card-title">📏 密度与尺寸 (Grid & Unit)</div>
+            <div class="row-flex">
+                <div class="col-flex">
+                    <span style="font-size: 11px;">横向数量 (Cols)</span>
+                    <div class="num-control">
+                        <button onclick="changeGrid('cols', -1)">-</button>
+                        <input type="text" id="colsInput" value="8" readonly>
+                        <button onclick="changeGrid('cols', 1)">+</button>
+                    </div>
+                </div>
+                <div class="col-flex">
+                    <span style="font-size: 11px;">纵向数量 (Rows)</span>
+                    <div class="num-control">
+                        <button onclick="changeGrid('rows', -1)">-</button>
+                        <input type="text" id="rowsInput" value="12" readonly>
+                        <button onclick="changeGrid('rows', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="row-flex">
+                <div class="col-flex">
+                    <span style="font-size: 11px;">单元宽度 (W)</span>
+                    <div class="num-control">
+                        <button onclick="changeUnitSize('width', -10)">-</button>
+                        <input type="text" id="unitWidthInput" value="270" readonly>
+                        <button onclick="changeUnitSize('width', 10)">+</button>
+                    </div>
+                </div>
+                <div class="col-flex">
+                    <span style="font-size: 11px;">单元高度 (H)</span>
+                    <div class="num-control">
+                        <button onclick="changeUnitSize('height', -10)">-</button>
+                        <input type="text" id="unitHeightInput" value="170" readonly>
+                        <button onclick="changeUnitSize('height', 10)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="row-flex" style="margin-top: 10px;">
+                <label style="font-size: 12px;"><input type="checkbox" id="showEye" checked> 眼睛</label>
+                <label style="font-size: 12px;"><input type="checkbox" id="showLine"> 辅助线</label>
+                <label style="font-size: 12px;"><input type="checkbox" id="fullFill" checked> 全充满</label>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">〰️ 连线样式</div>
+            <div style="display:flex; gap:15px; font-size:12px;">
+                <label><input type="radio" name="lineStyle" value="straight" checked onchange="updateLineStyle(this.value)"> 直线</label>
+                <label><input type="radio" name="lineStyle" value="curved" onchange="updateLineStyle(this.value)"> 曲线</label>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">🎨 配色方案</div>
+            <div class="color-palette">
+                <input type="color" class="color-picker" id="color0" value="#0ea5e9">
+                <input type="color" class="color-picker" id="color1" value="#bef264">
+                <input type="color" class="color-picker" id="color2" value="#e2e8f0">
+            </div>
+            <div style="text-align:right; margin-top:5px; font-size:11px; color:var(--primary); cursor:pointer" onclick="randomColors()">🎲 随机配色</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">✨ 快速模板</div>
+            <div class="template-grid">
+                <button class="btn btn-outline" style="padding:6px" onclick="loadTemplate('reset')">复位</button>
+                <button class="btn btn-outline" style="padding:6px" onclick="loadTemplate('bird')">飞鸟</button>
+                <button class="btn btn-outline" style="padding:6px" onclick="loadTemplate('fish')">游鱼</button>
+                <button class="btn btn-outline" style="padding:6px" onclick="loadTemplate('puzzle')">拼图</button>
+            </div>
+        </div>
+
+        <div style="margin-top:auto">
+            <button class="btn btn-primary" onclick="generatePattern()">🚀 生成密铺</button>
+            <button class="btn btn-outline" onclick="exportImage()">💾 导出图片</button>
+        </div>
+    </div>
+
+    <div class="editor-area">
+        <div class="area-label">编辑单元 (支持触控拖拽)</div>
+        <canvas id="editCanvas" width="400" height="400"></canvas>
+    </div>
+
+    <div class="preview-area" id="previewContainer">
+        <div class="area-label">预览区 (无缝铺满)</div>
+        <canvas id="patternCanvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const editCanvas = document.getElementById('editCanvas');
+    const editCtx = editCanvas.getContext('2d');
+    const patternCanvas = document.getElementById('patternCanvas');
+    const patternCtx = patternCanvas.getContext('2d');
+    const previewContainer = document.getElementById('previewContainer');
+
+    // --- 系统配置 ---
+    const ORIGINAL_REFERENCE_SIZE = 160; 
+    let state = {
+        cols: 8, rows: 12,
+        unitWidth: 270, unitHeight: 170,
+        showEye: true, showLine: false, fullFill: true,
+        lineStyle: 'straight',
+        colors: ['#0ea5e9', '#bef264', '#e2e8f0'],
+        patternGenerated: false
+    };
+
+    let shape = {
+        top: Array(6).fill(0).map((_,i) => ({x: (20 + i*20)/ORIGINAL_REFERENCE_SIZE, y: 0})),
+        left: Array(6).fill(0).map((_,i) => ({x: 0, y: (20 + i*20)/ORIGINAL_REFERENCE_SIZE})),
+        eye: {x: 80/ORIGINAL_REFERENCE_SIZE, y: 40/ORIGINAL_REFERENCE_SIZE}
+    };
+
+    let draggingPoint = null;
+    let animationTimer = null;
+    let OFFSET_X, OFFSET_Y;
+
+    // --- 绘图逻辑 ---
+
+    function traceTilePath(ctx, uW, uH, dX, dY, curShape, style) {
+        const T = curShape.top, L = curShape.left;
+        ctx.beginPath();
+        ctx.moveTo(dX, dY);
+        // Top
+        if (style === 'straight') {
+            T.forEach(p => ctx.lineTo(dX + p.x * uW, dY + p.y * uH));
+        } else {
+            ctx.quadraticCurveTo(dX+T[0].x*uW, dY+T[0].y*uH, dX+(T[0].x+T[1].x)/2*uW, dY+(T[0].y+T[1].y)/2*uH);
+            for(let i=1; i<T.length-1; i++) ctx.quadraticCurveTo(dX+T[i].x*uW, dY+T[i].y*uH, dX+(T[i].x+T[i+1].x)/2*uW, dY+(T[i].y+T[i+1].y)/2*uH);
+            ctx.quadraticCurveTo(dX+T[T.length-1].x*uW, dY+T[T.length-1].y*uH, dX+uW, dY);
+        }
+        ctx.lineTo(dX + uW, dY);
+        // Right
+        if (style === 'straight') {
+            L.forEach(p => ctx.lineTo(dX + p.x * uW + uW, dY + p.y * uH));
+        } else {
+            ctx.quadraticCurveTo(dX+L[0].x*uW+uW, dY+L[0].y*uH, dX+(L[0].x+L[1].x)/2*uW+uW, dY+(L[0].y+L[1].y)/2*uH);
+            for(let i=1; i<L.length-1; i++) ctx.quadraticCurveTo(dX+L[i].x*uW+uW, dY+L[i].y*uH, dX+(L[i].x+L[i+1].x)/2*uW+uW, dY+(L[i].y+L[i+1].y)/2*uH);
+            ctx.quadraticCurveTo(dX+L[L.length-1].x*uW+uW, dY+L[L.length-1].y*uH, dX+uW, dY+uH);
+        }
+        ctx.lineTo(dX + uW, dY + uH);
+        // Bottom (Reverse)
+        if (style === 'straight') {
+            for(let i=T.length-1; i>=0; i--) ctx.lineTo(dX + T[i].x * uW, dY + T[i].y * uH + uH);
+        } else {
+            ctx.quadraticCurveTo(dX+T[T.length-1].x*uW, dY+T[T.length-1].y*uH+uH, dX+(T[T.length-1].x+T[T.length-2].x)/2*uW, dY+(T[T.length-1].y+T[T.length-2].y)/2*uH+uH);
+            for(let i=T.length-2; i>0; i--) ctx.quadraticCurveTo(dX+T[i].x*uW, dY+T[i].y*uH+uH, dX+(T[i].x+T[i-1].x)/2*uW, dY+(T[i].y+T[i-1].y)/2*uH+uH);
+            ctx.quadraticCurveTo(dX+T[0].x*uW, dY+T[0].y*uH+uH, dX, dY+uH);
+        }
+        ctx.lineTo(dX, dY + uH);
+        // Left (Reverse)
+        if (style === 'straight') {
+            for(let i=L.length-1; i>=0; i--) ctx.lineTo(dX + L[i].x * uW, dY + L[i].y * uH);
+        } else {
+            ctx.quadraticCurveTo(dX+L[L.length-1].x*uW, dY+L[L.length-1].y*uH, dX+(L[L.length-1].x+L[L.length-2].x)/2*uW, dY+(L[L.length-1].y+L[L.length-2].y)/2*uH);
+            for(let i=L.length-2; i>0; i--) ctx.quadraticCurveTo(dX+L[i].x*uW, dY+L[i].y*uH, dX+(L[i].x+L[i-1].x)/2*uW, dY+(L[i].y+L[i-1].y)/2*uH);
+            ctx.quadraticCurveTo(dX+L[0].x*uW, dY+L[0].y*uH, dX, dY);
+        }
+        ctx.closePath();
+    }
+
+    function drawEditor() {
+        OFFSET_X = (editCanvas.width - state.unitWidth) / 2;
+        OFFSET_Y = (editCanvas.height - state.unitHeight) / 2;
+        editCtx.clearRect(0, 0, 400, 400);
+        editCtx.strokeStyle = '#cbd5e1';
+        editCtx.setLineDash([5, 5]);
+        editCtx.strokeRect(OFFSET_X, OFFSET_Y, state.unitWidth, state.unitHeight);
+        editCtx.setLineDash([]);
+        
+        traceTilePath(editCtx, state.unitWidth, state.unitHeight, OFFSET_X, OFFSET_Y, shape, state.lineStyle);
+        editCtx.fillStyle = 'rgba(14, 165, 233, 0.1)';
+        editCtx.fill();
+        editCtx.strokeStyle = '#0ea5e9';
+        editCtx.lineWidth = 2;
+        editCtx.stroke();
+
+        const drawPt = (p, col, ox=0, oy=0) => {
+            editCtx.beginPath();
+            editCtx.arc(OFFSET_X + p.x * state.unitWidth + ox, OFFSET_Y + p.y * state.unitHeight + oy, 8, 0, Math.PI*2);
+            editCtx.fillStyle = col;
+            editCtx.fill();
+            editCtx.strokeStyle = '#fff';
+            editCtx.lineWidth = 2;
+            editCtx.stroke();
+        };
+
+        shape.top.forEach(p => { drawPt(p, 'var(--blue-dot)'); drawPt(p, 'var(--blue-dot)', 0, state.unitHeight); });
+        shape.left.forEach(p => { drawPt(p, 'var(--red-dot)'); drawPt(p, 'var(--red-dot)', state.unitWidth, 0); });
+        if (state.showEye) drawPt(shape.eye, '#000');
+    }
+
+    function drawPreview(maxCount = -1) {
+        const rect = previewContainer.getBoundingClientRect();
+        patternCanvas.width = rect.width;
+        patternCanvas.height = rect.height;
+        if (!state.patternGenerated) return;
+
+        // 计算预览区单体缩放后的实际宽高
+        let pW = state.unitWidth / 2.5; 
+        let pH = state.unitHeight / 2.5;
+
+        // 如果开启“全充满”，则根据 Cols 重新计算宽度，Rows 根据比例自动
+        if (state.fullFill) {
+            pW = rect.width / state.cols;
+            pH = pW * (state.unitHeight / state.unitWidth);
+        }
+
+        const colsNeeded = Math.ceil(rect.width / pW) + 2;
+        const rowsNeeded = Math.ceil(rect.height / pH) + 2;
+
+        if (maxCount === -1) patternCtx.clearRect(0, 0, rect.width, rect.height);
+
+        let count = 0;
+        for(let r=-1; r < rowsNeeded; r++) {
+            for(let c=-1; c < colsNeeded; c++) {
+                if (maxCount !== -1 && ++count > maxCount) return;
+                const dX = c * pW, dY = r * pH;
+                traceTilePath(patternCtx, pW, pH, dX, dY, shape, state.lineStyle);
+                patternCtx.fillStyle = state.colors[((r + c) % 3 + 3) % 3];
+                patternCtx.fill();
+                patternCtx.strokeStyle = 'rgba(0,0,0,0.1)';
+                patternCtx.stroke();
+                if(state.showLine) { patternCtx.strokeStyle = 'rgba(255,255,255,0.2)'; patternCtx.strokeRect(dX,dY,pW,pH); }
+                if(state.showEye) {
+                    patternCtx.beginPath();
+                    patternCtx.arc(dX + shape.eye.x*pW, dY + shape.eye.y*pH, pW/30, 0, Math.PI*2);
+                    patternCtx.fillStyle = '#000';
+                    patternCtx.fill();
+                }
+            }
+        }
+    }
+
+    // --- 触控交互适配 ---
+
+    function getPointerPos(e) {
+        const rect = editCanvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left - OFFSET_X, y: e.clientY - rect.top - OFFSET_Y };
+    }
+
+    function distSq(p1, p2) { return (p1.x - p2.x)**2 + (p1.y - p2.y)**2; }
+
+    editCanvas.addEventListener('pointerdown', (e) => {
+        const pos = getPointerPos(e);
+        const hit = 600; // 判定半径平方 (约 24px)
+        draggingPoint = null;
+
+        for (let p of shape.top) {
+            if (distSq(pos, {x:p.x*state.unitWidth, y:p.y*state.unitHeight}) < hit) { draggingPoint = {p, t:'top'}; break; }
+            if (distSq(pos, {x:p.x*state.unitWidth, y:p.y*state.unitHeight+state.unitHeight}) < hit) { draggingPoint = {p, t:'top-m'}; break; }
+        }
+        if(!draggingPoint) {
+            for (let p of shape.left) {
+                if (distSq(pos, {x:p.x*state.unitWidth, y:p.y*state.unitHeight}) < hit) { draggingPoint = {p, t:'left'}; break; }
+                if (distSq(pos, {x:p.x*state.unitWidth+state.unitWidth, y:p.y*state.unitHeight}) < hit) { draggingPoint = {p, t:'left-m'}; break; }
+            }
+        }
+        if(!draggingPoint && state.showEye && distSq(pos, {x:shape.eye.x*state.unitWidth, y:shape.eye.y*state.unitHeight}) < hit) draggingPoint = {p:shape.eye, t:'eye'};
+        
+        if (draggingPoint) editCanvas.setPointerCapture(e.pointerId);
+    });
+
+    editCanvas.addEventListener('pointermove', (e) => {
+        if (!draggingPoint) return;
+        const pos = getPointerPos(e);
+        let nX = pos.x / state.unitWidth, nY = pos.y / state.unitHeight;
+
+        if (draggingPoint.t === 'top') { draggingPoint.p.x = Math.max(0, Math.min(1, nX)); draggingPoint.p.y = nY; }
+        else if (draggingPoint.t === 'top-m') { draggingPoint.p.x = Math.max(0, Math.min(1, nX)); draggingPoint.p.y = nY - 1; }
+        else if (draggingPoint.t === 'left') { draggingPoint.p.x = nX; draggingPoint.p.y = Math.max(0, Math.min(1, nY)); }
+        else if (draggingPoint.t === 'left-m') { draggingPoint.p.x = nX - 1; draggingPoint.p.y = Math.max(0, Math.min(1, nY)); }
+        else { draggingPoint.p.x = nX; draggingPoint.p.y = nY; }
+
+        drawEditor();
+        if (state.patternGenerated && !animationTimer) drawPreview();
+    });
+
+    editCanvas.addEventListener('pointerup', () => draggingPoint = null);
+
+    // --- UI 控制 ---
+
+    function changeGrid(t, v) { state[t] = Math.max(1, Math.min(30, state[t] + v)); document.getElementById(t+'Input').value = state[t]; drawPreview(); }
+    function changeUnitSize(t, v) { 
+        if(t==='width') state.unitWidth = Math.max(50, Math.min(350, state.unitWidth + v));
+        else state.unitHeight = Math.max(50, Math.min(350, state.unitHeight + v));
+        document.getElementById('unitWidthInput').value = state.unitWidth;
+        document.getElementById('unitHeightInput').value = state.unitHeight;
+        drawEditor(); if(state.patternGenerated) drawPreview();
+    }
+
+    function generatePattern() {
+        if (animationTimer) clearTimeout(animationTimer);
+        state.patternGenerated = true;
+        const total = 50; // 动画阶段数
+        let cur = 0;
+        const animate = () => {
+            if (cur <= total) { drawPreview(cur++); animationTimer = setTimeout(animate, 1500/total); }
+            else animationTimer = null;
+        };
+        animate();
+    }
+
+    function loadTemplate(key) {
+        const T = {
+            reset: {
+                top: [20,40,60,100,120,140].map(x=>({x:x/ORIGINAL_REFERENCE_SIZE, y:0})),
+                left: [20,40,60,100,120,140].map(y=>({x:0, y:y/ORIGINAL_REFERENCE_SIZE})),
+                eye: {x:80/ORIGINAL_REFERENCE_SIZE, y:40/ORIGINAL_REFERENCE_SIZE}
+            },
+            bird: {
+                top: [{x:10,y:-30},{x:30,y:-50},{x:60,y:-40},{x:100,y:-20},{x:130,y:0},{x:150,y:10}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                left: [{x:-20,y:10},{x:0,y:40},{x:10,y:70},{x:-5,y:100},{x:10,y:130},{x:20,y:150}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                eye: {x:35/ORIGINAL_REFERENCE_SIZE, y:30/ORIGINAL_REFERENCE_SIZE}
+            },
+            fish: {
+                top: [{x:20,y:-20},{x:50,y:-40},{x:80,y:-20},{x:110,y:0},{x:130,y:10},{x:140,y:30}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                left: [{x:20,y:20},{x:0,y:50},{x:-15,y:80},{x:0,y:110},{x:10,y:130},{x:30,y:140}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                eye: {x:120/ORIGINAL_REFERENCE_SIZE, y:70/ORIGINAL_REFERENCE_SIZE}
+            },
+            puzzle: {
+                top: [{x:30,y:-20},{x:50,y:-40},{x:70,y:-30},{x:90,y:-30},{x:110,y:-40},{x:130,y:-20}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                left: [{x:20,y:30},{x:40,y:50},{x:30,y:70},{x:30,y:90},{x:40,y:110},{x:20,y:130}].map(p=>({x:p.x/ORIGINAL_REFERENCE_SIZE,y:p.y/ORIGINAL_REFERENCE_SIZE})),
+                eye: {x:80/ORIGINAL_REFERENCE_SIZE, y:80/ORIGINAL_REFERENCE_SIZE}
+            }
+        };
+        shape = JSON.parse(JSON.stringify(T[key]));
+        state.patternGenerated = false;
+        drawEditor(); patternCtx.clearRect(0,0,patternCanvas.width,patternCanvas.height);
+    }
+
+    function exportImage() {
+        const link = document.createElement('a');
+        link.download = 'Escher_Tiling.png';
+        link.href = patternCanvas.toDataURL();
+        link.click();
+    }
+
+    function randomColors() {
+        state.colors = state.colors.map((c, i) => {
+            const rc = '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+            document.getElementById('color'+i).value = rc;
+            return rc;
+        });
+        if (state.patternGenerated) drawPreview();
+    }
+
+    function updateLineStyle(s) { state.lineStyle = s; drawEditor(); if(state.patternGenerated) drawPreview(); }
+
+    window.onload = () => { drawEditor(); };
+    window.onresize = () => { drawEditor(); if(state.patternGenerated) drawPreview(); };
+    document.getElementById('showEye').onchange = (e) => { state.showEye = e.target.checked; drawEditor(); if(state.patternGenerated) drawPreview(); };
+    document.getElementById('showLine').onchange = (e) => { state.showLine = e.target.checked; drawPreview(); };
+    document.getElementById('fullFill').onchange = (e) => { state.fullFill = e.target.checked; drawPreview(); };
+    ['color0','color1','color2'].forEach((id,i)=>document.getElementById(id).oninput=(e)=>{state.colors[i]=e.target.value; drawPreview();});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理学实验：瞬时记忆矩阵</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --accent: #a29bfe;
+            --bg: #f8f9fa;
+            --tile-default: #dfe6e9;
+            --tile-active: #0984e3;
+            --tile-correct: #00b894;
+            --tile-wrong: #d63031;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            user-select: none;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+
+        h1 { color: var(--primary); margin: 0 0 10px 0; }
+        p { color: #666; margin-bottom: 20px; }
+
+        /* 游戏网格区域 */
+        .grid-container {
+            display: grid;
+            gap: 10px;
+            margin: 20px auto;
+            background: #b2bec3;
+            padding: 10px;
+            border-radius: 10px;
+            /* 动态控制行列 */
+            width: fit-content; 
+        }
+
+        .tile {
+            width: 60px;
+            height: 60px;
+            background-color: var(--tile-default);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .tile:active { transform: scale(0.9); }
+        
+        /* 状态样式 */
+        .tile.highlight { background-color: var(--tile-active); box-shadow: 0 0 15px var(--tile-active); }
+        .tile.correct { background-color: var(--tile-correct); }
+        .tile.wrong { background-color: var(--tile-wrong); animation: shake 0.4s; }
+
+        /* 界面切换 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(108, 92, 231, 0.3); }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-weight: bold;
+            color: #2d3436;
+        }
+
+        .theory-box {
+            background: #eef2f3;
+            border-left: 5px solid var(--primary);
+            padding: 15px;
+            margin-top: 20px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 首页 -->
+    <div id="start-screen" class="screen active container">
+        <h1>🟦 瞬时记忆矩阵</h1>
+        <p>基于“视觉空间工作记忆”理论</p>
+        <div style="text-align: left; margin: 20px;">
+            <p><strong>挑战规则：</strong></p>
+            <p>1. 屏幕上会闪现几个蓝色的方块。</p>
+            <p>2. 请以此记住它们的位置。</p>
+            <p>3. 等它们消失后，凭记忆把它们全部点出来！</p>
+            <p>随着关卡升级，方块会越来越多...</p>
+        </div>
+        <button onclick="startGame()">开始记忆</button>
+    </div>
+
+    <!-- 游戏页 -->
+    <div id="game-screen" class="screen container">
+        <div class="info-bar">
+            <span id="level-display">Level: 1</span>
+            <span id="lives-display">❤️ x 3</span>
+        </div>
+        <div id="message-tip" style="height: 20px; color: var(--primary); font-weight: bold;">准备...</div>
+        
+        <div class="grid-container" id="grid">
+            <!-- JS生成网格 -->
+        </div>
+    </div>
+
+    <!-- 结算页 -->
+    <div id="result-screen" class="screen container">
+        <h1 style="color: var(--tile-wrong)">记忆过载!</h1>
+        <h2>你达到了: <span id="final-level" style="font-size: 1.5em; color: var(--primary);">Level 5</span></h2>
+        
+        <div class="theory-box">
+            <h3>🧠 科学原理解析</h3>
+            <p><strong>神奇的数字 7±2：</strong> 心理学家乔治·米勒发现，人类短时记忆的容量大约只有 7 个单位（5到9之间）。</p>
+            <p>在这个游戏中，当你需要记住的方块超过 <strong>5-7个</strong> 时，你会发现难度陡增，感觉脑子“不够用”了。这就是你的<strong>工作记忆容量</strong>达到了极限。</p>
+            <p>通过这种训练，可以激活大脑的<strong>视觉空间画板</strong>区域。</p>
+        </div>
+        
+        <button onclick="startGame()" style="margin-top: 20px;">再次挑战极限</button>
+    </div>
+
+    <script>
+        // 游戏状态
+        let level = 1;
+        let lives = 3;
+        let gridSize = 3; // 3x3 起步
+        let patternCount = 3; // 初始记3个
+        let currentPattern = []; // 存储正确答案的索引
+        let userClicks = []; // 用户点击记录
+        let isInputLocked = true; // 是否允许点击
+
+        // DOM
+        const gridEl = document.getElementById('grid');
+        const levelEl = document.getElementById('level-display');
+        const livesEl = document.getElementById('lives-display');
+        const msgEl = document.getElementById('message-tip');
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame() {
+            level = 1;
+            lives = 3;
+            gridSize = 3;
+            patternCount = 3;
+            updateStats();
+            showScreen('game-screen');
+            startLevel();
+        }
+
+        function updateStats() {
+            levelEl.textContent = `Level: ${level}`;
+            livesEl.textContent = `❤️ x ${lives}`;
+        }
+
+        function startLevel() {
+            // 根据关卡调整难度
+            // 每2关增加网格大小，每关增加记忆数量
+            if (level <= 2) { gridSize = 3; }
+            else if (level <= 5) { gridSize = 4; }
+            else if (level <= 8) { gridSize = 5; }
+            else { gridSize = 6; }
+
+            // 记忆数量随关卡增加
+            patternCount = 2 + Math.floor(level / 1.5); 
+            
+            // 生成网格
+            createGrid(gridSize);
+            
+            userClicks = [];
+            currentPattern = [];
+            isInputLocked = true;
+            msgEl.textContent = "请观察...";
+
+            // 延迟一点后展示图案
+            setTimeout(() => {
+                generatePattern();
+                showPattern();
+            }, 500);
+        }
+
+        function createGrid(size) {
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+            
+            for (let i = 0; i < size * size; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.dataset.index = i;
+                tile.onclick = () => handleTileClick(i, tile);
+                gridEl.appendChild(tile);
+            }
+        }
+
+        function generatePattern() {
+            const totalTiles = gridSize * gridSize;
+            const indices = Array.from({length: totalTiles}, (_, i) => i);
+            
+            // 随机打乱取前 patternCount 个
+            indices.sort(() => Math.random() - 0.5);
+            currentPattern = indices.slice(0, patternCount);
+        }
+
+        function showPattern() {
+            const tiles = document.querySelectorAll('.tile');
+            
+            // 高亮显示
+            currentPattern.forEach(index => {
+                tiles[index].classList.add('highlight');
+            });
+
+            // 1.5秒后隐藏
+            setTimeout(() => {
+                currentPattern.forEach(index => {
+                    tiles[index].classList.remove('highlight');
+                });
+                msgEl.textContent = "请复原！";
+                isInputLocked = false;
+            }, 1000 + (level * 100)); // 关卡越高展示时间稍微长一点点，防止纯粹来不及看
+        }
+
+        function handleTileClick(index, tileEl) {
+            if (isInputLocked) return;
+            
+            // 防止重复点击已选正确的
+            if (tileEl.classList.contains('correct')) return;
+
+            if (currentPattern.includes(index)) {
+                // 点对了
+                tileEl.classList.add('correct');
+                userClicks.push(index);
+
+                // 检查是否全部找齐
+                if (userClicks.length === currentPattern.length) {
+                    isInputLocked = true;
+                    msgEl.textContent = "正确！下一关...";
+                    setTimeout(() => {
+                        level++;
+                        updateStats();
+                        startLevel();
+                    }, 1000);
+                }
+            } else {
+                // 点错了
+                tileEl.classList.add('wrong');
+                lives--;
+                updateStats();
+                
+                if (lives <= 0) {
+                    endGame();
+                } else {
+                    // 点错一个不重置，只需继续找
+                    msgEl.textContent = "点错了，小心！";
+                    setTimeout(() => {
+                        tileEl.classList.remove('wrong');
+                    }, 500);
+                }
+            }
+        }
+
+        function endGame() {
+            isInputLocked = true;
+            setTimeout(() => {
+                document.getElementById('final-level').textContent = `Level ${level}`;
+                showScreen('result-screen');
+            }, 500);
+        }
+    </script>
+</body>
+</html>

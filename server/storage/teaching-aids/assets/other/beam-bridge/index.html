@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>梁桥受力原理演示</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #f0f7ff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 { margin-bottom: 10px; color: #1565c0; }
+        .subtitle { font-size: 14px; color: #666; margin-bottom: 20px; }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 800px;
+            text-align: center;
+        }
+
+        canvas {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: linear-gradient(to bottom, #e3f2fd 0%, #bbdefb 70%, #81d4fa 70%, #4fc3f7 100%);
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .slider-container {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        input[type=range] {
+            flex: 1;
+            height: 8px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed #ccc;
+        }
+
+        .stat-box {
+            text-align: center;
+        }
+        .stat-val { font-size: 20px; font-weight: bold; color: #1565c0; }
+        .stat-label { font-size: 12px; color: #666; }
+
+        .info-badge {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            margin-top: 15px;
+            border-left: 4px solid #ffeeba;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>梁桥 (Beam Bridge) 原理演示</h1>
+    <div class="subtitle">结构最简单，利用横梁的抗弯能力来承重</div>
+
+    <div class="container">
+        <canvas id="bridgeCanvas" width="760" height="400"></canvas>
+
+        <div class="controls">
+            <div class="slider-container">
+                <span style="font-weight:bold;">车辆载重:</span>
+                <input type="range" id="loadSlider" min="0" max="100" value="0">
+                <span id="loadDisplay" style="width: 60px; font-weight:bold;">0 吨</span>
+            </div>
+            
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-val" id="forcePier">0 kN</div>
+                    <div class="stat-label">桥墩受力 (支撑力)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="beamBend">0 cm</div>
+                    <div class="stat-label">横梁下弯 (挠度)</div>
+                </div>
+            </div>
+
+            <div class="info-badge">
+                <strong>观察重点：</strong>
+                <ol style="margin: 5px 0 0 20px; padding:0;">
+                    <li>随着载重增加，<strong>横梁向下弯曲</strong>（为了教学效果，动画中夸大了弯曲程度）。</li>
+                    <li>横梁上部受挤压（压力），下部受拉伸（拉力）。</li>
+                    <li>力被传递到了两端的<strong>桥墩</strong>上，桥墩提供向上的支撑力。</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('bridgeCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('loadSlider');
+        const loadDisplay = document.getElementById('loadDisplay');
+        const forcePierDisplay = document.getElementById('forcePier');
+        const beamBendDisplay = document.getElementById('beamBend');
+
+        // 桥梁参数
+        const bridgeY = 200; // 桥面基准高度
+        const bridgeWidth = 500;
+        const bridgeHeight = 30;
+        const centerX = canvas.width / 2;
+        const leftPierX = centerX - bridgeWidth / 2;
+        const rightPierX = centerX + bridgeWidth / 2;
+
+        let load = 0; // 当前载重 (0-100)
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 计算形变 (挠度)
+            // 载重越大，下沉越多。最大下沉 80px (夸张显示)
+            const deflection = (load / 100) * 80; 
+            
+            // 2. 绘制背景环境
+            drawEnvironment();
+
+            // 3. 绘制桥墩 (Piers) - 静态
+            ctx.fillStyle = '#795548'; // 混凝土/石柱颜色
+            ctx.fillRect(leftPierX - 20, bridgeY + deflection * 0.1, 40, 200); // 左桥墩
+            ctx.fillRect(rightPierX - 20, bridgeY + deflection * 0.1, 40, 200); // 右桥墩
+            
+            // 绘制桥台 (Abutments - 地面连接处)
+            ctx.fillStyle = '#5d4037';
+            ctx.fillRect(0, bridgeY + 30, leftPierX - 10, 200); // 左岸
+            ctx.fillRect(rightPierX + 10, bridgeY + 30, canvas.width - rightPierX, 200); // 右岸
+
+            // 4. 绘制受力弯曲的横梁 (The Beam)
+            drawBentBeam(deflection);
+
+            // 5. 绘制车辆 (Load)
+            if (load > 0) {
+                drawTruck(centerX, bridgeY + deflection - bridgeHeight/2);
+                drawForceArrow(centerX, bridgeY + deflection, load, 'down'); // 重力箭头
+            }
+
+            // 6. 绘制桥墩反作用力箭头 (Reaction Forces)
+            if (load > 0) {
+                const supportForce = load / 2;
+                drawForceArrow(leftPierX, bridgeY + 50, supportForce, 'up');
+                drawForceArrow(rightPierX, bridgeY + 50, supportForce, 'up');
+            }
+        }
+
+        // 绘制弯曲的梁
+        function drawBentBeam(deflection) {
+            ctx.beginPath();
+            
+            // 梁的颜色：根据载重变化，越重越红
+            const redVal = Math.floor((load / 100) * 255);
+            const greenVal = Math.floor(200 - (load / 100) * 100);
+            ctx.fillStyle = `rgb(${redVal}, ${greenVal}, 100)`;
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+
+            // 使用二次贝塞尔曲线模拟弯曲
+            // 上边缘
+            ctx.moveTo(leftPierX - 30, bridgeY); // 左端点
+            ctx.quadraticCurveTo(centerX, bridgeY + deflection, rightPierX + 30, bridgeY); // 控制点在中间下方
+            
+            // 右边缘连接线
+            ctx.lineTo(rightPierX + 30, bridgeY + bridgeHeight);
+
+            // 下边缘
+            ctx.quadraticCurveTo(centerX, bridgeY + bridgeHeight + deflection, leftPierX - 30, bridgeY + bridgeHeight);
+            
+            // 左边缘闭合
+            ctx.closePath();
+
+            ctx.fill();
+            ctx.stroke();
+
+            // 绘制中性层虚线 (辅助理解)
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(leftPierX - 30, bridgeY + bridgeHeight/2);
+            ctx.quadraticCurveTo(centerX, bridgeY + bridgeHeight/2 + deflection, rightPierX + 30, bridgeY + bridgeHeight/2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 绘制简单卡车
+        function drawTruck(x, bottomY) {
+            ctx.save();
+            ctx.translate(x, bottomY);
+            
+            // 根据梁的弯曲旋转卡车 (简单的角度计算)
+            // 这里的旋转是为了让车看起来贴合路面
+            // 简单模拟：角度与偏移量成正比，但中心点其实是水平的，这里为了视觉稳定暂不旋转
+            
+            // 车身
+            ctx.fillStyle = '#ef5350';
+            ctx.fillRect(-30, -40, 60, 30);
+            ctx.fillStyle = '#e53935';
+            ctx.fillRect(-30, -40, 40, 30); // 车厢
+            ctx.fillStyle = '#42a5f5';
+            ctx.fillRect(15, -35, 10, 15); // 窗户
+
+            // 轮子
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(-20, -10, 8, 0, Math.PI*2);
+            ctx.arc(20, -10, 8, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // 绘制箭头
+        function drawForceArrow(x, y, magnitude, direction) {
+            const scale = 1.5; // 箭头长度系数
+            const length = 20 + magnitude * scale;
+            
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            
+            if (direction === 'down') {
+                ctx.strokeStyle = '#d32f2f'; // 红色代表压力/重力
+                ctx.fillStyle = '#d32f2f';
+                // 箭头起点在物体中心，向下指
+                ctx.moveTo(x, y);
+                ctx.lineTo(x, y + length);
+                // 箭头头
+                ctx.lineTo(x - 5, y + length - 10);
+                ctx.moveTo(x, y + length);
+                ctx.lineTo(x + 5, y + length - 10);
+            } else {
+                ctx.strokeStyle = '#1976d2'; // 蓝色代表支撑力
+                ctx.fillStyle = '#1976d2';
+                // 箭头向上
+                ctx.moveTo(x, y + length);
+                ctx.lineTo(x, y);
+                // 箭头头
+                ctx.lineTo(x - 5, y + 10);
+                ctx.moveTo(x, y);
+                ctx.lineTo(x + 5, y + 10);
+            }
+            ctx.stroke();
+
+            // 标注文字
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            if (direction === 'down') {
+                ctx.fillText('G', x + 15, y + length / 2);
+            } else {
+                ctx.fillText('N', x + 15, y + length / 2);
+            }
+        }
+
+        function drawEnvironment() {
+            // 水面
+            ctx.fillStyle = 'rgba(33, 150, 243, 0.3)';
+            ctx.fillRect(0, 300, canvas.width, 100);
+            // 波纹线
+            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            ctx.lineWidth = 2;
+            for(let i=0; i<canvas.width; i+=50) {
+                ctx.beginPath();
+                ctx.moveTo(i, 320);
+                ctx.lineTo(i+30, 320);
+                ctx.stroke();
+            }
+            
+            // 标尺线 (虚线显示未受力时的水平位置)
+            ctx.beginPath();
+            ctx.strokeStyle = '#999';
+            ctx.setLineDash([2, 2]);
+            ctx.moveTo(0, bridgeY + bridgeHeight);
+            ctx.lineTo(canvas.width, bridgeY + bridgeHeight);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 交互更新
+        slider.addEventListener('input', (e) => {
+            load = parseInt(e.target.value);
+            loadDisplay.textContent = load + " 吨";
+            
+            // 更新数据面板
+            // 假设 100单位 = 1000kN
+            const forceN = load * 10; 
+            forcePierDisplay.textContent = (forceN / 2).toFixed(0) + " kN";
+            
+            // 假设形变比例
+            const bendCm = (load * 0.5).toFixed(1);
+            beamBendDisplay.textContent = bendCm + " cm";
+            
+            requestAnimationFrame(draw);
+        });
+
+        // 初始化
+        draw();
+
+    </script>
+</body>
+</html>

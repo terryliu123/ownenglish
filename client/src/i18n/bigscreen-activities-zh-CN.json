@@ -1,0 +1,172 @@
+{
+  "nav": {
+    "bigscreenActivities": "大屏任务"
+  },
+  "bigscreenActivities": {
+    "title": "大屏互动",
+    "subtitle": "管理内容素材、活动包，并启动大屏双人对战。",
+    "workflow": {
+      "title": "步进式操作路径",
+      "step1Label": "第一步 创建素材",
+      "step1Desc": "创建配对、排序、分类归组等互动素材",
+      "step1Action": "前往素材",
+      "step1Create": "新建素材",
+      "step2Label": "第二步 发布活动包",
+      "step2Desc": "选择素材组合成可直接上课使用的活动包",
+      "step2Action": "前往活动包",
+      "step2Create": "新建活动包",
+      "step3Label": "白板启动",
+      "step3Desc": "到白板模式中选择活动包、设置双方并启动大屏互动。",
+      "step3Action": "切换到白板",
+      "readyAssets": "就绪素材：{{count}}",
+      "readyPacks": "就绪活动包：{{count}}",
+      "needReadyAssets": "先至少准备 1 个就绪素材，再创建活动包。",
+      "needReadyPacks": "先至少准备 1 个就绪活动包，再去白板启动。"
+    },
+    "assetsTab": "内容素材",
+    "packsTab": "活动包",
+    "searchAssets": "搜索素材标题或标签...",
+    "searchPacks": "搜索活动包标题或类型...",
+    "newAsset": "新建素材",
+    "editAsset": "编辑素材",
+    "newPack": "新建活动包",
+    "editPack": "编辑活动包",
+    "emptyAssets": "暂无内容素材",
+    "emptyPacks": "暂无活动包",
+    "save": "保存",
+    "cancel": "取消",
+    "status": {
+      "draft": "草稿",
+      "active": "就绪",
+      "archived": "归档"
+    },
+    "actions": {
+      "markReady": "设为就绪",
+      "backToDraft": "转为草稿"
+    },
+    "contentType": {
+      "matching": "配对",
+      "sorting": "排序",
+      "classification": "分类归组"
+    },
+    "participantMode": {
+      "student_vs_student": "学生对战",
+      "team_vs_team": "小组对战",
+      "anonymous_side": "匿名阵营"
+    },
+    "difficulty": {
+      "easy": "简单",
+      "medium": "中等",
+      "hard": "困难"
+    },
+    "form": {
+      "title": "标题",
+      "contentType": "内容类型",
+      "difficulty": "难度",
+      "tags": "标签（逗号分隔）",
+      "prompt": "提示语",
+      "status": "状态",
+      "supportsDevice": "支持平板互动",
+      "supportsBigscreen": "支持大屏互动",
+      "supportsCompetition": "支持竞技",
+      "activityType": "玩法类型",
+      "participantMode": "参与模式",
+      "roundCount": "回合数",
+      "timeLimit": "每回合限时（秒）",
+      "scoringRule": "计分规则",
+      "scoringRuleOptions": {
+        "round_wins": "按回合胜利数",
+        "round_wins_then_time": "按回合胜利数，相同时用时短者胜",
+        "total_score": "按总得分",
+        "total_score_then_time": "按总得分，相同时用时短者胜"
+      },
+      "winRule": "胜负规则",
+      "winRuleOptions": {
+        "highest_score": "得分最高者获胜",
+        "highest_score_then_time": "得分最高者获胜，相同时用时短者胜",
+        "first_to_complete": "率先完成者获胜",
+        "majority_wins": "多数回合胜利者获胜"
+      },
+      "assetSelection": "素材选择",
+      "selectedAssets": "已选素材",
+      "pairs": "配对项",
+      "sortingItems": "排序项",
+      "sortingItemText": "排序内容",
+      "classificationCategories": "分类",
+      "classificationItems": "归组项",
+      "category": "目标分类",
+      "categoryKey": "分类标识",
+      "categoryName": "分类名称",
+      "itemId": "项标识",
+      "itemText": "项内容",
+      "label": "标签",
+      "left": "左侧",
+      "right": "右侧",
+      "text": "文本",
+      "addPair": "新增配对项",
+      "addSortingItem": "新增排序项",
+      "addCategory": "新增分类",
+      "addClassificationItem": "新增归组项",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "remove": "删除"
+    },
+    "packCard": {
+      "launch": "启动活动",
+      "manage": "编辑活动包",
+      "rounds": "回合数"
+    },
+    "launcher": {
+      "title": "启动大屏互动",
+      "subtitle": "选择活动包并设置双方信息。",
+      "classroomStudents": "教室学生",
+      "pack": "活动包",
+      "leftSide": "左侧",
+      "rightSide": "右侧",
+      "sideLabel": "阵营名称",
+      "launch": "开始活动",
+      "launching": "启动中...",
+      "noPacks": "暂无可启动的活动包",
+      "selectPack": "请选择活动包",
+      "defaultLeft": "A组",
+      "defaultRight": "B组",
+      "studentLeft": "左侧学生",
+      "studentRight": "右侧学生",
+      "goManage": "前往大屏互动"
+    },
+    "run": {
+      "round": "第 {{round}} / {{total}} 回合",
+      "paused": "已暂停",
+      "start": "开始",
+      "pause": "暂停",
+      "resume": "继续",
+      "end": "结束",
+      "cancel": "取消",
+      "back": "返回",
+      "result": "活动结果",
+      "winner": "获胜方",
+      "draw": "平局",
+      "waiting": "等待双方提交",
+      "submitSide": "提交本轮",
+      "submitted": "已提交",
+      "time": "用时",
+      "score": "得分",
+      "roundWins": "回合胜利",
+      "completed": "完成项",
+      "currentLeader": "当前领先",
+      "roundResult": "本轮结果",
+      "allDone": "本轮已完成",
+      "noAsset": "当前回合素材不存在"
+    },
+    "messages": {
+      "saveFailed": "保存失败",
+      "loadFailed": "加载失败",
+      "launchFailed": "启动失败",
+      "missingParticipants": "请先设置双方信息",
+      "missingAssetSelection": "请至少选择一个素材",
+      "invalidRoundCount": "回合数不能超过已选择素材数",
+      "studentSelectionRequired": "请选择两位学生",
+      "whiteboardEntry": "大屏互动"
+    }
+  }
+}

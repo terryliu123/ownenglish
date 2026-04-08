@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>专业架子鼓 - 逻辑修复版</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --stage-color: #2c3e50;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #333, #000);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* === 顶部：节奏谱与控制栏 === */
+        #top-bar {
+            width: 100%;
+            background: rgba(0,0,0,0.6);
+            padding: 15px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+            border-bottom: 1px solid #444;
+            backdrop-filter: blur(5px);
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 8px 20px;
+            background: #e67e22;
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.95); background: #d35400; }
+        
+        #rhythm-staff {
+            width: 90%;
+            max-width: 800px;
+            height: 120px;
+            background: #fff;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            border-left: 8px solid #333;
+            padding: 0 20px;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .staff-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: #999;
+            top: 50%;
+            left: 0;
+        }
+
+        .note {
+            width: 24px;
+            height: 24px;
+            margin-right: 15px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            z-index: 2;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            color: white;
+            font-weight: bold;
+            box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .n-kick { background: #3498db; top: 35px; }
+        .n-tom { background: #2ecc71; top: 15px; }
+        .n-snare { background: #e74c3c; top: 0; }
+        .n-hihat { background: #f1c40f; top: -20px; color: black;}
+        .n-crash { background: #9b59b6; top: -40px; border: 2px solid #fff;}
+
+        /* === 核心：SVG 鼓组舞台 === */
+        #drum-stage {
+            flex-grow: 1;
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            max-height: 80vh;
+            filter: drop-shadow(0px 10px 30px rgba(0,0,0,0.6));
+        }
+
+        .instrument {
+            cursor: pointer;
+            transition: filter 0.1s;
+            -webkit-tap-highlight-color: transparent; 
+        }
+        .instrument:hover { filter: brightness(1.15); }
+        
+        .hit-drum { 
+            transform-origin: center center;
+            animation: drumVibrate 0.1s linear; 
+        }
+
+        .hit-cymbal { 
+            transform-origin: center center;
+            animation: cymbalShake 0.6s ease-out;
+        }
+
+        @keyframes drumVibrate {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.97); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes cymbalShake {
+            0% { transform: rotate(0deg) scale(1); }
+            10% { transform: rotate(-2deg) scale(1.02); }
+            25% { transform: rotate(2deg) scale(0.98); }
+            40% { transform: rotate(-1deg); }
+            60% { transform: rotate(1deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        text.key-hint {
+            font-family: monospace;
+            fill: rgba(255,255,255,0.7);
+            font-size: 16px;
+            pointer-events: none;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        #status {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 10px;
+            position: absolute;
+            bottom: 5px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <div class="controls">
+            <button onclick="playRhythm()">▶ 回放节奏</button>
+            <button onclick="clearStaff()" style="background:#c0392b">🗑 清空乐谱</button>
+        </div>
+        <div id="rhythm-staff">
+            <div class="staff-line"></div>
+            <div id="notes-container" style="display:flex; z-index:2; align-items: center;"></div>
+        </div>
+    </div>
+
+    <div id="drum-stage">
+        <svg viewBox="0 0 800 600" id="drum-svg">
+            <defs>
+                <linearGradient id="grad-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f1c40f;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#b7950b;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#f1c40f;stop-opacity:1" />
+                </linearGradient>
+                <radialGradient id="grad-cymbal" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                    <stop offset="0%" style="stop-color:#fff9c4;stop-opacity:1" />
+                    <stop offset="20%" style="stop-color:#fbc02d;stop-opacity:1" />
+                    <stop offset="40%" style="stop-color:#f9a825;stop-opacity:1" />
+                    <stop offset="60%" style="stop-color:#fbc02d;stop-opacity:1" />
+                    <stop offset="90%" style="stop-color:#f57f17;stop-opacity:1" />
+                </radialGradient>
+                <linearGradient id="grad-shell-red" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#922b21;stop-opacity:1" />
+                    <stop offset="50%" style="stop-color:#e74c3c;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#641e16;stop-opacity:1" />
+                </linearGradient>
+                <radialGradient id="grad-head" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                    <stop offset="60%" style="stop-color:#fdfefe;stop-opacity:1" />
+                    <stop offset="95%" style="stop-color:#bdc3c7;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#95a5a6;stop-opacity:1" />
+                </radialGradient>
+                <linearGradient id="grad-stand" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style="stop-color:#555"/>
+                    <stop offset="50%" style="stop-color:#999"/>
+                    <stop offset="100%" style="stop-color:#555"/>
+                </linearGradient>
+            </defs>
+
+            <!-- 支架绘制 -->
+            <path d="M180 325 L180 550" stroke="url(#grad-stand)" stroke-width="8" stroke-linecap="round"/>
+            <path d="M160 550 L200 550" stroke="#333" stroke-width="6"/>
+            <path d="M650 250 L650 550" stroke="url(#grad-stand)" stroke-width="8" stroke-linecap="round"/>
+            <path d="M620 550 L680 550" stroke="#333" stroke-width="6"/>
+            <path d="M150 180 L220 450" stroke="url(#grad-stand)" stroke-width="6" stroke-linecap="round"/>
+
+            <!-- 乐器绘制 -->
+            <g id="kick" class="instrument" style="transform-box: fill-box;">
+                <circle cx="400" cy="450" r="110" fill="url(#grad-shell-red)" stroke="#555" stroke-width="4"/>
+                <circle cx="400" cy="450" r="105" fill="none" stroke="#333" stroke-width="8"/>
+                <circle cx="400" cy="450" r="95" fill="#ecf0f1" opacity="0.9"/>
+                <text x="400" y="460" text-anchor="middle" fill="#333" font-weight="bold" font-size="24" style="pointer-events:none; opacity:0.8">ROCK</text>
+                <text x="400" y="490" text-anchor="middle" class="key-hint">SPACE</text>
+            </g>
+            <g id="floor-tom" class="instrument" style="transform-box: fill-box;">
+                <ellipse cx="580" cy="450" rx="70" ry="70" fill="url(#grad-shell-red)" />
+                <circle cx="580" cy="420" r="68" fill="url(#grad-head)" stroke="#95a5a6" stroke-width="4"/>
+                <text x="580" y="430" text-anchor="middle" class="key-hint">L</text>
+            </g>
+            <g id="snare" class="instrument" style="transform-box: fill-box;">
+                <path d="M210 480 L290 480 L250 400 Z" fill="#555" opacity="0.5"/>
+                <ellipse cx="250" cy="420" rx="65" ry="50" fill="#fff" stroke="#999" stroke-width="1"/>
+                <rect x="185" y="400" width="130" height="40" fill="#ddd" opacity="0.5"/>
+                <ellipse cx="250" cy="400" rx="65" ry="30" fill="url(#grad-head)" stroke="#7f8c8d" stroke-width="5"/>
+                <text x="250" y="410" text-anchor="middle" class="key-hint">S</text>
+            </g>
+            <g id="tom1" class="instrument" style="transform-box: fill-box;">
+                <circle cx="330" cy="280" r="50" fill="url(#grad-shell-red)" />
+                <circle cx="330" cy="280" r="46" fill="url(#grad-head)" stroke="#bdc3c7" stroke-width="4"/>
+                <text x="330" y="285" text-anchor="middle" class="key-hint">F</text>
+            </g>
+             <g id="tom2" class="instrument" style="transform-box: fill-box;">
+                <circle cx="470" cy="280" r="50" fill="url(#grad-shell-red)" />
+                <circle cx="470" cy="280" r="46" fill="url(#grad-head)" stroke="#bdc3c7" stroke-width="4"/>
+                <text x="470" y="285" text-anchor="middle" class="key-hint">G</text>
+            </g>
+            <g id="hihat" class="instrument" style="transform-box: fill-box;">
+                <ellipse cx="180" cy="325" rx="60" ry="15" fill="#f39c12" />
+                <ellipse cx="180" cy="320" rx="60" ry="15" fill="url(#grad-cymbal)" stroke="#d35400" stroke-width="1"/>
+                <circle cx="180" cy="315" r="5" fill="#333"/>
+                <text x="180" y="300" text-anchor="middle" class="key-hint">A</text>
+            </g>
+            <g id="crash" class="instrument" style="transform-box: fill-box;">
+                <ellipse cx="150" cy="180" rx="75" ry="20" fill="url(#grad-cymbal)" stroke="#e67e22" stroke-width="1"/>
+                <circle cx="150" cy="178" r="6" fill="#444"/>
+                <circle cx="150" cy="175" r="3" fill="#222"/> 
+                <text x="150" y="150" text-anchor="middle" class="key-hint">Q</text>
+            </g>
+            <g id="ride" class="instrument" style="transform-box: fill-box;">
+                <ellipse cx="650" cy="250" rx="85" ry="25" fill="url(#grad-cymbal)" stroke="#d35400" stroke-width="1"/>
+                <ellipse cx="650" cy="245" rx="15" ry="5" fill="#f1c40f" stroke="#bf9000"/>
+                <text x="650" y="215" text-anchor="middle" class="key-hint">K</text>
+            </g>
+        </svg>
+    </div>
+    
+    <div id="status">全平台支持多点触控</div>
+
+    <script>
+        // === 1. 音频引擎 ===
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function createNoiseBuffer() {
+            const bufferSize = audioCtx.sampleRate * 2.0; 
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+            return buffer;
+        }
+        const noiseBuffer = createNoiseBuffer();
+
+        const sounds = {
+            kick: () => {
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(150, t); osc.frequency.exponentialRampToValueAtTime(0.01, t + 0.5);
+                gain.gain.setValueAtTime(1.2, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.5);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.5);
+            },
+            snare: () => {
+                const t = audioCtx.currentTime;
+                const noise = audioCtx.createBufferSource(); noise.buffer = noiseBuffer;
+                const noiseFilter = audioCtx.createBiquadFilter(); noiseFilter.type = 'highpass'; noiseFilter.frequency.value = 1000;
+                const noiseGain = audioCtx.createGain(); noiseGain.gain.setValueAtTime(1, t); noiseGain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+                noise.connect(noiseFilter); noiseFilter.connect(noiseGain); noiseGain.connect(audioCtx.destination);
+                const osc = audioCtx.createOscillator(); osc.type = 'triangle'; osc.frequency.setValueAtTime(250, t);
+                const oscGain = audioCtx.createGain(); oscGain.gain.setValueAtTime(0.5, t); oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                osc.connect(oscGain); oscGain.connect(audioCtx.destination); noise.start(t); osc.start(t); osc.stop(t + 0.2);
+            },
+            hihat: () => {
+                const t = audioCtx.currentTime;
+                const source = audioCtx.createBufferSource(); source.buffer = noiseBuffer;
+                const bandpass = audioCtx.createBiquadFilter(); bandpass.type = 'bandpass'; bandpass.frequency.value = 10000;
+                const highpass = audioCtx.createBiquadFilter(); highpass.type = 'highpass'; highpass.frequency.value = 7000;
+                const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.8, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08); 
+                source.connect(bandpass); bandpass.connect(highpass); highpass.connect(gain); gain.connect(audioCtx.destination); source.start(t);
+            },
+            tom: (freq) => {
+                const t = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.frequency.setValueAtTime(freq, t); osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.4); 
+                gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(t); osc.stop(t + 0.4);
+            },
+            crash: () => {
+                const t = audioCtx.currentTime;
+                const source = audioCtx.createBufferSource(); source.buffer = noiseBuffer;
+                const filter = audioCtx.createBiquadFilter(); filter.type = 'highpass'; filter.frequency.value = 2000;
+                const gain = audioCtx.createGain(); gain.gain.setValueAtTime(1, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 1.5);
+                source.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination); source.start(t);
+            },
+            ride: () => {
+                const t = audioCtx.currentTime;
+                const osc1 = audioCtx.createOscillator(); const osc2 = audioCtx.createOscillator();
+                osc1.type = 'square'; osc2.type = 'square'; osc1.frequency.value = 500; osc2.frequency.value = 800;
+                const filter = audioCtx.createBiquadFilter(); filter.type = 'bandpass'; filter.frequency.value = 8000; filter.Q.value = 10;
+                const gain = audioCtx.createGain(); gain.gain.setValueAtTime(0.5, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 1.0);
+                osc1.connect(filter); osc2.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+                osc1.start(t); osc2.start(t); osc1.stop(t+1); osc2.stop(t+1);
+            }
+        };
+
+        const instruments = {
+            'kick': () => sounds.kick(),
+            'snare': () => sounds.snare(),
+            'hihat': () => sounds.hihat(),
+            'tom1': () => sounds.tom(180),
+            'tom2': () => sounds.tom(130),
+            'floor-tom': () => sounds.tom(80),
+            'crash': () => sounds.crash(),
+            'ride': () => sounds.ride()
+        };
+
+        // === 2. 交互逻辑修正 ===
+        
+        // 分离出的“演奏”函数：只负责声音和动画，不负责记谱
+        function perform(id) {
+            // 解锁音频
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            // 播放声音
+            if(instruments[id]) instruments[id]();
+
+            // 触发动画
+            const el = document.getElementById(id);
+            if(el) {
+                const animClass = (id === 'crash' || id === 'ride' || id === 'hihat') ? 'hit-cymbal' : 'hit-drum';
+                el.classList.remove(animClass);
+                void el.offsetWidth; 
+                el.classList.add(animClass);
+            }
+        }
+
+        // 用户击打函数：演奏 + 记谱
+        function hit(id) {
+            perform(id); // 演奏
+            addToStaff(id); // 记谱 (回放时不能调这个!)
+        }
+
+        // 绑定事件
+        document.querySelectorAll('.instrument').forEach(el => {
+            const handler = (e) => {
+                e.preventDefault(); 
+                hit(el.id);
+            };
+            el.addEventListener('touchstart', handler, {passive: false});
+            el.addEventListener('mousedown', handler);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if(e.repeat) return;
+            const key = e.key.toLowerCase();
+            switch(key) {
+                case ' ': case 'd': hit('kick'); break;
+                case 's': hit('snare'); break;
+                case 'a': hit('hihat'); break;
+                case 'q': hit('crash'); break;
+                case 'k': hit('ride'); break;
+                case 'f': hit('tom1'); break;
+                case 'g': hit('tom2'); break;
+                case 'l': hit('floor-tom'); break;
+            }
+        });
+
+        // === 3. 乐谱与回放逻辑 ===
+        const rhythmNotes = [];
+
+        function addToStaff(id) {
+            const container = document.getElementById('notes-container');
+            const note = document.createElement('div');
+            note.className = 'note';
+            
+            let symbol = '';
+            if(id === 'kick') { note.classList.add('n-kick'); symbol = '●'; }
+            else if(id === 'snare') { note.classList.add('n-snare'); symbol = '●'; }
+            else if(id.includes('tom')) { note.classList.add('n-tom'); symbol = '●'; }
+            else if(id === 'hihat') { note.classList.add('n-hihat'); symbol = 'x'; }
+            else { note.classList.add('n-crash'); symbol = '✳'; }
+            
+            note.innerText = symbol;
+            container.appendChild(note);
+            rhythmNotes.push(id);
+            
+            const staff = document.getElementById('rhythm-staff');
+            staff.scrollLeft = staff.scrollWidth;
+        }
+
+        function clearStaff() {
+            document.getElementById('notes-container').innerHTML = '';
+            rhythmNotes.length = 0;
+        }
+
+        function playRhythm() {
+            if(rhythmNotes.length === 0) return;
+            const BPM = 120;
+            const interval = 60 / BPM * 1000 * 0.5;
+
+            // 禁用按钮防止重复点击
+            const btn = document.querySelector('button');
+            const originalText = btn.innerText;
+            btn.innerText = "播放中...";
+            btn.disabled = true;
+
+            rhythmNotes.forEach((id, index) => {
+                setTimeout(() => {
+                    perform(id); // 重点：这里只调用 perform，不调用 hit
+                }, index * interval);
+            });
+
+            // 恢复按钮
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }, rhythmNotes.length * interval);
+        }
+    </script>
+</body>
+</html>

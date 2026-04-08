@@ -1,0 +1,584 @@
+<!-- 
+修改点：
+1. 添加了模态弹出框的HTML结构
+2. 修改了游戏结束逻辑，改为显示模态框
+3. 添加了确认按钮的事件处理
+4. 调整了样式使模态框更美观
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animal Flashcards</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        .flashcard {
+            perspective: 1000px;
+            width: 300px;
+            height: 200px;
+        }
+        .flashcard-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .flashcard.flipped .flashcard-inner {
+            transform: rotateY(180deg);
+        }
+        .flashcard-front, .flashcard-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .flashcard-front {
+            background: linear-gradient(45deg, #6a11cb 0%, #2575fc 100%);
+            color: white;
+        }
+        .flashcard-back {
+            background: linear-gradient(45deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .progress-bar {
+            height: 10px;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+        }
+        .progress {
+            height: 100%;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #ff9a9e 0%, #fad0c4 100%);
+            transition: width 0.3s ease;
+        }
+        .game-option {
+            transition: all 0.3s ease;
+        }
+        .game-option:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .correct {
+            background: linear-gradient(45deg, #4CAF50 0%, #81C784 100%) !important;
+            color: white !important;
+        }
+        .incorrect {
+            background: linear-gradient(45deg, #F44336 0%, #E57373 100%) !important;
+            color: white !important;
+        }
+        .speaker-btn {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+        }
+        /* 新增模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: modalFadeIn 0.3s ease-out;
+        }
+        @keyframes modalFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            color: #4a5568;
+        }
+        .modal-score {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 1rem 0;
+            color: #6b46c1;
+        }
+        .modal-message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            color: #4a5568;
+        }
+        .modal-btn {
+            background: #6b46c1;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .modal-btn:hover {
+            background: #553c9a;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="py-8">
+    <div class="container mx-auto px-4">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-indigo-800 mb-2">Animal Flashcards</h1>
+            <p class="text-xl text-gray-600">Learn 10 animal names in English</p>
+        </div>
+
+        <!-- Flashcard Section -->
+        <div id="flashcard-section" class="mb-12">
+            <div class="flex flex-col items-center">
+                <div class="mb-6 flex justify-between w-full max-w-md">
+                    <span id="card-count" class="font-bold text-gray-700">Card 1 of 10</span>
+                    <span id="progress-text" class="font-bold text-gray-700">0% Complete</span>
+                </div>
+                <div class="progress-bar w-full max-w-md mb-6">
+                    <div id="progress" class="progress" style="width: 0%"></div>
+                </div>
+                
+                <div class="flashcard mb-8" id="flashcard">
+                    <div class="flashcard-inner">
+                        <div class="flashcard-front flex-col p-6 relative">
+                            <i class="fas fa-paw text-4xl mb-4"></i>
+                            <h2 id="animal-name" class="text-3xl font-bold mb-2">Animal</h2>
+                            <p class="text-sm">Click to flip</p>
+                            <button class="speaker-btn text-white bg-blue-500 hover:bg-blue-600 rounded-full p-2">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                        </div>
+                        <div class="flashcard-back flex-col p-6 relative">
+                            <i class="fas fa-language text-4xl mb-4"></i>
+                            <h2 id="animal-translation" class="text-3xl font-bold mb-2">动物</h2>
+                            <p id="animal-sentence" class="text-sm text-center">Example sentence</p>
+                            <button class="speaker-btn text-white bg-green-500 hover:bg-green-600 rounded-full p-2">
+                                <i class="fas fa-volume-up"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-4">
+                    <button id="prev-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-full">
+                        <i class="fas fa-arrow-left mr-2"></i>Previous
+                    </button>
+                    <button id="next-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-full">
+                        Next<i class="fas fa-arrow-right ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Section (Initially Hidden) -->
+        <div id="game-section" class="hidden">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-indigo-800 mb-2">Test Your Knowledge</h2>
+                <p class="text-xl text-gray-600">Match the animal names to their meanings</p>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6 max-w-2xl mx-auto">
+                <div class="mb-6">
+                    <h3 id="game-question" class="text-2xl font-bold text-center mb-4">What is the English word for...?</h3>
+                    <div id="game-image" class="flex justify-center mb-6">
+                        <i class="fas fa-paw text-6xl text-indigo-500"></i>
+                    </div>
+                </div>
+                
+                <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <!-- Options will be inserted here by JavaScript -->
+                </div>
+                
+                <div class="flex justify-between items-center">
+                    <button id="back-to-flashcards" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                        <i class="fas fa-arrow-left mr-1"></i> Back to Flashcards
+                    </button>
+                    <span id="score" class="font-bold text-gray-700">Score: 0/0</span>
+                    <button id="next-question" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded">
+                        Next Question <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Start Game Button -->
+        <div id="start-game-section" class="text-center mt-8">
+            <button id="start-game" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-lg">
+                Start Test <i class="fas fa-gamepad ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- 新增的模态框 -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Quiz Completed!</div>
+            <div class="modal-score" id="modal-score">0/0</div>
+            <div class="modal-message" id="modal-message">Great job!</div>
+            <button id="confirm-btn" class="modal-btn">OK</button>
+        </div>
+    </div>
+
+    <script>
+        // 使用立即执行函数封装代码，避免全局变量污染
+        (function() {
+            // Animal data
+            const animalList = [
+                {
+                    name: "Elephant",
+                    translation: "大象",
+                    sentence: "An elephant has a long trunk.",
+                    emoji: "🐘"
+                },
+                {
+                    name: "Giraffe",
+                    translation: "长颈鹿",
+                    sentence: "Giraffes have very long necks.",
+                    emoji: "🦒"
+                },
+                {
+                    name: "Lion",
+                    translation: "狮子",
+                    sentence: "The lion is the king of the jungle.",
+                    emoji: "🦁"
+                },
+                {
+                    name: "Penguin",
+                    translation: "企鹅",
+                    sentence: "Penguins can't fly but they swim well.",
+                    emoji: "🐧"
+                },
+                {
+                    name: "Kangaroo",
+                    translation: "袋鼠",
+                    sentence: "Kangaroos carry babies in their pouches.",
+                    emoji: "🦘"
+                },
+                {
+                    name: "Dolphin",
+                    translation: "海豚",
+                    sentence: "Dolphins are very intelligent animals.",
+                    emoji: "🐬"
+                },
+                {
+                    name: "Tiger",
+                    translation: "老虎",
+                    sentence: "Tigers have orange fur with black stripes.",
+                    emoji: "🐅"
+                },
+                {
+                    name: "Koala",
+                    translation: "考拉",
+                    sentence: "Koalas sleep up to 20 hours a day.",
+                    emoji: "🐨"
+                },
+            ];
+
+            // Game state
+            let currentCardIdx = 0;
+            let quizQuestions = [];
+            let currentQuestionIdx = 0;
+            let quizScore = 0;
+
+            // DOM elements
+            const flashcardSection = document.getElementById('flashcard-section');
+            const gameSection = document.getElementById('game-section');
+            const startGameSection = document.getElementById('start-game-section');
+            const animalName = document.getElementById('animal-name');
+            const animalTranslation = document.getElementById('animal-translation');
+            const animalSentence = document.getElementById('animal-sentence');
+            const cardCount = document.getElementById('card-count');
+            const progressText = document.getElementById('progress-text');
+            const progressBar = document.getElementById('progress');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const flashcard = document.getElementById('flashcard');
+            const startGameBtn = document.getElementById('start-game');
+            const backToFlashcardsBtn = document.getElementById('back-to-flashcards');
+            const nextQuestionBtn = document.getElementById('next-question');
+            // 新增的模态框元素
+            const resultModal = document.getElementById('result-modal');
+            const modalScore = document.getElementById('modal-score');
+            const modalMessage = document.getElementById('modal-message');
+            const confirmBtn = document.getElementById('confirm-btn');
+
+            // Initialize the flashcards
+            function initFlashcards() {
+                updateCard();
+                updateProgress();
+                
+                // Event listeners
+                flashcard.addEventListener('click', flipCard);
+                prevBtn.addEventListener('click', prevCard);
+                nextBtn.addEventListener('click', nextCard);
+                startGameBtn.addEventListener('click', startGame);
+                backToFlashcardsBtn.addEventListener('click', returnToFlashcards);
+                nextQuestionBtn.addEventListener('click', nextQuestion);
+                // 新增确认按钮事件
+                confirmBtn.addEventListener('click', returnToFlashcards);
+
+                // Speaker buttons
+                const speakerBtns = document.querySelectorAll('.speaker-btn');
+                speakerBtns.forEach(btn => {
+                    btn.addEventListener('click', function(e) {
+                        e.stopPropagation();
+                        const isFront = this.parentElement.classList.contains('flashcard-front');
+                        const text = isFront ? animalName.textContent : animalTranslation.textContent;
+                        const lang = isFront ? 'en-US' : 'zh-CN';
+                        speakText(text, lang);
+                    });
+                });
+            }
+
+            // Update the current flashcard
+            function updateCard() {
+                const animal = animalList[currentCardIdx];
+                animalName.textContent = animal.name;
+                animalTranslation.textContent = animal.translation;
+                animalSentence.textContent = animal.sentence;
+                cardCount.textContent = `Card ${currentCardIdx + 1} of ${animalList.length}`;
+                
+                // Disable/enable navigation buttons
+                prevBtn.disabled = currentCardIdx === 0;
+                nextBtn.disabled = currentCardIdx === animalList.length - 1;
+            }
+
+            // Update progress
+            function updateProgress() {
+                const progress = ((currentCardIdx + 1) / animalList.length) * 100;
+                progressText.textContent = `${Math.round(progress)}% Complete`;
+                progressBar.style.width = `${progress}%`;
+            }
+
+            // Flip the card
+            function flipCard() {
+                flashcard.classList.toggle('flipped');
+            }
+
+            // Go to previous card
+            function prevCard() {
+                if (currentCardIdx > 0) {
+                    currentCardIdx--;
+                    flashcard.classList.remove('flipped');
+                    updateCard();
+                    updateProgress();
+                }
+            }
+
+            // Go to next card
+            function nextCard() {
+                if (currentCardIdx < animalList.length - 1) {
+                    currentCardIdx++;
+                    flashcard.classList.remove('flipped');
+                    updateCard();
+                    updateProgress();
+                }
+            }
+
+            // Text-to-speech function
+            function speakText(text, lang) {
+                try {
+                    if ('speechSynthesis' in window) {
+                        console.log('Speech synthesis is supported');
+                        console.log('Speaking text:', text, 'in language:', lang);
+                        const utterance = new SpeechSynthesisUtterance(text);
+                        utterance.lang = lang;
+                        utterance.onstart = function() {
+                            console.log('Speech started');
+                        };
+                        utterance.onend = function() {
+                            console.log('Speech ended');
+                        };
+                        utterance.onerror = function(event) {
+                            console.error('Speech error:', event.error);
+                            alert('Speech error: ' + event.error);
+                        };
+                        window.speechSynthesis.speak(utterance);
+                    } else {
+                        console.error('Speech synthesis not supported');
+                        alert('Text-to-speech is not supported in your browser');
+                    }
+                } catch (error) {
+                    console.error('Error in speech synthesis:', error);
+                    alert('Error in speech synthesis: ' + error.message);
+                }
+            }
+
+            // Start the game
+            function startGame() {
+                // Create game questions (shuffle and select all)
+                quizQuestions = [...animalList];
+                shuffleArray(quizQuestions);
+                
+                // Reset game state
+                currentQuestionIdx = 0;
+                quizScore = 0;
+                
+                // Show game section, hide flashcard section
+                flashcardSection.classList.add('hidden');
+                gameSection.classList.remove('hidden');
+                startGameSection.classList.add('hidden');
+                
+                // Show first question
+                showQuestion();
+            }
+
+            // Return to flashcards from game
+            function returnToFlashcards() {
+                // 隐藏模态框
+                resultModal.style.display = 'none';
+                gameSection.classList.add('hidden');
+                flashcardSection.classList.remove('hidden');
+                startGameSection.classList.remove('hidden');
+            }
+
+            // Show current question
+            function showQuestion() {
+                const question = quizQuestions[currentQuestionIdx];
+                const options = getRandomOptions(question.name);
+                
+                // Update question
+                document.getElementById('game-question').textContent = `What is the English word for \"${question.translation}\"?`;
+                document.getElementById('game-image').innerHTML = `<span class=\"text-6xl\">${question.emoji}</span>`;
+                document.getElementById('score').textContent = `Score: ${quizScore}/${currentQuestionIdx}`;
+                
+                // Update options
+                const optionsContainer = document.getElementById('options-container');
+                optionsContainer.innerHTML = '';
+                
+                options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.className = 'game-option bg-indigo-100 hover:bg-indigo-200 text-indigo-800 font-bold py-4 px-4 rounded-lg';
+                    button.textContent = option;
+                    button.addEventListener('click', () => checkAnswer(option, question.name));
+                    optionsContainer.appendChild(button);
+                });
+                
+                // Hide next question button until answer is selected
+                nextQuestionBtn.classList.add('hidden');
+            }
+
+            // Get random options (correct answer + 3 random wrong answers)
+            function getRandomOptions(correctAnswer) {
+                const options = [correctAnswer];
+                
+                // Get wrong answers
+                while (options.length < 4 && options.length < animalList.length) {
+                    const randomAnimal = animalList[Math.floor(Math.random() * animalList.length)].name;
+                    if (!options.includes(randomAnimal) && randomAnimal !== correctAnswer) {
+                        options.push(randomAnimal);
+                    }
+                }
+                
+                // Shuffle options
+                shuffleArray(options);
+                return options;
+            }
+
+            // Check if answer is correct
+            function checkAnswer(selectedOption, correctAnswer) {
+                const options = document.querySelectorAll('.game-option');
+                
+                // Disable all buttons
+                options.forEach(option => {
+                    option.disabled = true;
+                    option.classList.remove('hover:bg-indigo-200');
+                    
+                    if (option.textContent === correctAnswer) {
+                        option.classList.add('correct');
+                    } else if (option.textContent === selectedOption && selectedOption !== correctAnswer) {
+                        option.classList.add('incorrect');
+                    }
+                });
+                
+                // Update score if correct
+                if (selectedOption === correctAnswer) {
+                    quizScore++;
+                    document.getElementById('score').textContent = `Score: ${quizScore}/${currentQuestionIdx + 1}`;
+                }
+                
+                // Show next button
+                nextQuestionBtn.classList.remove('hidden');
+            }
+
+            // Go to next question
+            function nextQuestion() {
+                currentQuestionIdx++;
+                
+                if (currentQuestionIdx < quizQuestions.length) {
+                    showQuestion();
+                } else {
+                    showResults();
+                }
+            }
+
+            // Show final results in modal
+            function showResults() {
+                // 更新模态框内容
+                modalScore.textContent = `${quizScore}/${quizQuestions.length}`;
+                
+                let message;
+                if (quizScore === quizQuestions.length) {
+                    message = "Perfect! You're an animal expert! 🎉";
+                } else if (quizScore >= quizQuestions.length * 0.7) {
+                    message = "Great job! You know most of these animals! 👍";
+                } else if (quizScore >= quizQuestions.length * 0.5) {
+                    message = "Good effort! Keep practicing! 💪";
+                } else {
+                    message = "Keep studying! You'll get better! 📚";
+                }
+                
+                modalMessage.textContent = message;
+                
+                // 显示模态框
+                resultModal.style.display = 'flex';
+            }
+
+            // Utility function to shuffle an array
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+
+            // Initialize the app when DOM is loaded
+            document.addEventListener('DOMContentLoaded', initFlashcards);
+        })();
+    </script>
+</body>
+</html>

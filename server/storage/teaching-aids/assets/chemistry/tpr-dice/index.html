@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D TPR Action Dice</title>
+    <style>
+        :root {
+            --bg-color: #eef2f3;
+            --verb-color: #ff4757;
+            --verb-dark: #c0392b;
+            --adverb-color: #2ed573;
+            --adverb-dark: #218c74;
+            --cube-size: 180px; /* 骰子尺寸 */
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- 顶部控制栏 --- */
+        header {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; color: #333; }
+
+        .btn-settings {
+            background: none; border: 2px solid #ddd;
+            border-radius: 50%; width: 40px; height: 40px;
+            font-size: 20px; cursor: pointer; transition: 0.3s;
+        }
+        .btn-settings:hover { background: #f0f0f0; border-color: #aaa; }
+
+        /* --- 3D 舞台区域 --- */
+        .stage {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 80px; /* 两个骰子的间距 */
+            perspective: 1000px; /* 3D透视深度 */
+            padding: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* 骰子容器 (场景) */
+        .scene {
+            width: var(--cube-size);
+            height: var(--cube-size);
+            position: relative;
+            cursor: pointer;
+        }
+
+        /* 3D 立方体本身 */
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            transform-style: preserve-3d;
+            transform: rotateX(-15deg) rotateY(25deg); /* 初始展示角度 */
+            transition: transform 1.5s cubic-bezier(0.19, 1, 0.22, 1); /* 平滑停顿 */
+        }
+
+        /* 滚动动画类 */
+        .cube.rolling {
+            animation: spin 0.8s linear infinite; /* 快速无限旋转 */
+        }
+
+        @keyframes spin {
+            0% { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+            100% { transform: rotateX(360deg) rotateY(720deg) rotateZ(360deg); }
+        }
+
+        /* 立方体的6个面 */
+        .face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px; /* 圆角真实感 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white;
+            box-sizing: border-box;
+            border: 4px solid rgba(255,255,255,0.2);
+            backface-visibility: hidden; /* 性能优化，不渲染背面 */
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.1); /* 内部阴影 */
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            padding: 10px;
+            overflow: hidden;
+            word-break: break-word;
+        }
+
+        /* 面的位置计算 (translateZ = size / 2) */
+        .face.front  { transform: rotateY(0deg) translateZ(calc(var(--cube-size)/2)); }
+        .face.back   { transform: rotateY(180deg) translateZ(calc(var(--cube-size)/2)); }
+        .face.right  { transform: rotateY(90deg) translateZ(calc(var(--cube-size)/2)); }
+        .face.left   { transform: rotateY(-90deg) translateZ(calc(var(--cube-size)/2)); }
+        .face.top    { transform: rotateX(90deg) translateZ(calc(var(--cube-size)/2)); }
+        .face.bottom { transform: rotateX(-90deg) translateZ(calc(var(--cube-size)/2)); }
+
+        /* 颜色主题 */
+        .verb-cube .face {
+            background: linear-gradient(135deg, var(--verb-color), var(--verb-dark));
+        }
+        .adverb-cube .face {
+            background: linear-gradient(135deg, var(--adverb-color), var(--adverb-dark));
+        }
+
+        /* 骰子下方的阴影 */
+        .shadow {
+            position: absolute;
+            width: 100%;
+            height: 20px;
+            background: radial-gradient(rgba(0,0,0,0.3), transparent);
+            bottom: -40px;
+            border-radius: 50%;
+            transform: scale(1);
+            transition: transform 0.5s;
+        }
+        .scene:hover .shadow { transform: scale(1.1); }
+
+        /* --- 底部控制 --- */
+        .controls {
+            padding: 40px;
+            text-align: center;
+        }
+
+        #roll-btn {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        #roll-btn:active { transform: scale(0.95); }
+        #roll-btn:disabled { background-color: #999; cursor: not-allowed; }
+
+        /* --- 设置弹窗 --- */
+        .modal {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 100;
+            justify-content: center; align-items: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: white; padding: 30px; border-radius: 15px;
+            width: 90%; max-width: 600px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+        }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        textarea {
+            width: 100%; height: 150px; padding: 10px;
+            border: 2px solid #eee; border-radius: 8px; resize: vertical;
+        }
+        .btn-save {
+            background: #2ed573; color: white; border: none;
+            padding: 10px 30px; border-radius: 5px; cursor: pointer;
+            font-size: 1rem; margin-top: 20px; float: right;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            :root { --cube-size: 140px; }
+            .stage { gap: 40px; flex-direction: column; margin-top: 20px; }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🎲 3D Action Dice</h1>
+    <button class="btn-settings" onclick="toggleSettings()" title="设置词库">⚙️</button>
+</header>
+
+<div class="stage">
+    <!-- 红色动词骰子 -->
+    <div class="scene">
+        <div class="cube verb-cube" id="cube-verb" onclick="rollSingle('verb')">
+            <div class="face front">Run</div>
+            <div class="face back">Jump</div>
+            <div class="face right">Dance</div>
+            <div class="face left">Swim</div>
+            <div class="face top">Eat</div>
+            <div class="face bottom">Sleep</div>
+        </div>
+        <div class="shadow"></div>
+    </div>
+
+    <!-- 绿色副词骰子 -->
+    <div class="scene">
+        <div class="cube adverb-cube" id="cube-adverb" onclick="rollSingle('adverb')">
+            <div class="face front">Quickly</div>
+            <div class="face back">Slowly</div>
+            <div class="face right">Happily</div>
+            <div class="face left">Sad</div>
+            <div class="face top">Loudly</div>
+            <div class="face bottom">Quietly</div>
+        </div>
+        <div class="shadow"></div>
+    </div>
+</div>
+
+<div class="controls">
+    <button id="roll-btn" onclick="rollAll()">ROLL!</button>
+    <div style="margin-top:15px; color:#666; font-size: 0.9rem;">
+        点击按钮 或 直接点击骰子
+    </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div id="settings-modal" class="modal">
+    <div class="modal-content">
+        <h2 style="margin-top:0">自定义词库</h2>
+        <div class="grid">
+            <div>
+                <h3 style="color:var(--verb-color)">🔴 动作 (Verbs)</h3>
+                <textarea id="input-verbs" placeholder="Run&#10;Jump&#10;..."></textarea>
+            </div>
+            <div>
+                <h3 style="color:var(--adverb-color)">🟢 方式 (Adverbs)</h3>
+                <textarea id="input-adverbs" placeholder="Quickly&#10;Slowly&#10;..."></textarea>
+            </div>
+        </div>
+        <button class="btn-save" onclick="saveSettings()">保存配置</button>
+    </div>
+</div>
+
+<script>
+    // 默认数据
+    const DEFAULT_VERBS = ["Run", "Jump", "Walk", "Dance", "Swim", "Fly", "Climb", "Sing", "Read", "Cook"];
+    const DEFAULT_ADVERBS = ["Quickly", "Slowly", "Happily", "Sadly", "Like a robot", "Like a monkey", "In the rain", "Loudly", "Silently", "Angrily"];
+
+    let verbList = [];
+    let adverbList = [];
+    let isRolling = false;
+
+    // 初始化
+    window.onload = () => {
+        loadSettings();
+        // 初始填充随机面
+        randomizeFaces('cube-verb', verbList);
+        randomizeFaces('cube-adverb', adverbList);
+    };
+
+    // 掷所有骰子
+    function rollAll() {
+        if (isRolling) return;
+        isRolling = true;
+        document.getElementById('roll-btn').disabled = true;
+
+        // 两个骰子同时滚动，但持续时间略有不同，增加真实感
+        const p1 = animateDice('cube-verb', verbList, 1000);
+        const p2 = animateDice('cube-adverb', adverbList, 1200);
+
+        Promise.all([p1, p2]).then(() => {
+            isRolling = false;
+            document.getElementById('roll-btn').disabled = false;
+        });
+    }
+
+    // 点击单个骰子滚动
+    function rollSingle(type) {
+        if (isRolling) return;
+        isRolling = true;
+        
+        let p;
+        if(type === 'verb') {
+            p = animateDice('cube-verb', verbList, 1000);
+        } else {
+            p = animateDice('cube-adverb', adverbList, 1000);
+        }
+
+        p.then(() => isRolling = false);
+    }
+
+    // 核心动画逻辑
+    function animateDice(elementId, wordList, duration) {
+        return new Promise((resolve) => {
+            const cube = document.getElementById(elementId);
+            
+            // 1. 开始狂暴旋转模式
+            cube.style.transition = 'none'; // 移除过渡，以便立刻开始动画
+            cube.classList.add('rolling');
+
+            // 2. 在旋转过程中，悄悄更新除了正面以外的其他面，增加视觉丰富度
+            const interval = setInterval(() => {
+                randomizeFaces(elementId, wordList, true); // true = 跳过正面(front)暂时不更
+            }, 100);
+
+            // 3. 停止旋转
+            setTimeout(() => {
+                clearInterval(interval);
+                cube.classList.remove('rolling');
+                
+                // 恢复过渡效果，为了最后的“停靠”动画
+                cube.style.transition = 'transform 1.5s cubic-bezier(0.15, 1, 0.3, 1)'; // 弹簧/摩擦效果曲线
+
+                // 4. 计算结果并展示
+                // 核心技巧：我们不真的去算3D旋转到哪一面，
+                // 而是直接把结果写在 'front' 面，然后把骰子转回正面。
+                // 为了看起来自然，我们加一点随机微调角度 (Tilt)。
+                
+                const resultWord = wordList[Math.floor(Math.random() * wordList.length)];
+                const frontFace = cube.querySelector('.face.front');
+                frontFace.innerText = resultWord;
+
+                // 随机微调角度 (-15deg 到 15deg)，模拟没扔平
+                const randomX = (Math.random() - 0.5) * 30;
+                const randomY = (Math.random() - 0.5) * 30;
+                
+                // 为了让动画看起来是从“疯转”变回来的，我们让它多转几圈归位
+                // 这里我们设定归位到 (0,0) 附近，就是 Front 面朝前
+                // 之前的 infinite animation 是 transform none，这里我们手动设置 transform
+                cube.style.transform = `rotateX(${randomX}deg) rotateY(${randomY}deg)`;
+
+                resolve();
+            }, duration);
+        });
+    }
+
+    // 随机填充骰子的各个面（让旋转时看起来字都不一样）
+    function randomizeFaces(elementId, list, skipFront = false) {
+        const cube = document.getElementById(elementId);
+        const faces = cube.querySelectorAll('.face');
+        
+        faces.forEach(face => {
+            if (skipFront && face.classList.contains('front')) return;
+            face.innerText = list[Math.floor(Math.random() * list.length)];
+        });
+    }
+
+    // --- 设置逻辑 ---
+    function toggleSettings() {
+        const modal = document.getElementById('settings-modal');
+        modal.classList.toggle('active');
+        if(modal.classList.contains('active')) {
+            document.getElementById('input-verbs').value = verbList.join('\n');
+            document.getElementById('input-adverbs').value = adverbList.join('\n');
+        }
+    }
+
+    function saveSettings() {
+        const vRaw = document.getElementById('input-verbs').value;
+        const aRaw = document.getElementById('input-adverbs').value;
+
+        verbList = parseList(vRaw, DEFAULT_VERBS);
+        adverbList = parseList(aRaw, DEFAULT_ADVERBS);
+
+        localStorage.setItem('tpr3d_verbs', JSON.stringify(verbList));
+        localStorage.setItem('tpr3d_adverbs', JSON.stringify(adverbList));
+
+        toggleSettings();
+    }
+
+    function parseList(raw, fallback) {
+        const list = raw.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+        return list.length > 0 ? list : fallback;
+    }
+
+    function loadSettings() {
+        const v = localStorage.getItem('tpr3d_verbs');
+        const a = localStorage.getItem('tpr3d_adverbs');
+        verbList = v ? JSON.parse(v) : [...DEFAULT_VERBS];
+        adverbList = a ? JSON.parse(a) : [...DEFAULT_ADVERBS];
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>轴对称 - 交互式演示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #1e1e1e; /* 深灰色背景 */
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #eee;
+        }
+
+        #canvas-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            display: block;
+            cursor: default;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 25px;
+            border-radius: 30px;
+            backdrop-filter: blur(5px);
+            pointer-events: none; /* 让鼠标事件穿透到 Canvas */
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: normal;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+        
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: #888;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <h1>轴对称 (Axial Symmetry)</h1>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        <div class="hint">拖动三角形顶点 或 黄色对称轴进行交互</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 状态数据 ---
+        
+        // 原始三角形 ABC
+        const triangle = [
+            { x: 200, y: 250, label: 'A', color: '#aaddff' },
+            { x: 400, y: 450, label: 'B', color: '#aaddff' },
+            { x: 350, y: 150, label: 'C', color: '#aaddff' }
+        ];
+
+        // 对称轴 (由两个控制点定义)
+        const axis = {
+            p1: { x: window.innerWidth / 2, y: 100 }, // 上端点
+            p2: { x: window.innerWidth / 2, y: window.innerHeight - 100 }, // 下端点
+            center: { x: 0, y: 0 } // 中间用于平移的手柄
+        };
+
+        // 交互状态
+        let dragTarget = null; // 当前拖动的对象
+        let dragType = null;   // 'point', 'axis-p1', 'axis-p2', 'axis-center'
+        let offset = { x: 0, y: 0 };
+
+        // --- 初始化与事件监听 ---
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // 重新定位轴到屏幕中间 (如果这是第一次加载)
+            if(axis.p1.x === 0) {
+                axis.p1.x = canvas.width/2;
+                axis.p2.x = canvas.width/2;
+                axis.p2.y = canvas.height - 100;
+            }
+            draw();
+        }
+        window.addEventListener('resize', resize);
+
+        // 鼠标/触摸事件
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('touchstart', (e) => handleStart(e.touches[0]));
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('touchmove', (e) => handleMove(e.touches[0]));
+
+        window.addEventListener('mouseup', handleEnd);
+        window.addEventListener('touchend', handleEnd);
+
+        // --- 核心数学逻辑 ---
+
+        // 计算点 P 关于直线 AB 的对称点
+        function getReflection(p, lineStart, lineEnd) {
+            const x1 = lineStart.x, y1 = lineStart.y;
+            const x2 = lineEnd.x, y2 = lineEnd.y;
+            const x3 = p.x, y3 = p.y;
+
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            
+            // 直线方程参数形式计算投影点
+            const t = ((x3 - x1) * dx + (y3 - y1) * dy) / (dx * dx + dy * dy);
+            
+            // 投影点 H
+            const hx = x1 + t * dx;
+            const hy = y1 + t * dy;
+
+            // 对称点 P' (2H - P)
+            return {
+                x: 2 * hx - x3,
+                y: 2 * hy - y3
+            };
+        }
+
+        // --- 交互逻辑 ---
+
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function distance(p1, p2) {
+            return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+        }
+
+        function handleStart(e) {
+            const pos = getMousePos(e);
+            const hitRadius = 20;
+
+            // 1. 检查是否点击了三角形顶点
+            for (let p of triangle) {
+                if (distance(pos, p) < hitRadius) {
+                    dragTarget = p;
+                    dragType = 'point';
+                    return;
+                }
+            }
+
+            // 2. 检查对称轴控制点
+            updateAxisCenter();
+            if (distance(pos, axis.center) < hitRadius) {
+                dragTarget = axis;
+                dragType = 'axis-center';
+                offset = { x: pos.x - axis.center.x, y: pos.y - axis.center.y };
+                return;
+            }
+            if (distance(pos, axis.p1) < hitRadius) {
+                dragTarget = axis.p1;
+                dragType = 'axis-end';
+                return;
+            }
+            if (distance(pos, axis.p2) < hitRadius) {
+                dragTarget = axis.p2;
+                dragType = 'axis-end';
+                return;
+            }
+        }
+
+        function handleMove(e) {
+            const pos = getMousePos(e);
+            
+            // 鼠标样式改变
+            let hovering = false;
+            updateAxisCenter();
+            const allPoints = [...triangle, axis.p1, axis.p2, axis.center];
+            for(let p of allPoints) {
+                if(distance(pos, p) < 20) hovering = true;
+            }
+            canvas.style.cursor = hovering ? 'pointer' : 'default';
+
+            if (!dragTarget) return;
+
+            if (dragType === 'point' || dragType === 'axis-end') {
+                dragTarget.x = pos.x;
+                dragTarget.y = pos.y;
+            } else if (dragType === 'axis-center') {
+                // 整体平移轴
+                const dx = (pos.x - offset.x) - axis.center.x;
+                const dy = (pos.y - offset.y) - axis.center.y;
+                axis.p1.x += dx; axis.p1.y += dy;
+                axis.p2.x += dx; axis.p2.y += dy;
+            }
+
+            draw();
+        }
+
+        function handleEnd() {
+            dragTarget = null;
+            dragType = null;
+        }
+
+        function updateAxisCenter() {
+            axis.center.x = (axis.p1.x + axis.p2.x) / 2;
+            axis.center.y = (axis.p1.y + axis.p2.y) / 2;
+        }
+
+        // --- 绘图逻辑 ---
+
+        function drawPoint(p, label, color = '#fff', isSolid = true) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = isSolid ? color : '#1e1e1e';
+            ctx.fill();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = color;
+            ctx.stroke();
+
+            // 绘制光晕 (交互感)
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+            ctx.fillStyle = color + '33'; // 20% 透明度
+            ctx.fill();
+
+            // 标签
+            ctx.font = "bold 16px Arial";
+            ctx.fillStyle = color;
+            const offset = 25;
+            // 简单的避让逻辑：如果在左边文字往左，右边往右
+            ctx.fillText(label, p.x + (p.x < canvas.width/2 ? -offset : 10), p.y - 10);
+        }
+
+        function drawDashedLine(p1, p2, color = '#555') {
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawTriangle(pts, strokeColor, fillColor) {
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            ctx.lineTo(pts[1].x, pts[1].y);
+            ctx.lineTo(pts[2].x, pts[2].y);
+            ctx.closePath();
+            
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 计算镜像点
+            const reflectedTriangle = triangle.map(p => {
+                return {
+                    ...getReflection(p, axis.p1, axis.p2),
+                    label: p.label + "'",
+                    color: '#99ff99'
+                };
+            });
+
+            // 2. 绘制虚线连接 (对应点)
+            for(let i=0; i<3; i++) {
+                drawDashedLine(triangle[i], reflectedTriangle[i], '#666');
+            }
+
+            // 3. 绘制三角形 ABC (原图)
+            drawTriangle(triangle, '#aaddff', 'rgba(170, 221, 255, 0.1)');
+
+            // 4. 绘制三角形 A'B'C' (镜像)
+            drawTriangle(reflectedTriangle, '#99ff99', 'rgba(153, 255, 153, 0.1)');
+
+            // 5. 绘制对称轴
+            // 绘制无限长线的视觉效果
+            // 计算延长线
+            const dx = axis.p2.x - axis.p1.x;
+            const dy = axis.p2.y - axis.p1.y;
+            const scale = 100; // 延长系数
+            
+            ctx.beginPath();
+            ctx.moveTo(axis.p1.x - dx * scale, axis.p1.y - dy * scale);
+            ctx.lineTo(axis.p2.x + dx * scale, axis.p2.y + dy * scale);
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#ffd700'; // 金黄色
+            ctx.stroke();
+
+            // 6. 绘制所有点
+            // 原图点
+            triangle.forEach(p => drawPoint(p, p.label, p.color));
+            // 镜像点
+            reflectedTriangle.forEach(p => drawPoint(p, p.label, p.color, true));
+
+            // 7. 绘制轴控制点
+            updateAxisCenter();
+            // 中间平移点
+            drawPoint(axis.center, '', '#ffd700');
+            // 两端旋转点 (稍微小一点，透明一点)
+            ctx.beginPath();
+            ctx.arc(axis.p1.x, axis.p1.y, 5, 0, Math.PI*2);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(axis.p2.x, axis.p2.y, 5, 0, Math.PI*2);
+            ctx.fillStyle = '#ffd700';
+            ctx.fill();
+        }
+
+        // 启动
+        resize();
+
+    </script>
+</body>
+</html>

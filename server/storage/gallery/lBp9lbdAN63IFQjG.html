@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>汉字笔顺学习（带田字格）</title>
+    <script src="https://cdn.jsdelivr.net/npm/hanzi-writer@3.5/dist/hanzi-writer.min.js"></script>
+    <script src="https://unpkg.com/pinyin-pro"></script>
+    
+    <style>
+        :root {
+            --primary: #00b894;
+            --grid-color: #e09f9d; /* 田字格的红色 */
+            --bg: #f5f6fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #2d3436; }
+
+        .input-group {
+            background: white;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input[type="text"] {
+            font-size: 24px;
+            width: 150px;
+            padding: 8px;
+            border: 2px solid #dfe6e9;
+            border-radius: 8px;
+            text-align: center;
+            outline: none;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:active { transform: scale(0.95); }
+
+        .char-card {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pinyin-display {
+            font-size: 36px;
+            color: #e17055;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-family: Arial, sans-serif;
+        }
+
+        /* --- 田字格核心样式 START --- */
+        .tian-zi-ge {
+            width: 250px;
+            height: 250px;
+            position: relative;
+            /* 外边框：红色实线 */
+            border: 2px solid var(--grid-color); 
+            /* 防止背景颜色遮挡 */
+            background-color: #fff;
+            margin-bottom: 20px;
+            cursor: pointer;
+        }
+
+        /* 横向虚线 */
+        .tian-zi-ge::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            border-top: 1px dashed var(--grid-color);
+            pointer-events: none; /* 让鼠标点击能穿透线条，不影响写字 */
+            z-index: 0;
+        }
+
+        /* 纵向虚线 */
+        .tian-zi-ge::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            width: 1px;
+            border-left: 1px dashed var(--grid-color);
+            pointer-events: none;
+            z-index: 0;
+        }
+        /* --- 田字格核心样式 END --- */
+
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
+        .btn-outline:hover { background: var(--primary); color: white; }
+        .hint { margin-top: 15px; color: #b2bec3; font-size: 14px; }
+
+    </style>
+</head>
+<body>
+
+    <h1>✍️ 田字格汉字笔顺</h1>
+
+    <div class="input-group">
+        <input type="text" id="charInput" placeholder="输入汉字" maxlength="1" onkeypress="handleEnter(event)">
+        <button onclick="queryChar()">查询</button>
+    </div>
+
+    <div class="char-card" id="resultCard" style="display:none;">
+        <div class="pinyin-display" id="pinyin"></div>
+        
+        <!-- 这里的 class="tian-zi-ge" 就是加上田字格的关键 -->
+        <div id="character-target" class="tian-zi-ge"></div>
+
+        <div class="controls">
+            <button class="btn-outline" onclick="animateChar()">▶ 播放笔顺</button>
+            <button class="btn-outline" onclick="startQuiz()">✏️ 描红测试</button>
+            <button onclick="speak()">🔊 听发音</button>
+        </div>
+        <div class="hint" id="statusText">点击“描红测试”开始书写</div>
+    </div>
+
+    <script>
+        let writer = null;
+        const { pinyin } = pinyinPro;
+        const charInput = document.getElementById('charInput');
+        const pinyinDisplay = document.getElementById('pinyin');
+        const card = document.getElementById('resultCard');
+        const statusText = document.getElementById('statusText');
+
+        window.onload = () => charInput.focus();
+
+        function handleEnter(e) {
+            if (e.key === 'Enter') queryChar();
+        }
+
+        function queryChar() {
+            const char = charInput.value.trim();
+            if (!char || !/[\u4e00-\u9fa5]/.test(char)) {
+                alert("请输入一个中文汉字！");
+                return;
+            }
+
+            card.style.display = 'flex';
+            pinyinDisplay.innerText = pinyin(char);
+            
+            // 清空容器
+            document.getElementById('character-target').innerHTML = '';
+
+            // 初始化 HanziWriter
+            writer = HanziWriter.create('character-target', char, {
+                width: 250,
+                height: 250,
+                padding: 5,
+                showOutline: true,
+                strokeAnimationSpeed: 1, 
+                delayBetweenStrokes: 200,
+                // 关键：笔画颜色设为深黑，确保在田字格上清晰
+                strokeColor: '#2d3436', 
+                radicalColor: '#00b894',
+                // 关键：确保画布背景透明，这样才能看到底下的田字格
+                drawingWidth: 20, 
+                onLoadCharDataSuccess: function() {
+                    statusText.innerText = "加载完成";
+                    animateChar();
+                    speak();
+                },
+                onLoadCharDataError: function() {
+                    statusText.innerText = "字库中暂无此字";
+                }
+            });
+        }
+
+        function animateChar() {
+            if(writer) writer.animateCharacter();
+        }
+
+        function startQuiz() {
+            if(writer) {
+                statusText.innerText = "请在田字格中书写...";
+                // 开启测试时，我们可以把轮廓隐藏，增加难度，也可以保留
+                writer.quiz({
+                    onMistake: function() { statusText.innerText = "写错位置了，再试一次！"; },
+                    onCorrectStroke: function() { statusText.innerText = "这一笔很棒！"; },
+                    onComplete: function() { 
+                        statusText.innerText = "恭喜！写得非常标准！";
+                        speak();
+                    }
+                });
+            }
+        }
+
+        function speak() {
+            const char = charInput.value.trim();
+            if (!char) return;
+            const utterance = new SpeechSynthesisUtterance(char);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 0.8;
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>

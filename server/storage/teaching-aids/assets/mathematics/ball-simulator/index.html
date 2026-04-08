@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摸球模拟器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #E6F3FF;
+        }
+        .container {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            width: 100%;
+            background-color: #e0e0e0;
+            padding: 3px;
+            border-radius: 10px;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+            margin-bottom: 20px;
+        }
+        .progress-bar-fill {
+            display: block;
+            height: 24px;
+            border-radius: 8px;
+            transition: width 500ms ease-in-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .white-ball {
+            background-color: #FFFFFF;
+            border: 1px solid #ddd;
+        }
+        .red-ball {
+            background-color: #FF0000;
+        }
+        button {
+            margin-right: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        .settings-panel {
+            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            max-height: 1000px;
+            opacity: 1;
+            overflow: hidden;
+        }
+        .settings-panel.hidden {
+            max-height: 0;
+            opacity: 0;
+        }
+        #toggleSettings {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        #toggleSettings:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>摸球模拟器</h1>
+        <div class="settings-panel">
+            <div class="input-group">
+                <label for="whiteBalls">白球数量：</label>
+                <input type="number" id="whiteBalls" value="50" min="1">
+            </div>
+            <div class="input-group">
+                <label for="redBalls">红球数量：</label>
+                <input type="number" id="redBalls" value="50" min="1">
+            </div>
+            <div class="input-group">
+                <label for="simulationTimes">模拟次数：</label>
+                <input type="number" id="simulationTimes" value="1000" min="1">
+            </div>
+        </div>
+        <div class="button-group">
+            <button onclick="simulate()">开始模拟</button>
+            <button onclick="reset()">归零</button>
+            <button id="toggleSettings">隐藏设置</button>
+        </div>
+        <h2>模拟结果</h2>
+        <p>总次数：<span id="totalCount">0</span></p>
+        <p>白球被摸到次数：<span id="whiteCount">0</span></p>
+        <div class="progress-bar">
+            <span class="progress-bar-fill white-ball" style="width: 0%;" id="whiteProgressBar"></span>
+        </div>
+        <p>红球被摸到次数：<span id="redCount">0</span></p>
+        <div class="progress-bar">
+            <span class="progress-bar-fill red-ball" style="width: 0%;" id="redProgressBar"></span>
+        </div>
+    </div>
+
+    <script>
+        let totalCount = 0;
+        let whiteCount = 0;
+        let redCount = 0;
+
+        function simulate() {
+            const whiteBalls = parseInt(document.getElementById('whiteBalls').value);
+            const redBalls = parseInt(document.getElementById('redBalls').value);
+            const times = parseInt(document.getElementById('simulationTimes').value);
+            const totalBalls = whiteBalls + redBalls;
+
+            for (let i = 0; i < times; i++) {
+                if (Math.random() < whiteBalls / totalBalls) {
+                    whiteCount++;
+                } else {
+                    redCount++;
+                }
+                totalCount++;
+            }
+
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            document.getElementById('totalCount').textContent = totalCount;
+            document.getElementById('whiteCount').textContent = whiteCount;
+            document.getElementById('redCount').textContent = redCount;
+            
+            const whitePercentage = (whiteCount / totalCount * 100).toFixed(2);
+            const redPercentage = (redCount / totalCount * 100).toFixed(2);
+            
+            document.getElementById('whiteProgressBar').style.width = whitePercentage + '%';
+            document.getElementById('redProgressBar').style.width = redPercentage + '%';
+        }
+
+        function reset() {
+            totalCount = 0;
+            whiteCount = 0;
+            redCount = 0;
+            updateDisplay();
+        }
+
+        function toggleSettings() {
+            const settingsPanel = document.querySelector('.settings-panel');
+            const toggleButton = document.getElementById('toggleSettings');
+            settingsPanel.classList.toggle('hidden');
+            if (settingsPanel.classList.contains('hidden')) {
+                toggleButton.textContent = '显示设置';
+            } else {
+                toggleButton.textContent = '隐藏设置';
+            }
+        }
+
+        document.getElementById('toggleSettings').addEventListener('click', toggleSettings);
+    </script>
+</body>
+</html>

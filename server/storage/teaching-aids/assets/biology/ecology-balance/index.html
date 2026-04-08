@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生态平衡模拟器 v3.1 - 荒漠化危机 (大屏版)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #5d4037; margin-bottom: 5px; }
+        .subtitle { color: #8d6e63; font-size: 14px; margin-bottom: 20px; }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            /* 允许在大屏幕上横向排列，小屏幕自动换行 */
+            max-width: 1200px; 
+        }
+
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 250px;
+            height: fit-content; /* 让高度自适应 */
+        }
+
+        .control-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        
+        .buttons { display: flex; gap: 10px; margin-top: 20px; }
+        button {
+            flex: 1; padding: 10px; border: none; border-radius: 5px;
+            cursor: pointer; font-weight: bold; color: white; transition: 0.3s;
+        }
+        #btn-start { background-color: #2196F3; }
+        #btn-add-grass { background-color: #4CAF50; display: none; } 
+
+        /* --- 修改点 1: 模拟区尺寸变大 --- */
+        #simulation-area {
+            width: 800px;  /* 从 600 改为 800 */
+            height: 500px; /* 从 400 改为 500 */
+            background-color: #e8f5e9; 
+            border: 3px solid #81c784;
+            border-radius: 10px;
+            position: relative;
+            transition: background-color 1.5s ease, border-color 1.5s ease;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); /* 增加阴影增加立体感 */
+        }
+
+        #simulation-area.desert {
+            background-color: #d7ccc8 !important; 
+            border-color: #8d6e63 !important;
+        }
+
+        #warning-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px; /* 字体稍微调大 */
+            font-weight: bold;
+            color: #d32f2f;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px 30px;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 10;
+        }
+
+        /* --- 修改点 2: 统计条宽度跟随变大 --- */
+        .stats-bar {
+            width: 800px; /* 跟随画布宽度 */
+            height: 35px; /* 稍微加高 */
+            background: #ddd; margin-top: 10px;
+            border-radius: 5px; overflow: hidden; display: flex;
+        }
+        .stat-segment {
+            height: 100%; transition: width 0.2s; display: flex;
+            align-items: center; justify-content: center; color: white;
+            font-size: 14px; overflow: hidden; white-space: nowrap;
+        }
+
+        svg { width: 100%; height: 100%; display: block; }
+
+        .skull { font-size: 16px; opacity: 0.7; }
+    </style>
+</head>
+<body>
+
+    <h1>🏜️ 生态平衡模拟器 v3.1</h1>
+    <div class="subtitle">大屏演示版：更广阔的生存空间</div>
+
+    <div class="container">
+        <!-- 左侧：演示区 -->
+        <div>
+            <div id="simulation-area">
+                <!-- 修改点 3: viewBox 适配新尺寸 -->
+                <svg id="world" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div id="warning-overlay">⚠️ 严重警告：植被已枯竭！</div>
+            </div>
+            <div class="stats-bar">
+                <div id="bar-plant" class="stat-segment" style="width: 33%; background: #4CAF50;">🌿: <span id="count-plant">0</span></div>
+                <div id="bar-herb" class="stat-segment" style="width: 33%; background: #FF9800;">🐰: <span id="count-herb">0</span></div>
+                <div id="bar-carn" class="stat-segment" style="width: 33%; background: #F44336;">🐺: <span id="count-carn">0</span></div>
+            </div>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <div class="controls">
+            <div class="control-group">
+                <label>🌿 植物 (灭绝后不重生)</label>
+                <input type="range" id="input-plant" min="0" max="300" value="50">
+                <span id="val-plant">50</span>
+            </div>
+            <div class="control-group">
+                <label>🐰 兔子 (贪吃)</label>
+                <input type="range" id="input-herb" min="0" max="80" value="40">
+                <span id="val-herb">40</span>
+            </div>
+            <div class="control-group">
+                <label>🐺 狼</label>
+                <input type="range" id="input-carn" min="0" max="30" value="4">
+                <span id="val-carn">4</span>
+            </div>
+            
+            <div class="buttons">
+                <button id="btn-start" onclick="toggleSimulation()">开始 / 暂停</button>
+                <button id="btn-add-grass" onclick="manualSeed()">🌱 人工播种</button>
+            </div>
+            <button onclick="resetSimulation()" style="margin-top:10px; background-color:#9E9E9E; width:100%;">重置世界</button>
+
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">
+                <strong>灾难预演：</strong><br>
+                1. <strong>设置少草多兔</strong>。<br>
+                2. 观察兔子迅速吃光草。<br>
+                3. 地面变黄，草不再生长。<br>
+                4. 兔子饿死，狼饿死，变成死寂的荒原。
+            </p>
+        </div>
+    </div>
+
+    <script>
+        // --- 修改点 4: CONFIG 参数调整 ---
+        const CONFIG = {
+            width: 800,  // 宽度增加到 800
+            height: 500, // 高度增加到 500
+            plantSpawnRate: 0.1, 
+            svgNS: "http://www.w3.org/2000/svg"
+        };
+
+        let entities = [];
+        let isRunning = false;
+        let animationId;
+        const world = document.getElementById('world');
+        const simArea = document.getElementById('simulation-area');
+        const warning = document.getElementById('warning-overlay');
+        const btnRescue = document.getElementById('btn-add-grass');
+
+        class Entity {
+            constructor(type, x, y) {
+                this.type = type; 
+                this.x = x || Math.random() * CONFIG.width;
+                this.y = y || Math.random() * CONFIG.height;
+                this.energy = 100;
+                this.reproCooldown = 0; 
+                this.id = Math.random().toString(36).substr(2, 9);
+                
+                if (type === 'plant') {
+                    this.emoji = '🌿'; this.size = 14; this.speed = 0;
+                } else if (type === 'herbivore') {
+                    this.emoji = '🐰'; this.size = 20; this.speed = 1.2;
+                    this.energyDecay = 0.3; this.reproThreshold = 120;
+                } else if (type === 'carnivore') {
+                    this.emoji = '🐺'; this.size = 24; this.speed = 1.8;
+                    this.energyDecay = 0.5; this.reproThreshold = 150;
+                }
+                this.vx = (Math.random() - 0.5) * this.speed;
+                this.vy = (Math.random() - 0.5) * this.speed;
+                this.element = this.createSVGElement();
+            }
+
+            createSVGElement() {
+                const text = document.createElementNS(CONFIG.svgNS, "text");
+                text.setAttribute("x", this.x); text.setAttribute("y", this.y);
+                text.setAttribute("font-size", this.size);
+                text.setAttribute("text-anchor", "middle");
+                text.setAttribute("dominant-baseline", "middle");
+                text.textContent = this.emoji;
+                text.style.userSelect = "none";
+                text.style.transition = "transform 0.1s linear";
+                world.appendChild(text);
+                return text;
+            }
+
+            update() {
+                if (this.type !== 'plant') {
+                    this.x += this.vx; this.y += this.vy;
+                    // 边界反弹修正
+                    if (this.x < 10 || this.x > CONFIG.width - 10) this.vx *= -1;
+                    if (this.y < 10 || this.y > CONFIG.height - 10) this.vy *= -1;
+                    
+                    if (Math.random() < 0.05) {
+                        this.vx = (Math.random() - 0.5) * this.speed * 2;
+                        this.vy = (Math.random() - 0.5) * this.speed * 2;
+                    }
+                    this.energy -= this.energyDecay;
+                    if (this.reproCooldown > 0) this.reproCooldown--;
+                }
+                this.element.setAttribute("x", this.x);
+                this.element.setAttribute("y", this.y);
+                if (this.energy <= 0) return false;
+                return true;
+            }
+
+            remove() {
+                if (this.element && this.element.parentNode) {
+                    this.element.parentNode.removeChild(this.element);
+                }
+                if (this.type !== 'plant' && this.energy <= 0) {
+                    leaveSkull(this.x, this.y);
+                }
+            }
+        }
+
+        function leaveSkull(x, y) {
+            const skull = document.createElementNS(CONFIG.svgNS, "text");
+            skull.setAttribute("x", x); skull.setAttribute("y", y);
+            skull.setAttribute("class", "skull");
+            skull.textContent = "☠️";
+            world.appendChild(skull);
+            setTimeout(() => { if(skull.parentNode) skull.parentNode.removeChild(skull); }, 3000);
+        }
+
+        ['plant', 'herb', 'carn'].forEach(type => {
+            const input = document.getElementById(`input-${type}`);
+            const output = document.getElementById(`val-${type}`);
+            input.oninput = () => {
+                output.textContent = input.value;
+                if(!isRunning) resetSimulation();
+            };
+        });
+
+        function initEntities() {
+            entities.forEach(e => e.remove());
+            document.querySelectorAll('.skull').forEach(e => e.remove());
+            entities = [];
+            
+            const pCount = parseInt(document.getElementById('input-plant').value);
+            const hCount = parseInt(document.getElementById('input-herb').value);
+            const cCount = parseInt(document.getElementById('input-carn').value);
+
+            for(let i=0; i<pCount; i++) entities.push(new Entity('plant'));
+            for(let i=0; i<hCount; i++) entities.push(new Entity('herbivore'));
+            for(let i=0; i<cCount; i++) entities.push(new Entity('carnivore'));
+            
+            updateVisuals(pCount);
+            updateStats();
+        }
+
+        function loop() {
+            if (!isRunning) return;
+
+            const plants = entities.filter(e => e.type === 'plant');
+            const herbs = entities.filter(e => e.type === 'herbivore');
+            const carns = entities.filter(e => e.type === 'carnivore');
+            
+            // --- 修改点 5: 增加最大植物容量 ---
+            // 因为地图变大了，最大容量从 300 提升到 450，避免地图看起来太稀疏
+            if (plants.length > 0 && plants.length < 450) {
+                let growthChance = CONFIG.plantSpawnRate * (plants.length / 20); 
+                if (Math.random() < growthChance) {
+                    entities.push(new Entity('plant'));
+                }
+            }
+
+            let toRemove = new Set();
+            let newBabies = [];
+
+            // 兔子逻辑
+            herbs.forEach(rabbit => {
+                let nearestGrass = null;
+                let minDist = 60;
+                if (plants.length < 5) minDist = 300; // 视野扩大
+
+                for (let grass of plants) {
+                    if (toRemove.has(grass)) continue;
+                    const d = Math.hypot(rabbit.x - grass.x, rabbit.y - grass.y);
+                    if (d < 15) {
+                        toRemove.add(grass);
+                        rabbit.energy = Math.min(rabbit.energy + 30, 150);
+                        if (rabbit.energy > rabbit.reproThreshold && rabbit.reproCooldown === 0) {
+                            rabbit.energy -= 50; rabbit.reproCooldown = 40;
+                            newBabies.push(new Entity('herbivore', rabbit.x, rabbit.y));
+                        }
+                    } else if (d < minDist) {
+                        minDist = d; nearestGrass = grass;
+                    }
+                }
+                if (nearestGrass) {
+                    const dx = nearestGrass.x - rabbit.x;
+                    const dy = nearestGrass.y - rabbit.y;
+                    rabbit.vx += dx * 0.005; rabbit.vy += dy * 0.005;
+                    limitSpeed(rabbit);
+                }
+            });
+
+            // 狼逻辑
+            carns.forEach(wolf => {
+                let target = null;
+                let minDist = 120;
+                for (let rabbit of herbs) {
+                    if (toRemove.has(rabbit)) continue;
+                    const d = Math.hypot(wolf.x - rabbit.x, wolf.y - rabbit.y);
+                    if (d < 15) {
+                        toRemove.add(rabbit);
+                        wolf.energy = Math.min(wolf.energy + 70, 250);
+                    } else if (d < minDist) {
+                        minDist = d; target = rabbit;
+                    }
+                }
+                
+                if (wolf.energy > wolf.reproThreshold && wolf.reproCooldown === 0) {
+                    for (let other of carns) {
+                        if (other === wolf) continue;
+                        if (other.energy > wolf.reproThreshold && other.reproCooldown === 0) {
+                            if (Math.hypot(wolf.x - other.x, wolf.y - other.y) < 20) {
+                                wolf.energy -= 60; other.energy -= 60;
+                                wolf.reproCooldown = 300; other.reproCooldown = 300;
+                                newBabies.push(new Entity('carnivore', wolf.x, wolf.y));
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (target) {
+                    const dx = target.x - wolf.x;
+                    const dy = target.y - wolf.y;
+                    wolf.vx += dx * 0.005; wolf.vy += dy * 0.005;
+                    limitSpeed(wolf);
+                }
+            });
+
+            entities = entities.filter(e => {
+                if (toRemove.has(e)) { e.remove(); return false; }
+                const isAlive = e.update();
+                if (!isAlive) { e.remove(); return false; }
+                return true;
+            });
+            entities.push(...newBabies);
+            
+            const currentPlantCount = entities.filter(e => e.type === 'plant').length;
+            updateVisuals(currentPlantCount);
+            updateStats();
+
+            animationId = requestAnimationFrame(loop);
+        }
+
+        function limitSpeed(e) {
+            const s = Math.hypot(e.vx, e.vy);
+            if (s > e.speed) { e.vx = (e.vx/s)*e.speed; e.vy = (e.vy/s)*e.speed; }
+        }
+
+        function updateVisuals(plantCount) {
+            if (plantCount === 0) {
+                if (!simArea.classList.contains('desert')) {
+                    simArea.classList.add('desert');
+                    warning.style.opacity = 1;
+                    btnRescue.style.display = 'block'; 
+                }
+            } else {
+                if (simArea.classList.contains('desert')) {
+                    simArea.classList.remove('desert');
+                    warning.style.opacity = 0;
+                    btnRescue.style.display = 'none';
+                }
+            }
+        }
+
+        function manualSeed() {
+            for(let i=0; i<15; i++) entities.push(new Entity('plant'));
+            updateVisuals(15);
+        }
+
+        function updateStats() {
+            const p = entities.filter(e => e.type === 'plant').length;
+            const h = entities.filter(e => e.type === 'herbivore').length;
+            const c = entities.filter(e => e.type === 'carnivore').length;
+            const t = Math.max(1, p+h+c);
+            document.getElementById('count-plant').innerText = p;
+            document.getElementById('count-herb').innerText = h;
+            document.getElementById('count-carn').innerText = c;
+            document.getElementById('bar-plant').style.width = (p/t*100)+'%';
+            document.getElementById('bar-herb').style.width = (h/t*100)+'%';
+            document.getElementById('bar-carn').style.width = (c/t*100)+'%';
+        }
+
+        function toggleSimulation() {
+            const btn = document.getElementById('btn-start');
+            if (isRunning) {
+                isRunning = false; cancelAnimationFrame(animationId);
+                btn.textContent = "继续"; btn.style.backgroundColor = "#2196F3";
+            } else {
+                if (entities.length === 0) initEntities();
+                isRunning = true; loop();
+                btn.textContent = "暂停"; btn.style.backgroundColor = "#FFC107"; btn.style.color = "black";
+            }
+        }
+
+        function resetSimulation() {
+            isRunning = false; cancelAnimationFrame(animationId);
+            document.getElementById('btn-start').textContent = "开始";
+            document.getElementById('btn-start').style.backgroundColor = "#2196F3";
+            document.getElementById('btn-start').style.color = "white";
+            initEntities();
+        }
+
+        resetSimulation();
+    </script>
+</body>
+</html>

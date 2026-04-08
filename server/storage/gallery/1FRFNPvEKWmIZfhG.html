@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>TensorFlow.js Handpose</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column; /* Stack elements vertically */
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px; /* Add some padding around content */
+            box-sizing: border-box; /* Include padding in element's total width and height */
+        }
+        h1 {
+            margin-bottom: 10px; /* Space below the title */
+            color: #333;
+        }
+        p {
+            margin-top: 0;
+            margin-bottom: 20px; /* Space below the description */
+            color: #555;
+            text-align: center;
+            max-width: 800px; /* Limit description width for readability */
+        }
+        #canvas-container {
+            display: flex; /* Use flexbox for canvases */
+            gap: 20px; /* Space between the two canvases */
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap; /* Allow canvases to wrap on smaller screens */
+        }
+        canvas {
+            border: 1px solid black;
+            max-width: 100%; /* Ensure canvases are responsive */
+            height: auto;
+        }
+        video {
+            display: none; /* Hide the video element, we draw on canvas */
+        }
+    </style>
+    <!-- 加载 MediaPipe Hands 模型 -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+</head>
+<body>
+    <video id="webcam" autoplay playsinline></video>
+
+    <h1>手势骨骼识别</h1>
+    <p>
+        手势骨骼识别技术利用计算机视觉和机器学习模型（如 MediaPipe Hands 模型），
+        能够实时检测图像或视频中的手部，并识别出关键的骨骼点（landmarks）。
+        这些骨骼点构成了手部的骨骼结构，通过连接这些点，可以可视化手部的姿态和形状，
+        进而用于手势识别、人机交互等应用。本示例展示了如何从摄像头获取视频流，
+        检测手部骨骼点，并在单独的窗口中绘制出来。
+    </p>
+
+    <div id="canvas-container">
+        <canvas id="video-canvas"></canvas>
+        <canvas id="drawing-canvas"></canvas>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const videoCanvas = document.getElementById('video-canvas');
+        const videoCtx = videoCanvas.getContext('2d');
+
+        const drawingCanvas = document.getElementById('drawing-canvas');
+        const drawingCtx = drawingCanvas.getContext('2d');
+
+        // 定义手部连接线
+        const HAND_CONNECTIONS = [
+            [0, 1], [1, 2], [2, 3], [3, 4], // 拇指
+            [0, 5], [5, 6], [6, 7], [7, 8], // 食指
+            [0, 9], [9, 10], [10, 11], [11, 12], // 中指
+            [0, 13], [13, 14], [14, 15], [15, 16], // 无名指
+            [0, 17], [17, 18], [18, 19], [19, 20], // 小指
+            [0, 5], [5, 9], [9, 13], [13, 17] // 手掌
+        ];
+
+        // 设置摄像头
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            return new Promise((resolve) => {
+                video.onloadedmetadata = () => {
+                    videoCanvas.width = video.videoWidth;
+                    videoCanvas.height = video.videoHeight;
+                    drawingCanvas.width = video.videoWidth;
+                    drawingCanvas.height = video.videoHeight;
+                    resolve(video);
+                };
+            });
+        }
+
+        // 初始化 MediaPipe Hands 模型
+        function setupMediaPipeHands() {
+            const hands = new Hands({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                }
+            });
+
+            hands.setOptions({
+                maxNumHands: 2, // 设置最大检测手数为2
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            hands.onResults(onResults);
+
+            return hands;
+        }
+
+        // 处理检测结果
+        function onResults(results) {
+            // 绘制视频帧
+            videoCtx.save();
+            videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+            videoCtx.drawImage(results.image, 0, 0, videoCanvas.width, videoCanvas.height);
+            videoCtx.restore();
+
+            // 清空绘图画布
+            drawingCtx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+
+            // 显示检测到的手数量
+            drawingCtx.font = '20px Arial';
+            drawingCtx.fillStyle = 'black';
+            drawingCtx.fillText(`检测到 ${results.multiHandLandmarks.length} 只手`, 10, 30);
+
+            // 绘制每只手的骨骼点和连接线
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const colors = ['blue', 'red', 'green', 'purple', 'orange'];
+
+                for (let i = 0; i < results.multiHandLandmarks.length; i++) {
+                    const landmarks = results.multiHandLandmarks[i];
+                    const handColor = colors[i % colors.length];
+
+                    // 绘制骨骼点
+                    for (let j = 0; j < landmarks.length; j++) {
+                        const landmark = landmarks[j];
+                        drawingCtx.beginPath();
+                        drawingCtx.arc(
+                            landmark.x * drawingCanvas.width,
+                            landmark.y * drawingCanvas.height,
+                            5, 0, 2 * Math.PI
+                        );
+                        drawingCtx.fillStyle = handColor;
+                        drawingCtx.fill();
+                    }
+
+                    // 绘制连接线
+                    drawingCtx.strokeStyle = handColor;
+                    drawingCtx.lineWidth = 2;
+                    for (let k = 0; k < HAND_CONNECTIONS.length; k++) {
+                        const start = landmarks[HAND_CONNECTIONS[k][0]];
+                        const end = landmarks[HAND_CONNECTIONS[k][1]];
+                        drawingCtx.beginPath();
+                        drawingCtx.moveTo(
+                            start.x * drawingCanvas.width,
+                            start.y * drawingCanvas.height
+                        );
+                        drawingCtx.lineTo(
+                            end.x * drawingCanvas.width,
+                            end.y * drawingCanvas.height
+                        );
+                        drawingCtx.stroke();
+                    }
+                }
+            }
+        }
+
+        async function main() {
+            await setupCamera();
+            video.play();
+
+            const hands = setupMediaPipeHands();
+            const camera = new Camera(video, {
+                onFrame: async () => {
+                    await hands.send({ image: video });
+                },
+                width: 640,
+                height: 480
+            });
+            camera.start();
+        }
+
+        main();
+    </script>
+</body>
+</html>

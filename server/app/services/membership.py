@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models import (
+    BigscreenActivityPack,
+    BigscreenContentAsset,
     Class,
     ClassEnrollment,
     LiveTaskGroup,
@@ -31,6 +33,12 @@ FEATURE_TASK_GROUPS = "task_groups"
 FEATURE_STUDY_PACKS = "study_packs"
 FEATURE_AI_TASK_GROUPS = "ai_task_groups"
 FEATURE_AI_STUDY_PACKS = "ai_study_packs"
+FEATURE_BIGSCREEN_CONTENT_ASSETS = "bigscreen_content_assets"
+FEATURE_BIGSCREEN_ACTIVITY_PACKS = "bigscreen_activity_packs"
+FEATURE_STUDENT_AI = "student_ai"
+
+FREE_BIGSCREEN_CONTENT_ASSET_LIMIT = 5
+FREE_BIGSCREEN_ACTIVITY_PACK_LIMIT = 2
 
 
 @dataclass
@@ -154,14 +162,14 @@ async def _downgrade_to_free_if_expired(
         membership.expires_at = None
         membership.trial_ends_at = None
         membership.source = "system"
-        await db.flush()
+        await db.commit()
     elif membership.status == "active" and membership.expires_at and membership.expires_at <= now:
         membership.plan_code = FREE_PLAN_CODE
         membership.status = "free"
         membership.expires_at = None
         membership.trial_ends_at = None
         membership.source = "system"
-        await db.flush()
+        await db.commit()
     return membership
 
 
@@ -219,10 +227,30 @@ async def get_membership_usage(db: AsyncSession, teacher_id: str) -> dict[str, i
         )
     ).scalar_one()
 
+    bigscreen_content_asset_count = (
+        await db.execute(
+            select(func.count(BigscreenContentAsset.id)).where(
+                BigscreenContentAsset.teacher_id == teacher_id,
+                BigscreenContentAsset.status != "archived",
+            )
+        )
+    ).scalar_one()
+
+    bigscreen_activity_pack_count = (
+        await db.execute(
+            select(func.count(BigscreenActivityPack.id)).where(
+                BigscreenActivityPack.teacher_id == teacher_id,
+                BigscreenActivityPack.status != "archived",
+            )
+        )
+    ).scalar_one()
+
     return {
         FEATURE_CREATE_CLASS: int(class_count or 0),
         FEATURE_TASK_GROUPS: int(task_group_count or 0),
         FEATURE_STUDY_PACKS: int(study_pack_count or 0),
+        FEATURE_BIGSCREEN_CONTENT_ASSETS: int(bigscreen_content_asset_count or 0),
+        FEATURE_BIGSCREEN_ACTIVITY_PACKS: int(bigscreen_activity_pack_count or 0),
     }
 
 
@@ -271,7 +299,7 @@ async def assert_teacher_feature_access(
     plan = effective.plan
     usage = await get_membership_usage(db, teacher_id)
 
-    if feature_code in {FEATURE_AI_TASK_GROUPS, FEATURE_AI_STUDY_PACKS}:
+    if feature_code in {FEATURE_AI_TASK_GROUPS, FEATURE_AI_STUDY_PACKS, FEATURE_STUDENT_AI}:
         if not plan.can_use_ai:
             raise build_membership_error(
                 message="当前会员不支持 AI 功能，请升级后继续使用。",
@@ -292,6 +320,12 @@ async def assert_teacher_feature_access(
     elif feature_code == FEATURE_STUDY_PACKS:
         limit = plan.max_study_packs
         used = usage[FEATURE_STUDY_PACKS]
+    elif feature_code == FEATURE_BIGSCREEN_CONTENT_ASSETS:
+        limit = None if effective.is_paid else FREE_BIGSCREEN_CONTENT_ASSET_LIMIT
+        used = usage[FEATURE_BIGSCREEN_CONTENT_ASSETS]
+    elif feature_code == FEATURE_BIGSCREEN_ACTIVITY_PACKS:
+        limit = None if effective.is_paid else FREE_BIGSCREEN_ACTIVITY_PACK_LIMIT
+        used = usage[FEATURE_BIGSCREEN_ACTIVITY_PACKS]
     elif feature_code == FEATURE_CLASS_STUDENTS:
         if not class_id:
             raise ValueError("class_id is required for class student quota checks")
@@ -337,11 +371,15 @@ async def serialize_teacher_membership_snapshot(
             "max_students_per_class": plan.max_students_per_class,
             "max_task_groups": plan.max_task_groups,
             "max_study_packs": plan.max_study_packs,
+            "max_bigscreen_content_assets": None if effective.is_paid else FREE_BIGSCREEN_CONTENT_ASSET_LIMIT,
+            "max_bigscreen_activity_packs": None if effective.is_paid else FREE_BIGSCREEN_ACTIVITY_PACK_LIMIT,
         },
         "usage": {
             "class_count": usage[FEATURE_CREATE_CLASS],
             "task_group_count": usage[FEATURE_TASK_GROUPS],
             "study_pack_count": usage[FEATURE_STUDY_PACKS],
+            "bigscreen_content_asset_count": usage[FEATURE_BIGSCREEN_CONTENT_ASSETS],
+            "bigscreen_activity_pack_count": usage[FEATURE_BIGSCREEN_ACTIVITY_PACKS],
         },
     }
 

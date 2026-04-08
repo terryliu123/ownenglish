@@ -1,0 +1,2194 @@
+{
+  "schema_version": 1,
+  "base_path": "server/storage/teaching-aids/assets",
+  "categories": [
+    {
+      "code": "physics",
+      "label": "物理"
+    },
+    {
+      "code": "chemistry",
+      "label": "化学"
+    },
+    {
+      "code": "biology",
+      "label": "生物"
+    },
+    {
+      "code": "earth_science",
+      "label": "地球科学"
+    },
+    {
+      "code": "mathematics",
+      "label": "数学"
+    },
+    {
+      "code": "general_science",
+      "label": "综合科学"
+    },
+    {
+      "code": "other",
+      "label": "其他"
+    }
+  ],
+  "items": [
+    {
+      "name": "落花生",
+      "slug": "peanuts",
+      "category": "other",
+      "summary": "实现小学五年级落花生课文阅读探究及生字词自主学习",
+      "cover_image": "other/peanuts/cover.png",
+      "diagram_image": "other/peanuts/diagram.png",
+      "html_entry": "other/peanuts/index.html",
+      "source_filename": "OtQZnOgWTaieopQg.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "植树问题",
+      "slug": "tree-planting",
+      "category": "other",
+      "summary": "同学们在全长100m的小路植树，每隔5m栽一棵，比较两种情况",
+      "cover_image": "other/tree-planting/cover.png",
+      "diagram_image": "other/tree-planting/diagram.png",
+      "html_entry": "other/tree-planting/index.html",
+      "source_filename": "植树问题.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "掷一掷",
+      "slug": "dice-probability",
+      "category": "mathematics",
+      "summary": "探索骰子中的概率世界",
+      "cover_image": "mathematics/dice-probability/cover.png",
+      "diagram_image": "mathematics/dice-probability/diagram.png",
+      "html_entry": "mathematics/dice-probability/index.html",
+      "source_filename": "zyz.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "跑道长度差异可视化",
+      "slug": "track-length-diff",
+      "category": "other",
+      "summary": "标准400米跑道各跑道长度比较与起跑线确定",
+      "cover_image": "other/track-length-diff/cover.png",
+      "diagram_image": "other/track-length-diff/diagram.png",
+      "html_entry": "other/track-length-diff/index.html",
+      "source_filename": "lSHrNuN3IkC0zH3P.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "英语动物单词闪卡",
+      "slug": "english-animal-flashcards",
+      "category": "biology",
+      "summary": "英语单词学习好工具，闪卡",
+      "cover_image": "biology/english-animal-flashcards/cover.png",
+      "diagram_image": "biology/english-animal-flashcards/diagram.png",
+      "html_entry": "biology/english-animal-flashcards/index.html",
+      "source_filename": "YGPDKfYxoeaFrLtY.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "解释电流的形成",
+      "slug": "current-formation",
+      "category": "physics",
+      "summary": "模拟电子在导体中的定向移动，形象地解释电流是如何形成的",
+      "cover_image": "physics/current-formation/cover.png",
+      "diagram_image": "physics/current-formation/diagram.png",
+      "html_entry": "physics/current-formation/index.html",
+      "source_filename": "JmIol5f9GIy36ZyF.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "地球自转、公转与24节气",
+      "slug": "earth-rotation-solar-terms",
+      "category": "earth_science",
+      "summary": "地球自转、公转与24节气",
+      "cover_image": "earth_science/earth-rotation-solar-terms/cover.png",
+      "diagram_image": "earth_science/earth-rotation-solar-terms/diagram.png",
+      "html_entry": "earth_science/earth-rotation-solar-terms/index.html",
+      "source_filename": "24jq.html",
+      "tags": [
+        "earth_science"
+      ]
+    },
+    {
+      "name": "电流形成原理",
+      "slug": "current-principle",
+      "category": "physics",
+      "summary": "电流形成原理，探索电荷定向移动的奥秘",
+      "cover_image": "physics/current-principle/cover.png",
+      "diagram_image": "physics/current-principle/diagram.png",
+      "html_entry": "physics/current-principle/index.html",
+      "source_filename": "nl9F7g1BKf6CgNKa.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "图片拼图游戏",
+      "slug": "image-puzzle-game",
+      "category": "mathematics",
+      "summary": "图片拼图游戏",
+      "cover_image": "mathematics/image-puzzle-game/cover.png",
+      "diagram_image": "mathematics/image-puzzle-game/diagram.png",
+      "html_entry": "mathematics/image-puzzle-game/index.html",
+      "source_filename": "7ZYGa2dbiHKGieiC.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "智能教室分贝监测系统",
+      "slug": "noise-monitor",
+      "category": "other",
+      "summary": "教室分贝监测系统",
+      "cover_image": "other/noise-monitor/cover.png",
+      "diagram_image": "other/noise-monitor/diagram.png",
+      "html_entry": "other/noise-monitor/index.html",
+      "source_filename": "QEWdyjqZOfPh08IH.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "追及相遇问题互动游戏",
+      "slug": "chase-meet-game",
+      "category": "other",
+      "summary": "通过动画演示学习速度、时间、路程的关系",
+      "cover_image": "other/chase-meet-game/cover.png",
+      "diagram_image": "other/chase-meet-game/diagram.png",
+      "html_entry": "other/chase-meet-game/index.html",
+      "source_filename": "SMTHLVNCFqOyFUxP.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "摸球模拟器",
+      "slug": "ball-simulator",
+      "category": "mathematics",
+      "summary": "小学数学概率学",
+      "cover_image": "mathematics/ball-simulator/cover.png",
+      "diagram_image": "mathematics/ball-simulator/diagram.png",
+      "html_entry": "mathematics/ball-simulator/index.html",
+      "source_filename": "FbHhjixbZKQbLUa6.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "智能英文填字游戏生成器",
+      "slug": "english-crossword",
+      "category": "chemistry",
+      "summary": "自适应难度系统，智能预填字母，提供个性化学习体验",
+      "cover_image": "chemistry/english-crossword/cover.png",
+      "diagram_image": "chemistry/english-crossword/diagram.png",
+      "html_entry": "chemistry/english-crossword/index.html",
+      "source_filename": "hwbOTPpsop2wQs6L.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "AI骨骼识别",
+      "slug": "ai-skeleton",
+      "category": "biology",
+      "summary": "AI骨骼识别教具",
+      "cover_image": "biology/ai-skeleton/cover.png",
+      "diagram_image": "biology/ai-skeleton/diagram.png",
+      "html_entry": "biology/ai-skeleton/index.html",
+      "source_filename": "wp1EewDZwBRTu3hZ.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "制作花钟（左侧鲜花，右侧钟表）",
+      "slug": "flower-clock",
+      "category": "other",
+      "summary": "将右侧时钟调整到花朵开放的正确时间，回答正确后花朵会美丽绽放！",
+      "cover_image": "other/flower-clock/cover.png",
+      "diagram_image": "other/flower-clock/diagram.png",
+      "html_entry": "other/flower-clock/index.html",
+      "source_filename": "DrbrApJk2dMsoYgB.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "认知分类游戏(动物/水果/蔬菜)",
+      "slug": "classification-game",
+      "category": "biology",
+      "summary": "认知分类游戏(动物/水果/蔬菜)",
+      "cover_image": "biology/classification-game/cover.png",
+      "diagram_image": "biology/classification-game/diagram.png",
+      "html_entry": "biology/classification-game/index.html",
+      "source_filename": "prEbBCJLwE3BPJHQ.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "探索正方形中的小正方形",
+      "slug": "square-explore",
+      "category": "mathematics",
+      "summary": "从不同角度发现数学规律",
+      "cover_image": "mathematics/square-explore/cover.png",
+      "diagram_image": "mathematics/square-explore/diagram.png",
+      "html_entry": "mathematics/square-explore/index.html",
+      "source_filename": "lWS3YzLitNyTRb7Z.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "地球的内核",
+      "slug": "earth-core",
+      "category": "chemistry",
+      "summary": "地球是一个复杂的行星，由多个不同的层组成，每一层都有其独特的物理和化学特性。了解地球内部结构对于研究板块构造、地震活动和火山喷发等现象至关重要。",
+      "cover_image": "chemistry/earth-core/cover.png",
+      "diagram_image": "chemistry/earth-core/diagram.png",
+      "html_entry": "chemistry/earth-core/index.html",
+      "source_filename": "52A98iiFw6jVQKm9.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "地球内核探究",
+      "slug": "earth-core-explore",
+      "category": "chemistry",
+      "summary": "地球内部由多个同心圆层组成，从外到内依次是地壳、地幔、外核和内核。每一层都有其独特的物理和化学性质，共同构成了我们居住的这颗蓝色星球",
+      "cover_image": "chemistry/earth-core-explore/cover.png",
+      "diagram_image": "chemistry/earth-core-explore/diagram.png",
+      "html_entry": "chemistry/earth-core-explore/index.html",
+      "source_filename": "jU1hrCnAg2w56edk.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "课堂计时器",
+      "slug": "classroom-timer",
+      "category": "general_science",
+      "summary": "课堂计时器",
+      "cover_image": "general_science/classroom-timer/cover.png",
+      "diagram_image": "general_science/classroom-timer/diagram.png",
+      "html_entry": "general_science/classroom-timer/index.html",
+      "source_filename": "c6fyo1JYSTee10kL.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "计时器（小）",
+      "slug": "timer-small",
+      "category": "general_science",
+      "summary": "小尺寸计时器",
+      "cover_image": "general_science/timer-small/cover.png",
+      "diagram_image": "general_science/timer-small/diagram.png",
+      "html_entry": "general_science/timer-small/index.html",
+      "source_filename": "rLhaRTEevueNRFXn.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "教室分贝监测系统（新）",
+      "slug": "noise-monitor-new",
+      "category": "other",
+      "summary": "教室分贝监测系统，动感小球",
+      "cover_image": "other/noise-monitor-new/cover.png",
+      "diagram_image": "other/noise-monitor-new/diagram.png",
+      "html_entry": "other/noise-monitor-new/index.html",
+      "source_filename": "Rin54LhldCjaKqNQ.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "数字华容道",
+      "slug": "digital-klotski",
+      "category": "mathematics",
+      "summary": "开动思维，数字华容道",
+      "cover_image": "mathematics/digital-klotski/cover.png",
+      "diagram_image": "mathematics/digital-klotski/diagram.png",
+      "html_entry": "mathematics/digital-klotski/index.html",
+      "source_filename": "uGmBF80dxlVVNKYu.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "华容道",
+      "slug": "klotski",
+      "category": "mathematics",
+      "summary": "思维锻炼，华容道",
+      "cover_image": "mathematics/klotski/cover.png",
+      "diagram_image": "mathematics/klotski/diagram.png",
+      "html_entry": "mathematics/klotski/index.html",
+      "source_filename": "jerk1M305g3I35Bq.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "2、3、5的倍数特征练习",
+      "slug": "multiple-235",
+      "category": "other",
+      "summary": "小学五年级，倍数特征数的应用",
+      "cover_image": "other/multiple-235/cover.png",
+      "diagram_image": "other/multiple-235/diagram.png",
+      "html_entry": "other/multiple-235/index.html",
+      "source_filename": "OkBEYZqD1Od5oPYY.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "俄罗斯方块（新）",
+      "slug": "tetris",
+      "category": "mathematics",
+      "summary": "小学二、三年级，学习平移和旋转后联系使用",
+      "cover_image": "mathematics/tetris/cover.png",
+      "diagram_image": "mathematics/tetris/diagram.png",
+      "html_entry": "mathematics/tetris/index.html",
+      "source_filename": "4WbUVZPyCcIZq5NJ.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "24点数字游戏",
+      "slug": "24-point-game",
+      "category": "mathematics",
+      "summary": "24点数字游戏",
+      "cover_image": "mathematics/24-point-game/cover.png",
+      "diagram_image": "mathematics/24-point-game/diagram.png",
+      "html_entry": "mathematics/24-point-game/index.html",
+      "source_filename": "WPfooUg8k6WYtIqk.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "数独",
+      "slug": "sudoku",
+      "category": "mathematics",
+      "summary": "经典数字游戏，思维挑战，试用小学三年级，逐步排除不可能的思维方式。",
+      "cover_image": "mathematics/sudoku/cover.png",
+      "diagram_image": "mathematics/sudoku/diagram.png",
+      "html_entry": "mathematics/sudoku/index.html",
+      "source_filename": "cgAlTW9uRcf2CQ8k.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "分数学习互动",
+      "slug": "fraction-learning",
+      "category": "mathematics",
+      "summary": "分数学习互动课件",
+      "cover_image": "mathematics/fraction-learning/cover.png",
+      "diagram_image": "mathematics/fraction-learning/diagram.png",
+      "html_entry": "mathematics/fraction-learning/index.html",
+      "source_filename": "Sm0Ebrr3uGdgXO7c.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "单位换算挑战",
+      "slug": "unit-conversion",
+      "category": "other",
+      "summary": "单位换算挑战",
+      "cover_image": "other/unit-conversion/cover.png",
+      "diagram_image": "other/unit-conversion/diagram.png",
+      "html_entry": "other/unit-conversion/index.html",
+      "source_filename": "shIROGspVxrBT2gA.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "小小收银员",
+      "slug": "cashier",
+      "category": "mathematics",
+      "summary": "适用年级：小学二年级或三年级，学习完人民币以后练习用。\n核心知识点：\n1.人民币的认识。\n2.人民币的计算\n3.人民币的支付方式",
+      "cover_image": "mathematics/cashier/cover.png",
+      "diagram_image": "mathematics/cashier/diagram.png",
+      "html_entry": "mathematics/cashier/index.html",
+      "source_filename": "elWQlV0Im3prrwC8.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "音乐协作",
+      "slug": "music-collab",
+      "category": "other",
+      "summary": "与库乐队，课堂音乐选择协作工具",
+      "cover_image": "other/music-collab/cover.png",
+      "diagram_image": "other/music-collab/diagram.png",
+      "html_entry": "other/music-collab/index.html",
+      "source_filename": "B9ZttLe8CqGkyC9x.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "滑动与滚动",
+      "slug": "sliding-rolling",
+      "category": "physics",
+      "summary": "两种模式切换：可选择“立方体（滑动）”或“小球（滚动）”。\n物理仿真：\n滑动：物体沿斜面平移，黄色圆点相对位置不变，轨迹为直线。\n滚动：物体沿斜面旋转下落，黄色圆点随物体转动，轨迹为摆线（Cycloi",
+      "cover_image": "physics/sliding-rolling/cover.png",
+      "diagram_image": "physics/sliding-rolling/diagram.png",
+      "html_entry": "physics/sliding-rolling/index.html",
+      "source_filename": "aE1Bz3DohBPahqQG.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "手电筒的工作原理和构造",
+      "slug": "flashlight",
+      "category": "other",
+      "summary": "手电筒的工作原理和构造",
+      "cover_image": "other/flashlight/cover.png",
+      "diagram_image": "other/flashlight/diagram.png",
+      "html_entry": "other/flashlight/index.html",
+      "source_filename": "kJL6Grp73nTSfpUi.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "火山构造教学演示",
+      "slug": "volcano-structure",
+      "category": "earth_science",
+      "summary": "火山构造教学演示",
+      "cover_image": "earth_science/volcano-structure/cover.png",
+      "diagram_image": "earth_science/volcano-structure/diagram.png",
+      "html_entry": "earth_science/volcano-structure/index.html",
+      "source_filename": "6DCAnr5NhihhV3v5.html",
+      "tags": [
+        "earth_science"
+      ]
+    },
+    {
+      "name": "八大行星排序",
+      "slug": "planets-sorting",
+      "category": "earth_science",
+      "summary": "八大行星排序",
+      "cover_image": "earth_science/planets-sorting/cover.png",
+      "diagram_image": "earth_science/planets-sorting/diagram.png",
+      "html_entry": "earth_science/planets-sorting/index.html",
+      "source_filename": "sgIqUSWtkgLTMsNV.html",
+      "tags": [
+        "earth_science"
+      ]
+    },
+    {
+      "name": "探索两圆相交",
+      "slug": "circles-intersection",
+      "category": "mathematics",
+      "summary": "探索两圆相交",
+      "cover_image": "mathematics/circles-intersection/cover.png",
+      "diagram_image": "mathematics/circles-intersection/diagram.png",
+      "html_entry": "mathematics/circles-intersection/index.html",
+      "source_filename": "oWU7ZEcVUBHtYvpq.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "二十四节气流转图",
+      "slug": "solar-terms",
+      "category": "earth_science",
+      "summary": "二十四节气流转图",
+      "cover_image": "earth_science/solar-terms/cover.png",
+      "diagram_image": "earth_science/solar-terms/diagram.png",
+      "html_entry": "earth_science/solar-terms/index.html",
+      "source_filename": "T7zsuB02fZL5TUfz.html",
+      "tags": [
+        "earth_science"
+      ]
+    },
+    {
+      "name": "探索酒精增发的快慢",
+      "slug": "alcohol-evaporation",
+      "category": "mathematics",
+      "summary": "自由控制变量：\n风扇：点击可开启/关闭，开启后扇叶旋转，模拟加快空气流动。\n加热器：点击可开启/关闭，开启后发红光，模拟提高温度。",
+      "cover_image": "mathematics/alcohol-evaporation/cover.png",
+      "diagram_image": "mathematics/alcohol-evaporation/diagram.png",
+      "html_entry": "mathematics/alcohol-evaporation/index.html",
+      "source_filename": "mvXERWwcfLVIpqHi.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "潜望镜的原理",
+      "slug": "periscope",
+      "category": "other",
+      "summary": "它演示了光线是如何通过两个 45 度角的平面镜进行两次反射，从而将海面上的景象传递到水下的观察者眼中的。",
+      "cover_image": "other/periscope/cover.png",
+      "diagram_image": "other/periscope/diagram.png",
+      "html_entry": "other/periscope/index.html",
+      "source_filename": "7wYLDc0z8jH5dORK.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "种子萌芽条件",
+      "slug": "seed-germination",
+      "category": "biology",
+      "summary": "允许学生通过调整水分、空气、温度、光照、土壤等变量，观察对种子萌发率的影响",
+      "cover_image": "biology/seed-germination/cover.png",
+      "diagram_image": "biology/seed-germination/diagram.png",
+      "html_entry": "biology/seed-germination/index.html",
+      "source_filename": "PzvKUs3V6v8c2eyB.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "探究溶解的快慢",
+      "slug": "dissolution-speed",
+      "category": "chemistry",
+      "summary": "帮助学生理解影响溶解速度的三个主要因素：温度、颗粒大小、是否搅拌。",
+      "cover_image": "chemistry/dissolution-speed/cover.png",
+      "diagram_image": "chemistry/dissolution-speed/diagram.png",
+      "html_entry": "chemistry/dissolution-speed/index.html",
+      "source_filename": "mPjqFESIGEvWrV5X.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "定滑轮演示",
+      "slug": "fixed-pulley",
+      "category": "physics",
+      "summary": "定滑轮演示",
+      "cover_image": "physics/fixed-pulley/cover.png",
+      "diagram_image": "physics/fixed-pulley/diagram.png",
+      "html_entry": "physics/fixed-pulley/index.html",
+      "source_filename": "oeAXVj6cfYVShNyp.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "动滑轮演示",
+      "slug": "movable-pulley",
+      "category": "physics",
+      "summary": "动滑轮演示",
+      "cover_image": "physics/movable-pulley/cover.png",
+      "diagram_image": "physics/movable-pulley/diagram.png",
+      "html_entry": "physics/movable-pulley/index.html",
+      "source_filename": "mWav7PXYyyoutpcc.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "围长方形演示",
+      "slug": "rectangle-demo",
+      "category": "other",
+      "summary": "围长方形问题演示",
+      "cover_image": "other/rectangle-demo/cover.png",
+      "diagram_image": "other/rectangle-demo/diagram.png",
+      "html_entry": "other/rectangle-demo/index.html",
+      "source_filename": "JZDX5JlaqJdwDNLY.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "探究摩擦力大小的影响因素",
+      "slug": "friction-factors",
+      "category": "physics",
+      "summary": "模拟了真实的物理过程：先拉伸弹簧，当拉力大于摩擦力时，木块才会开始移动。",
+      "cover_image": "physics/friction-factors/cover.png",
+      "diagram_image": "physics/friction-factors/diagram.png",
+      "html_entry": "physics/friction-factors/index.html",
+      "source_filename": "nYAerVcAwQ3zuXHu.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "热传递的三种方式",
+      "slug": "heat-transfer",
+      "category": "physics",
+      "summary": "热可以从一个物体传递给另一个物体，或者从物体的一部分传递到另一部分。热传递的方式有三种，即热传导、热辐射、热对流。",
+      "cover_image": "physics/heat-transfer/cover.png",
+      "diagram_image": "physics/heat-transfer/diagram.png",
+      "html_entry": "physics/heat-transfer/index.html",
+      "source_filename": "Iu9l4duBG75SyyeM.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "视觉暂留现象",
+      "slug": "persistence-vision",
+      "category": "other",
+      "summary": "视觉暂留现象实验",
+      "cover_image": "other/persistence-vision/cover.png",
+      "diagram_image": "other/persistence-vision/diagram.png",
+      "html_entry": "other/persistence-vision/index.html",
+      "source_filename": "b25MAisB6gAywQGf.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "多力杠杆平衡演示",
+      "slug": "lever-balance",
+      "category": "physics",
+      "summary": "多力杠杆平衡演示",
+      "cover_image": "physics/lever-balance/cover.png",
+      "diagram_image": "physics/lever-balance/diagram.png",
+      "html_entry": "physics/lever-balance/index.html",
+      "source_filename": "oHsLN0fDBCpFT8fM.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "梁桥原理演示",
+      "slug": "beam-bridge",
+      "category": "other",
+      "summary": "梁桥原理演示",
+      "cover_image": "other/beam-bridge/cover.png",
+      "diagram_image": "other/beam-bridge/diagram.png",
+      "html_entry": "other/beam-bridge/index.html",
+      "source_filename": "U6DFGymlnLZ2p1uV.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "拱桥原理演示",
+      "slug": "arch-bridge",
+      "category": "other",
+      "summary": "拱桥原理演示",
+      "cover_image": "other/arch-bridge/cover.png",
+      "diagram_image": "other/arch-bridge/diagram.png",
+      "html_entry": "other/arch-bridge/index.html",
+      "source_filename": "kMuYXPGVNv8ZdQ6T.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "向上排气法",
+      "slug": "upward-air",
+      "category": "chemistry",
+      "summary": "向上排气法",
+      "cover_image": "chemistry/upward-air/cover.png",
+      "diagram_image": "chemistry/upward-air/diagram.png",
+      "html_entry": "chemistry/upward-air/index.html",
+      "source_filename": "1uKFmi0odueUl2Li.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "钢架桥受力原理",
+      "slug": "steel-bridge",
+      "category": "other",
+      "summary": "钢架桥受力原理",
+      "cover_image": "other/steel-bridge/cover.png",
+      "diagram_image": "other/steel-bridge/diagram.png",
+      "html_entry": "other/steel-bridge/index.html",
+      "source_filename": "p1VobZOSsM8TTCrb.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "排水集气法",
+      "slug": "water-displacement",
+      "category": "chemistry",
+      "summary": "排水集气法",
+      "cover_image": "chemistry/water-displacement/cover.png",
+      "diagram_image": "chemistry/water-displacement/diagram.png",
+      "html_entry": "chemistry/water-displacement/index.html",
+      "source_filename": "xpTr8IDZbS44fx1Q.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "悬索桥受理原理",
+      "slug": "suspension-bridge",
+      "category": "other",
+      "summary": "悬索桥受理原理",
+      "cover_image": "other/suspension-bridge/cover.png",
+      "diagram_image": "other/suspension-bridge/diagram.png",
+      "html_entry": "other/suspension-bridge/index.html",
+      "source_filename": "c0a0PNOb7Yhpnj6Y.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "斜拉桥受力演示",
+      "slug": "cable-bridge",
+      "category": "other",
+      "summary": "斜拉桥受力演示",
+      "cover_image": "other/cable-bridge/cover.png",
+      "diagram_image": "other/cable-bridge/diagram.png",
+      "html_entry": "other/cable-bridge/index.html",
+      "source_filename": "WHrdeHnvAoCwNl6J.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "星舰起飞返回3D模拟",
+      "slug": "starship-3d",
+      "category": "other",
+      "summary": "星舰起飞返回3D模拟",
+      "cover_image": "other/starship-3d/cover.png",
+      "diagram_image": "other/starship-3d/diagram.png",
+      "html_entry": "other/starship-3d/index.html",
+      "source_filename": "44hGwG33lcSRkMWz.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "飞机起飞作用力模拟",
+      "slug": "airplane-force",
+      "category": "other",
+      "summary": "飞机起飞作用力模拟",
+      "cover_image": "other/airplane-force/cover.png",
+      "diagram_image": "other/airplane-force/diagram.png",
+      "html_entry": "other/airplane-force/index.html",
+      "source_filename": "s5WRKrrrGtVYIVzh.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "工业制氧原理",
+      "slug": "oxygen-production",
+      "category": "chemistry",
+      "summary": "工业制氧原理：分离液态空气法",
+      "cover_image": "chemistry/oxygen-production/cover.png",
+      "diagram_image": "chemistry/oxygen-production/diagram.png",
+      "html_entry": "chemistry/oxygen-production/index.html",
+      "source_filename": "WZilbL7bRU8F7tbu.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "斜抛中的能量转化",
+      "slug": "oblique-energy",
+      "category": "other",
+      "summary": "斜抛中的能量转化",
+      "cover_image": "other/oblique-energy/cover.png",
+      "diagram_image": "other/oblique-energy/diagram.png",
+      "html_entry": "other/oblique-energy/index.html",
+      "source_filename": "1KDlGzWcc8Igoo9L.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "焦耳定律（电流热效应）实验",
+      "slug": "joule-law",
+      "category": "physics",
+      "summary": "焦耳定律（电流热效应）实验",
+      "cover_image": "physics/joule-law/cover.png",
+      "diagram_image": "physics/joule-law/diagram.png",
+      "html_entry": "physics/joule-law/index.html",
+      "source_filename": "OFWK8Qe1IhwLHBRK.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "四冲程汽油机工作原理演示",
+      "slug": "engine-4stroke",
+      "category": "other",
+      "summary": "四冲程汽油机工作原理演示",
+      "cover_image": "other/engine-4stroke/cover.png",
+      "diagram_image": "other/engine-4stroke/diagram.png",
+      "html_entry": "other/engine-4stroke/index.html",
+      "source_filename": "qJM3jlZPdiKANsyF.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "电铃工作原理演示",
+      "slug": "electric-bell",
+      "category": "other",
+      "summary": "电铃工作原理演示",
+      "cover_image": "other/electric-bell/cover.png",
+      "diagram_image": "other/electric-bell/diagram.png",
+      "html_entry": "other/electric-bell/index.html",
+      "source_filename": "4bEQo2G1e1EZabPT.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "中和反应",
+      "slug": "neutralization",
+      "category": "chemistry",
+      "summary": "中和反应",
+      "cover_image": "chemistry/neutralization/cover.png",
+      "diagram_image": "chemistry/neutralization/diagram.png",
+      "html_entry": "chemistry/neutralization/index.html",
+      "source_filename": "ywXPexpKHmjW4JDK.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "动能的影响因素",
+      "slug": "kinetic-energy",
+      "category": "other",
+      "summary": "动能的影响因素",
+      "cover_image": "other/kinetic-energy/cover.png",
+      "diagram_image": "other/kinetic-energy/diagram.png",
+      "html_entry": "other/kinetic-energy/index.html",
+      "source_filename": "4TMwwUJm898yBiGa.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "色光的混合",
+      "slug": "color-mixing",
+      "category": "physics",
+      "summary": "色光的混合",
+      "cover_image": "physics/color-mixing/cover.png",
+      "diagram_image": "physics/color-mixing/diagram.png",
+      "html_entry": "physics/color-mixing/index.html",
+      "source_filename": "DDbZRgbfUwBsVTeq.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "伽利略望远镜",
+      "slug": "galileo-telescope",
+      "category": "physics",
+      "summary": "伽利略望远镜",
+      "cover_image": "physics/galileo-telescope/cover.png",
+      "diagram_image": "physics/galileo-telescope/diagram.png",
+      "html_entry": "physics/galileo-telescope/index.html",
+      "source_filename": "J5Ir1C9zUjSqIH6A.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "模拟膈肌的运动",
+      "slug": "diaphragm",
+      "category": "biology",
+      "summary": "模拟膈肌的运动",
+      "cover_image": "biology/diaphragm/cover.png",
+      "diagram_image": "biology/diaphragm/diagram.png",
+      "html_entry": "biology/diaphragm/index.html",
+      "source_filename": "VlsficyDSW9MdSSr.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "开普勒望远镜",
+      "slug": "kepler-telescope",
+      "category": "physics",
+      "summary": "开普勒望远镜",
+      "cover_image": "physics/kepler-telescope/cover.png",
+      "diagram_image": "physics/kepler-telescope/diagram.png",
+      "html_entry": "physics/kepler-telescope/index.html",
+      "source_filename": "TBWjb12xKkBYI6NL.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "光学显微镜成像原理",
+      "slug": "microscope",
+      "category": "physics",
+      "summary": "光学显微镜成像原理",
+      "cover_image": "physics/microscope/cover.png",
+      "diagram_image": "physics/microscope/diagram.png",
+      "html_entry": "physics/microscope/index.html",
+      "source_filename": "BQPrQVtojEceTCHu.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "凸透镜成像",
+      "slug": "convex-lens",
+      "category": "physics",
+      "summary": "凸透镜成像",
+      "cover_image": "physics/convex-lens/cover.png",
+      "diagram_image": "physics/convex-lens/diagram.png",
+      "html_entry": "physics/convex-lens/index.html",
+      "source_filename": "d5mwzGCDPuC2ar9L.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "启普发生器",
+      "slug": "kipp-generator",
+      "category": "chemistry",
+      "summary": "启普发生器",
+      "cover_image": "chemistry/kipp-generator/cover.png",
+      "diagram_image": "chemistry/kipp-generator/diagram.png",
+      "html_entry": "chemistry/kipp-generator/index.html",
+      "source_filename": "EzKPaCprfN7lJxow.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "向下排气法",
+      "slug": "downward-air",
+      "category": "chemistry",
+      "summary": "向下排气法",
+      "cover_image": "chemistry/downward-air/cover.png",
+      "diagram_image": "chemistry/downward-air/diagram.png",
+      "html_entry": "chemistry/downward-air/index.html",
+      "source_filename": "CfTqLdpIB6qlFgtk.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "拉瓦锡实验",
+      "slug": "lavoisier",
+      "category": "chemistry",
+      "summary": "拉瓦锡实验",
+      "cover_image": "chemistry/lavoisier/cover.png",
+      "diagram_image": "chemistry/lavoisier/diagram.png",
+      "html_entry": "chemistry/lavoisier/index.html",
+      "source_filename": "jKFEPFQ7FRUBBSBi.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "用拼图表达整式运算",
+      "slug": "polynomial-puzzle",
+      "category": "mathematics",
+      "summary": "用拼图表达整式运算",
+      "cover_image": "mathematics/polynomial-puzzle/cover.png",
+      "diagram_image": "mathematics/polynomial-puzzle/diagram.png",
+      "html_entry": "mathematics/polynomial-puzzle/index.html",
+      "source_filename": "gsGjXvJxEm3xPlTL.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "月历中的数学",
+      "slug": "calendar-math",
+      "category": "physics",
+      "summary": "核心的数学探究功",
+      "cover_image": "physics/calendar-math/cover.png",
+      "diagram_image": "physics/calendar-math/diagram.png",
+      "html_entry": "physics/calendar-math/index.html",
+      "source_filename": "CDCQqPrmSPw67iVv.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "轴对称",
+      "slug": "axial-symmetry",
+      "category": "other",
+      "summary": "轴对称",
+      "cover_image": "other/axial-symmetry/cover.png",
+      "diagram_image": "other/axial-symmetry/diagram.png",
+      "html_entry": "other/axial-symmetry/index.html",
+      "source_filename": "RcOhNZB6iM4QAzbY.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "中心对称",
+      "slug": "central-symmetry",
+      "category": "other",
+      "summary": "中心对称",
+      "cover_image": "other/central-symmetry/cover.png",
+      "diagram_image": "other/central-symmetry/diagram.png",
+      "html_entry": "other/central-symmetry/index.html",
+      "source_filename": "8viI1B0iSp4KTMtk.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "坐标轴对称",
+      "slug": "axis-symmetry",
+      "category": "mathematics",
+      "summary": "坐标轴对称",
+      "cover_image": "mathematics/axis-symmetry/cover.png",
+      "diagram_image": "mathematics/axis-symmetry/diagram.png",
+      "html_entry": "mathematics/axis-symmetry/index.html",
+      "source_filename": "QB7DlSh01aMS3f4E.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "坐标表示平移",
+      "slug": "coordinate-translation",
+      "category": "mathematics",
+      "summary": "坐标表示平移",
+      "cover_image": "mathematics/coordinate-translation/cover.png",
+      "diagram_image": "mathematics/coordinate-translation/diagram.png",
+      "html_entry": "mathematics/coordinate-translation/index.html",
+      "source_filename": "z3PEXr56eEQzG0lp.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "正切",
+      "slug": "tangent",
+      "category": "mathematics",
+      "summary": "正切",
+      "cover_image": "mathematics/tangent/cover.png",
+      "diagram_image": "mathematics/tangent/diagram.png",
+      "html_entry": "mathematics/tangent/index.html",
+      "source_filename": "EshQDqk9658IV3xS.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "正弦和余弦",
+      "slug": "sine-cosine",
+      "category": "mathematics",
+      "summary": "正弦和余弦",
+      "cover_image": "mathematics/sine-cosine/cover.png",
+      "diagram_image": "mathematics/sine-cosine/diagram.png",
+      "html_entry": "mathematics/sine-cosine/index.html",
+      "source_filename": "r861uBY0vFjXirZq.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "作三角形的外接圆",
+      "slug": "circumcircle",
+      "category": "mathematics",
+      "summary": "作三角形的外接圆",
+      "cover_image": "mathematics/circumcircle/cover.png",
+      "diagram_image": "mathematics/circumcircle/diagram.png",
+      "html_entry": "mathematics/circumcircle/index.html",
+      "source_filename": "qESpvrUA8IeHCkfQ.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "作三角形的内切圆",
+      "slug": "incircle",
+      "category": "mathematics",
+      "summary": "作三角形的内切圆",
+      "cover_image": "mathematics/incircle/cover.png",
+      "diagram_image": "mathematics/incircle/diagram.png",
+      "html_entry": "mathematics/incircle/index.html",
+      "source_filename": "LcpaQ86YEYfoTNcL.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "图形的平移",
+      "slug": "translation",
+      "category": "mathematics",
+      "summary": "教学设计思路：\n视觉对应：\n为了区分“原像”和“像”，原始三角形使用了半透明白色，而平移后的三角形使用了亮青色（Cyan），与截图保持一致。这有助于学生区分 AA 和 A′A ′ 。连接线使用了虚线，",
+      "cover_image": "mathematics/translation/cover.png",
+      "diagram_image": "mathematics/translation/diagram.png",
+      "html_entry": "mathematics/translation/index.html",
+      "source_filename": "f0uWIDQtaUIL6amW.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "平行线被折线所截",
+      "slug": "parallel-lines",
+      "category": "other",
+      "summary": "教学演示建议：\n第一步：隐藏辅助线\n取消勾选“显示辅助线”。\n让学生观察折线 \n∠\nC\n∠C\n（拐点角）与上下两个角 \n∠\nA\n,\n∠\nB\n∠A,∠B\n 的关系。这时候很难直接看出来。\n第二步：引入辅",
+      "cover_image": "other/parallel-lines/cover.png",
+      "diagram_image": "other/parallel-lines/diagram.png",
+      "html_entry": "other/parallel-lines/index.html",
+      "source_filename": "YA9NOBsNUVifHvQ9.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "三角形的内切圆与外接圆",
+      "slug": "incircle-circumcircle",
+      "category": "physics",
+      "summary": "核心教学功能\n对比观察：可以同时显示或单独显示内切圆与外接圆，帮助学生区分两者的定义。\n位置关系演示：\n外心 (Circumcenter)：观察锐角、直角、钝角三角形时，外心如何从内部移动到斜边，再移",
+      "cover_image": "physics/incircle-circumcircle/cover.png",
+      "diagram_image": "physics/incircle-circumcircle/diagram.png",
+      "html_entry": "physics/incircle-circumcircle/index.html",
+      "source_filename": "3Vq7NIjac4loZdi2.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "不等式的性质：用天平模拟不等关系",
+      "slug": "inequality-balance",
+      "category": "chemistry",
+      "summary": "教学设计亮点\n视觉反馈（Visual Feedback）：\n颜色编码：正数为红色，负数为蓝色，与底部按钮颜色呼应，强化学生对“正/负”操作的区别记忆。\n交互逻辑（Interaction Logic）：",
+      "cover_image": "chemistry/inequality-balance/cover.png",
+      "diagram_image": "chemistry/inequality-balance/diagram.png",
+      "html_entry": "chemistry/inequality-balance/index.html",
+      "source_filename": "0xlbFOExI04CVVOY.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "三角形的分类：按边分",
+      "slug": "triangle-classification",
+      "category": "mathematics",
+      "summary": "教学设计思路\n数值显示：代码中将屏幕像素值除以 20 并保留一位小数（toFixed(1)），使得显示的数值（如 15.2, 25.0）更符合教材中的几何题风格，避免了直接显示几百像素的突兀感。\n判定",
+      "cover_image": "mathematics/triangle-classification/cover.png",
+      "diagram_image": "mathematics/triangle-classification/diagram.png",
+      "html_entry": "mathematics/triangle-classification/index.html",
+      "source_filename": "CABRovymOSRt4JHx.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "两圆的位置关系与公切线",
+      "slug": "circles-position",
+      "category": "mathematics",
+      "summary": "教学设计亮点\n几何直观性：\n切线使用了白色无限长线段的视觉效果，符合数学中“直线”的定义，让学生直观感受到切线在远处的延伸。\n在切点处画了极小的白点，帮助学生定位切点位置。\n容差处理：\n在判断“外切”",
+      "cover_image": "mathematics/circles-position/cover.png",
+      "diagram_image": "mathematics/circles-position/diagram.png",
+      "html_entry": "mathematics/circles-position/index.html",
+      "source_filename": "84Z0KYtn8CbKr71G.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "三角形的高、中线与角平分线",
+      "slug": "triangle-lines",
+      "category": "mathematics",
+      "summary": "????? 老师备课提示 (Teacher's Notes)\n在演示时，您可以按照以下步骤进行，效果最佳：\n展示一般情况：\n打开网页，默认显示一个不等边三角形。\n向学生展示：从顶点 B 出发，蓝色的高",
+      "cover_image": "mathematics/triangle-lines/cover.png",
+      "diagram_image": "mathematics/triangle-lines/diagram.png",
+      "html_entry": "mathematics/triangle-lines/index.html",
+      "source_filename": "KlS4KJKvzCtb7BZp.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "车轮中的数学道理",
+      "slug": "wheel-math",
+      "category": "mathematics",
+      "summary": "教学设计说明：\n几何算法还原（Mathematical Fidelity）：\n代码没有简单地让正方形“飘”过去，而是通过算法计算了旋转角度与中心高度的关系。\n正方形：你会看到它在角落着地时中心最高，在",
+      "cover_image": "mathematics/wheel-math/cover.png",
+      "diagram_image": "mathematics/wheel-math/diagram.png",
+      "html_entry": "mathematics/wheel-math/index.html",
+      "source_filename": "kQohag8h7gyPXbvB.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "一次函数的应用：追及问题",
+      "slug": "linear-chase",
+      "category": "mathematics",
+      "summary": "教学设计思路\n函数图像的 \"V\" 型解析：\n通过左侧图像，学生可以清晰看到图像在 t=4 处“触底反弹”。配合右侧动画，当 t=4 时，A车正好与B车位置重合（红色圆点覆盖黄色圆点），直观解释了为什么",
+      "cover_image": "mathematics/linear-chase/cover.png",
+      "diagram_image": "mathematics/linear-chase/diagram.png",
+      "html_entry": "mathematics/linear-chase/index.html",
+      "source_filename": "30AfZs8oi0TRvvLM.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "双线段最值探究",
+      "slug": "segment-extreme",
+      "category": "mathematics",
+      "summary": "教学设计思路\n视觉重点：\n我特意将线段 CE\n 设为明亮的黄色，与蓝色的背景图形形成高对比，确保学生的注意力集中在“动线段”上。\n保留了截图中的虚线对角线 AC，这通常是此类题目（如将军饮马、最短路径",
+      "cover_image": "mathematics/segment-extreme/cover.png",
+      "diagram_image": "mathematics/segment-extreme/diagram.png",
+      "html_entry": "mathematics/segment-extreme/index.html",
+      "source_filename": "DzXcTjEngRZKk0Tq.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "一次函数的应用：相遇问题可视化",
+      "slug": "linear-meeting",
+      "category": "mathematics",
+      "summary": "点击“播放演示”，让学生观察图象上的点与实际物体运动的一一对应关系。\n强调：图象下降代表距离减小（相向而行），图象上升代表距离增大（相遇后背向而行）。",
+      "cover_image": "mathematics/linear-meeting/cover.png",
+      "diagram_image": "mathematics/linear-meeting/diagram.png",
+      "html_entry": "mathematics/linear-meeting/index.html",
+      "source_filename": "41rzzOHhxC48N6VE.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "函数的应用：异速双动点 (面积问题)",
+      "slug": "moving-points",
+      "category": "mathematics",
+      "summary": "函数的应用：异速双动点 (面积问题)",
+      "cover_image": "mathematics/moving-points/cover.png",
+      "diagram_image": "mathematics/moving-points/diagram.png",
+      "html_entry": "mathematics/moving-points/index.html",
+      "source_filename": "8sTmNtPLNaHusXRv.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "三角形中位线定理：旋转变换证明",
+      "slug": "midline-theorem",
+      "category": "physics",
+      "summary": "功能特点：\n动态旋转：拖动滑块，可以看到 △ADE绕点 E 旋转并与 △CQE\n 重合的过程。几何标记：自动标注相等线段（单杠、双杠），辅助学生理解全等关系。平行四边形可视化：旋转到位后，自动高亮显示",
+      "cover_image": "physics/midline-theorem/cover.png",
+      "diagram_image": "physics/midline-theorem/diagram.png",
+      "html_entry": "physics/midline-theorem/index.html",
+      "source_filename": "PMGLAU9dptAgx244.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "三角形的边角关系：大边对大角",
+      "slug": "side-angle-relation",
+      "category": "physics",
+      "summary": "核心功能：\n任意拖拽：你可以拖动顶点 A，实时改变三角形的形状。\n实时数据：边长和角度会随着拖动实时计算并显示在图上。\n可视化反馈：\n大边对大角：系统会自动判断并高亮显示最大的角和最长的边（文字加粗变",
+      "cover_image": "physics/side-angle-relation/cover.png",
+      "diagram_image": "physics/side-angle-relation/diagram.png",
+      "html_entry": "physics/side-angle-relation/index.html",
+      "source_filename": "4ZkFUXFUJpfIQ5Vq.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "生活中的几何体 (集装箱)",
+      "slug": "container-geometry",
+      "category": "physics",
+      "summary": "核心功能特点：\n虚实对比滑块：中间有一个可拖动的滑块（播放按钮图标），向左拖动显示“实物图”，向右拖动显示“几何抽象图（长方体）”。\n纯代码生成：为了防止图片链接失效，我用 SVG 和 CSS 手绘了",
+      "cover_image": "physics/container-geometry/cover.png",
+      "diagram_image": "physics/container-geometry/diagram.png",
+      "html_entry": "physics/container-geometry/index.html",
+      "source_filename": "53uXGajGW4iNCDmQ.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "生活中的几何体 (金字塔)",
+      "slug": "pyramid-geometry",
+      "category": "mathematics",
+      "summary": "核心亮点：\n零素材依赖：为了确保教具永久可用且加载极快，其中的“金字塔实拍图”并非引用外部图片，而是完全使用 SVG 滤镜（feTurbulence）和渐变代码绘制的。它模拟了岩石纹理、光照阴影和沙漠",
+      "cover_image": "mathematics/pyramid-geometry/cover.png",
+      "diagram_image": "mathematics/pyramid-geometry/diagram.png",
+      "html_entry": "mathematics/pyramid-geometry/index.html",
+      "source_filename": "1hah2auBTGUfigW5.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "交通拥堵仿真系统",
+      "slug": "traffic-sim",
+      "category": "other",
+      "summary": "交通拥堵仿真系统",
+      "cover_image": "other/traffic-sim/cover.png",
+      "diagram_image": "other/traffic-sim/diagram.png",
+      "html_entry": "other/traffic-sim/index.html",
+      "source_filename": "Km22YmY6vKqzNCFt.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "仿真城市构建活动",
+      "slug": "city-building",
+      "category": "other",
+      "summary": "仿真城市构建活动",
+      "cover_image": "other/city-building/cover.png",
+      "diagram_image": "other/city-building/diagram.png",
+      "html_entry": "other/city-building/index.html",
+      "source_filename": "8zBNogTjSifFjRpX.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "非洲大草原",
+      "slug": "african-savannah",
+      "category": "other",
+      "summary": "非洲大草原",
+      "cover_image": "other/african-savannah/cover.png",
+      "diagram_image": "other/african-savannah/diagram.png",
+      "html_entry": "other/african-savannah/index.html",
+      "source_filename": "TokP6n25LjaL4Qfo.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "直列四缸引擎仿真",
+      "slug": "engine-inline4",
+      "category": "other",
+      "summary": "观察直列四缸引擎仿真",
+      "cover_image": "other/engine-inline4/cover.png",
+      "diagram_image": "other/engine-inline4/diagram.png",
+      "html_entry": "other/engine-inline4/index.html",
+      "source_filename": "icBA4p6SgnRRuTdj.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "城市电网构建",
+      "slug": "power-grid",
+      "category": "other",
+      "summary": "城市电网构建",
+      "cover_image": "other/power-grid/cover.png",
+      "diagram_image": "other/power-grid/diagram.png",
+      "html_entry": "other/power-grid/index.html",
+      "source_filename": "tT8Cl9VwF0qiehqt.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "自然、生命、科学炼金术",
+      "slug": "science-alchemy",
+      "category": "other",
+      "summary": "科学趣味游戏",
+      "cover_image": "other/science-alchemy/cover.png",
+      "diagram_image": "other/science-alchemy/diagram.png",
+      "html_entry": "other/science-alchemy/index.html",
+      "source_filename": "vNDqmhQZFyJD65l6.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "拍立得照片墙",
+      "slug": "polaroid-wall",
+      "category": "other",
+      "summary": "拍立得照片墙，记录快乐",
+      "cover_image": "other/polaroid-wall/cover.png",
+      "diagram_image": "other/polaroid-wall/diagram.png",
+      "html_entry": "other/polaroid-wall/index.html",
+      "source_filename": "2MRdcpAjw1V6ofZR.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "橡皮人混音器",
+      "slug": "rubber-mixer",
+      "category": "other",
+      "summary": "红色 (Beats)：底鼓、军鼓、拍手声。\n绿色 (Effects)：和弦、铃声。\n蓝色 (Melody)：贝斯、琶音。\n黄色 (Vocals)：合成人声。",
+      "cover_image": "other/rubber-mixer/cover.png",
+      "diagram_image": "other/rubber-mixer/diagram.png",
+      "html_entry": "other/rubber-mixer/index.html",
+      "source_filename": "C9s5oHTs2vJeVutF.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "摆姿势通关游戏",
+      "slug": "pose-game",
+      "category": "other",
+      "summary": "把动作通关",
+      "cover_image": "other/pose-game/cover.png",
+      "diagram_image": "other/pose-game/diagram.png",
+      "html_entry": "other/pose-game/index.html",
+      "source_filename": "4pAJkGX1h4hx1gkv.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "汉字田字格带笔画",
+      "slug": "chinese-grid",
+      "category": "general_science",
+      "summary": "汉字田字格带笔画",
+      "cover_image": "general_science/chinese-grid/cover.png",
+      "diagram_image": "general_science/chinese-grid/diagram.png",
+      "html_entry": "general_science/chinese-grid/index.html",
+      "source_filename": "lBp9lbdAN63IFQjG.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "广义相对论",
+      "slug": "general-relativity",
+      "category": "other",
+      "summary": "广义相对论",
+      "cover_image": "other/general-relativity/cover.png",
+      "diagram_image": "other/general-relativity/diagram.png",
+      "html_entry": "other/general-relativity/index.html",
+      "source_filename": "47b31fGclWqUBo79.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "航空发动机3D",
+      "slug": "aircraft-engine",
+      "category": "physics",
+      "summary": "航空发动机3D",
+      "cover_image": "physics/aircraft-engine/cover.png",
+      "diagram_image": "physics/aircraft-engine/diagram.png",
+      "html_entry": "physics/aircraft-engine/index.html",
+      "source_filename": "jcq8sUZddk0lPPe4.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "电路原理交互演示",
+      "slug": "circuit-demo",
+      "category": "physics",
+      "summary": "电路原理交互演示",
+      "cover_image": "physics/circuit-demo/cover.png",
+      "diagram_image": "physics/circuit-demo/diagram.png",
+      "html_entry": "physics/circuit-demo/index.html",
+      "source_filename": "Pt8KPHFUmpwtgHHM.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "垃圾分类小游戏",
+      "slug": "garbage-sorting",
+      "category": "other",
+      "summary": "垃圾分类小游戏",
+      "cover_image": "other/garbage-sorting/cover.png",
+      "diagram_image": "other/garbage-sorting/diagram.png",
+      "html_entry": "other/garbage-sorting/index.html",
+      "source_filename": "R0yAp3EL08FdT5fz.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "几何画板小工具",
+      "slug": "geometry-sketchpad",
+      "category": "mathematics",
+      "summary": "几何画板小工具",
+      "cover_image": "mathematics/geometry-sketchpad/cover.png",
+      "diagram_image": "mathematics/geometry-sketchpad/diagram.png",
+      "html_entry": "mathematics/geometry-sketchpad/index.html",
+      "source_filename": "UgRLj0OUu6Nbg9Vw.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "物质的变化：微观世界探索器",
+      "slug": "matter-change",
+      "category": "other",
+      "summary": "物质的变化：微观世界探索器",
+      "cover_image": "other/matter-change/cover.png",
+      "diagram_image": "other/matter-change/diagram.png",
+      "html_entry": "other/matter-change/index.html",
+      "source_filename": "ptlRNXefa6U5xZoz.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "摩斯密码模拟器",
+      "slug": "morse-code",
+      "category": "other",
+      "summary": "摩斯密码模拟器",
+      "cover_image": "other/morse-code/cover.png",
+      "diagram_image": "other/morse-code/diagram.png",
+      "html_entry": "other/morse-code/index.html",
+      "source_filename": "lhiUiSCZGeRLSezb.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "Dinner Time",
+      "slug": "dinner-time",
+      "category": "other",
+      "summary": "有声场景互动",
+      "cover_image": "other/dinner-time/cover.png",
+      "diagram_image": "other/dinner-time/diagram.png",
+      "html_entry": "other/dinner-time/index.html",
+      "source_filename": "X783kjQ4kS0B6Muo.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "Happy Zoo",
+      "slug": "happy-zoo",
+      "category": "other",
+      "summary": "有声场景互动",
+      "cover_image": "other/happy-zoo/cover.png",
+      "diagram_image": "other/happy-zoo/diagram.png",
+      "html_entry": "other/happy-zoo/index.html",
+      "source_filename": "Vk9s1r0gEnTyjJ6w.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "安静养小树",
+      "slug": "grow-tree",
+      "category": "other",
+      "summary": "安静养小树",
+      "cover_image": "other/grow-tree/cover.png",
+      "diagram_image": "other/grow-tree/diagram.png",
+      "html_entry": "other/grow-tree/index.html",
+      "source_filename": "GooNIDTgEhmChPGR.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "气球与静电",
+      "slug": "balloon-static",
+      "category": "physics",
+      "summary": "气球与静电",
+      "cover_image": "physics/balloon-static/cover.png",
+      "diagram_image": "physics/balloon-static/diagram.png",
+      "html_entry": "physics/balloon-static/index.html",
+      "source_filename": "bNTZBEnDRMJLGidd.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "快乐钢琴-创编乐园",
+      "slug": "happy-piano",
+      "category": "other",
+      "summary": "快乐钢琴-创编乐园",
+      "cover_image": "other/happy-piano/cover.png",
+      "diagram_image": "other/happy-piano/diagram.png",
+      "html_entry": "other/happy-piano/index.html",
+      "source_filename": "tr2WTaxLStZxJg9q.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "架子鼓--创编乐园",
+      "slug": "drum-kit",
+      "category": "other",
+      "summary": "架子鼓--创编乐园",
+      "cover_image": "other/drum-kit/cover.png",
+      "diagram_image": "other/drum-kit/diagram.png",
+      "html_entry": "other/drum-kit/index.html",
+      "source_filename": "6q99SARZAnyocmWF.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "大提琴",
+      "slug": "cello",
+      "category": "other",
+      "summary": "大提琴，音乐创编",
+      "cover_image": "other/cello/cover.png",
+      "diagram_image": "other/cello/diagram.png",
+      "html_entry": "other/cello/index.html",
+      "source_filename": "MGjUFjGiGcuNhFSU.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "卡宏鼓",
+      "slug": "cajon",
+      "category": "other",
+      "summary": "卡宏鼓",
+      "cover_image": "other/cajon/cover.png",
+      "diagram_image": "other/cajon/diagram.png",
+      "html_entry": "other/cajon/index.html",
+      "source_filename": "51823WftSpMERsvj.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "微波原理：宏观与微观同步演示",
+      "slug": "microwave",
+      "category": "other",
+      "summary": "微波原理：宏观与微观同步演示",
+      "cover_image": "other/microwave/cover.png",
+      "diagram_image": "other/microwave/diagram.png",
+      "html_entry": "other/microwave/index.html",
+      "source_filename": "u8W5Nu7nLu5rRUE0.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "流程图画板",
+      "slug": "flowchart",
+      "category": "general_science",
+      "summary": "流程图画板",
+      "cover_image": "general_science/flowchart/cover.png",
+      "diagram_image": "general_science/flowchart/diagram.png",
+      "html_entry": "general_science/flowchart/index.html",
+      "source_filename": "uWGUv4Uoh8VpJatp.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "FPV模拟器",
+      "slug": "fpv-sim",
+      "category": "other",
+      "summary": "FPV模拟器",
+      "cover_image": "other/fpv-sim/cover.png",
+      "diagram_image": "other/fpv-sim/diagram.png",
+      "html_entry": "other/fpv-sim/index.html",
+      "source_filename": "GU3V4rEQuC9Rp00c.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "简易版贾维斯效果",
+      "slug": "jarvis-effect",
+      "category": "other",
+      "summary": "简易版贾维斯效果",
+      "cover_image": "other/jarvis-effect/cover.png",
+      "diagram_image": "other/jarvis-effect/diagram.png",
+      "html_entry": "other/jarvis-effect/index.html",
+      "source_filename": "mDWGlpqpJApa8006.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "斯特鲁普效应测试",
+      "slug": "stroop-test",
+      "category": "physics",
+      "summary": "直观性强：学生一玩就知道“脑子卡壳”是什么感觉，比单纯讲理论生动得多。\n竞争性：有分数和倒计时，适合在班级里让几个同学比赛，或者全班一起玩（看谁分高）。\n教育意义：\n小学阶段：可以解释为“习惯”的力量",
+      "cover_image": "physics/stroop-test/cover.png",
+      "diagram_image": "physics/stroop-test/diagram.png",
+      "html_entry": "physics/stroop-test/index.html",
+      "source_filename": "dFRo3LKYO467zB2i.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "瞬时记忆矩阵 (The Memory Matrix)",
+      "slug": "memory-matrix",
+      "category": "mathematics",
+      "summary": "理论依据：\n工作记忆容量：著名的心理学家乔治·米勒提出**“神奇的数字 7±2”**，认为人的短时记忆容量是非常有限的，大约只能同时处理 5 到 9 个组块。\n游戏的心理学价值：\n工作记忆的瓶颈：\n在",
+      "cover_image": "mathematics/memory-matrix/cover.png",
+      "diagram_image": "mathematics/memory-matrix/diagram.png",
+      "html_entry": "mathematics/memory-matrix/index.html",
+      "source_filename": "9A3kSJia3Brwfe9k.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "游戏名称：外星人猎手 (Alien Hunter)",
+      "slug": "alien-hunter",
+      "category": "mathematics",
+      "summary": "核心玩法：\n玩家需要在满屏的图形中找到唯一的“目标外星人”。\n第一阶段（简单）：外星人颜色很特别，一眼就能看见。\n第二阶段（困难）：外星人和周围的人长得很像，必须仔细找。\n\n理论依据：\n平行加工 (P",
+      "cover_image": "mathematics/alien-hunter/cover.png",
+      "diagram_image": "mathematics/alien-hunter/diagram.png",
+      "html_entry": "mathematics/alien-hunter/index.html",
+      "source_filename": "Ix0Mzs8K4aRnpule.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "游戏名称：规则破壁者 (The Rule Breaker)",
+      "slug": "rule-breaker",
+      "category": "physics",
+      "summary": "戏名称：规则破壁者 (The Rule Breaker)\n适合人群：15岁以上（特别是想测试自己逻辑变通能力的人）。\n核心玩法：\n屏幕上方有4张“参考牌”，每张牌有不同的颜色、形状和数量。\n玩家手中有",
+      "cover_image": "physics/rule-breaker/cover.png",
+      "diagram_image": "physics/rule-breaker/diagram.png",
+      "html_entry": "physics/rule-breaker/index.html",
+      "source_filename": "BYO1bhBqehwIjZ6t.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "游戏：Emoji 召唤师 (Mini Scribblenauts)",
+      "slug": "emoji-summoner",
+      "category": "other",
+      "summary": "游戏：Emoji 召唤师 (Mini Scribblenauts)\n这是一个单文件 HTML 游戏。你可以直接保存并在浏览器运行。\n核心玩法：\n控制小人（WASD 或 箭头键）移动。\n目标是拿到高处的",
+      "cover_image": "other/emoji-summoner/cover.png",
+      "diagram_image": "other/emoji-summoner/diagram.png",
+      "html_entry": "other/emoji-summoner/index.html",
+      "source_filename": "7zHPcRLQIq6be3AI.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "TPR（全身反应法）动作骰子",
+      "slug": "tpr-dice",
+      "category": "chemistry",
+      "summary": "????? 教学建议：如何使用这个教具\n热身环节 (Warm-up)：\n直接使用默认词库。\n让全班起立，老师点击 ROLL!，全班一起做动作。\n例子： 骰子出现 \"Swim\" + \"Like a ro",
+      "cover_image": "chemistry/tpr-dice/cover.png",
+      "diagram_image": "chemistry/tpr-dice/diagram.png",
+      "html_entry": "chemistry/tpr-dice/index.html",
+      "source_filename": "vl3Jkz3tAVxtFH0W.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "火柴棍数学",
+      "slug": "matchstick-math",
+      "category": "mathematics",
+      "summary": "火柴棍数学",
+      "cover_image": "mathematics/matchstick-math/cover.png",
+      "diagram_image": "mathematics/matchstick-math/diagram.png",
+      "html_entry": "mathematics/matchstick-math/index.html",
+      "source_filename": "oFe1uuqyVafWztVk.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "二维码生成器",
+      "slug": "qr-generator",
+      "category": "general_science",
+      "summary": "配合二维码伴我生活",
+      "cover_image": "general_science/qr-generator/cover.png",
+      "diagram_image": "general_science/qr-generator/diagram.png",
+      "html_entry": "general_science/qr-generator/index.html",
+      "source_filename": "yPaSh9CD7CQUICna.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "AR-星空大师",
+      "slug": "ar-starry-sky",
+      "category": "chemistry",
+      "summary": "“魔法”手势：\n?? 召唤红心 (双手)\n动作：将左右手的大拇指指尖对齐，食指指尖对齐，做出经典的“比心”动作。\n效果：所有粒子会变成红色，迅速汇聚成一个在两手中间跳动的心形。\n? 召唤黑洞 (单手)",
+      "cover_image": "chemistry/ar-starry-sky/cover.png",
+      "diagram_image": "chemistry/ar-starry-sky/diagram.png",
+      "html_entry": "chemistry/ar-starry-sky/index.html",
+      "source_filename": "FWZtXDWo5cOIbyTY.html",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "name": "封面制作工坊",
+      "slug": "cover-maker",
+      "category": "other",
+      "summary": "封面制作工坊",
+      "cover_image": "other/cover-maker/cover.png",
+      "diagram_image": "other/cover-maker/diagram.png",
+      "html_entry": "other/cover-maker/index.html",
+      "source_filename": "q6ZOoRnJAS5cxT0P.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "圣诞节快乐",
+      "slug": "christmas",
+      "category": "other",
+      "summary": "圣诞节快乐",
+      "cover_image": "other/christmas/cover.png",
+      "diagram_image": "other/christmas/diagram.png",
+      "html_entry": "other/christmas/index.html",
+      "source_filename": "xK6bgPPIKAPlHP5n.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "华容道（新）",
+      "slug": "klotski-new",
+      "category": "mathematics",
+      "summary": "华容道（新）",
+      "cover_image": "mathematics/klotski-new/cover.png",
+      "diagram_image": "mathematics/klotski-new/diagram.png",
+      "html_entry": "mathematics/klotski-new/index.html",
+      "source_filename": "16O9giT7StZbVJET.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "生态平衡模拟器",
+      "slug": "ecology-balance",
+      "category": "biology",
+      "summary": "生态平衡模拟器",
+      "cover_image": "biology/ecology-balance/cover.png",
+      "diagram_image": "biology/ecology-balance/diagram.png",
+      "html_entry": "biology/ecology-balance/index.html",
+      "source_filename": "DkQNDP9x2vGluXnx.html",
+      "tags": [
+        "biology"
+      ]
+    },
+    {
+      "name": "角的度量演示器",
+      "slug": "angle-measure",
+      "category": "other",
+      "summary": "角的度量演示器",
+      "cover_image": "other/angle-measure/cover.png",
+      "diagram_image": "other/angle-measure/diagram.png",
+      "html_entry": "other/angle-measure/index.html",
+      "source_filename": "E03fuQAC3ejKFGKX.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "长方形与正方形演示器",
+      "slug": "rectangle-square",
+      "category": "mathematics",
+      "summary": "小学三年级，长方形与正方形演示器，演示周长和面积的关系",
+      "cover_image": "mathematics/rectangle-square/cover.png",
+      "diagram_image": "mathematics/rectangle-square/diagram.png",
+      "html_entry": "mathematics/rectangle-square/index.html",
+      "source_filename": "7G7HeBDXju92g6X8.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "提词器--专业版",
+      "slug": "teleprompter",
+      "category": "general_science",
+      "summary": "提示词工具",
+      "cover_image": "general_science/teleprompter/cover.png",
+      "diagram_image": "general_science/teleprompter/diagram.png",
+      "html_entry": "general_science/teleprompter/index.html",
+      "source_filename": "BdAqCmLMNIQlECuG.html",
+      "tags": [
+        "general_science"
+      ]
+    },
+    {
+      "name": "钟琴",
+      "slug": "glockenspiel",
+      "category": "other",
+      "summary": "钟琴",
+      "cover_image": "other/glockenspiel/cover.png",
+      "diagram_image": "other/glockenspiel/diagram.png",
+      "html_entry": "other/glockenspiel/index.html",
+      "source_filename": "6FKRxtfP0bhKu9PJ.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "三角铁",
+      "slug": "triangle",
+      "category": "other",
+      "summary": "三角铁",
+      "cover_image": "other/triangle/cover.png",
+      "diagram_image": "other/triangle/diagram.png",
+      "html_entry": "other/triangle/index.html",
+      "source_filename": "w4V4gnXqWe2HqlbW.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "双响筒",
+      "slug": "double-tone",
+      "category": "other",
+      "summary": "双响筒",
+      "cover_image": "other/double-tone/cover.png",
+      "diagram_image": "other/double-tone/diagram.png",
+      "html_entry": "other/double-tone/index.html",
+      "source_filename": "UfmxUgRsmf33OEmi.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "时钟教具",
+      "slug": "clock-teaching",
+      "category": "other",
+      "summary": "时钟教具",
+      "cover_image": "other/clock-teaching/cover.png",
+      "diagram_image": "other/clock-teaching/diagram.png",
+      "html_entry": "other/clock-teaching/index.html",
+      "source_filename": "CNZuT1sQ1RDt5oN1.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "英语单词连连看",
+      "slug": "english-matching",
+      "category": "other",
+      "summary": "英语单词连连看",
+      "cover_image": "other/english-matching/cover.png",
+      "diagram_image": "other/english-matching/diagram.png",
+      "html_entry": "other/english-matching/index.html",
+      "source_filename": "VW33gSEgpxwBD5ic.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "英文连连看-听力版",
+      "slug": "english-matching-listen",
+      "category": "other",
+      "summary": "英文连连看-听力版",
+      "cover_image": "other/english-matching-listen/cover.png",
+      "diagram_image": "other/english-matching-listen/diagram.png",
+      "html_entry": "other/english-matching-listen/index.html",
+      "source_filename": "c6cU5yt6aSAM1NJ7.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "拼图游戏--触屏版",
+      "slug": "puzzle-touch",
+      "category": "mathematics",
+      "summary": "拼图游戏--触屏版",
+      "cover_image": "mathematics/puzzle-touch/cover.png",
+      "diagram_image": "mathematics/puzzle-touch/diagram.png",
+      "html_entry": "mathematics/puzzle-touch/index.html",
+      "source_filename": "rjXycC8bsDiPJ7vG.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "长方体滚动印图演示",
+      "slug": "cuboid-rolling",
+      "category": "other",
+      "summary": "长方体滚动印图演示",
+      "cover_image": "other/cuboid-rolling/cover.png",
+      "diagram_image": "other/cuboid-rolling/diagram.png",
+      "html_entry": "other/cuboid-rolling/index.html",
+      "source_filename": "AESTyRnDpaPwyYgp.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "五子棋",
+      "slug": "gomoku",
+      "category": "mathematics",
+      "summary": "五子棋",
+      "cover_image": "mathematics/gomoku/cover.png",
+      "diagram_image": "mathematics/gomoku/diagram.png",
+      "html_entry": "mathematics/gomoku/index.html",
+      "source_filename": "InPMzrh5h7WTovII.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "国际象棋",
+      "slug": "chess",
+      "category": "mathematics",
+      "summary": "国际象棋",
+      "cover_image": "mathematics/chess/cover.png",
+      "diagram_image": "mathematics/chess/diagram.png",
+      "html_entry": "mathematics/chess/index.html",
+      "source_filename": "nxAdSctgjY8gGHfH.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "中国象棋",
+      "slug": "chinese-chess",
+      "category": "mathematics",
+      "summary": "中国象棋",
+      "cover_image": "mathematics/chinese-chess/cover.png",
+      "diagram_image": "mathematics/chinese-chess/diagram.png",
+      "html_entry": "mathematics/chinese-chess/index.html",
+      "source_filename": "tiqk5qM4vuuW9kYn.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "井字棋",
+      "slug": "tic-tac-toe",
+      "category": "other",
+      "summary": "井字棋",
+      "cover_image": "other/tic-tac-toe/cover.png",
+      "diagram_image": "other/tic-tac-toe/diagram.png",
+      "html_entry": "other/tic-tac-toe/index.html",
+      "source_filename": "DEYLNN6I544xXu45.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "探究太阳能小车速度因素",
+      "slug": "solar-car",
+      "category": "earth_science",
+      "summary": "探究太阳能小车速度因素",
+      "cover_image": "earth_science/solar-car/cover.png",
+      "diagram_image": "earth_science/solar-car/diagram.png",
+      "html_entry": "earth_science/solar-car/index.html",
+      "source_filename": "Zi4qO1atBtgZ2jzA.html",
+      "tags": [
+        "earth_science"
+      ]
+    },
+    {
+      "name": "数学游园会",
+      "slug": "math-carnival",
+      "category": "mathematics",
+      "summary": "数学游园会",
+      "cover_image": "mathematics/math-carnival/cover.png",
+      "diagram_image": "mathematics/math-carnival/diagram.png",
+      "html_entry": "mathematics/math-carnival/index.html",
+      "source_filename": "bYqlGkaO0Ol0e5ga.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "数字迷宫挑战",
+      "slug": "number-maze",
+      "category": "other",
+      "summary": "数字迷宫挑战",
+      "cover_image": "other/number-maze/cover.png",
+      "diagram_image": "other/number-maze/diagram.png",
+      "html_entry": "other/number-maze/index.html",
+      "source_filename": "7ZATzH5AGrTxcrIs.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "数学游园",
+      "slug": "math-garden",
+      "category": "mathematics",
+      "summary": "数学游园",
+      "cover_image": "mathematics/math-garden/cover.png",
+      "diagram_image": "mathematics/math-garden/diagram.png",
+      "html_entry": "mathematics/math-garden/index.html",
+      "source_filename": "hCruY6JztXjKjNii.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "埃舍尔密铺生成器--正方形",
+      "slug": "escher-square",
+      "category": "mathematics",
+      "summary": "埃舍尔密铺生成器",
+      "cover_image": "mathematics/escher-square/cover.png",
+      "diagram_image": "mathematics/escher-square/diagram.png",
+      "html_entry": "mathematics/escher-square/index.html",
+      "source_filename": "Y4pnjxAlID5KzrRf.html",
+      "tags": [
+        "mathematics"
+      ]
+    },
+    {
+      "name": "埃舍尔密铺生成器--平行四边形",
+      "slug": "escher-parallelogram",
+      "category": "other",
+      "summary": "埃舍尔平行四边形密铺",
+      "cover_image": "other/escher-parallelogram/cover.png",
+      "diagram_image": "other/escher-parallelogram/diagram.png",
+      "html_entry": "other/escher-parallelogram/index.html",
+      "source_filename": "fPGiyT7VpPcXdT9V.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "埃舍尔密铺生成器--长方形",
+      "slug": "escher-rectangle",
+      "category": "other",
+      "summary": "埃舍尔密铺生成器--长方形",
+      "cover_image": "other/escher-rectangle/cover.png",
+      "diagram_image": "other/escher-rectangle/diagram.png",
+      "html_entry": "other/escher-rectangle/index.html",
+      "source_filename": "X0XvZgevJ9a4upEN.html",
+      "tags": [
+        "other"
+      ]
+    },
+    {
+      "name": "图斯双环定理 (Tusi Couple)",
+      "slug": "tusi-couple",
+      "category": "physics",
+      "summary": "当小圆半径是大圆的一半并在其内部滚动时，小圆周上的点做直线运动。",
+      "cover_image": "physics/tusi-couple/cover.png",
+      "diagram_image": "physics/tusi-couple/diagram.png",
+      "html_entry": "physics/tusi-couple/index.html",
+      "source_filename": "SMahxVL8hiulM1DC.html",
+      "tags": [
+        "physics"
+      ]
+    },
+    {
+      "name": "维维尼亚定理",
+      "slug": "viviani",
+      "category": "physics",
+      "summary": "维维尼亚定理演示",
+      "cover_image": "physics/viviani/cover.png",
+      "diagram_image": "physics/viviani/diagram.png",
+      "html_entry": "physics/viviani/index.html",
+      "source_filename": "HzXpcHBSp3oi6IL9.html",
+      "tags": [
+        "physics"
+      ]
+    }
+  ]
+}

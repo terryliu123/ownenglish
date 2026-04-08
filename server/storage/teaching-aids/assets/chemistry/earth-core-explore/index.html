@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地球内核探究</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e6e6e6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .title {
+            font-family: 'Noto Serif SC', serif;
+            text-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+        }
+        .content-card {
+            background: rgba(26, 32, 44, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        .content-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 150, 255, 0.2);
+        }
+        .section-title {
+            position: relative;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: #3b82f6;
+            border-radius: 3px;
+        }
+        .earth-model {
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(0, 150, 255, 0.3);
+            transition: all 0.3s ease;
+            height: 800px; /* 放大后的高度 */
+        }
+        .earth-model:hover {
+            box-shadow: 0 0 40px rgba(0, 150, 255, 0.5);
+        }
+        .layer-card {
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+        .layer-card:hover {
+            transform: translateX(5px);
+        }
+        .crust { border-left-color: #10b981; }
+        .mantle { border-left-color: #f59e0b; }
+        .outer-core { border-left-color: #ef4444; }
+        .inner-core { border-left-color: #8b5cf6; }
+        .scroll-indicator {
+            animation: bounce 2s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+            40% {transform: translateY(-15px);}
+            60% {transform: translateY(-7px);}
+        }
+        .highlight {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0) 100%);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .model-container {
+            height: 500px; /* 放大后的高度 */
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-12">
+        <!-- 标题部分 -->
+        <div class="text-center mb-16">
+            <h1 class="title text-4xl md:text-6xl font-bold mb-4 text-blue-400">地球内核探究</h1>
+            <p class="text-xl text-blue-200 max-w-3xl mx-auto">探索地球最神秘的部分 - 从地壳到内核的奇妙旅程</p>
+            <div class="mt-8 scroll-indicator">
+                <i class="fas fa-chevron-down text-2xl text-blue-400"></i>
+            </div>
+        </div>
+
+        <!-- 主要内容区 -->
+        <div class="flex flex-col lg:flex-row gap-8 items-start">
+            <!-- 左侧内容区 -->
+            <div class="flex-1 content-card p-8 rounded-xl">
+                <h2 class="section-title text-2xl font-bold mb-6">地球内部结构</h2>
+                <p class="mb-6 leading-relaxed">
+                    地球内部由多个同心圆层组成，从外到内依次是<span class="highlight">地壳</span>、<span class="highlight">地幔</span>、<span class="highlight">外核</span>和<span class="highlight">内核</span>。每一层都有其独特的物理和化学性质，共同构成了我们居住的这颗蓝色星球。
+                </p>
+
+                <!-- 各层介绍 -->
+                <div class="space-y-6">
+                    <div class="layer-card crust p-5 rounded-lg bg-gray-800">
+                        <h3 class="text-xl font-semibold text-green-400 mb-2">地壳</h3>
+                        <p class="text-gray-300">
+                            地壳是地球最外层，平均厚度约17公里（海洋地壳）至70公里（大陆地壳）。主要由硅酸盐矿物组成，分为大陆地壳和海洋地壳两种类型。
+                        </p>
+                    </div>
+
+                    <div class="layer-card mantle p-5 rounded-lg bg-gray-800">
+                        <h3 class="text-xl font-semibold text-yellow-400 mb-2">地幔</h3>
+                        <p class="text-gray-300">
+                            地幔位于地壳之下，厚度约2900公里，占地球体积的84%。主要由富含铁和镁的硅酸盐矿物组成，分为上地幔和下地幔。地幔对流是板块构造运动的主要驱动力。
+                        </p>
+                    </div>
+
+                    <div class="layer-card outer-core p-5 rounded-lg bg-gray-800">
+                        <h3 class="text-xl font-semibold text-red-400 mb-2">外核</h3>
+                        <p class="text-gray-300">
+                            外核位于地幔之下，深度约2900-5150公里，主要由液态铁和镍组成。外核的对流运动产生了地球磁场，保护我们免受太阳风的侵害。
+                        </p>
+                    </div>
+
+                    <div class="layer-card inner-core p-5 rounded-lg bg-gray-800">
+                        <h3 class="text-xl font-semibold text-purple-400 mb-2">内核</h3>
+                        <p class="text-gray-300">
+                            内核是地球最中心的部分，半径约1220公里，温度高达5400°C，与太阳表面温度相当。尽管温度极高，但由于巨大的压力，内核保持固态，主要由铁和少量镍组成。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 科学事实 -->
+                <div class="mt-10">
+                    <h2 class="section-title text-2xl font-bold mb-6">关于内核的科学事实</h2>
+                    <ul class="space-y-4">
+                        <li class="flex items-start">
+                            <span class="text-blue-400 mr-3 mt-1"><i class="fas fa-atom"></i></span>
+                            <span>内核的年龄约为10-15亿年，比地球本身年轻得多</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-400 mr-3 mt-1"><i class="fas fa-temperature-high"></i></span>
+                            <span>内核温度约5400°C，压力达到330-360万个大气压</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-400 mr-3 mt-1"><i class="fas fa-compress-arrows-alt"></i></span>
+                            <span>内核每年以约1毫米的速度增长，因为外核逐渐冷却凝固</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-blue-400 mr-3 mt-1"><i class="fas fa-magnet"></i></span>
+                            <span>内核的自转速度比地球其他部分快，大约每1000年快1度</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 研究意义 -->
+                <div class="mt-10">
+                    <h2 class="section-title text-2xl font-bold mb-6">研究内核的意义</h2>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 p-5 rounded-lg">
+                            <h4 class="font-semibold text-blue-400 mb-2"><i class="fas fa-shield-alt mr-2"></i>地球磁场</h4>
+                            <p class="text-gray-300 text-sm">
+                                了解内核和外核的相互作用有助于预测地球磁场的变化，这对导航系统和保护地球免受太阳辐射至关重要。
+                            </p>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-lg">
+                            <h4 class="font-semibold text-blue-400 mb-2"><i class="fas fa-globe-americas mr-2"></i>板块构造</h4>
+                            <p class="text-gray-300 text-sm">
+                                内核产生的热量驱动地幔对流，进而影响板块运动。研究内核有助于更好地理解地震和火山的形成机制。
+                            </p>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-lg">
+                            <h4 class="font-semibold text-blue-400 mb-2"><i class="fas fa-history mr-2"></i>地球演化</h4>
+                            <p class="text-gray-300 text-sm">
+                                通过研究内核，科学家可以了解地球的形成和演化历史，以及地球与其他行星的差异。
+                            </p>
+                        </div>
+                        <div class="bg-gray-800 p-5 rounded-lg">
+                            <h4 class="font-semibold text-blue-400 mb-2"><i class="fas fa-tools mr-2"></i>技术应用</h4>
+                            <p class="text-gray-300 text-sm">
+                                模拟内核极端条件的技术可应用于材料科学、能源研究等领域，推动工业技术进步。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧3D模型 - 放大五倍 -->
+            <div class="w-full lg:w-1/2 sticky top-4 earth-model">
+                <div class="model-container">
+                    <iframe title="Earth Structure" frameborder="0" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" 
+                            allow="autoplay; fullscreen; xr-spatial-tracking" xr-spatial-tracking 
+                            execution-while-out-of-viewport execution-while-not-rendered web-share 
+                            src="https://sketchfab.com/models/60689bbfb0ea415c903626bf10753e45/embed" 
+                            class="w-full h-full rounded-xl">
+                    </iframe>
+                </div>
+                <div class="mt-4 text-center text-gray-400 text-sm">
+                    <p>使用鼠标拖动可旋转模型，滚轮缩放，右键拖动可平移</p>
+                </div>
+
+                <!-- 模型控制面板 -->
+                <div class="mt-6 bg-gray-800 p-4 rounded-lg">
+                    <h3 class="font-semibold text-blue-400 mb-3">模型控制</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="toggleLayer('crust')" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                            <i class="fas fa-layer-group mr-2"></i> 地壳
+                        </button>
+                        <button onclick="toggleLayer('mantle')" class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                            <i class="fas fa-layer-group mr-2"></i> 地幔
+                        </button>
+                        <button onclick="toggleLayer('outer-core')" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                            <i class="fas fa-layer-group mr-2"></i> 外核
+                        </button>
+                        <button onclick="toggleLayer('inner-core')" class="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                            <i class="fas fa-layer-group mr-2"></i> 内核
+                        </button>
+                    </div>
+                    <div class="mt-4">
+                        <button onclick="resetModel()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                            <i class="fas fa-sync-alt mr-2"></i> 重置视图
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 比例尺 -->
+                <div class="mt-6 bg-gray-800 p-4 rounded-lg">
+                    <h3 class="font-semibold text-blue-400 mb-3">比例尺</h3>
+                    <div class="relative h-6 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full">
+                        <div class="absolute -bottom-6 left-0 text-xs">0km</div>
+                        <div class="absolute -bottom-6 left-1/4 -ml-4 text-xs">1,500km</div>
+                        <div class="absolute -bottom-6 left-1/2 -ml-4 text-xs">3,000km</div>
+                        <div class="absolute -bottom-6 right-0 text-xs">6,371km</div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-4 gap-2 text-xs text-center">
+                        <div class="text-green-400">地壳</div>
+                        <div class="text-yellow-400">地幔</div>
+                        <div class="text-red-400">外核</div>
+                        <div class="text-purple-400">内核</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 研究方法 -->
+        <div class="mt-16 content-card p-8 rounded-xl">
+            <h2 class="section-title text-2xl font-bold mb-6">科学家如何研究内核</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-wave-square"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">地震波研究</h3>
+                    <p class="text-gray-300 text-sm">
+                        通过分析地震波在地球内部的传播速度和路径变化，科学家可以推断地球内部的结构和组成。P波和S波的不同行为揭示了内核的固态性质。
+                    </p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-magnet"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">地磁场分析</h3>
+                    <p class="text-gray-300 text-sm">
+                        研究地球磁场的变化可以提供关于外核液态金属流动模式的信息，进而推测内核的旋转和结构特征。
+                    </p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-flask"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">高压实验</h3>
+                    <p class="text-gray-300 text-sm">
+                        在实验室中使用金刚石压砧等设备模拟地球内部的极端压力和温度条件，研究铁合金在这些条件下的行为。
+                    </p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-laptop-code"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">计算机模拟</h3>
+                    <p class="text-gray-300 text-sm">
+                        利用超级计算机模拟地球内部的物理和化学过程，帮助理解内核的形成和演化过程。
+                    </p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-meteor"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">陨石比较</h3>
+                    <p class="text-gray-300 text-sm">
+                        研究铁陨石的成分和结构，因为它们被认为是太阳系形成初期行星内核的残留物，可以提供关于地球内核组成的线索。
+                    </p>
+                </div>
+                <div class="bg-gray-800 p-5 rounded-lg">
+                    <div class="text-blue-400 text-3xl mb-3">
+                        <i class="fas fa-satellite"></i>
+                    </div>
+                    <h3 class="font-semibold text-lg mb-2">卫星观测</h3>
+                    <p class="text-gray-300 text-sm">
+                        通过卫星测量地球重力场和磁场的变化，获取关于地球内部质量分布和流动模式的信息。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 结语 -->
+        <div class="mt-16 text-center">
+            <h2 class="title text-3xl font-bold mb-6 text-blue-400">地球内核 - 最后的未知疆域</h2>
+            <p class="text-xl text-gray-300 max-w-3xl mx-auto mb-8">
+                尽管人类已经登上月球，探索了火星，但我们对脚下仅几千公里外的地球内核仍知之甚少。这个炽热的金属球体保持着地球的生命力，它的秘密等待着未来的科学家去揭开。
+            </p>
+            <div class="inline-flex space-x-4">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-full flex items-center">
+                    <i class="fas fa-book mr-2"></i> 了解更多
+                </button>
+                <button class="bg-gray-700 hover:bg-gray-600 text-white py-3 px-6 rounded-full flex items-center">
+                    <i class="fas fa-video mr-2"></i> 观看视频
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 简单的模型控制函数
+        function toggleLayer(layer) {
+            alert(`在实际应用中，这里会控制3D模型显示/隐藏${layer}层。由于嵌入的模型来自Sketchfab，实际控制需要其API支持。`);
+        }
+
+        function resetModel() {
+            alert("在实际应用中，这里会重置3D模型视图到初始状态。");
+        }
+
+        // 滚动动画
+        document.addEventListener('DOMContentLoaded', () => {
+            const scrollIndicator = document.querySelector('.scroll-indicator');
+            if (scrollIndicator) {
+                scrollIndicator.addEventListener('click', () => {
+                    window.scrollBy({
+                        top: window.innerHeight * 0.8,
+                        behavior: 'smooth'
+                    });
+                });
+            }
+
+            // 卡片动画
+            const cards = document.querySelectorAll('.content-card, .layer-card');
+            cards.forEach((card, index) => {
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    card.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+                    card.style.opacity = '1';
+                    card.style.transform = 'translateY(0)';
+                }, 100 + index * 100);
+            });
+        });
+    </script>
+</body>
+</html>

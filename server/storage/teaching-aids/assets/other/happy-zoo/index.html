@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Zoo - SVG高清全身版</title>
+    <style>
+        :root {
+            --sky-top: #81d4fa;
+            --sky-bottom: #e1f5fe;
+            --grass-light: #aed581;
+            --grass-dark: #7cb342;
+            --primary: #ff9800;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #e1f5fe;
+            height: 100vh;
+            display: flex; flex-direction: column;
+            overflow: hidden; user-select: none;
+        }
+
+        /* --- UI 面板 --- */
+        .ui-panel {
+            background: white; padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        .title { font-size: 1.3rem; font-weight: 800; color: #0277bd; display: flex; align-items: center; gap: 8px;}
+        .controls { display: flex; gap: 10px; }
+        button { padding: 10px 20px; border: none; border-radius: 25px; cursor: pointer; font-weight: bold; font-size: 0.95rem; transition: transform 0.1s; }
+        button:active { transform: scale(0.95); }
+        .btn-learn { background: #e0f7fa; color: #006064; border: 2px solid #006064; }
+        .btn-quiz { background: #fce4ec; color: #880e4f; border: 2px solid #880e4f; }
+        .active-mode { background: var(--primary) !important; color: white !important; border-color: var(--primary) !important; box-shadow: 0 2px 8px rgba(255, 152, 0, 0.4);}
+
+        .message-box {
+            position: absolute; top: 90px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 12px 30px;
+            border-radius: 40px; font-size: 1.6rem; font-weight: bold;
+            color: #333; box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+            z-index: 90; text-align: center; border: 3px solid white;
+        }
+
+        .score-board { font-size: 1.2rem; color: #d84315; font-weight: 800; display: none; margin-left: 15px;}
+
+        /* --- 场景容器 --- */
+        .scene {
+            flex: 1; position: relative;
+            background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 60%);
+            perspective: 1200px; overflow: hidden;
+            display: flex; justify-content: center; align-items: flex-end;
+        }
+
+        /* --- 交互元素公共样式 --- */
+        .item {
+            position: absolute; cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+            /* SVG 容器样式 */
+            width: 120px; height: 120px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        
+        /* 这里的 img 样式确保 SVG 充满容器且保持比例 */
+        .item img {
+            width: 100%; height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));
+            transition: filter 0.2s;
+        }
+
+        .item:hover {
+            transform: scale(1.15);
+            z-index: 100 !important;
+        }
+        .item:hover img {
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.3)) brightness(1.1);
+        }
+        .item:active { transform: scale(0.95); }
+
+        /* --- 天空区域 --- */
+        #sun {
+            width: 140px; height: 140px; top: 5%; right: 5%; z-index: 5;
+            animation: sun-spin 20s linear infinite;
+        }
+        @keyframes sun-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .cloud-item { width: 140px; height: 80px; z-index: 4; opacity: 0.95; }
+        .cloud-float { animation: float 40s linear infinite alternate; }
+        @keyframes float { from { transform: translateX(-30px); } to { transform: translateX(30px); } }
+
+        #cloud1 { top: 12%; left: 10%; animation-duration: 35s; }
+        #cloud2 { top: 18%; left: 45%; animation-duration: 45s; }
+        #cloud3 { top: 8%; left: 75%; animation-duration: 40s; }
+
+        /* --- 地面区域 --- */
+        .ground {
+            width: 140%; height: 75%;
+            background: radial-gradient(ellipse at center, var(--grass-light) 0%, var(--grass-dark) 100%);
+            transform: rotateX(20deg) translateY(40px);
+            position: relative;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.15);
+            border-top: 8px solid #9ccc65;
+            border-radius: 50% 50% 0 0 / 10% 10% 0 0;
+            z-index: 10;
+        }
+
+        /* 植物 (使用 SVG 图标) */
+        .tree-item { width: 160px; height: 160px; z-index: 15; transform-origin: bottom center; }
+        #tree1 { top: -10%; left: 2%; }
+        #tree2 { top: 0%; right: 2%; width: 180px; height: 180px; }
+        #tree3 { top: -15%; left: 40%; width: 140px; height: 140px; z-index: 14; }
+
+        /* --- 动物 (SVG 全身版布局) --- */
+        .animal { z-index: 20; width: 140px; height: 140px; }
+
+        /* 后排 (大动物) */
+        #giraffe { width: 180px; height: 180px; top: 5%; left: 15%; }
+        #elephant { width: 170px; height: 170px; top: 10%; right: 15%; transform: scaleX(-1); }
+
+        /* 中排 */
+        #lion { width: 150px; height: 150px; top: 30%; left: 32%; }
+        #zebra { width: 140px; height: 140px; top: 32%; right: 32%; transform: scaleX(-1); }
+        #hippo { width: 140px; height: 140px; top: 25%; left: 2%; z-index: 21; }
+
+        /* 前排 (小动物) */
+        #tiger { width: 150px; height: 150px; top: 55%; left: 50%; transform: translateX(-50%); z-index: 25;}
+        #monkey { width: 110px; height: 110px; top: 58%; left: 18%; }
+        #panda { width: 120px; height: 120px; top: 58%; right: 18%; }
+
+        /* 正确动画 */
+        @keyframes bounce-anim {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.4) translateY(-20px); }
+            100% { transform: scale(1); }
+        }
+        .correct-anim { animation: bounce-anim 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .correct-anim img { filter: drop-shadow(0 0 20px gold) brightness(1.2) !important; }
+
+    </style>
+</head>
+<body class="learn-mode">
+
+    <div class="ui-panel">
+        <div class="title">
+            <span>🦁</span> Happy Zoo
+            <span id="score-display" class="score-board">Score: 0</span>
+        </div>
+        <div class="controls">
+            <button class="btn-learn active-mode" onclick="setMode('learn')">📖 Learn</button>
+            <button class="btn-quiz" onclick="setMode('quiz')">🎮 Quiz</button>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box"></div>
+
+    <div class="scene">
+        
+        <!-- 天空物品 (使用 SVG URL) -->
+        <div id="sun" class="item">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2600.svg" alt="Sun">
+        </div>
+        <div id="cloud1" class="item cloud-item cloud-float">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2601.svg" alt="Cloud">
+        </div>
+        <div id="cloud2" class="item cloud-item cloud-float">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2601.svg" alt="Cloud">
+        </div>
+        <div id="cloud3" class="item cloud-item cloud-float">
+            <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/2601.svg" alt="Cloud">
+        </div>
+
+        <!-- 地面区域 -->
+        <div class="ground">
+            
+            <!-- 植物 (Trees) -->
+            <div id="tree1" class="item tree-item">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f333.svg" alt="Tree">
+            </div>
+            <div id="tree2" class="item tree-item">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f332.svg" alt="Tree">
+            </div>
+            <div id="tree3" class="item tree-item">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f334.svg" alt="Tree">
+            </div>
+
+            <!-- 动物 (SVG 全身版 - 使用 OpenMoji/Twemoji 的高清资源) -->
+            
+            <!-- 长颈鹿 -->
+            <div id="giraffe" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f992.svg" alt="Giraffe">
+            </div>
+            <!-- 大象 -->
+            <div id="elephant" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f418.svg" alt="Elephant">
+            </div>
+            <!-- 河马 -->
+            <div id="hippo" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f99b.svg" alt="Hippo">
+            </div>
+            <!-- 斑马 -->
+            <div id="zebra" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f993.svg" alt="Zebra">
+            </div>
+            <!-- 狮子 (OpenMoji 提供了更像全身/漫画风格的狮子，这里使用 Twemoji 风格统一) -->
+            <div id="lion" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f981.svg" alt="Lion">
+            </div>
+            <!-- 老虎 (使用全身 SVG) -->
+            <div id="tiger" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f405.svg" alt="Tiger">
+            </div>
+            <!-- 猴子 -->
+            <div id="monkey" class="item animal">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f412.svg" alt="Monkey">
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const items = {
+            'sun': { en: 'Sun', zh: '太阳' },
+            'cloud1': { en: 'Cloud', zh: '云' },
+            'cloud2': { en: 'Cloud', zh: '云' },
+            'cloud3': { en: 'Cloud', zh: '云' },
+            'tree1': { en: 'Tree', zh: '树' },
+            'tree2': { en: 'Tree', zh: '树' },
+            'tree3': { en: 'Tree', zh: '树' },
+            'lion': { en: 'Lion', zh: '狮子' },
+            'elephant': { en: 'Elephant', zh: '大象' },
+            'giraffe': { en: 'Giraffe', zh: '长颈鹿' },
+            'zebra': { en: 'Zebra', zh: '斑马' },
+            'monkey': { en: 'Monkey', zh: '猴子' },
+            'tiger': { en: 'Tiger', zh: '老虎' },
+            'hippo': { en: 'Hippo', zh: '河马' }
+        };
+
+        let currentMode = 'learn';
+        let targetWord = null;
+        let score = 0;
+        
+        // --- 核心优化：问题队列（洗牌算法）---
+        // 保证每个单词只问一次，直到全部问完才开始下一轮
+        let questionQueue = [];
+
+        const msgBox = document.getElementById('message-box');
+        const scoreDisplay = document.getElementById('score-display');
+
+        document.querySelectorAll('.item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                handleItemClick(e.currentTarget.id);
+            });
+        });
+
+        function setMode(mode) {
+            currentMode = mode; score = 0; updateScore();
+            document.querySelector('.btn-learn').classList.toggle('active-mode', mode === 'learn');
+            document.querySelector('.btn-quiz').classList.toggle('active-mode', mode === 'quiz');
+            document.querySelector('#score-display').style.display = mode === 'quiz' ? 'inline' : 'none';
+            msgBox.style.opacity = 0;
+            
+            if (mode === 'quiz') { 
+                initQuestionQueue(); // 初始化题库
+                setTimeout(startNextQuestion, 500); 
+            } else { 
+                showMessage("Explore the Zoo! Click anything.", 2000); 
+                targetWord = null; 
+            }
+        }
+
+        function handleItemClick(id) {
+            if (!items[id]) return;
+            animClick(id);
+
+            const item = items[id];
+
+            if (currentMode === 'learn') {
+                speak(item.en);
+                showMessage(`${item.en} (${item.zh})`, 2000);
+            } else if (currentMode === 'quiz') {
+                // 只要单词对就得分（比如点任何一朵云都对）
+                if (item.en === targetWord) {
+                    score += 10; updateScore();
+                    speak("Correct! Good job.");
+                    showMessage(`✅ Correct! It's a ${item.en}.`, 1500);
+                    targetWord = null;
+                    setTimeout(startNextQuestion, 1500);
+                } else {
+                    speak("Try again.");
+                    showMessage("❌ Try again!", 1000);
+                }
+            }
+        }
+
+        // --- 优化后的出题逻辑 ---
+        function initQuestionQueue() {
+            // 提取所有不重复的单词
+            const uniqueWords = [...new Set(Object.values(items).map(i => i.en))];
+            // 简单的随机打乱 (Fisher-Yates Shuffle)
+            for (let i = uniqueWords.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [uniqueWords[i], uniqueWords[j]] = [uniqueWords[j], uniqueWords[i]];
+            }
+            questionQueue = uniqueWords;
+        }
+
+        function startNextQuestion() {
+            if (currentMode !== 'quiz') return;
+            
+            // 如果队列空了，重新生成一轮
+            if (questionQueue.length === 0) {
+                initQuestionQueue();
+            }
+
+            // 取出下一个单词
+            targetWord = questionQueue.pop();
+            
+            const question = `Where is the ${targetWord}?`;
+            showMessage(`❓ ${question}`, 0);
+            speak(question);
+        }
+
+        function showMessage(text, duration) {
+            msgBox.innerText = text; msgBox.style.opacity = 1;
+            if (duration > 0) {
+                if(msgBox.timer) clearTimeout(msgBox.timer);
+                msgBox.timer = setTimeout(() => { msgBox.style.opacity = 0; }, duration);
+            }
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function animClick(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('correct-anim');
+            void el.offsetWidth;
+            el.classList.add('correct-anim');
+        }
+
+        function updateScore() { scoreDisplay.innerText = `Score: ${score}`; }
+
+        window.onload = () => { setTimeout(() => { showMessage("Welcome! Look at these animals!", 3000); }, 500); };
+    </script>
+</body>
+</html>

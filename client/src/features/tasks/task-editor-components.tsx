@@ -6,14 +6,15 @@ import {
   isExperimentTask,
   taskSupportsAnswerRequiredToggle,
   taskSupportsBlanks,
-  taskSupportsExternalUrl,
   taskSupportsPairs,
   taskSupportsPassage,
   taskSupportsSorting,
+  taskSupportsTeachingAid,
   taskUsesBooleanAnswer,
 } from './task-config'
 import { getTaskTypeLabel, getTaskTypesForMode, shouldShowChoiceOptions } from './task-helpers'
 import { EMPTY_TIPTAP_DOC } from './task-editing'
+import { TeachingAidSelector } from '../teaching-aids/TeachingAidSelector'
 
 export function ManualTaskComposer({
   t,
@@ -32,8 +33,12 @@ export function ManualTaskComposer({
   setManualOptions,
   manualAnswer,
   setManualAnswer,
-  manualHtmlUrl,
+  manualHtmlUrl: _manualHtmlUrl,
   setManualHtmlUrl,
+  manualTeachingAidId = null,
+  setManualTeachingAidId = () => {},
+  manualTeachingAidName: _manualTeachingAidName = '',
+  setManualTeachingAidName = () => {},
   manualBlanks,
   setManualBlanks,
   manualPairs,
@@ -43,7 +48,7 @@ export function ManualTaskComposer({
   moveManualOption,
 }: {
   t: (key: string) => string
-  taskMode: 'objective' | 'reading'
+  taskMode: 'objective' | 'reading' | 'experiment'
   manualType: string
   setManualType: (value: string) => void
   manualText: Record<string, unknown>
@@ -60,6 +65,10 @@ export function ManualTaskComposer({
   setManualAnswer: (value: string) => void
   manualHtmlUrl: string
   setManualHtmlUrl: (value: string) => void
+  manualTeachingAidId?: string | null
+  setManualTeachingAidId?: (value: string | null) => void
+  manualTeachingAidName?: string
+  setManualTeachingAidName?: (value: string) => void
   manualBlanks: string[]
   setManualBlanks: (value: string[]) => void
   manualPairs: Array<{ left: string; right: string }>
@@ -133,28 +142,22 @@ export function ManualTaskComposer({
         </>
       )}
 
-      {taskSupportsExternalUrl(manualType) && (
+      {taskSupportsTeachingAid(manualType) && (
         <>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">{t('taskGroupReading.experimentUrlLabel')}</label>
-            <input
-              type="url"
-              value={manualHtmlUrl}
-              onChange={(event) => setManualHtmlUrl(event.target.value)}
-              placeholder={t('taskGroupReading.experimentUrlPlaceholder')}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white"
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              {t('teacherTeachingAids.title')}
+            </label>
+            <TeachingAidSelector
+              selectedAidId={manualTeachingAidId}
+              onSelectAid={(aid) => {
+                setManualTeachingAidId(aid?.id ?? null)
+                setManualTeachingAidName(aid?.name ?? '')
+                if (aid?.entryUrl) {
+                  setManualHtmlUrl(aid.entryUrl)
+                }
+              }}
             />
-            {manualHtmlUrl && (
-              <div className="mt-2 rounded-xl border border-slate-200 overflow-hidden">
-                <iframe
-                  src={manualHtmlUrl}
-                  className="w-full"
-                  style={{ minHeight: 300, border: 'none' }}
-                  title="Experiment preview"
-                  sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
-                />
-              </div>
-            )}
           </div>
           {taskSupportsAnswerRequiredToggle(manualType) && (
             <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
@@ -403,17 +406,47 @@ export function TaskPreviewEditForm({
 
       {isExperimentTask(editTask) && (
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">{t('taskGroupReading.experimentUrlLabel')}</label>
-          <input
-            type="url"
-            value={String((editTask?.question as any)?.html_url || '')}
-            onChange={(event) => setEditTask(editTask ? {
-              ...editTask,
-              question: { ...editTask.question, html_url: event.target.value },
-            } : null)}
-            placeholder={t('taskGroupReading.experimentUrlPlaceholder')}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 bg-white text-sm"
-          />
+          <label className="block text-sm font-medium text-slate-700 mb-1">{t('teacherTeachingAids.title')}</label>
+          {(editTask?.question as any)?.teaching_aid_id ? (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-medium text-slate-900 truncate">{(editTask?.question as any)?.teaching_aid_name || t('teacherTeachingAids.title')}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setEditTask(editTask ? {
+                      ...editTask,
+                      question: { ...editTask.question, teaching_aid_id: null, teaching_aid_name: null, html_url: '' },
+                    } : null)}
+                    className="text-xs text-blue-600 hover:text-blue-700 px-2 py-1 rounded border border-blue-200 hover:bg-blue-50"
+                  >
+                    {t('common.change')}
+                  </button>
+                  <button
+                    onClick={() => setEditTask(editTask ? {
+                      ...editTask,
+                      question: { ...editTask.question, teaching_aid_id: null, teaching_aid_name: null, html_url: '' },
+                    } : null)}
+                    className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded border border-red-200 hover:bg-red-50"
+                  >
+                    {t('common.clear')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <TeachingAidSelector
+              selectedAidId={(editTask?.question as any)?.teaching_aid_id}
+              onSelectAid={(aid) => setEditTask(editTask ? {
+                ...editTask,
+                question: {
+                  ...editTask.question,
+                  teaching_aid_id: aid?.id ?? null,
+                  teaching_aid_name: aid?.name ?? null,
+                  html_url: aid?.entryUrl ?? '',
+                },
+              } : null)}
+            />
+          )}
         </div>
       )}
 

@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dinner Time! - 最终完美版</title>
+    <style>
+        :root {
+            --wood-dark: #5d4037;
+            --wood-light: #8d6e63;
+            --bg-color: #ffe0b2;
+            --primary: #ff9800;
+        }
+
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #fff3e0;
+            height: 100vh;
+            display: flex; flex-direction: column;
+            overflow: hidden; user-select: none;
+        }
+
+        /* --- UI 面板 --- */
+        .ui-panel {
+            background: white; padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        .title { font-size: 1.2rem; font-weight: bold; color: var(--wood-dark); }
+        .controls { display: flex; gap: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
+        .btn-learn { background: #e0f7fa; color: #006064; border: 2px solid #006064; }
+        .btn-quiz { background: #fce4ec; color: #880e4f; border: 2px solid #880e4f; }
+        .active-mode { background: var(--primary) !important; color: white !important; border-color: var(--primary) !important; }
+
+        .message-box {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95); padding: 10px 25px;
+            border-radius: 30px; font-size: 1.5rem; font-weight: bold;
+            color: var(--wood-dark); box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+            z-index: 90; text-align: center;
+        }
+
+        .score-board { font-size: 1.1rem; color: #d84315; font-weight: bold; display: none; margin-left: 10px;}
+
+        /* --- 场景容器 --- */
+        .scene {
+            flex: 1; position: relative;
+            background: radial-gradient(circle at center, #fff8e1 0%, #ffe0b2 100%);
+            perspective: 800px; overflow: hidden;
+            display: flex; justify-content: center; align-items: flex-end;
+        }
+
+        /* 桌子 */
+        .table {
+            width: 120%; height: 65%;
+            background: linear-gradient(180deg, var(--wood-light) 0%, var(--wood-dark) 100%);
+            transform: rotateX(20deg) translateY(60px);
+            border-top: 10px solid #4e342e;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.3);
+            position: relative;
+            border-radius: 50% 50% 0 0 / 20% 20% 0 0;
+        }
+
+        /* 物品基础 */
+        .item {
+            position: absolute; cursor: pointer;
+            transition: transform 0.2s, filter 0.2s;
+            filter: drop-shadow(5px 5px 10px rgba(0,0,0,0.3));
+            display: flex; justify-content: center; align-items: center;
+            /* 关键：设置宽高，确保点击区域稳定 */
+            width: 100px; height: 100px; 
+            /* 移除 hover 提示的 content 样式，保持纯净 */
+        }
+        .item:hover {
+            transform: scale(1.15) translateY(-10px);
+            filter: drop-shadow(8px 20px 20px rgba(0,0,0,0.4)) brightness(1.1);
+        }
+        .item:active { transform: scale(0.95); }
+
+        /* --- 物品布局与层级 --- */
+
+        /* 1. 装饰层 (不可点) */
+        .placemat {
+            width: 600px; height: 380px; background: #ef9a9a;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 15px; box-shadow: inset 0 0 20px rgba(0,0,0,0.1);
+            pointer-events: none; z-index: 1;
+        }
+        
+        .plate-visual {
+            width: 260px; height: 260px; background: white; border-radius: 50%;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            box-shadow: inset 0 0 20px #ddd, 5px 5px 15px rgba(0,0,0,0.2);
+            display: flex; justify-content: center; align-items: center; 
+            z-index: 2; pointer-events: none;
+        }
+        .plate-inner { width: 170px; height: 170px; border: 2px solid #eee; border-radius: 50%; }
+
+        /* 2. 点击层 (交互核心) */
+        
+        /* 盘子 (z-index: 5) - 最底层交互 */
+        #plate {
+            width: 260px; height: 260px;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            border-radius: 50%;
+            z-index: 5;
+        }
+
+        /* 左侧餐具 */
+        #napkin {
+            width: 90px; height: 160px; background: #fff;
+            top: 50%; left: calc(50% - 350px);
+            transform: translate(-50%, -50%) skewY(10deg);
+            border: 1px solid #ddd;
+            font-size: 40px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            z-index: 5;
+        }
+        #napkin::before { content: "🍽"; opacity: 0.3; }
+
+        #fork { 
+            font-size: 110px; width: 80px; height: 200px;
+            top: 50%; left: calc(50% - 220px);
+            transform: translate(-50%, -50%) rotate(-5deg); 
+            z-index: 5;
+        }
+
+        /* 右侧餐具 */
+        #knife { 
+            font-size: 110px; width: 80px; height: 200px;
+            top: 50%; left: calc(50% + 220px);
+            transform: translate(-50%, -50%) rotate(5deg); 
+            z-index: 5;
+        }
+
+        #spoon { 
+            font-size: 100px; width: 80px; height: 200px;
+            top: 50%; left: calc(50% + 310px);
+            transform: translate(-50%, -50%) rotate(8deg); 
+            z-index: 5;
+        }
+
+        #glass { 
+            font-size: 90px; 
+            top: 15%; left: calc(50% + 280px);
+            transform: translate(-50%, -50%); 
+            z-index: 20;
+        }
+
+        /* 食物层 - (z-index: 30) 保证肉在盘子上方，绝对可点 */
+        #steak {
+            font-size: 90px; width: 140px; height: 140px;
+            top: 45%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 30;
+        }
+
+        #salad {
+            font-size: 70px; width: 100px; height: 100px;
+            top: 40%; left: 43%;
+            transform: translate(-50%, -50%);
+            z-index: 31;
+        }
+
+        /* 装饰背景 */
+        .window {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            width: 300px; height: 150px; background: #b3e5fc; border: 8px solid white;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.2); z-index: 0;
+        }
+        .window::after { content: ''; position: absolute; top: 0; left: 50%; width: 4px; height: 100%; background: white; }
+        .window::before { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: white; }
+        
+        @keyframes pop { 0% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.3); } 100% { transform: translate(-50%, -50%) scale(1); } }
+        .correct-anim { animation: pop 0.4s ease-out; filter: drop-shadow(0 0 15px gold) !important; }
+
+    </style>
+</head>
+<body class="learn-mode">
+
+    <div class="ui-panel">
+        <div class="title">
+            <span>🍽️</span> Dinner Time
+            <span id="score-display" class="score-board">Score: 0</span>
+        </div>
+        <div class="controls">
+            <button class="btn-learn active-mode" onclick="setMode('learn')">📖 Learn</button>
+            <button class="btn-quiz" onclick="setMode('quiz')">🎮 Quiz</button>
+        </div>
+    </div>
+
+    <div id="message-box" class="message-box"></div>
+
+    <div class="scene">
+        <div class="window"></div>
+        
+        <div class="table">
+            <!-- 装饰层 -->
+            <div class="placemat"></div>
+            <div class="plate-visual"><div class="plate-inner"></div></div>
+
+            <!-- 点击层：盘子 -->
+            <div id="plate" class="item"></div>
+
+            <!-- 点击层：餐具 -->
+            <div id="napkin" class="item"></div>
+            <div id="fork" class="item">🍴</div>
+            <div id="knife" class="item">🔪</div>
+            <div id="spoon" class="item">🥄</div>
+            <div id="glass" class="item">🥛</div>
+
+            <!-- 点击层：食物 (HTML顺序最后+高Z-index，解决选不中问题) -->
+            <div id="steak" class="item">🥩</div>
+            <div id="salad" class="item">🥗</div>
+        </div>
+    </div>
+
+    <script>
+        const items = {
+            'napkin': { en: 'Napkin', zh: '餐巾' },
+            'fork': { en: 'Fork', zh: '叉子' },
+            'plate': { en: 'Plate', zh: '盘子' },
+            'steak': { en: 'Steak', zh: '牛排' },
+            'salad': { en: 'Salad', zh: '沙拉' },
+            'knife': { en: 'Knife', zh: '餐刀' },
+            'spoon': { en: 'Spoon', zh: '勺子' },
+            'glass': { en: 'Glass', zh: '玻璃杯' }
+        };
+
+        let currentMode = 'learn';
+        let targetItem = null;
+        let lastQuestionItem = null; // 记录上一个问题，防止重复
+        let score = 0;
+        const msgBox = document.getElementById('message-box');
+        const scoreDisplay = document.getElementById('score-display');
+
+        document.querySelectorAll('.item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                // 阻止冒泡：这是确保点肉不点盘子的双重保险
+                e.stopPropagation(); 
+                handleItemClick(e.currentTarget.id);
+            });
+        });
+
+        function setMode(mode) {
+            currentMode = mode; score = 0; updateScore();
+            document.querySelector('.btn-learn').classList.toggle('active-mode', mode === 'learn');
+            document.querySelector('.btn-quiz').classList.toggle('active-mode', mode === 'quiz');
+            document.querySelector('#score-display').style.display = mode === 'quiz' ? 'inline' : 'none';
+            msgBox.style.opacity = 0;
+            
+            if (mode === 'quiz') { 
+                // 切换到测验模式时，清空历史记录
+                lastQuestionItem = null;
+                setTimeout(startNextQuestion, 500); 
+            } else { 
+                showMessage("Click items to learn!", 2000); 
+                targetItem = null; 
+            }
+        }
+
+        function handleItemClick(id) {
+            if (!items[id]) return;
+            
+            // 点击动画反馈
+            animClick(id);
+
+            if (currentMode === 'learn') {
+                const item = items[id];
+                speak(item.en);
+                // 只显示单词，没有鼠标悬停的Tooltip了
+                showMessage(`${item.en} (${item.zh})`, 2000);
+            } else if (currentMode === 'quiz') {
+                if (targetItem === id) {
+                    score += 10; updateScore();
+                    speak("Correct!");
+                    showMessage("✅ Correct!", 1500);
+                    targetItem = null;
+                    setTimeout(startNextQuestion, 1500);
+                } else {
+                    speak("Try again.");
+                    showMessage("❌ Try again!", 1000);
+                }
+            }
+        }
+
+        function startNextQuestion() {
+            if (currentMode !== 'quiz') return;
+            
+            const keys = Object.keys(items);
+            let newKey;
+
+            // --- 核心修复逻辑：去重算法 ---
+            // 如果只剩1个物品，就没法去重了，所以加个判断 keys.length > 1
+            if (keys.length > 1) {
+                do {
+                    newKey = keys[Math.floor(Math.random() * keys.length)];
+                } while (newKey === lastQuestionItem); // 如果随机到的和上次一样，就重随
+            } else {
+                newKey = keys[0];
+            }
+
+            lastQuestionItem = newKey; // 记录本次问题
+            targetItem = newKey;
+            
+            const question = `Where is the ${items[newKey].en}?`;
+            showMessage(`❓ ${question}`, 0);
+            speak(question);
+        }
+
+        function showMessage(text, duration) {
+            msgBox.innerText = text; msgBox.style.opacity = 1;
+            if (duration > 0) {
+                if(msgBox.timer) clearTimeout(msgBox.timer);
+                msgBox.timer = setTimeout(() => { msgBox.style.opacity = 0; }, duration);
+            }
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US'; utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function animClick(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('correct-anim');
+            void el.offsetWidth;
+            el.classList.add('correct-anim');
+        }
+
+        function updateScore() { scoreDisplay.innerText = `Score: ${score}`; }
+
+        window.onload = () => { setTimeout(() => { showMessage("Welcome! Click Learn or Quiz.", 3000); }, 500); };
+    </script>
+</body>
+</html>

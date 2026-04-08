@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工业制氧原理演示 - 分离液态空气法</title>
+    <style>
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f4f8;
+            margin: 0;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 900px;
+            width: 100%;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        /* 管道流动动画 */
+        .flow-line {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            stroke-dasharray: 20 10;
+            animation: flowAnimation 2s linear infinite;
+        }
+
+        .flow-gas-in { stroke: #a0c4ff; } /* 空气进 */
+        .flow-hot { stroke: #ffadad; } /* 压缩热空气 */
+        .flow-cold { stroke: #48cae4; } /* 液态冷空气 */
+        
+        /* 产物颜色 */
+        .flow-n2 { stroke: #e0e0e0; } /* 氮气 (气态) */
+        .flow-ar { stroke: #caffbf; } /* 氩气 */
+        .flow-o2 { stroke: #0077b6; } /* 氧气 (液态/气态) */
+
+        @keyframes flowAnimation {
+            to {
+                stroke-dashoffset: -30;
+            }
+        }
+
+        /* 气泡动画 */
+        .bubble {
+            fill: rgba(255, 255, 255, 0.6);
+            animation: rise 3s infinite ease-in;
+        }
+        .bubble:nth-child(odd) { animation-duration: 2.5s; animation-delay: 0.5s; }
+        .bubble:nth-child(even) { animation-duration: 3.5s; animation-delay: 1s; }
+
+        @keyframes rise {
+            0% { transform: translateY(0); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(-150px); opacity: 0; }
+        }
+
+        /* 文字样式 */
+        .label {
+            font-size: 14px;
+            font-weight: bold;
+            fill: #555;
+        }
+        .sub-label {
+            font-size: 12px;
+            fill: #777;
+        }
+        .temp-label {
+            font-size: 12px;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* 设备样式 */
+        .machine-body {
+            fill: #e9ecef;
+            stroke: #495057;
+            stroke-width: 2;
+        }
+        .tower-liquid {
+            fill: url(#liquidGradient);
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>工业制氧原理：分离液态空气法</h2>
+    <svg viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <!-- 液体渐变 -->
+            <linearGradient id="liquidGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#caf0f8;stop-opacity:1" />
+                <stop offset="100%" style="stop-color:#0077b6;stop-opacity:1" />
+            </linearGradient>
+            
+            <!-- 箭头标记 -->
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#555" />
+            </marker>
+        </defs>
+
+        <!-- 1. 空气入口与压缩机 -->
+        <g transform="translate(50, 200)">
+            <text x="0" y="-10" class="label">空气入口</text>
+            <!-- 管道 -->
+            <path d="M0,20 L60,20" class="flow-line flow-gas-in" />
+            
+            <!-- 压缩机图标 -->
+            <rect x="60" y="-20" width="60" height="80" rx="5" class="machine-body" />
+            <line x1="60" y1="20" x2="120" y2="20" stroke="#999" stroke-width="2" />
+            <rect x="80" y="-10" width="20" height="60" fill="#adb5bd" />
+            <text x="90" y="75" text-anchor="middle" class="label">压缩机</text>
+            <text x="90" y="90" text-anchor="middle" class="sub-label">(加压升温)</text>
+        </g>
+
+        <!-- 2. 冷却盘管系统 -->
+        <g transform="translate(170, 200)">
+            <!-- 热空气出压缩机 -->
+            <path d="M0,20 L20,20 L20,-80 L50,-80" class="flow-line flow-hot" />
+            <text x="35" y="-90" class="sub-label">热空气</text>
+
+            <!-- 盘管容器 -->
+            <rect x="50" y="-100" width="100" height="140" rx="10" class="machine-body" fill="#def" />
+            
+            <!-- 螺旋冷却管 -->
+            <path d="M50,-80 C80,-80 80,-60 50,-60 C20,-60 20,-40 50,-40 C80,-40 80,-20 50,-20 C20,-20 20,0 50,0 C80,0 80,20 50,20 L150,20" 
+                  class="flow-line flow-cold" fill="none" />
+            
+            <text x="100" y="60" text-anchor="middle" class="label">制冷装置</text>
+            <text x="100" y="75" text-anchor="middle" class="sub-label">(-200℃ 液化)</text>
+        </g>
+
+        <!-- 3. 进入精馏塔 -->
+        <g transform="translate(320, 220)">
+            <path d="M0,0 L40,0 L40,80 L100,80" class="flow-line flow-cold" />
+            <text x="45" y="70" class="sub-label">液态空气</text>
+        </g>
+
+        <!-- 4. 精馏塔 (分离核心) -->
+        <g transform="translate(450, 50)">
+            <!-- 塔身 -->
+            <rect x="0" y="0" width="120" height="300" rx="20" class="machine-body" stroke-width="3" />
+            
+            <!-- 塔内液体背景 -->
+            <rect x="2" y="150" width="116" height="148" rx="18" class="tower-liquid" />
+            
+            <!-- 气泡效果 (模拟沸腾) -->
+            <circle cx="30" cy="280" r="3" class="bubble" />
+            <circle cx="60" cy="290" r="4" class="bubble" />
+            <circle cx="90" cy="270" r="2" class="bubble" />
+            <circle cx="40" cy="250" r="3" class="bubble" />
+            <circle cx="80" cy="230" r="3" class="bubble" />
+
+            <!-- 隔板/出口层级 -->
+            <!-- 层级1: 氮气 (顶部) -->
+            <line x1="0" y1="80" x2="120" y2="80" stroke="#999" stroke-dasharray="5,5" />
+            <text x="60" y="60" text-anchor="middle" class="label" fill="#555">氮气 (N₂)</text>
+            <text x="130" y="85" class="temp-label" fill="#d00000">沸点 -196℃</text>
+            <path d="M120,40 L180,40" class="flow-line flow-n2" marker-end="url(#arrow)" />
+            
+            <!-- 钢瓶 N2 -->
+            <rect x="190" y="10" width="30" height="60" rx="3" fill="#333" />
+            <text x="205" y="45" text-anchor="middle" fill="white" font-size="10">N₂</text>
+
+            <!-- 层级2: 氩气 (中部) -->
+            <line x1="0" y1="180" x2="120" y2="180" stroke="#999" stroke-dasharray="5,5" />
+            <text x="60" y="160" text-anchor="middle" class="label" fill="#333">氩气 (Ar)</text>
+            <text x="130" y="185" class="temp-label" fill="#d00000">沸点 -186℃</text>
+            <path d="M120,140 L180,140" class="flow-line flow-ar" marker-end="url(#arrow)" />
+
+             <!-- 钢瓶 Ar -->
+             <rect x="190" y="110" width="30" height="60" rx="3" fill="#ccc" stroke="#333" />
+             <text x="205" y="145" text-anchor="middle" fill="black" font-size="10">Ar</text>
+
+            <!-- 层级3: 氧气 (底部) -->
+            <text x="60" y="260" text-anchor="middle" class="label" fill="white">液态氧 (O₂)</text>
+            <text x="130" y="285" class="temp-label" fill="#d00000">沸点 -183℃</text>
+            <path d="M120,240 L180,240" class="flow-line flow-o2" marker-end="url(#arrow)" />
+
+             <!-- 钢瓶 O2 -->
+             <rect x="190" y="210" width="30" height="60" rx="3" fill="#0077b6" />
+             <text x="205" y="245" text-anchor="middle" fill="white" font-size="10">O₂</text>
+
+             <text x="60" y="330" text-anchor="middle" class="label" font-size="16">精馏塔</text>
+             <text x="60" y="350" text-anchor="middle" class="sub-label">(利用沸点不同分离)</text>
+        </g>
+        
+        <!-- 说明性箭头或标注 -->
+        <text x="650" y="350" class="sub-label" fill="red">* 沸点低的氮气先蒸发</text>
+        <text x="650" y="370" class="sub-label" fill="blue">* 沸点高的氧气留到底部</text>
+
+    </svg>
+</div>
+
+</body>
+</html>

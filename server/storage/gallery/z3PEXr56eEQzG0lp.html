@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>坐标表示平移 - 交互式教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #fff;
+            user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            cursor: default;
+        }
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        /* 右侧控制面板 */
+        #controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 180px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            border: 1px solid #eee;
+        }
+
+        /* 模式切换按钮 */
+        .mode-switch {
+            display: flex;
+            background: #f0f0f0;
+            border-radius: 20px;
+            padding: 3px;
+            width: 100%;
+        }
+
+        .mode-btn {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 8px 0;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: #2196F3;
+            color: white;
+            box-shadow: 0 2px 5px rgba(33, 150, 243, 0.3);
+        }
+
+        /* 方向键控制器 */
+        .d-pad {
+            display: grid;
+            grid-template-columns: 40px 40px 40px;
+            grid-template-rows: 40px 40px 40px;
+            gap: 5px;
+            margin-top: 10px;
+        }
+
+        .arrow-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ddd;
+            background: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            color: #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background 0.1s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .arrow-btn:hover { background: #f5f5f5; color: #2196F3; }
+        .arrow-btn:active { background: #e0e0e0; transform: translateY(1px); }
+
+        /* 布局占位，让按钮形成十字 */
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 3; }
+
+        /* 状态文字显示 */
+        .status-text {
+            width: 100%;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+            text-align: center;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px dashed #ccc;
+        }
+        
+        .highlight { color: #2196F3; font-weight: bold; }
+
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #999;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        
+        <div id="controls">
+            <div class="mode-switch">
+                <button class="mode-btn" onclick="setMode('point')">点</button>
+                <button class="mode-btn active" onclick="setMode('segment')">线段</button>
+            </div>
+
+            <div class="d-pad">
+                <button class="arrow-btn btn-up" onclick="translate(0, 1)">▲</button>
+                <button class="arrow-btn btn-left" onclick="translate(-1, 0)">◀</button>
+                <button class="arrow-btn btn-right" onclick="translate(1, 0)">▶</button>
+                <button class="arrow-btn btn-down" onclick="translate(0, -1)">▼</button>
+            </div>
+
+            <div class="status-text">
+                <div id="x-status">向右平移 0 个单位</div>
+                <div id="y-status">向上平移 0 个单位</div>
+            </div>
+            
+            <button onclick="resetTranslation()" style="padding:5px 15px; cursor:pointer; background:#eee; border:none; border-radius:4px; color:#666; font-size:12px;">重置平移</button>
+        </div>
+
+        <div id="hint">拖动原图红点改变形状 | 滚轮缩放坐标系</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 状态管理 ---
+        const state = {
+            mode: 'segment', // 'point' or 'segment'
+            zoom: 30,        // 1个单位 = 30px
+            offsetX: 0,      // 视口偏移 X
+            offsetY: 0,      // 视口偏移 Y
+            transX: 5,       // 当前平移量 X (单位)
+            transY: 0,       // 当前平移量 Y (单位)
+            
+            // 原始图形的点坐标 (世界坐标)
+            points: [
+                {x: -5, y: 3, label: 'B'}, // Point 0
+                {x: -2, y: -3, label: 'A'}  // Point 1
+            ]
+        };
+
+        // --- 核心函数：坐标转换 ---
+        
+        // 世界坐标(逻辑单位) -> 屏幕坐标(像素)
+        function worldToScreen(wx, wy) {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+            return {
+                x: cx + wx * state.zoom,
+                y: cy - wy * state.zoom // Canvas Y轴向下，数学Y轴向上
+            };
+        }
+
+        // 屏幕坐标 -> 世界坐标
+        function screenToWorld(sx, sy) {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+            return {
+                x: (sx - cx) / state.zoom,
+                y: -(sy - cy) / state.zoom
+            };
+        }
+
+        // --- 绘图逻辑 ---
+
+        function draw() {
+            // 清屏
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawGrid();
+            drawAxes();
+            drawShapes();
+            updateStatusText();
+        }
+
+        function drawGrid() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const step = state.zoom;
+            const cx = w / 2 + state.offsetX;
+            const cy = h / 2 + state.offsetY;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#eef';
+            ctx.lineWidth = 1;
+
+            // 垂直线
+            const startX = cx % step;
+            for(let x = startX; x < w; x += step) {
+                ctx.moveTo(x, 0); ctx.lineTo(x, h);
+            }
+            // 水平线
+            const startY = cy % step;
+            for(let y = startY; y < h; y += step) {
+                ctx.moveTo(0, y); ctx.lineTo(w, y);
+            }
+            ctx.stroke();
+        }
+
+        function drawAxes() {
+            const cx = canvas.width / 2 + state.offsetX;
+            const cy = canvas.height / 2 + state.offsetY;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1.5;
+            
+            // X Axis
+            ctx.moveTo(0, cy); ctx.lineTo(canvas.width, cy);
+            // Y Axis
+            ctx.moveTo(cx, 0); ctx.lineTo(cx, canvas.height);
+            ctx.stroke();
+
+            // Arrows
+            drawArrow(canvas.width, cy, 'right');
+            drawArrow(cx, 0, 'up');
+
+            // Labels
+            ctx.fillStyle = '#000';
+            ctx.font = 'italic 16px Arial';
+            ctx.fillText('x', canvas.width - 20, cy + 20);
+            ctx.fillText('y', cx - 20, 20);
+            
+            // Numbers (Adaptive)
+            ctx.font = '12px Arial';
+            ctx.fillStyle = '#666';
+            const step = state.zoom;
+            // 简单的每5格标一个数，避免太密
+            for(let i = -20; i <= 20; i+=5) {
+                if(i===0) continue;
+                const p = worldToScreen(i, 0);
+                ctx.fillText(i, p.x - 5, cy + 15); // X axis numbers
+                
+                const py = worldToScreen(0, i);
+                ctx.fillText(i, cx + 8, py.y + 4); // Y axis numbers
+            }
+        }
+
+        function drawArrow(x, y, dir) {
+            ctx.beginPath();
+            ctx.fillStyle = '#444';
+            if(dir === 'right') {
+                ctx.moveTo(x, y); ctx.lineTo(x-10, y-4); ctx.lineTo(x-10, y+4);
+            } else {
+                ctx.moveTo(x, y); ctx.lineTo(x-4, y+10); ctx.lineTo(x+4, y+10);
+            }
+            ctx.fill();
+        }
+
+        function drawShapes() {
+            // 准备点集
+            const p = state.points; // 原图点
+            // 计算新图点
+            const np = p.map(pt => ({
+                x: pt.x + state.transX,
+                y: pt.y + state.transY,
+                label: pt.label + "'"
+            }));
+
+            const count = state.mode === 'point' ? 1 : 2;
+
+            // 1. 绘制蓝色虚线连接对应点
+            ctx.beginPath();
+            ctx.strokeStyle = '#2196F3';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1.5;
+            for(let i=0; i<count; i++) {
+                const start = worldToScreen(p[i].x, p[i].y);
+                const end = worldToScreen(np[i].x, np[i].y);
+                ctx.moveTo(start.x, start.y);
+                ctx.lineTo(end.x, end.y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 2. 绘制线段 (如果是线段模式)
+            if(state.mode === 'segment') {
+                // 原图线段
+                ctx.beginPath();
+                ctx.strokeStyle = '#8bc34a'; // 绿色
+                ctx.lineWidth = 3;
+                const s1 = worldToScreen(p[0].x, p[0].y);
+                const s2 = worldToScreen(p[1].x, p[1].y);
+                ctx.moveTo(s1.x, s1.y);
+                ctx.lineTo(s2.x, s2.y);
+                ctx.stroke();
+
+                // 新图线段
+                ctx.beginPath();
+                const e1 = worldToScreen(np[0].x, np[0].y);
+                const e2 = worldToScreen(np[1].x, np[1].y);
+                ctx.moveTo(e1.x, e1.y);
+                ctx.lineTo(e2.x, e2.y);
+                ctx.stroke();
+            }
+
+            // 3. 绘制点和标签
+            // 绘制函数
+            const drawPt = (pt, color, isOriginal) => {
+                const s = worldToScreen(pt.x, pt.y);
+                
+                // 点
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 5, 0, Math.PI*2);
+                ctx.fillStyle = color;
+                ctx.fill();
+                // 选中圈
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, 9, 0, Math.PI*2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 标签 (文本)
+                ctx.fillStyle = '#333';
+                ctx.font = '16px Arial';
+                const text = `${pt.label}(${pt.x}, ${pt.y})`;
+                // 简单的防遮挡偏移
+                const offsetY = isOriginal ? 25 : -15;
+                ctx.fillText(text, s.x + 10, s.y + offsetY);
+            };
+
+            for(let i=0; i<count; i++) {
+                drawPt(p[i], '#ff5252', true);   // 原图红点
+                drawPt(np[i], '#ff5252', false); // 新图红点
+            }
+        }
+
+        function updateStatusText() {
+            const tx = state.transX;
+            const ty = state.transY;
+            
+            const xDiv = document.getElementById('x-status');
+            const yDiv = document.getElementById('y-status');
+
+            if (tx > 0) xDiv.innerHTML = `向右平移 <span class="highlight">${tx}</span> 个单位`;
+            else if (tx < 0) xDiv.innerHTML = `向左平移 <span class="highlight">${Math.abs(tx)}</span> 个单位`;
+            else xDiv.innerHTML = `向右平移 0 个单位`;
+
+            if (ty > 0) yDiv.innerHTML = `向上平移 <span class="highlight">${ty}</span> 个单位`;
+            else if (ty < 0) yDiv.innerHTML = `向下平移 <span class="highlight">${Math.abs(ty)}</span> 个单位`;
+            else yDiv.innerHTML = `向上平移 0 个单位`;
+        }
+
+        // --- 交互控制 ---
+        
+        // 模式切换
+        window.setMode = function(mode) {
+            state.mode = mode;
+            // 更新按钮样式
+            const btns = document.querySelectorAll('.mode-btn');
+            if(mode === 'point') {
+                btns[0].classList.add('active');
+                btns[1].classList.remove('active');
+            } else {
+                btns[0].classList.remove('active');
+                btns[1].classList.add('active');
+            }
+            draw();
+        };
+
+        // 平移控制
+        window.translate = function(dx, dy) {
+            state.transX += dx;
+            state.transY += dy;
+            draw();
+        };
+
+        window.resetTranslation = function() {
+            state.transX = 0;
+            state.transY = 0;
+            draw();
+        };
+
+        // 鼠标交互
+        let isDraggingPoint = -1; // -1: none, 0: B, 1: A
+        let isPanning = false;
+        let lastMouse = {x:0, y:0};
+
+        canvas.addEventListener('mousedown', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            
+            // 1. 检查是否点击了原图的点 (允许拖动改变原图)
+            const count = state.mode === 'point' ? 1 : 2;
+            for(let i=0; i<count; i++) {
+                const s = worldToScreen(state.points[i].x, state.points[i].y);
+                if(Math.hypot(mx - s.x, my - s.y) < 15) {
+                    isDraggingPoint = i;
+                    return;
+                }
+            }
+
+            // 2. 如果没点中点，则是平移画布
+            isPanning = true;
+            lastMouse = {x: mx, y: my};
+            canvas.style.cursor = 'move';
+        });
+
+        canvas.addEventListener('mousemove', e => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            if(isDraggingPoint !== -1) {
+                // 拖拽点 - 转换为世界坐标并吸附到整数
+                let w = screenToWorld(mx, my);
+                // 吸附逻辑
+                w.x = Math.round(w.x);
+                w.y = Math.round(w.y);
+                
+                state.points[isDraggingPoint].x = w.x;
+                state.points[isDraggingPoint].y = w.y;
+                draw();
+            } else if(isPanning) {
+                state.offsetX += mx - lastMouse.x;
+                state.offsetY += my - lastMouse.y;
+                lastMouse = {x: mx, y: my};
+                draw();
+            } else {
+                // 鼠标悬停检测
+                let hover = false;
+                const count = state.mode === 'point' ? 1 : 2;
+                for(let i=0; i<count; i++) {
+                    const s = worldToScreen(state.points[i].x, state.points[i].y);
+                    if(Math.hypot(mx - s.x, my - s.y) < 15) hover = true;
+                }
+                canvas.style.cursor = hover ? 'pointer' : 'default';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDraggingPoint = -1;
+            isPanning = false;
+            canvas.style.cursor = 'default';
+        });
+
+        // 滚轮缩放
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const scaleFactor = 1.1;
+            if(e.deltaY < 0) state.zoom *= scaleFactor;
+            else state.zoom /= scaleFactor;
+            
+            // 限制缩放
+            state.zoom = Math.max(10, Math.min(100, state.zoom));
+            draw();
+        });
+
+        // 窗口调整
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            draw();
+        });
+
+        // 初始化
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        draw();
+
+    </script>
+</body>
+</html>

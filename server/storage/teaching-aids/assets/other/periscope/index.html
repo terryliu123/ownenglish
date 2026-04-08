@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>潜望镜原理 - 交互微件</title>
+    <style>
+        :root {
+            --sky-color: #B3E5FC;
+            --sea-surface: #4FC3F7;
+            --sea-deep: #0288D1;
+            --sub-color: #3F51B5;
+            --highlight: #FFEB3B;
+            --panel-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* 1. 顶部标题 */
+        .header {
+            width: 100%;
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            padding-left: 40px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* 2. 主舞台 */
+        .stage-container {
+            position: relative;
+            width: 900px;
+            height: 500px;
+            margin-top: 20px;
+            background: linear-gradient(to bottom, var(--sky-color) 0%, var(--sky-color) 30%, var(--sea-surface) 30%, var(--sea-deep) 100%);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 放大镜气泡 (CSS 实现覆盖层) */
+        .magnifier {
+            position: absolute;
+            width: 140px; height: 140px;
+            background: rgba(255,255,255,0.9);
+            border: 4px solid white;
+            border-radius: 50%;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: none;
+        }
+        .magnifier.show { opacity: 1; transform: scale(1); }
+        
+        /* 气泡内的小箭头指示器 */
+        .bubble-arrow {
+            position: absolute; width: 20px; height: 20px; background: white; transform: rotate(45deg);
+        }
+
+        /* 顶部反射镜放大 */
+        #mag-top { top: 50px; left: 280px; }
+        #mag-top .bubble-arrow { right: -10px; top: 60px; } /* 指向右侧 */
+
+        /* 底部反射镜放大 */
+        #mag-bottom { bottom: 120px; right: 300px; }
+        #mag-bottom .bubble-arrow { left: -10px; top: 60px; } /* 指向左侧 */
+
+        /* 眼睛视野放大 */
+        #mag-eye { bottom: 100px; left: 100px; width: 180px; height: 180px; border-color: #FF9800; }
+        
+        /* 放大镜内部的内容 (SVG) */
+        .mag-content { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
+        
+        /* 播放按钮 */
+        .play-btn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; background: rgba(0,0,0,0.6);
+            border: 4px solid white; border-radius: 50%;
+            cursor: pointer; display: flex; justify-content: center; align-items: center;
+            z-index: 100; transition: all 0.2s;
+        }
+        .play-btn:hover { background: rgba(0,0,0,0.8); transform: translate(-50%, -50%) scale(1.1); }
+        .play-btn svg { fill: white; width: 40px; height: 40px; margin-left: 5px; }
+        .play-btn.hidden { display: none; }
+
+        /* 3. 底部指南 */
+        .guide {
+            width: 900px; margin-top: 20px;
+            background: white; padding: 20px; border-radius: 10px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        }
+        .guide h3 { margin-top: 0; color: #0277BD; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .guide p { font-size: 14px; line-height: 1.6; color: #555; }
+        .guide strong { color: #F57F17; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        🔭 潜望镜原理
+    </div>
+
+    <div class="stage-container">
+        <canvas id="simCanvas" width="900" height="500"></canvas>
+
+        <!-- 顶部反射镜放大镜 -->
+        <div class="magnifier" id="mag-top">
+            <svg class="mag-content" viewBox="0 0 100 100">
+                <!-- 镜子 -->
+                <line x1="20" y1="80" x2="80" y2="20" stroke="#555" stroke-width="4" />
+                <!-- 法线 -->
+                <line x1="50" y1="50" x2="90" y2="90" stroke="#aaa" stroke-width="1" stroke-dasharray="3,3" />
+                <!-- 光路 -->
+                <line x1="100" y1="50" x2="50" y2="50" stroke="#FFEB3B" stroke-width="3" marker-end="url(#arrow)" />
+                <line x1="50" y1="50" x2="50" y2="100" stroke="#FFEB3B" stroke-width="3" />
+                <!-- 角度文字 -->
+                <text x="60" y="70" font-size="12" fill="#333">45°</text>
+                <path d="M 65 65 Q 58 58 58 50" fill="none" stroke="#333" stroke-width="1"/>
+            </svg>
+            <div class="bubble-arrow"></div>
+        </div>
+
+        <!-- 底部反射镜放大镜 -->
+        <div class="magnifier" id="mag-bottom">
+            <svg class="mag-content" viewBox="0 0 100 100">
+                <!-- 镜子 -->
+                <line x1="20" y1="80" x2="80" y2="20" stroke="#555" stroke-width="4" />
+                <!-- 法线 -->
+                <line x1="50" y1="50" x2="10" y2="10" stroke="#aaa" stroke-width="1" stroke-dasharray="3,3" />
+                <!-- 光路 -->
+                <line x1="50" y1="0" x2="50" y2="50" stroke="#FFEB3B" stroke-width="3" />
+                <line x1="50" y1="50" x2="0" y2="50" stroke="#FFEB3B" stroke-width="3" marker-end="url(#arrow)" />
+                <!-- 角度文字 -->
+                <text x="20" y="40" font-size="12" fill="#333">45°</text>
+                <path d="M 42 42 Q 50 35 50 25" fill="none" stroke="#333" stroke-width="1"/>
+            </svg>
+            <div class="bubble-arrow"></div>
+        </div>
+
+        <!-- 视野放大镜 -->
+        <div class="magnifier" id="mag-eye">
+            <!-- 显示看到的灯塔 -->
+            <div style="width:100%; height:100%; border-radius:50%; background:#B3E5FC; overflow:hidden; position:relative; border:4px solid #333;">
+                <div style="position:absolute; bottom:0; width:100%; height:30%; background:#4FC3F7;"></div>
+                <!-- 小灯塔 -->
+                <div style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:30px; height:80px;">
+                    <div style="width:100%; height:100%; background:repeating-linear-gradient(0deg, #D32F2F, #D32F2F 10px, #fff 10px, #fff 20px);"></div>
+                    <div style="position:absolute; top:-15px; left:-5px; width:40px; height:15px; background:#D32F2F; border-radius:50% 50% 0 0;"></div>
+                </div>
+                <div style="position:absolute; top:10px; width:100%; text-align:center; font-weight:bold; color:#0277BD; font-size:14px;">眼中景象</div>
+            </div>
+        </div>
+
+        <!-- 播放按钮 -->
+        <div class="play-btn" id="playBtn" onclick="startAnimation()">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+    </div>
+
+    <div class="guide">
+        <h3>📖 使用指南</h3>
+        <p>
+            <strong>潜望镜</strong>是指从海面下伸出海面或从低洼坑道伸出地面，用以窥探海面或地面上活动的装置。
+        </p>
+        <ul>
+            <li><strong>构造</strong>：由一根长管子和两块平面镜组成。两块平面镜互相平行，且都与水平方向成 <strong>45度角</strong>。</li>
+            <li><strong>原理</strong>：利用光的<strong>反射</strong>原理。光线经过两次反射，改变了传播方向，最终射入观察者眼中。</li>
+            <li><strong>操作</strong>：点击屏幕中央的 <strong>播放按钮</strong>，观察光线（黄色线条）如何从灯塔出发，经过两次折射进入潜水艇内观察者的眼中。同时留意弹出的放大镜，观察反射角的细节。</li>
+        </ul>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 场景参数
+        const CONFIG = {
+            seaLevel: 150,
+            lighthouseX: 750,
+            subX: 400,
+            subY: 300,
+            mirrorTop: { x: 500, y: 100 },
+            mirrorBottom: { x: 500, y: 300 },
+            eye: { x: 350, y: 300 },
+            lightSpeed: 5
+        };
+
+        let animationState = {
+            isPlaying: false,
+            progress: 0, // 0-3 阶段
+            ray: { x: 0, y: 0 }
+        };
+
+        // 初始化
+        window.onload = () => {
+            drawScene();
+        };
+
+        function startAnimation() {
+            if (animationState.isPlaying) return;
+            
+            // 重置状态
+            animationState = {
+                isPlaying: true,
+                progress: 0,
+                // 光线起点：灯塔灯光处
+                ray: { x: CONFIG.lighthouseX - 25, y: CONFIG.mirrorTop.y } 
+            };
+
+            document.getElementById('playBtn').classList.add('hidden');
+            document.querySelectorAll('.magnifier').forEach(el => el.classList.remove('show'));
+            
+            animate();
+        }
+
+        function animate() {
+            if (!animationState.isPlaying) return;
+
+            let finished = false;
+            
+            // 阶段 1: 灯塔 -> 顶部镜子 (水平向左)
+            if (animationState.progress === 0) {
+                animationState.ray.x -= CONFIG.lightSpeed;
+                if (animationState.ray.x <= CONFIG.mirrorTop.x) {
+                    animationState.ray.x = CONFIG.mirrorTop.x;
+                    animationState.progress = 1;
+                    // 显示顶部放大镜
+                    document.getElementById('mag-top').classList.add('show');
+                }
+            }
+            // 阶段 2: 顶部镜子 -> 底部镜子 (垂直向下)
+            else if (animationState.progress === 1) {
+                animationState.ray.y += CONFIG.lightSpeed;
+                if (animationState.ray.y >= CONFIG.mirrorBottom.y) {
+                    animationState.ray.y = CONFIG.mirrorBottom.y;
+                    animationState.progress = 2;
+                    // 显示底部放大镜
+                    document.getElementById('mag-bottom').classList.add('show');
+                }
+            }
+            // 阶段 3: 底部镜子 -> 眼睛 (水平向左)
+            else if (animationState.progress === 2) {
+                animationState.ray.x -= CONFIG.lightSpeed;
+                if (animationState.ray.x <= CONFIG.eye.x) {
+                    animationState.ray.x = CONFIG.eye.x;
+                    animationState.progress = 3;
+                    finished = true;
+                    // 显示视野
+                    document.getElementById('mag-eye').classList.add('show');
+                }
+            }
+
+            drawScene();
+
+            if (!finished) {
+                requestAnimationFrame(animate);
+            } else {
+                animationState.isPlaying = false;
+                // 允许重播
+                setTimeout(() => {
+                    document.getElementById('playBtn').classList.remove('hidden');
+                }, 1000);
+            }
+        }
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. 绘制波浪线 (简单的正弦波)
+            ctx.beginPath();
+            ctx.moveTo(0, CONFIG.seaLevel);
+            for(let i=0; i<=canvas.width; i+=10) {
+                ctx.lineTo(i, CONFIG.seaLevel + Math.sin(i/20) * 5);
+            }
+            ctx.lineTo(canvas.width, canvas.height);
+            ctx.lineTo(0, canvas.height);
+            ctx.fillStyle = "rgba(2, 136, 209, 0.1)"; // 深海颜色层
+            ctx.fill();
+            
+            // 2. 绘制灯塔
+            drawLighthouse(CONFIG.lighthouseX, CONFIG.seaLevel - 20);
+
+            // 3. 绘制潜水艇
+            drawSubmarine();
+
+            // 4. 绘制光路 (黄色)
+            if (animationState.isPlaying || animationState.progress === 3) {
+                drawLightRay();
+            }
+        }
+
+        function drawLighthouse(x, y) {
+            ctx.save();
+            // 基座
+            ctx.fillStyle = "#D32F2F"; // 红
+            const w = 50, h = 140;
+            // 画条纹
+            for(let i=0; i<h; i+=20) {
+                ctx.fillStyle = (i/20)%2 === 0 ? "#D32F2F" : "#FFFFFF";
+                ctx.fillRect(x - w/2 + i/10, y - h + i, w - i/5, 20);
+            }
+            // 灯室
+            ctx.fillStyle = "#FFEB3B";
+            ctx.beginPath();
+            ctx.arc(x, y - h - 10, 20, 0, Math.PI*2);
+            ctx.fill();
+            // 屋顶
+            ctx.fillStyle = "#D32F2F";
+            ctx.beginPath();
+            ctx.moveTo(x - 25, y - h - 10);
+            ctx.lineTo(x + 25, y - h - 10);
+            ctx.lineTo(x, y - h - 40);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawSubmarine() {
+            const sx = CONFIG.subX, sy = CONFIG.subY;
+            
+            // 潜艇主体 (椭圆)
+            ctx.save();
+            ctx.fillStyle = "#3F51B5";
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, 180, 100, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 尾翼
+            ctx.beginPath();
+            ctx.moveTo(sx - 150, sy);
+            ctx.lineTo(sx - 220, sy - 50);
+            ctx.lineTo(sx - 220, sy + 50);
+            ctx.fill();
+
+            // 潜望镜管子 (Z型/L型)
+            const pipeW = 30;
+            const topY = CONFIG.mirrorTop.y;
+            const midX = CONFIG.mirrorTop.x;
+            
+            ctx.fillStyle = "#5C6BC0";
+            ctx.strokeStyle = "#303F9F";
+            ctx.lineWidth = 4;
+
+            // 竖管
+            ctx.fillRect(midX - pipeW/2, topY - pipeW/2, pipeW, CONFIG.mirrorBottom.y - topY + pipeW);
+            ctx.strokeRect(midX - pipeW/2, topY - pipeW/2, pipeW, CONFIG.mirrorBottom.y - topY + pipeW);
+
+            // 上横管 (向右开口，但这图里灯塔在右边，所以潜望镜应该朝右)
+            // 图片中光从右来，所以上口朝右
+            ctx.fillRect(midX, topY - pipeW/2, 50, pipeW); 
+            ctx.strokeRect(midX, topY - pipeW/2, 50, pipeW);
+
+            // 下横管 (连着眼睛)
+            ctx.fillRect(midX - 80, CONFIG.mirrorBottom.y - pipeW/2, 80, pipeW);
+            ctx.strokeRect(midX - 80, CONFIG.mirrorBottom.y - pipeW/2, 80, pipeW);
+            
+            // 绘制镜子 (两条45度斜线)
+            ctx.strokeStyle = "#CFD8DC";
+            ctx.lineWidth = 5;
+            
+            // 顶部镜子 (反射面朝右下, / )
+            ctx.beginPath();
+            ctx.moveTo(midX - 10, topY + 10);
+            ctx.lineTo(midX + 10, topY - 10);
+            ctx.stroke();
+
+            // 底部镜子 (反射面朝左上, / ) -- 等等，为了把向下的光反射向左，镜子应该是 / 还是 \ ?
+            // 光向下(y增加)，要变成向左(x减少)。
+            // 镜子如果是 / (右上-左下)：碰到后确实往左。
+            ctx.beginPath();
+            ctx.moveTo(midX - 10, CONFIG.mirrorBottom.y + 10);
+            ctx.lineTo(midX + 10, CONFIG.mirrorBottom.y - 10);
+            ctx.stroke();
+
+            // 绘制眼睛
+            drawEye(CONFIG.eye.x, CONFIG.eye.y);
+
+            ctx.restore();
+        }
+
+        function drawEye(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            // 眼白
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 15, 8, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+            // 眼珠
+            ctx.fillStyle = "#333";
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI*2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawLightRay() {
+            ctx.save();
+            ctx.strokeStyle = "#FFEB3B"; // 黄光
+            ctx.lineWidth = 4;
+            ctx.lineCap = "round";
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = "#FFEB3B";
+
+            ctx.beginPath();
+            
+            // 起点：灯塔
+            const startX = CONFIG.lighthouseX - 25;
+            const startY = CONFIG.mirrorTop.y;
+            
+            ctx.moveTo(startX, startY);
+
+            // 根据进度画线
+            if (animationState.progress >= 1) {
+                // 画完第一段
+                ctx.lineTo(CONFIG.mirrorTop.x, CONFIG.mirrorTop.y);
+                
+                if (animationState.progress >= 2) {
+                    // 画完第二段
+                    ctx.lineTo(CONFIG.mirrorBottom.x, CONFIG.mirrorBottom.y);
+                    
+                    if (animationState.progress >= 3) {
+                        // 画完第三段
+                        ctx.lineTo(CONFIG.eye.x, CONFIG.eye.y);
+                    } else {
+                        // 正在画第三段
+                        ctx.lineTo(animationState.ray.x, animationState.ray.y);
+                    }
+                } else {
+                    // 正在画第二段
+                    ctx.lineTo(animationState.ray.x, animationState.ray.y);
+                }
+            } else {
+                // 正在画第一段
+                ctx.lineTo(animationState.ray.x, animationState.ray.y);
+            }
+
+            ctx.stroke();
+
+            // 绘制光线箭头 (仅在头部)
+            // 略去箭头绘制以保持动画流畅，用发光点代替
+            ctx.fillStyle = "#FFF";
+            ctx.beginPath();
+            ctx.arc(animationState.ray.x, animationState.ray.y, 4, 0, Math.PI*2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+    </script>
+</body>
+</html>

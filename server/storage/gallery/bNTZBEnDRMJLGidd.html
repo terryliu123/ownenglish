@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>摩擦起电虚拟实验室 - 增强版</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #eef;
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #fcfcfc;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            cursor: grab;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .ui-panel {
+            position: absolute;
+            bottom: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 25px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            z-index: 10;
+        }
+
+        button {
+            background: #FFC107;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #333;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: transform 0.1s, background 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        button:hover { background: #ffcd38; transform: scale(1.05); }
+        button:active { transform: scale(0.95); }
+        button.reset { background: #ff6b6b; color: white; }
+        
+        .legend { display: flex; gap: 15px; font-size: 0.9rem; color: #555; }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 14px; height: 14px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; color: white; box-shadow: 1px 1px 2px rgba(0,0,0,0.3); }
+        .plus { background: #d32f2f; background: radial-gradient(circle at 30% 30%, #ff6b6b, #d32f2f); }
+        .minus { background: #1976d2; background: radial-gradient(circle at 30% 30%, #42a5f5, #1565c0); }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <canvas id="simCanvas"></canvas>
+    
+    <div class="ui-panel">
+        <div class="legend">
+            <div class="legend-item"><div class="dot plus">+</div> 正电荷</div>
+            <div class="legend-item"><div class="dot minus">-</div> 负电荷</div>
+        </div>
+        <button onclick="resetSim()" class="reset">重置实验</button>
+        <button onclick="toggleCharges()">显示/隐藏 电荷</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height;
+    let showCharges = true;
+    let texturePattern = null; // 缓存毛衣纹理
+    
+    // 实体定义
+    const sweater = { x: 0, y: 0, width: 0, height: 0, color: '#BA68C8' }; 
+    const wall = { x: 0, y: 0, width: 0, height: 0, color: '#fff9c4' };
+    const balloon = { 
+        x: 0, y: 0, radius: 0, 
+        color: '#ffeb3b', 
+        vx: 0, vy: 0, 
+        dragging: false,
+        dragOffsetX: 0, dragOffsetY: 0
+    };
+
+    let charges = []; 
+
+    class Charge {
+        constructor(type, x, y, parent) {
+            this.type = type; 
+            this.x = x; 
+            this.y = y;
+            this.parent = parent; 
+            this.baseX = x; 
+            this.randX = (Math.random() - 0.5) * 8; // 稍微增加随机范围
+            this.randY = (Math.random() - 0.5) * 8;
+        }
+    }
+
+    // --- 初始化功能 ---
+
+    // 创建毛衣的针织纹理
+    function createKnittedPattern() {
+        const pCanvas = document.createElement('canvas');
+        pCanvas.width = 16;
+        pCanvas.height = 16;
+        const pCtx = pCanvas.getContext('2d');
+        
+        // 背景色
+        pCtx.fillStyle = sweater.color;
+        pCtx.fillRect(0, 0, 16, 16);
+
+        // 绘制“V”形针织纹路
+        pCtx.strokeStyle = 'rgba(0,0,0,0.1)'; // 深色阴影
+        pCtx.lineWidth = 2;
+        pCtx.lineCap = 'round';
+        
+        pCtx.beginPath();
+        pCtx.moveTo(4, 4);
+        pCtx.lineTo(8, 10);
+        pCtx.lineTo(12, 4);
+        pCtx.stroke();
+
+        pCtx.beginPath();
+        pCtx.moveTo(4, 12);
+        pCtx.lineTo(8, 16); // 稍微出界衔接
+        pCtx.lineTo(12, 12);
+        pCtx.stroke();
+        
+        // 高光，增加立体感
+        pCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+        pCtx.beginPath();
+        pCtx.moveTo(4, 2);
+        pCtx.lineTo(8, 8);
+        pCtx.lineTo(12, 2);
+        pCtx.stroke();
+
+        return ctx.createPattern(pCanvas, 'repeat');
+    }
+
+    function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        initScenario();
+        texturePattern = createKnittedPattern(); // 重新生成纹理
+    }
+
+    function initScenario() {
+        charges = [];
+        
+        // 1. 设置毛衣 (屏幕左侧)
+        sweater.width = width * 0.28;
+        sweater.height = height * 0.7;
+        sweater.x = 20;
+        sweater.y = (height - sweater.height) / 2;
+
+        // 2. 设置墙壁 (屏幕右侧)
+        wall.width = width * 0.15;
+        wall.height = height;
+        wall.x = width - wall.width;
+        wall.y = 0;
+
+        // 3. 设置气球 (中间)
+        balloon.radius = Math.min(width, height) * 0.11;
+        balloon.x = width / 2;
+        balloon.y = height / 2;
+        balloon.vx = 0;
+        balloon.vy = 0;
+
+        // 4. 生成电荷
+        // 毛衣
+        const sweaterRows = 10;
+        const sweaterCols = 5;
+        // 稍微往里缩一点，不要在毛边上生成电荷
+        const pad = 20;
+        for(let r=0; r<sweaterRows; r++) {
+            for(let c=0; c<sweaterCols; c++) {
+                let cx = sweater.x + pad + c * ((sweater.width - pad*2)/sweaterCols);
+                let cy = sweater.y + pad + r * ((sweater.height - pad*2)/sweaterRows);
+                charges.push(new Charge(1, cx, cy, 'sweater'));
+                charges.push(new Charge(-1, cx, cy, 'sweater'));
+            }
+        }
+
+        // 墙壁
+        const wallRows = 12;
+        const wallCols = 3;
+        for(let r=0; r<wallRows; r++) {
+            for(let c=0; c<wallCols; c++) {
+                let cx = wall.x + (c + 0.5) * (wall.width/wallCols);
+                let cy = wall.y + (r + 0.5) * (wall.height/wallRows);
+                charges.push(new Charge(1, cx, cy, 'wall'));
+                charges.push(new Charge(-1, cx, cy, 'wall'));
+            }
+        }
+
+        // 气球
+        const balloonCharges = 6;
+        for(let i=0; i<balloonCharges; i++) {
+            let angle = Math.random() * Math.PI * 2;
+            let r = Math.random() * (balloon.radius * 0.5);
+            let cx = r * Math.cos(angle);
+            let cy = r * Math.sin(angle);
+            charges.push(new Charge(1, cx, cy, 'balloon'));
+            charges.push(new Charge(-1, cx, cy, 'balloon'));
+        }
+    }
+
+    // --- 物理引擎 ---
+
+    function update() {
+        if (!balloon.dragging) {
+            applyPhysics();
+        } else {
+            checkFriction();
+        }
+        
+        applyWallInduction();
+        
+        // 边界
+        if(balloon.x < balloon.radius) { balloon.x = balloon.radius; balloon.vx *= -0.5; }
+        if(balloon.x > wall.x - balloon.radius) { balloon.x = wall.x - balloon.radius; balloon.vx *= -0.5; }
+        if(balloon.y < balloon.radius) { balloon.y = balloon.radius; balloon.vy *= -0.5; }
+        if(balloon.y > height - balloon.radius) { balloon.y = height - balloon.radius; balloon.vy *= -0.5; }
+    }
+
+    function checkFriction() {
+        let grabRange = balloon.radius; 
+        for (let p of charges) {
+            if (p.parent === 'sweater' && p.type === -1) {
+                let dx = p.x - balloon.x;
+                let dy = p.y - balloon.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+
+                if (dist < grabRange) {
+                    p.parent = 'balloon';
+                    p.x = dx; 
+                    p.y = dy; 
+                }
+            }
+        }
+    }
+
+    function applyPhysics() {
+        let balloonNetCharge = 0;
+        charges.forEach(p => { if(p.parent === 'balloon') balloonNetCharge += p.type; });
+
+        let fx = 0, fy = 0;
+
+        // 1. 库仑力 (毛衣)
+        let sweaterCenterX = sweater.x + sweater.width / 2;
+        let sweaterCenterY = sweater.y + sweater.height / 2;
+        if (balloonNetCharge < 0) {
+            let dx = sweaterCenterX - balloon.x;
+            let dy = sweaterCenterY - balloon.y;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            dist = Math.max(dist, 80); 
+            let force = 2800 * Math.abs(balloonNetCharge) / dist; 
+            fx += (dx / dist) * force;
+            fy += (dy / dist) * force;
+        }
+
+        // 2. 墙壁感应吸附
+        let distToWall = wall.x - (balloon.x + balloon.radius);
+        if (balloonNetCharge < 0 && distToWall < 120) {
+            let wallForce = 60 * Math.abs(balloonNetCharge) / (Math.max(distToWall, 5) + 20);
+            fx += wallForce; 
+        }
+
+        balloon.vx = (balloon.vx * 0.94) + (fx * 0.05);
+        balloon.vy = (balloon.vy * 0.94) + (fy * 0.05);
+        balloon.x += balloon.vx;
+        balloon.y += balloon.vy;
+    }
+
+    function applyWallInduction() {
+        let balloonNetCharge = 0;
+        charges.forEach(p => { if(p.parent === 'balloon') balloonNetCharge += p.type; });
+
+        if (balloonNetCharge >= 0) {
+            charges.forEach(p => {
+                if(p.parent === 'wall' && p.type === -1) p.x += (p.baseX - p.x) * 0.1;
+            });
+            return;
+        }
+
+        charges.forEach(p => {
+            if(p.parent === 'wall' && p.type === -1) {
+                let dx = p.baseX - balloon.x;
+                let dy = p.y - balloon.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                let repulsion = (dist < 350) ? (350 - dist) * 0.35 : 0;
+                let targetX = Math.min(p.baseX + repulsion, wall.x + wall.width - 15);
+                p.x += (targetX - p.x) * 0.15;
+            }
+        });
+    }
+
+    // --- 增强后的渲染 ---
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        drawSweater(); // 新的毛衣绘制函数
+        drawWall();
+        drawBalloon(balloon.x, balloon.y, balloon.radius);
+        if (showCharges) drawCharges();
+    }
+
+    // 绘制更形象的毛衣
+    function drawSweater() {
+        ctx.save();
+        
+        // 1. 设定纹理
+        ctx.fillStyle = texturePattern || sweater.color;
+
+        // 2. 绘制不规则形状 (模拟布料的自然下垂)
+        let sLeft = sweater.x;
+        let sTop = sweater.y;
+        let sW = sweater.width;
+        let sH = sweater.height;
+        
+        ctx.beginPath();
+        // 上边 (肩膀)
+        ctx.moveTo(sLeft, sTop); 
+        ctx.quadraticCurveTo(sLeft + sW/2, sTop + 10, sLeft + sW, sTop);
+        // 右边 (靠近身体侧，做成波浪形)
+        ctx.bezierCurveTo(sLeft + sW - 10, sTop + sH*0.3, sLeft + sW + 15, sTop + sH*0.6, sLeft + sW, sTop + sH);
+        // 下边
+        ctx.lineTo(sLeft, sTop + sH);
+        // 左边 (屏幕边缘)
+        ctx.lineTo(sLeft, sTop);
+        
+        ctx.fill();
+
+        // 3. 添加边缘毛绒感 (Fuzziness)
+        ctx.strokeStyle = sweater.color;
+        ctx.lineWidth = 1;
+        // 沿着右边缘画一些随机的“毛刺”
+        let steps = 40;
+        for(let i=0; i<=steps; i++) {
+            let t = i / steps;
+            // 简单的贝塞尔采样近似
+            let px = sLeft + sW; 
+            let py = sTop + sH * t;
+            
+            // 修正x坐标以贴合上面的曲线（简化估算）
+            if (t > 0.3 && t < 0.6) px += 10;
+            
+            // 随机画毛刺
+            if (Math.random() > 0.3) {
+                ctx.beginPath();
+                ctx.moveTo(px, py);
+                ctx.lineTo(px + 4 + Math.random()*4, py + (Math.random()-0.5)*5);
+                ctx.stroke();
+            }
+        }
+
+        // 4. 添加左侧的罗纹 (Ribbing) 装饰
+        ctx.fillStyle = "rgba(0,0,0,0.1)";
+        ctx.fillRect(sLeft, sTop, 30, sH);
+        ctx.strokeStyle = "rgba(0,0,0,0.1)";
+        for(let i=0; i<sH; i+=8) {
+            ctx.beginPath();
+            ctx.moveTo(sLeft, sTop + i);
+            ctx.lineTo(sLeft + 30, sTop + i + 4);
+            ctx.stroke();
+        }
+
+        ctx.restore();
+    }
+
+    function drawWall() {
+        ctx.fillStyle = wall.color;
+        ctx.fillRect(wall.x, wall.y, wall.width, wall.height);
+        
+        // 墙纸/砖块细节
+        ctx.strokeStyle = "#e6e1a0"; 
+        ctx.lineWidth = 2;
+        let brickH = 40;
+        for(let i=0; i<height; i+=brickH) {
+            ctx.beginPath();
+            ctx.moveTo(wall.x, i);
+            ctx.lineTo(wall.x + wall.width, i);
+            ctx.stroke();
+            // 竖线
+            let offset = (i/brickH % 2) * 30;
+            for(let j=offset; j<wall.width; j+=60) {
+                ctx.beginPath();
+                ctx.moveTo(wall.x + j, i);
+                ctx.lineTo(wall.x + j, i + brickH);
+                ctx.stroke();
+            }
+        }
+        
+        // 墙壁左边缘阴影
+        ctx.fillStyle = "rgba(0,0,0,0.05)";
+        ctx.fillRect(wall.x, 0, 5, height);
+    }
+
+    function drawBalloon(x, y, r) {
+        ctx.save();
+        // 气球本体渐变
+        let grad = ctx.createRadialGradient(x - r*0.3, y - r*0.3, r*0.1, x, y, r);
+        grad.addColorStop(0, "#fff59d"); // 高光区淡黄
+        grad.addColorStop(0.3, balloon.color);
+        grad.addColorStop(1, "#fbc02d"); // 边缘深黄
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        // 稍微拉长一点的椭圆
+        ctx.ellipse(x, y, r * 0.88, r, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // 强高光
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.beginPath();
+        ctx.ellipse(x - r*0.35, y - r*0.35, r*0.15, r*0.08, -0.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 绳结细节
+        ctx.fillStyle = "#fbc02d";
+        ctx.beginPath();
+        ctx.moveTo(x - 6, y + r - 3);
+        ctx.lineTo(x + 6, y + r - 3);
+        ctx.lineTo(x, y + r + 12);
+        ctx.fill();
+
+        // 绳子 (贝塞尔曲线模拟自然摆动)
+        ctx.strokeStyle = "#555";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(x, y + r + 10);
+        // 根据移动速度稍微甩动绳子
+        let swing = balloon.vx * 3; 
+        ctx.bezierCurveTo(x + swing, y + r + 60, x - swing, y + r + 90, x + swing*0.5, y + r + 140);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    function drawCharges() {
+        charges.forEach(p => {
+            let drawX, drawY;
+            if (p.parent === 'balloon') {
+                drawX = balloon.x + p.x;
+                drawY = balloon.y + p.y;
+            } else {
+                drawX = p.x;
+                drawY = p.y;
+            }
+            // 加上抖动
+            drawX += p.randX;
+            drawY += p.randY;
+
+            drawProtonElectron(p.type, drawX, drawY);
+        });
+    }
+
+    function drawProtonElectron(type, x, y) {
+        const r = 8;
+        ctx.save();
+        ctx.shadowBlur = 2;
+        ctx.shadowColor = "rgba(0,0,0,0.2)";
+        
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        
+        if (type === 1) {
+            // 质子 - 红色球体质感
+            let grad = ctx.createRadialGradient(x-2, y-2, 1, x, y, r);
+            grad.addColorStop(0, "#ff8a80");
+            grad.addColorStop(1, "#d32f2f");
+            ctx.fillStyle = grad;
+            ctx.fill();
+            // 加号
+            ctx.fillStyle = "white";
+            ctx.fillRect(x - 4, y - 1, 8, 2);
+            ctx.fillRect(x - 1, y - 4, 2, 8);
+        } else {
+            // 电子 - 蓝色球体质感
+            let grad = ctx.createRadialGradient(x-2, y-2, 1, x, y, r);
+            grad.addColorStop(0, "#82b1ff");
+            grad.addColorStop(1, "#1976d2");
+            ctx.fillStyle = grad;
+            ctx.fill();
+            // 减号
+            ctx.fillStyle = "white";
+            ctx.fillRect(x - 4, y - 1, 8, 2);
+        }
+        ctx.restore();
+    }
+
+    // --- 交互 ---
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = evt.clientX || evt.touches[0].clientX;
+        const clientY = evt.clientY || evt.touches[0].clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function onDown(e) {
+        e.preventDefault();
+        const pos = getMousePos(e);
+        const dist = Math.sqrt((pos.x - balloon.x)**2 + (pos.y - balloon.y)**2);
+        if (dist < balloon.radius * 1.5) {
+            balloon.dragging = true;
+            balloon.dragOffsetX = balloon.x - pos.x;
+            balloon.dragOffsetY = balloon.y - pos.y;
+            balloon.vx = 0; balloon.vy = 0;
+            canvas.style.cursor = 'grabbing';
+        }
+    }
+
+    function onMove(e) {
+        e.preventDefault();
+        if (balloon.dragging) {
+            const pos = getMousePos(e);
+            balloon.x = pos.x + balloon.dragOffsetX;
+            balloon.y = pos.y + balloon.dragOffsetY;
+        }
+    }
+
+    function onUp(e) {
+        e.preventDefault();
+        balloon.dragging = false;
+        canvas.style.cursor = 'grab';
+    }
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    canvas.addEventListener('touchstart', onDown, {passive: false});
+    canvas.addEventListener('touchmove', onMove, {passive: false});
+    window.addEventListener('touchend', onUp);
+
+    function resetSim() { initScenario(); }
+    function toggleCharges() { showCharges = !showCharges; }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    loop();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Alchemy Master - 科学炼金术</title>
+    <style>
+        :root {
+            --bg-dark: #1a1a1a;
+            --dock-bg: rgba(20, 20, 25, 0.95);
+            --dock-border: rgba(255, 255, 255, 0.1);
+            --highlight: #4fd1c5;
+            --element-size: 68px;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            user-select: none; 
+            -webkit-user-drag: none; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: radial-gradient(circle at center, #2b3246 0%, #111 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            overscroll-behavior: none;
+            touch-action: none; 
+        }
+
+        /* --- 游戏区域 --- */
+        #playground {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            background-image: radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        /* --- 新增：标题与说明样式 --- */
+        #game-header {
+            position: absolute;
+            top: 12%;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            pointer-events: none; /* 关键：允许点击穿透，不影响游戏操作 */
+            z-index: 0;
+            opacity: 0.8;
+            transition: opacity 0.5s;
+        }
+        
+        #game-header h1 {
+            margin: 0;
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(to bottom, #fff, #8fa5b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        #game-header p {
+            margin: 10px 0 0;
+            font-size: 14px;
+            color: #7f8c9a;
+            font-weight: 400;
+        }
+
+        /* --- 底部工具栏 --- */
+        #dock {
+            height: 160px;
+            width: 100%;
+            background: var(--dock-bg);
+            border-top: 1px solid var(--dock-border);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        #dock-header {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            font-size: 12px;
+            color: #888;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        #search-input {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 6px 12px;
+            color: white;
+            outline: none;
+            font-size: 13px;
+            text-align: center;
+            width: 100px;
+            transition: width 0.2s;
+        }
+        #search-input:focus { width: 150px; border-color: var(--highlight); background: black; }
+
+        #inventory {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 20px;
+            padding-right: 60px; 
+            overflow-x: auto;
+            overflow-y: hidden;
+            white-space: nowrap;
+            touch-action: pan-x; 
+            -webkit-overflow-scrolling: touch;
+        }
+        #inventory::-webkit-scrollbar { height: 0px; display: none; }
+
+        /* --- 元素卡片 --- */
+        .element {
+            width: var(--element-size);
+            height: var(--element-size);
+            border-radius: 16px;
+            background: linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+            border: 1px solid rgba(255,255,255,0.15);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: grab;
+            position: absolute; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.1s, box-shadow 0.2s;
+            touch-action: none; 
+        }
+
+        #inventory .element {
+            position: relative;
+            flex-shrink: 0; 
+            transform: scale(0.95);
+        }
+        
+        #inventory .element:active {
+            background: rgba(255,255,255,0.25);
+            transform: scale(0.9);
+        }
+
+        .element.new-discovery {
+            animation: highlightPulse 2s ease-out;
+        }
+        @keyframes highlightPulse {
+            0% { box-shadow: 0 0 20px var(--highlight); border-color: var(--highlight); }
+            100% { box-shadow: 0 0 0 transparent; }
+        }
+
+        .element.dragging {
+            cursor: grabbing;
+            z-index: 9999 !important;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+            transform: scale(1.2) !important;
+            pointer-events: none;
+            opacity: 0.9;
+        }
+
+        .icon { font-size: 30px; margin-bottom: 2px; pointer-events: none; }
+        .name { font-size: 11px; color: #aaa; pointer-events: none; text-align: center; width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+        /* --- UI 组件 --- */
+        #clear-btn {
+            position: absolute;
+            top: 20px; right: 20px;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 25px;
+            color: #bbb;
+            cursor: pointer;
+            font-size: 13px;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+        }
+        #clear-btn:active { color: white; background: rgba(255,50,50,0.5); }
+
+        #notification {
+            position: absolute;
+            top: 30%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.8);
+            background: rgba(255,255,255,0.95);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: bold;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 2000;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            white-space: nowrap;
+        }
+        #notification.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+
+        .particle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: fadeOut 0.8s ease-out forwards;
+        }
+        @keyframes fadeOut { to { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; } }
+
+        @media (max-width: 600px) {
+            :root { --element-size: 60px; }
+            .icon { font-size: 24px; }
+            .name { font-size: 10px; }
+            #dock { height: 150px; }
+            #game-header h1 { font-size: 26px; }
+            #game-header { top: 15%; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="playground">
+        <!-- 新增：标题与说明 -->
+        <div id="game-header">
+            <h1>科学炼金术</h1>
+            <p>将元素拖拽至画布中心，两两重叠以合成新物质</p>
+        </div>
+
+        <button id="clear-btn" onclick="game.clear()">🧹 清理画布</button>
+        <div id="notification">
+            <span style="font-size: 24px" id="notif-icon">✨</span>
+            <span id="notif-text">发现新元素</span>
+        </div>
+    </div>
+
+    <div id="dock">
+        <div id="dock-header">
+            <span id="counter">解锁: 4/54</span>
+            <input type="text" id="search-input" placeholder="搜索...">
+            <span style="cursor:pointer; padding: 5px;" onclick="game.reset()">重置</span>
+        </div>
+        <div id="inventory"></div>
+    </div>
+
+<script>
+// --- 游戏逻辑保持不变 ---
+
+const DB = {
+    elements: {
+        'water': { name: '水', icon: '💧', color: '#29b6f6' },
+        'fire': { name: '火', icon: '🔥', color: '#ff7043' },
+        'earth': { name: '土', icon: '🌱', color: '#8d6e63' },
+        'air': { name: '气', icon: '💨', color: '#e0e0e0' },
+        'steam': { name: '蒸汽', icon: '🌫️', color: '#b0bec5' },
+        'lava': { name: '岩浆', icon: '🌋', color: '#d84315' },
+        'mud': { name: '泥巴', icon: '💩', color: '#5d4037' },
+        'dust': { name: '尘埃', icon: '✨', color: '#90a4ae' },
+        'rain': { name: '雨', icon: '🌧️', color: '#0288d1' },
+        'energy': { name: '能量', icon: '⚡', color: '#ffee58' },
+        'stone': { name: '石头', icon: '🪨', color: '#757575' },
+        'sand': { name: '沙子', icon: '🏖️', color: '#fdd835' },
+        'glass': { name: '玻璃', icon: '🧊', color: '#e1f5fe' },
+        'cloud': { name: '云', icon: '☁️', color: '#fafafa' },
+        'plant': { name: '植物', icon: '🌿', color: '#66bb6a' },
+        'swamp': { name: '沼泽', icon: '🐊', color: '#33691e' },
+        'sky': { name: '天空', icon: '🌌', color: '#3f51b5' },
+        'sun': { name: '太阳', icon: '☀️', color: '#ffeb3b' },
+        'moon': { name: '月亮', icon: '🌙', color: '#fff9c4' },
+        'storm': { name: '风暴', icon: '⛈️', color: '#1a237e' },
+        'life': { name: '生命', icon: '🧬', color: '#ec407a' },
+        'metal': { name: '金属', icon: '🔩', color: '#9e9e9e' },
+        'human': { name: '人类', icon: '🧑', color: '#ffccbc' },
+        'bird': { name: '鸟', icon: '🐦', color: '#4fc3f7' },
+        'tree': { name: '树', icon: '🌳', color: '#2e7d32' },
+        'flower': { name: '花', icon: '🌸', color: '#f06292' },
+        'time': { name: '时间', icon: '⏳', color: '#ffd54f' },
+        'tool': { name: '工具', icon: '🔨', color: '#795548' },
+        'weapon': { name: '武器', icon: '⚔️', color: '#e53e3e' },
+        'electricity': { name: '电力', icon: '🔌', color: '#ffff00' },
+        'ash': { name: '灰烬', icon: '🏴', color: '#424242' },
+        'house': { name: '房屋', icon: '🏠', color: '#ffab91' },
+        'hunter': { name: '猎人', icon: '🏹', color: '#8d6e63' },
+        'farmer': { name: '农民', icon: '🧑‍🌾', color: '#c8e6c9' },
+        'meat': { name: '肉', icon: '🍖', color: '#ef9a9a' },
+        'light': { name: '光', icon: '💡', color: '#fff9c4' },
+        'computer': { name: '电脑', icon: '💻', color: '#546e7a' },
+        'internet': { name: '互联网', icon: '🌐', color: '#039be5' },
+        'robot': { name: '机器人', icon: '🤖', color: '#b0bec5' },
+        'ai': { name: 'AI', icon: '🧠', color: '#ab47bc' },
+        'rainbow': { name: '彩虹', icon: '🌈', color: '#ce93d8' },
+        'firefighter': { name: '消防员', icon: '🧑‍🚒', color: '#ff8a65' },
+        'pottery': { name: '陶器', icon: '🏺', color: '#d7ccc8' },
+        'brick': { name: '砖块', icon: '🧱', color: '#a1887f' }
+    },
+    recipes: [
+        ['water', 'fire', 'steam'], ['earth', 'fire', 'lava'], ['earth', 'water', 'mud'], ['air', 'earth', 'dust'],
+        ['water', 'air', 'rain'], ['air', 'fire', 'energy'], ['lava', 'water', 'stone'], ['stone', 'air', 'sand'],
+        ['sand', 'fire', 'glass'], ['water', 'steam', 'cloud'], ['rain', 'earth', 'plant'], ['plant', 'mud', 'swamp'],
+        ['cloud', 'air', 'sky'], ['sky', 'fire', 'sun'], ['sky', 'stone', 'moon'], ['cloud', 'energy', 'storm'],
+        ['swamp', 'energy', 'life'], ['fire', 'stone', 'metal'], ['life', 'earth', 'human'], ['life', 'sky', 'bird'],
+        ['plant', 'plant', 'tree'], ['plant', 'sun', 'flower'], ['sand', 'glass', 'time'], ['human', 'metal', 'tool'],
+        ['tool', 'metal', 'weapon'], ['metal', 'energy', 'electricity'], ['fire', 'tree', 'ash'], ['human', 'tool', 'house'],
+        ['human', 'weapon', 'hunter'], ['human', 'plant', 'farmer'], ['hunter', 'bird', 'meat'], ['electricity', 'glass', 'light'],
+        ['electricity', 'tool', 'computer'], ['computer', 'computer', 'internet'], ['life', 'computer', 'robot'],
+        ['robot', 'internet', 'ai'], ['rain', 'sun', 'rainbow'], ['human', 'fire', 'firefighter'], ['mud', 'fire', 'brick'],
+        ['mud', 'stone', 'pottery']
+    ]
+};
+
+const recipeMap = new Map();
+DB.recipes.forEach(([a, b, res]) => {
+    recipeMap.set([a, b].sort().join('+'), res);
+});
+
+class Game {
+    constructor() {
+        this.playground = document.getElementById('playground');
+        this.inventory = document.getElementById('inventory');
+        this.counter = document.getElementById('counter');
+        this.searchInput = document.getElementById('search-input');
+        
+        const saved = localStorage.getItem('alchemy_save');
+        this.unlocked = saved ? new Set(JSON.parse(saved)) : new Set(['water', 'fire', 'earth', 'air']);
+        
+        this.dragState = { active: false, el: null, offX: 0, offY: 0, curX: 0, curY: 0 };
+        
+        this.init();
+    }
+
+    init() {
+        this.renderInventory();
+        this.updateCounter();
+        
+        window.addEventListener('mousemove', this.onMove.bind(this));
+        window.addEventListener('touchmove', this.onMove.bind(this), { passive: false });
+        
+        window.addEventListener('mouseup', this.onUp.bind(this));
+        window.addEventListener('touchend', this.onUp.bind(this));
+        
+        this.searchInput.addEventListener('input', (e) => this.renderInventory(e.target.value));
+        
+        this.animate();
+    }
+
+    getPointerPos(e) {
+        if (e.touches && e.touches.length > 0) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+            return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    }
+
+    updateCounter() {
+        this.counter.innerText = `解锁: ${this.unlocked.size}/${Object.keys(DB.elements).length}`;
+        localStorage.setItem('alchemy_save', JSON.stringify(Array.from(this.unlocked)));
+    }
+
+    renderInventory(filter = '') {
+        this.inventory.innerHTML = '';
+        const basics = ['water', 'fire', 'earth', 'air'];
+        const others = Array.from(this.unlocked)
+            .filter(id => !basics.includes(id))
+            .sort((a, b) => DB.elements[a].name.localeCompare(DB.elements[b].name, 'zh'));
+            
+        [...basics, ...others].forEach(id => {
+            const data = DB.elements[id];
+            if (filter && !data.name.includes(filter)) return;
+
+            const el = document.createElement('div');
+            el.className = 'element';
+            if(this.justUnlocked === id) {
+                el.classList.add('new-discovery');
+                this.justUnlocked = null;
+            }
+            el.innerHTML = `<div class="icon">${data.icon}</div><div class="name">${data.name}</div>`;
+            el.style.borderColor = data.color;
+            
+            const startHandler = (e) => this.startDrag(e, id, true);
+            el.addEventListener('mousedown', startHandler);
+            el.addEventListener('touchstart', startHandler, { passive: false });
+            
+            this.inventory.appendChild(el);
+        });
+    }
+
+    startDrag(e, id, fromDock) {
+        if (e.cancelable) e.preventDefault();
+        
+        const data = DB.elements[id];
+        const pos = this.getPointerPos(e);
+        
+        const el = document.createElement('div');
+        el.className = 'element dragging';
+        el.dataset.id = id;
+        el.innerHTML = `<div class="icon">${data.icon}</div><div class="name">${data.name}</div>`;
+        el.style.borderColor = data.color;
+        el.style.backgroundColor = '#1e1e24'; 
+        
+        const playRect = this.playground.getBoundingClientRect();
+        let initX, initY;
+        const halfSize = 34; 
+
+        if (fromDock) {
+            initX = pos.x - playRect.left - halfSize;
+            initY = pos.y - playRect.top - halfSize;
+        } else {
+            const target = e.target.closest('.element');
+            const rect = target.getBoundingClientRect();
+            initX = rect.left - playRect.left;
+            initY = rect.top - playRect.top;
+            
+            this.dragState.offX = pos.x - rect.left;
+            this.dragState.offY = pos.y - rect.top;
+            
+            target.remove(); 
+        }
+
+        if(fromDock) {
+            this.dragState.offX = halfSize;
+            this.dragState.offY = halfSize;
+        }
+
+        el.style.left = initX + 'px';
+        el.style.top = initY + 'px';
+        
+        this.playground.appendChild(el);
+
+        this.dragState.active = true;
+        this.dragState.el = el;
+        this.dragState.curX = pos.x;
+        this.dragState.curY = pos.y;
+    }
+
+    onMove(e) {
+        if(!this.dragState.active) return;
+        if(e.cancelable) e.preventDefault();
+        
+        const pos = this.getPointerPos(e);
+        this.dragState.curX = pos.x;
+        this.dragState.curY = pos.y;
+    }
+
+    animate() {
+        if (this.dragState.active) {
+            const { curX, curY, offX, offY, el } = this.dragState;
+            const rect = this.playground.getBoundingClientRect();
+            
+            const x = curX - rect.left - offX;
+            const y = curY - rect.top - offY;
+            
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+        }
+        requestAnimationFrame(this.animate.bind(this));
+    }
+
+    onUp(e) {
+        if(!this.dragState.active) return;
+        
+        const el = this.dragState.el;
+        el.classList.remove('dragging');
+        this.dragState.active = false;
+
+        const playRect = this.playground.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        
+        if (elRect.top > playRect.height - 80) {
+            this.remove(el);
+            return;
+        }
+
+        const startHandler = (ev) => this.startDrag(ev, el.dataset.id, false);
+        el.addEventListener('mousedown', startHandler);
+        el.addEventListener('touchstart', startHandler, { passive: false });
+
+        const target = this.checkCollision(el);
+        if (target) {
+            this.combine(el, target);
+        } else {
+            this.separate(el);
+        }
+    }
+
+    checkCollision(src) {
+        const els = Array.from(this.playground.querySelectorAll('.element:not(.dragging)'));
+        const r1 = src.getBoundingClientRect();
+        const x1 = r1.left + r1.width/2, y1 = r1.top + r1.height/2;
+        
+        let hit = null;
+        let min = 60; 
+
+        for(let t of els) {
+            if(t === src) continue;
+            const r2 = t.getBoundingClientRect();
+            const dist = Math.hypot(x1 - (r2.left+r2.width/2), y1 - (r2.top+r2.height/2));
+            if(dist < min) {
+                min = dist;
+                hit = t;
+            }
+        }
+        return hit;
+    }
+
+    combine(el1, el2) {
+        const k = [el1.dataset.id, el2.dataset.id].sort().join('+');
+        const res = recipeMap.get(k);
+
+        if (res) {
+            const r1 = el1.getBoundingClientRect();
+            const r2 = el2.getBoundingClientRect();
+            const playRect = this.playground.getBoundingClientRect();
+            
+            const cx = (r1.left + r2.left)/2 - playRect.left;
+            const cy = (r1.top + r2.top)/2 - playRect.top;
+
+            this.remove(el1);
+            this.remove(el2);
+            this.spawn(res, cx, cy);
+            this.particles(cx+34, cy+34, DB.elements[res].color);
+
+            if(!this.unlocked.has(res)) {
+                this.unlocked.add(res);
+                this.justUnlocked = res;
+                this.renderInventory(this.searchInput.value);
+                this.updateCounter();
+                this.notify(DB.elements[res]);
+                setTimeout(() => this.inventory.scrollLeft = this.inventory.scrollWidth, 100);
+            }
+        } else {
+            this.repel(el1, el2);
+        }
+    }
+
+    spawn(id, x, y) {
+        const data = DB.elements[id];
+        const el = document.createElement('div');
+        el.className = 'element';
+        el.dataset.id = id;
+        el.innerHTML = `<div class="icon">${data.icon}</div><div class="name">${data.name}</div>`;
+        el.style.borderColor = data.color;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.animation = 'pop 0.3s ease-out';
+        
+        const startHandler = (ev) => this.startDrag(ev, id, false);
+        el.addEventListener('mousedown', startHandler);
+        el.addEventListener('touchstart', startHandler, { passive: false });
+        
+        this.playground.appendChild(el);
+    }
+
+    repel(el1, el2) {
+        const r1 = el1.getBoundingClientRect();
+        const r2 = el2.getBoundingClientRect();
+        let dx = r1.left - r2.left;
+        let dy = r1.top - r2.top;
+        const len = Math.hypot(dx, dy) || 1;
+        
+        const currLeft = parseFloat(el1.style.left);
+        const currTop = parseFloat(el1.style.top);
+        el1.style.transition = 'all 0.2s';
+        el1.style.left = (currLeft + (dx/len)*60) + 'px';
+        el1.style.top = (currTop + (dy/len)*60) + 'px';
+        
+        setTimeout(() => el1.style.transition = '', 200);
+    }
+
+    separate(el) {
+        const hit = this.checkCollision(el);
+        if(hit) this.repel(el, hit);
+    }
+
+    remove(el) {
+        el.style.transition = 'transform 0.2s, opacity 0.2s';
+        el.style.transform = 'scale(0)';
+        el.style.opacity = 0;
+        setTimeout(() => el.remove(), 200);
+    }
+
+    clear() {
+        this.playground.querySelectorAll('.element').forEach(e => this.remove(e));
+    }
+
+    reset() {
+        if(confirm('确定重置所有进度吗？')) {
+            this.unlocked = new Set(['water', 'fire', 'earth', 'air']);
+            this.clear();
+            this.renderInventory();
+            this.updateCounter();
+        }
+    }
+
+    notify(data) {
+        const n = document.getElementById('notification');
+        document.getElementById('notif-icon').innerText = data.icon;
+        document.getElementById('notif-text').innerText = `新元素: ${data.name}`;
+        n.classList.add('show');
+        setTimeout(() => n.classList.remove('show'), 2000);
+    }
+
+    particles(x, y, color) {
+        for(let i=0; i<10; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = x+'px'; p.style.top = y+'px';
+            p.style.background = color;
+            p.style.width = (Math.random()*6+4)+'px';
+            p.style.height = p.style.width;
+            const angle = Math.random()*6.28;
+            const vel = Math.random()*60+30;
+            p.style.setProperty('--tx', Math.cos(angle)*vel+'px');
+            p.style.setProperty('--ty', Math.sin(angle)*vel+'px');
+            this.playground.appendChild(p);
+            setTimeout(()=>p.remove(), 800);
+        }
+    }
+}
+
+const game = new Game();
+
+const style = document.createElement('style');
+style.innerHTML = `@keyframes pop { 0% { transform: scale(0); } 60% { transform: scale(1.1); } 100% { transform: scale(1); } }`;
+document.head.appendChild(style);
+
+</script>
+</body>
+</html>

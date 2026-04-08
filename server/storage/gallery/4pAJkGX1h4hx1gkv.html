@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 趣味体感游戏 (轻松版)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    
+    <style>
+        :root {
+            --primary-color: #ff00e6;
+            --secondary-color: #00f3ff;
+            --bg-color: #0f172a;
+            --panel-bg: #1e293b;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        #main-container {
+            display: flex;
+            width: 95%;
+            max-width: 1280px;
+            height: 90vh;
+            background: var(--panel-bg);
+            border-radius: 24px;
+            box-shadow: 0 0 60px rgba(0, 243, 255, 0.1);
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+
+        #game-area {
+            flex: 3;
+            position: relative;
+            background: #000;
+            overflow: hidden;
+        }
+
+        video {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; transform: scaleX(-1); display: none;
+        }
+        
+        canvas {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            transform: scaleX(-1);
+        }
+
+        #sidebar {
+            flex: 1;
+            min-width: 320px;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            border-left: 2px solid #334155;
+            z-index: 10;
+        }
+
+        .level-badge {
+            background: var(--secondary-color);
+            color: #000;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 800;
+            display: inline-block;
+            margin-bottom: 15px;
+            box-shadow: 0 0 15px var(--secondary-color);
+        }
+
+        #target-title {
+            font-size: 26px; margin: 0 0 10px 0; color: #fff; font-weight: 800;
+        }
+
+        #target-desc {
+            color: #cbd5e1; font-size: 15px; margin-bottom: 20px; line-height: 1.6;
+        }
+
+        #guide-visual {
+            flex-grow: 1;
+            background: rgba(255,255,255,0.03);
+            border-radius: 20px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            border: 2px dashed #475569;
+        }
+
+        #progress-container { height: 70px; display: flex; flex-direction: column; justify-content: center; }
+        .timer-label { display: flex; justify-content: space-between; font-size: 14px; color: #94a3b8; margin-bottom: 8px; }
+        .progress-bar-bg { width: 100%; height: 16px; background: #334155; border-radius: 8px; overflow: hidden; }
+        #progress-fill {
+            width: 0%; height: 100%; 
+            background: linear-gradient(90deg, var(--secondary-color), var(--primary-color));
+            transition: width 0.1s linear;
+            box-shadow: 0 0 15px var(--secondary-color);
+        }
+
+        #status-overlay {
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.8); padding: 15px 30px; border-radius: 40px;
+            font-size: 24px; font-weight: 900; color: var(--secondary-color);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+            border: 2px solid var(--secondary-color);
+        }
+
+        .stick-figure { stroke: white; stroke-width: 6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        .stick-head { fill: var(--bg-color); stroke: white; stroke-width: 4; }
+        .stick-joint { fill: var(--secondary-color); stroke: none; }
+
+        #loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a; z-index: 999;
+            display: flex; justify-content: center; align-items: center; flex-direction: column;
+        }
+        .spinner {
+            width: 50px; height: 50px; border: 5px solid #333; border-top: 5px solid var(--secondary-color);
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 800px) {
+            #main-container { flex-direction: column; height: 100vh; border-radius: 0; }
+            #sidebar { height: 35%; padding: 15px; min-width: auto; }
+            #guide-visual { display: none; } 
+        }
+    </style>
+</head>
+<body>
+
+<div id="main-container">
+    <div id="game-area">
+        <div id="loader">
+            <div class="spinner"></div>
+            <div style="color: white; font-weight: bold;">正在加载 (宽容模式)...</div>
+        </div>
+        <video id="input_video"></video>
+        <canvas id="output_canvas"></canvas>
+        <div id="status-overlay">很好！保持！</div>
+    </div>
+
+    <div id="sidebar">
+        <div>
+            <div class="level-badge" id="level-indicator">STAGE 1</div>
+            <h1 id="target-title">加载中...</h1>
+            <p id="target-desc">请允许摄像头权限。</p>
+        </div>
+
+        <div id="guide-visual"></div>
+
+        <div id="progress-container">
+            <div class="timer-label">
+                <span id="status-text">准备就绪</span>
+                <span id="timer-text">0.0s</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div id="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const videoElement = document.getElementById('input_video');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    
+    /* 
+       判定宽容度优化说明：
+       1. 放宽了角度检测，不再要求完美的几何形状。
+       2. 主要检测手腕相对于头部和肩膀的上下位置。
+       3. 只要动作看起来像，就能触发绿色判定。
+    */
+
+    const LEVELS = [
+        {
+            id: 1,
+            name: "Disco 狂热",
+            desc: "简单的热身：一只手举高高（超过头顶），另一只手放下（在肩膀以下）。左右不限！",
+            svg: `
+                <circle cx="100" cy="40" r="14" class="stick-head"/>
+                <path d="M100 54 L100 110 M100 110 L80 170 M100 110 L120 170" class="stick-figure"/>
+                <!-- 右手高举 -->
+                <path d="M100 60 L150 20" class="stick-figure"/> 
+                <!-- 左手叉腰 -->
+                <path d="M100 60 L60 90" class="stick-figure"/>
+                <circle cx="150" cy="20" r="6" class="stick-joint"/>
+            `,
+            check: (lm) => {
+                // 逻辑简化：
+                // 一只手腕必须高于鼻子 (y更小)
+                // 另一只手腕必须低于肩膀 (y更大)
+                // 左右互换均可
+                const leftUp = lm[15].y < lm[0].y; // 左手高
+                const leftDown = lm[15].y > lm[11].y; // 左手低
+                
+                const rightUp = lm[16].y < lm[0].y; // 右手高
+                const rightDown = lm[16].y > lm[12].y; // 右手低
+
+                return (leftUp && rightDown) || (rightUp && leftDown);
+            }
+        },
+        {
+            id: 2,
+            name: "我是射手 (投篮)",
+            desc: "把惯用手举到头顶上方（像要投球），另一只手抬到肩膀附近扶球。",
+            svg: `
+                <circle cx="100" cy="40" r="14" class="stick-head"/>
+                <path d="M100 54 L100 110 M100 110 L85 170 M100 110 L115 170" class="stick-figure"/>
+                <!-- 投篮手 -->
+                <path d="M100 60 L130 45 L120 15" class="stick-figure"/> 
+                <!-- 扶球手 -->
+                <path d="M100 60 L70 60 L90 40" class="stick-figure"/>
+            `,
+            check: (lm) => {
+                // 逻辑简化：
+                // 主手：手腕高于眼睛
+                // 副手：手腕高于肩膀
+                
+                // 假设左手投篮
+                const L_Shoot = lm[15].y < lm[2].y; // 左手过眼
+                const R_Assist = lm[16].y < lm[12].y; // 右手过肩
+                
+                // 假设右手投篮
+                const R_Shoot = lm[16].y < lm[5].y;
+                const L_Assist = lm[15].y < lm[11].y;
+
+                return (L_Shoot && R_Assist) || (R_Shoot && L_Assist);
+            }
+        },
+        {
+            id: 3,
+            name: "金鸡独立 (树式)",
+            desc: "双手在头上合拢（或者只是举高），抬起一只脚，让脚踝离开地面。",
+            svg: `
+                <circle cx="100" cy="40" r="14" class="stick-head"/>
+                <path d="M100 54 L100 110 M100 110 L90 170" class="stick-figure"/> <!-- 站立腿 -->
+                <path d="M100 110 L130 140 L110 160" class="stick-figure"/> <!-- 提起腿 -->
+                <!-- 手臂高举 -->
+                <path d="M100 60 L70 20 M100 60 L130 20" class="stick-figure"/>
+            `,
+            check: (lm) => {
+                // 1. 双手高举 (手腕低于鼻子坐标即可，也就是在上面)
+                const handsUp = lm[15].y < lm[0].y && lm[16].y < lm[0].y;
+                
+                // 2. 腿部检测 (宽松版)
+                // 比较两个脚踝的Y坐标，差值大于一定比例就算抬腿
+                // 0.05 是一个很小的阈值，稍微抬起来一点点就算过
+                const footDiff = Math.abs(lm[27].y - lm[28].y);
+                const isOneLegUp = footDiff > 0.05; 
+
+                return handsUp && isOneLegUp;
+            }
+        },
+        {
+            id: 4,
+            name: "扎马步 (深蹲)",
+            desc: "半蹲即可！双手向两侧张开，膝盖微微弯曲。",
+            svg: `
+                <circle cx="100" cy="50" r="14" class="stick-head"/>
+                <path d="M100 64 L100 120" class="stick-figure"/>
+                <!-- 弯曲的腿 -->
+                <path d="M100 120 L60 135 L60 170" class="stick-figure"/>
+                <path d="M100 120 L140 135 L140 170" class="stick-figure"/>
+                <!-- 手平举 -->
+                <path d="M100 70 L40 70 M100 70 L160 70" class="stick-figure"/>
+            `,
+            check: (lm) => {
+                // 1. 简单的深蹲判定：臀部位置变低了
+                // 比较 臀部Y 和 膝盖Y 的距离。站立时距离远，蹲下时距离近。
+                // 我们放宽阈值到 0.35 (之前是 0.25)
+                const hipY = (lm[23].y + lm[24].y) / 2;
+                const kneeY = (lm[25].y + lm[26].y) / 2;
+                const thighLen = Math.abs(hipY - kneeY);
+                
+                // 如果大腿垂直距离变短，说明蹲下了
+                const isSquat = thighLen < 0.35; 
+
+                // 2. 双手张开 (手腕X距离 > 肩膀X距离的1.5倍)
+                const shoulderDist = Math.abs(lm[11].x - lm[12].x);
+                const handDist = Math.abs(lm[15].x - lm[16].x);
+                const handsWide = handDist > (shoulderDist * 1.5);
+
+                return isSquat && handsWide;
+            }
+        },
+        {
+            id: 5,
+            name: "闪电庆祝 (Bolt)",
+            desc: "一手斜指向天空，另一只手弯曲放在胸前。",
+            svg: `
+                <circle cx="100" cy="40" r="14" class="stick-head"/>
+                <path d="M100 54 L100 110 L80 170 M100 110 L120 170" class="stick-figure"/>
+                <!-- 指天手 -->
+                <path d="M100 60 L160 30" class="stick-figure"/>
+                <!-- 拉弓手 -->
+                <path d="M100 60 L70 55 L50 80" class="stick-figure"/>
+            `,
+            check: (lm) => {
+                // 宽松判定：
+                // 指天手：只要伸直且高于头
+                // 拉弓手：只要手腕位于肩膀和腰之间
+
+                // 假设右手指天
+                const R_Point = lm[16].y < lm[0].y; // 高于鼻子
+                const L_Bow = lm[15].y > lm[11].y && lm[15].y < lm[23].y; // 在肩和髋之间
+
+                // 假设左手指天
+                const L_Point = lm[15].y < lm[0].y;
+                const R_Bow = lm[16].y > lm[12].y && lm[16].y < lm[24].y;
+
+                return (R_Point && L_Bow) || (L_Point && R_Bow);
+            }
+        }
+    ];
+
+    let currentLevelIndex = 0;
+    let holdStartTime = 0;
+    let isHolding = false;
+    const HOLD_DURATION = 1500; 
+    let isGameWon = false;
+
+    const pose = new Pose({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`});
+    pose.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+    });
+    pose.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => { await pose.send({image: videoElement}); },
+        width: 1280, height: 720
+    });
+
+    camera.start().then(() => {
+        document.getElementById('loader').style.display = 'none';
+        updateLevelUI();
+    });
+
+    function onResults(results) {
+        canvasElement.width = videoElement.videoWidth;
+        canvasElement.height = videoElement.videoHeight;
+        canvasCtx.save();
+        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+        if(isGameWon) { canvasCtx.restore(); return; }
+
+        let isPoseCorrect = false;
+        if (results.poseLandmarks) {
+            try {
+                isPoseCorrect = LEVELS[currentLevelIndex].check(results.poseLandmarks);
+            } catch(e) { isPoseCorrect = false; }
+
+            // 反馈颜色：正确=青色，错误=半透明白
+            const color = isPoseCorrect ? '#00f3ff' : 'rgba(255,255,255,0.4)';
+            const thick = isPoseCorrect ? 8 : 3;
+            
+            drawConnectors(canvasCtx, results.poseLandmarks, POSE_CONNECTIONS, {color: color, lineWidth: thick});
+            drawLandmarks(canvasCtx, results.poseLandmarks, {
+                color: isPoseCorrect ? '#ff00e6' : '#ffffff', 
+                lineWidth: 2, radius: isPoseCorrect ? 6 : 4
+            });
+        }
+        canvasCtx.restore();
+        handleGameLogic(isPoseCorrect);
+    }
+
+    function handleGameLogic(isCorrect) {
+        const overlay = document.getElementById('status-overlay');
+        const fill = document.getElementById('progress-fill');
+        const statusText = document.getElementById('status-text');
+        const timerText = document.getElementById('timer-text');
+
+        if (isCorrect) {
+            if (!isHolding) {
+                isHolding = true;
+                holdStartTime = Date.now();
+                overlay.style.opacity = 1;
+                statusText.innerText = "检测成功！保持！";
+                statusText.style.color = "var(--secondary-color)";
+            }
+
+            const elapsed = Date.now() - holdStartTime;
+            const remaining = Math.max(0, (HOLD_DURATION - elapsed) / 1000).toFixed(1);
+            const percent = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+            
+            fill.style.width = percent + '%';
+            timerText.innerText = remaining + 's';
+
+            if (elapsed >= HOLD_DURATION) {
+                levelComplete();
+            }
+        } else {
+            isHolding = false;
+            holdStartTime = 0;
+            overlay.style.opacity = 0;
+            fill.style.width = '0%';
+            statusText.innerText = "请模仿左侧动作";
+            statusText.style.color = "#94a3b8";
+            timerText.innerText = "0.0s";
+        }
+    }
+
+    function levelComplete() {
+        isHolding = false; holdStartTime = Date.now() + 5000;
+        
+        document.getElementById('status-text').innerText = "完成！🎉";
+        document.getElementById('sidebar').style.background = "linear-gradient(180deg, #064e3b 0%, #0f172a 100%)";
+        
+        setTimeout(() => {
+            document.getElementById('sidebar').style.background = "";
+            currentLevelIndex++;
+            if (currentLevelIndex >= LEVELS.length) gameWin();
+            else updateLevelUI();
+        }, 1200);
+    }
+
+    function updateLevelUI() {
+        const level = LEVELS[currentLevelIndex];
+        document.getElementById('level-indicator').innerText = `STAGE ${currentLevelIndex + 1}`;
+        document.getElementById('target-title').innerText = level.name;
+        document.getElementById('target-desc').innerText = level.desc;
+        document.getElementById('guide-visual').innerHTML = `<svg viewBox="0 0 200 200" style="width:80%; height:80%;">${level.svg}</svg>`;
+    }
+
+    function gameWin() {
+        isGameWon = true;
+        document.getElementById('sidebar').innerHTML = `
+            <div style="text-align:center; padding-top:50px;">
+                <div style="font-size: 80px;">🏆</div>
+                <h1 style="color:var(--secondary-color);">通关成功！</h1>
+                <p style="color:#cbd5e1;">你的体态控制很棒！</p>
+                <button onclick="location.reload()" style="
+                    background: var(--primary-color); color: white; border: none; 
+                    padding: 15px 40px; font-size: 18px; border-radius: 30px; 
+                    cursor: pointer; font-weight: bold; margin-top:20px;
+                    box-shadow: 0 0 20px var(--primary-color);">
+                    再玩一次
+                </button>
+            </div>
+        `;
+    }
+</script>
+</body>
+</html>

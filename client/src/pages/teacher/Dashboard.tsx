@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
 import { reportService, type TeacherDashboardData } from '../../services/api'
 
@@ -39,7 +40,7 @@ export default function Dashboard() {
   ]
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="dashboard" selectedClass={dashboardData?.selected_class} />}>
+    <Layout sidebar={<TeacherSidebar activePage="dashboard" selectedClass={dashboardData?.selected_class} />} leftSidebar={<TeacherLeftSidebar activePage="dashboard" />}>
       {/* Panel Head */}
       <section className="panel-head">
         <div>

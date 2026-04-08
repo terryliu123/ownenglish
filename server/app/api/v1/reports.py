@@ -3,13 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List
-from datetime import datetime, timedelta, timezone, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.db.session import get_db
 from app.models import (
     User, UserRole, Class, ClassEnrollment, StudyPack, PracticeModule,
     Submission, LiveSession, LiveTask, LiveSubmission, LiveTaskGroup,
-    TeacherProfile, StudentProfile
+    TeacherProfile, StudentProfile, LiveChallengeSession, BigscreenActivitySession,
+    TeachingAidSession
 )
 from app.api.v1.auth import get_current_user
 
@@ -160,8 +161,9 @@ async def get_student_weak_points(
 async def get_teacher_dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    live_session_id: str = None,
 ):
-    """Get teacher dashboard statistics."""
+    """Get teacher dashboard statistics, optionally filtered by classroom session."""
     if current_user.role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="Only teachers can access this")
 
@@ -181,6 +183,7 @@ async def get_teacher_dashboard(
                 "pending_tasks": 0,
                 "unpublished_packs": 0,
                 "focus_students": 0,
+                "total_sessions": 0,
             },
             "activities": [],
         }
@@ -225,19 +228,39 @@ async def get_teacher_dashboard(
     )
     unpublished_packs = result.scalar() or 0
 
+    # Count total classroom sessions for this class
+    result = await db.execute(
+        select(func.count(LiveSession.id)).where(
+            LiveSession.class_id == class_id,
+            LiveSession.status.in_(["active", "ended"])
+        )
+    )
+    total_sessions = result.scalar() or 0
+
     # Count students needing focus (low completion rate or no recent activity)
     # Students with less than 50% completion rate or no submissions in last 7 days
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    result = await db.execute(
-        select(Submission.student_id)
-        .join(StudyPack, Submission.study_pack_id == StudyPack.id)
-        .where(
-            StudyPack.class_id == class_id,
-            Submission.submitted_at >= seven_days_ago
+
+    # If filtering by session, check participation in that session
+    if live_session_id:
+        result = await db.execute(
+            select(LiveSubmission.student_id)
+            .join(LiveTask, LiveSubmission.task_id == LiveTask.id)
+            .where(LiveTask.session_id == live_session_id)
+            .distinct()
         )
-        .distinct()
-    )
-    active_student_ids = {row[0] for row in result.all()}
+        active_student_ids = {row[0] for row in result.all()}
+    else:
+        result = await db.execute(
+            select(Submission.student_id)
+            .join(StudyPack, Submission.study_pack_id == StudyPack.id)
+            .where(
+                StudyPack.class_id == class_id,
+                Submission.submitted_at >= seven_days_ago
+            )
+            .distinct()
+        )
+        active_student_ids = {row[0] for row in result.all()}
 
     # Students who haven't submitted anything in the last 7 days
     result = await db.execute(
@@ -315,6 +338,7 @@ async def get_teacher_dashboard(
             "pending_tasks": pending_tasks,
             "unpublished_packs": unpublished_packs,
             "focus_students": focus_students,
+            "total_sessions": total_sessions,
         },
         "activities": activities,
     }
@@ -325,8 +349,9 @@ async def get_class_summary(
     class_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    live_session_id: str = None,
 ):
-    """Get class learning summary for teacher."""
+    """Get class learning summary for teacher, optionally filtered by classroom session."""
     if current_user.role != UserRole.TEACHER:
         raise HTTPException(status_code=403, detail="Only teachers can access this")
 
@@ -362,13 +387,30 @@ async def get_class_summary(
     )
     active_session = result.scalar_one_or_none()
 
-    # Get recent submissions count
+    # Get recent submissions count (filtered by session if provided)
+    if live_session_id:
+        result = await db.execute(
+            select(func.count(LiveSubmission.id))
+            .join(LiveTask, LiveSubmission.task_id == LiveTask.id)
+            .where(LiveTask.session_id == live_session_id)
+        )
+        submission_count = result.scalar() or 0
+    else:
+        result = await db.execute(
+            select(func.count(Submission.id))
+            .join(StudyPack, Submission.study_pack_id == StudyPack.id)
+            .where(StudyPack.class_id == class_id)
+        )
+        submission_count = result.scalar() or 0
+
+    # Count total classroom sessions
     result = await db.execute(
-        select(func.count(Submission.id))
-        .join(StudyPack, Submission.study_pack_id == StudyPack.id)
-        .where(StudyPack.class_id == class_id)
+        select(func.count(LiveSession.id)).where(
+            LiveSession.class_id == class_id,
+            LiveSession.status.in_(["active", "ended"])
+        )
     )
-    submission_count = result.scalar() or 0
+    total_sessions = result.scalar() or 0
 
     # Get average completion rate (mock calculation)
     completion_rate = min(100, (student_count * 10) if student_count > 0 else 0)
@@ -382,6 +424,8 @@ async def get_class_summary(
         "completion_rate": completion_rate,
         "has_active_session": active_session is not None,
         "active_session_id": active_session.id if active_session else None,
+        "total_sessions": total_sessions,
+        "filtered_by_session": live_session_id,
     }
 
 
@@ -522,4 +566,163 @@ async def get_live_session_results(
         "started_at": session.started_at,
         "ended_at": session.ended_at,
         "task_results": task_results,
+    }
+
+
+@router.get("/teacher/class/{class_id}/session-effectiveness")
+async def get_session_effectiveness(
+    class_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Analyze classroom session effectiveness for a class."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can access this")
+
+    # Verify teacher owns this class
+    result = await db.execute(select(Class).where(Class.id == class_id))
+    class_obj = result.scalar_one_or_none()
+
+    if not class_obj or class_obj.teacher_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized for this class")
+
+    # Get all ended sessions for this class
+    result = await db.execute(
+        select(LiveSession).where(
+            LiveSession.class_id == class_id,
+            LiveSession.status == "ended"
+        ).order_by(LiveSession.started_at.desc())
+    )
+    sessions = result.scalars().all()
+
+    if not sessions:
+        return {
+            "class_id": class_id,
+            "class_name": class_obj.name,
+            "total_sessions": 0,
+            "sessions": [],
+            "overall_stats": {
+                "avg_duration_minutes": 0,
+                "avg_participation_rate": 0,
+                "avg_task_completion_rate": 0,
+                "avg_challenge_count": 0,
+                "total_interactions": 0,
+            }
+        }
+
+    # Get total enrolled students for participation rate calculation
+    result = await db.execute(
+        select(func.count(ClassEnrollment.id)).where(
+            ClassEnrollment.class_id == class_id
+        )
+    )
+    total_students = result.scalar() or 0
+
+    session_stats = []
+    total_duration = 0
+    total_participation = 0
+    total_task_completion = 0
+    total_challenges = 0
+    total_interactions = 0
+
+    for session in sessions:
+        # Calculate duration
+        duration_seconds = session.duration_seconds or 0
+        duration_minutes = duration_seconds / 60
+
+        # Count tasks in this session
+        result = await db.execute(
+            select(func.count(LiveTask.id)).where(LiveTask.session_id == session.id)
+        )
+        task_count = result.scalar() or 0
+
+        # Count unique students who submitted in this session
+        result = await db.execute(
+            select(func.count(func.distinct(LiveSubmission.student_id)))
+            .join(LiveTask, LiveSubmission.task_id == LiveTask.id)
+            .where(LiveTask.session_id == session.id)
+        )
+        participating_students = result.scalar() or 0
+
+        # Calculate participation rate
+        participation_rate = (participating_students / total_students * 100) if total_students > 0 else 0
+
+        # Count total submissions
+        result = await db.execute(
+            select(func.count(LiveSubmission.id))
+            .join(LiveTask, LiveSubmission.task_id == LiveTask.id)
+            .where(LiveTask.session_id == session.id)
+        )
+        submission_count = result.scalar() or 0
+
+        # Calculate task completion rate
+        expected_submissions = task_count * participating_students
+        task_completion_rate = (submission_count / expected_submissions * 100) if expected_submissions > 0 else 0
+
+        # Count challenges in this session
+        result = await db.execute(
+            select(func.count(LiveChallengeSession.id)).where(
+                LiveChallengeSession.live_session_id == session.id
+            )
+        )
+        challenge_count = result.scalar() or 0
+
+        # Count bigscreen activities
+        result = await db.execute(
+            select(func.count(BigscreenActivitySession.id)).where(
+                BigscreenActivitySession.live_session_id == session.id
+            )
+        )
+        bigscreen_count = result.scalar() or 0
+
+        # Count teaching aid sessions
+        result = await db.execute(
+            select(func.count(TeachingAidSession.id)).where(
+                TeachingAidSession.live_session_id == session.id
+            )
+        )
+        teaching_aid_count = result.scalar() or 0
+
+        # Total interactions
+        interaction_count = task_count + challenge_count + bigscreen_count + teaching_aid_count
+
+        session_stats.append({
+            "session_id": session.id,
+            "title": session.title,
+            "started_at": session.started_at.isoformat() if session.started_at else None,
+            "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+            "duration_minutes": round(duration_minutes, 1),
+            "task_count": task_count,
+            "challenge_count": challenge_count,
+            "bigscreen_count": bigscreen_count,
+            "teaching_aid_count": teaching_aid_count,
+            "interaction_count": interaction_count,
+            "participating_students": participating_students,
+            "participation_rate": round(participation_rate, 1),
+            "submission_count": submission_count,
+            "task_completion_rate": round(task_completion_rate, 1),
+        })
+
+        # Accumulate for overall stats
+        total_duration += duration_minutes
+        total_participation += participation_rate
+        total_task_completion += task_completion_rate
+        total_challenges += challenge_count
+        total_interactions += interaction_count
+
+    session_count = len(sessions)
+    overall_stats = {
+        "avg_duration_minutes": round(total_duration / session_count, 1) if session_count > 0 else 0,
+        "avg_participation_rate": round(total_participation / session_count, 1) if session_count > 0 else 0,
+        "avg_task_completion_rate": round(total_task_completion / session_count, 1) if session_count > 0 else 0,
+        "avg_challenge_count": round(total_challenges / session_count, 1) if session_count > 0 else 0,
+        "total_interactions": total_interactions,
+    }
+
+    return {
+        "class_id": class_id,
+        "class_name": class_obj.name,
+        "total_sessions": session_count,
+        "sessions": session_stats,
+        "overall_stats": overall_stats,
     }

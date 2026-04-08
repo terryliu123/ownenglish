@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不等式的性质演示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #C8C6D7; /* 仿照图片背景色 */
+            color: #333;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        h2 {
+            margin-top: 20px;
+            color: #444;
+            font-weight: normal;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin-top: 20px;
+            width: 800px;
+            height: 450px;
+            background: #D5D3E0; /* 画布区域背景稍微亮一点 */
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 30px;
+            right: 50px;
+            display: flex;
+            gap: 20px;
+        }
+
+        /* 圆形按钮样式 */
+        .btn-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: none;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+
+        .btn-circle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 10px rgba(0,0,0,0.3);
+        }
+
+        .btn-red { background-color: #FF5252; }
+        .btn-blue { background-color: #448AFF; }
+
+        .reset-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #666;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .reset-btn:hover { background: #555; }
+
+        /* 状态提示文字 */
+        .status-text {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #444;
+        }
+
+        .formula-display {
+            position: absolute;
+            bottom: 30px;
+            left: 50px;
+            font-size: 24px;
+            font-family: 'Times New Roman', serif;
+            color: #333;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h2>不等式的性质：用天平模拟不等关系</h2>
+
+    <div class="canvas-container">
+        <div class="status-text" id="statusText">尝试点击下方的数字球</div>
+        <div class="formula-display" id="formulaDisplay">4 > 2</div>
+        <button class="reset-btn" onclick="resetSystem()">重置</button>
+        
+        <canvas id="scaleCanvas" width="800" height="450"></canvas>
+
+        <div class="controls">
+            <button class="btn-circle btn-red" onclick="operate(2)">×2</button>
+            <button class="btn-circle btn-red" onclick="operate(3)">×3</button>
+            <button class="btn-circle btn-blue" onclick="operate(-2)">×-2</button>
+            <button class="btn-circle btn-blue" onclick="operate(-3)">×-3</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('scaleCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('statusText');
+    const formulaDisplay = document.getElementById('formulaDisplay');
+
+    // 初始状态
+    let leftValue = 4;
+    let rightValue = 2;
+    
+    // 动画相关
+    let currentAngle = -15; // 初始角度（左边重，向下倾斜为负）
+    let targetAngle = -15;
+    const MAX_ANGLE = 15;   // 最大倾斜度
+
+    // 物理参数
+    const centerX = 400;
+    const centerY = 300;
+    const beamLength = 150; // 半长
+
+    function resetSystem() {
+        leftValue = 4;
+        rightValue = 2;
+        updateFormula();
+        checkBalance();
+    }
+
+    function operate(multiplier) {
+        // 执行乘法运算
+        leftValue *= multiplier;
+        rightValue *= multiplier;
+
+        // 更新UI
+        updateFormula();
+        
+        // 检查平衡并设置动画目标
+        checkBalance();
+
+        // 更新提示语
+        if (multiplier > 0) {
+            statusText.innerHTML = "不等式两边乘 <span style='color:#FF5252'>正数</span>，不等号方向 <b>不变</b>";
+        } else {
+            statusText.innerHTML = "不等式两边乘 <span style='color:#448AFF'>负数</span>，不等号方向 <b>改变</b>";
+        }
+    }
+
+    function updateFormula() {
+        const symbol = leftValue > rightValue ? ">" : (leftValue < rightValue ? "<" : "=");
+        formulaDisplay.innerText = `${leftValue} ${symbol} ${rightValue}`;
+    }
+
+    function checkBalance() {
+        if (leftValue > rightValue) {
+            targetAngle = -MAX_ANGLE; // 左边下沉（逆时针旋转）
+        } else if (leftValue < rightValue) {
+            targetAngle = MAX_ANGLE;  // 右边下沉（顺时针旋转）
+        } else {
+            targetAngle = 0;
+        }
+    }
+
+    // 绘图循环
+    function draw() {
+        // 清除画布
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 动画插值 (简单的缓动效果)
+        const ease = 0.1;
+        currentAngle += (targetAngle - currentAngle) * ease;
+        const rad = currentAngle * Math.PI / 180;
+
+        // 2. 绘制底座和立柱
+        ctx.fillStyle = "#554F63"; // 深灰紫色
+        // 底座
+        ctx.beginPath();
+        ctx.roundRect(centerX - 60, 380, 120, 15, 5);
+        ctx.fill();
+        // 立柱
+        ctx.beginPath();
+        ctx.rect(centerX - 8, 150, 16, 230);
+        ctx.fill();
+        // 顶部圆轴
+        ctx.beginPath();
+        ctx.arc(centerX, 150, 12, 0, Math.PI*2);
+        ctx.fill();
+
+        // 3. 绘制横梁 (随角度旋转)
+        ctx.save();
+        ctx.translate(centerX, 150);
+        ctx.rotate(rad);
+
+        // 横梁主体
+        ctx.fillStyle = "#554F63";
+        ctx.beginPath();
+        ctx.roundRect(-beamLength - 10, -5, (beamLength * 2) + 20, 10, 5);
+        ctx.fill();
+
+        // 4. 绘制托盘 (随横梁位置改变，但保持垂直)
+        // 左侧托盘连接点
+        drawPan(-beamLength, 0, -rad, leftValue);
+        // 右侧托盘连接点
+        drawPan(beamLength, 0, -rad, rightValue);
+
+        ctx.restore();
+
+        // 5. 绘制不等号提示 (在中间)
+        // (已通过HTML元素展示，此处省略)
+
+        requestAnimationFrame(draw);
+    }
+
+    function drawPan(x, y, counterRot, value) {
+        ctx.save();
+        ctx.translate(x, y); // 移动到横梁端点
+        
+        // 绘制挂绳 (三角形结构)
+        ctx.strokeStyle = "#E09F3E"; // 橙色绳子
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(-30, 80); // 左绳
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(30, 80); // 右绳
+        ctx.stroke();
+
+        // 恢复旋转，使盘子保持水平
+        ctx.rotate(counterRot); 
+
+        // 计算盘子在世界坐标系相对于挂点的偏移
+        // 这是一个简化的视觉处理，实际上我们不需要精确物理，只需要盘子看起来挂着
+        // 因为 rotate(counterRot) 是为了抵消横梁的旋转，所以这里绘制的内容会保持水平
+        
+        // 注意：这里的坐标系是以横梁端点为原点，且Y轴垂直向下的
+        // 但因为我们做了反向旋转，这里的(0,0)其实还在旋转中心，我们需要往下推
+        // 简单的做法：我们在translate到端点后，不直接反向旋转，而是画完绳子后，计算绳子底端的世界坐标太麻烦
+        // 更好的视觉欺骗：在横梁端点处，画两根线连到一个始终水平的盘子上。
+        
+        // 让我们重写一下drawPan的逻辑使其更自然：
+    }
+
+    // 覆盖上面的 drawPan，使用更简单的视觉逻辑
+    // x, y 是横梁端点在"横梁坐标系"中的位置
+    // counterRot 是要把坐标系转回水平所需的角度
+    function drawPan(x, y, counterRot, value) {
+        // 1. 绳子 (随横梁动)
+        ctx.strokeStyle = "#D48631";
+        ctx.lineWidth = 3;
+        
+        // 绳子顶点
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        // 绳子底端 (相对于横梁端点，在旋转后的坐标系中)
+        // 为了让盘子看起来始终垂直向下，我们需要计算出"垂直向下"在这个旋转坐标系里的向量
+        // 实际上，最简单的方法是：先计算横梁端点的世界坐标，然后重置变换，再画盘子。
+    }
+
+    // --- 修改后的绘图逻辑 ---
+    
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 物理计算
+        const ease = 0.1;
+        currentAngle += (targetAngle - currentAngle) * ease;
+        const rad = currentAngle * Math.PI / 180;
+
+        // 计算横梁端点的世界坐标
+        const leftEnd = {
+            x: centerX + Math.cos(Math.PI + rad) * beamLength,
+            y: 150 + Math.sin(Math.PI + rad) * beamLength
+        };
+        const rightEnd = {
+            x: centerX + Math.cos(rad) * beamLength,
+            y: 150 + Math.sin(rad) * beamLength
+        };
+
+        // 2. 绘制静态底座
+        ctx.fillStyle = "#554F63";
+        ctx.beginPath(); ctx.roundRect(centerX - 60, 380, 120, 15, 5); ctx.fill(); // 底
+        ctx.beginPath(); ctx.rect(centerX - 8, 150, 16, 230); ctx.fill(); // 柱
+        ctx.beginPath(); ctx.arc(centerX, 150, 12, 0, Math.PI*2); ctx.fill(); // 轴
+
+        // 3. 绘制旋转横梁
+        ctx.save();
+        ctx.translate(centerX, 150);
+        ctx.rotate(rad);
+        ctx.fillStyle = "#554F63";
+        ctx.beginPath();
+        ctx.roundRect(-beamLength - 10, -5, (beamLength * 2) + 20, 10, 5);
+        ctx.fill();
+        
+        // 装饰：横梁上的小圆点
+        ctx.fillStyle = "#888";
+        ctx.beginPath(); ctx.arc(-beamLength, 0, 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(beamLength, 0, 4, 0, Math.PI*2); ctx.fill();
+        ctx.restore();
+
+        // 4. 绘制盘子 (独立绘制，方便保持水平)
+        drawHangingPan(leftEnd.x, leftEnd.y, leftValue);
+        drawHangingPan(rightEnd.x, rightEnd.y, rightValue);
+
+        requestAnimationFrame(draw);
+    }
+
+    function drawHangingPan(x, y, value) {
+        const ropeLength = 80;
+        const panWidth = 80;
+        
+        ctx.strokeStyle = "#E68A2E"; // 绳子颜色
+        ctx.lineWidth = 2;
+        
+        // 盘子中心位置
+        const panY = y + ropeLength;
+
+        // 画绳子 (三角形)
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - panWidth/2 + 10, panY);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + panWidth/2 - 10, panY);
+        ctx.stroke();
+
+        // 画盘子 (梯形或矩形)
+        ctx.fillStyle = "#554F63";
+        ctx.beginPath();
+        ctx.moveTo(x - panWidth/2, panY);
+        ctx.lineTo(x + panWidth/2, panY);
+        ctx.lineTo(x + panWidth/3, panY + 15);
+        ctx.lineTo(x - panWidth/3, panY + 15);
+        ctx.closePath();
+        ctx.fill();
+
+        // 画数字球
+        // 颜色根据正负变化
+        const ballColor = value >= 0 ? "#FF5252" : "#448AFF";
+        
+        ctx.fillStyle = ballColor;
+        ctx.beginPath();
+        ctx.arc(x, panY - 15, 20, 0, Math.PI*2); // 球放在盘子上
+        ctx.fill();
+
+        // 文字
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 16px Arial";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(value, x, panY - 15);
+    }
+
+    // 启动
+    resetSystem();
+    draw();
+
+</script>
+</body>
+</html>

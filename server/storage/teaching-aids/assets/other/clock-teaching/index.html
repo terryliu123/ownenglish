@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>幼儿认识时间助手</title>
+    <style>
+        :root {
+            --hour-color: #ff4757;
+            --min-color: #2e86de;
+            --bg-color: #f0f9ff;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'PingFang SC', "Microsoft YaHei", sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        /* 时钟容器 */
+        .clock-container {
+            position: relative;
+            width: 340px;
+            height: 340px;
+            background: white;
+            border-radius: 50%;
+            border: 12px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 刻度数字 */
+        .number {
+            position: absolute;
+            font-size: 28px;
+            font-weight: bold;
+            color: #333;
+            user-select: none;
+        }
+
+        /* 分钟数字辅助 */
+        .min-number {
+            position: absolute;
+            font-size: 14px;
+            color: var(--min-color);
+            font-weight: normal;
+        }
+
+        /* 指针通用样式 */
+        .hand {
+            position: absolute;
+            bottom: 50%;
+            left: 50%;
+            transform-origin: bottom center;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        /* 时针 */
+        .hour-hand {
+            width: 10px;
+            height: 80px;
+            background-color: var(--hour-color);
+            margin-left: -5px;
+        }
+
+        /* 分针 */
+        .min-hand {
+            width: 6px;
+            height: 120px;
+            background-color: var(--min-color);
+            margin-left: -3px;
+        }
+
+        /* 中心点 */
+        .center-dot {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #333;
+            border-radius: 50%;
+            z-index: 20;
+        }
+
+        /* 信息面板 */
+        .info-panel {
+            margin-top: 30px;
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .digital-time {
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .time-text {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .btn-speak {
+            background: var(--min-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .btn-speak:active { transform: scale(0.95); }
+
+        .label-hour { color: var(--hour-color); }
+        .label-min { color: var(--min-color); }
+    </style>
+</head>
+<body>
+
+    <div class="clock-container" id="clock">
+        <!-- 数字由JS生成 -->
+        <div class="center-dot"></div>
+        <div id="hour-hand" class="hand hour-hand"></div>
+        <div id="min-hand" class="hand min-hand"></div>
+    </div>
+
+    <div class="info-panel">
+        <div class="digital-time" id="digital">00:00</div>
+        <div class="time-text" id="description">
+            <span class="label-hour">0</span> 时 <span class="label-min">0</span> 分
+        </div>
+        <button class="btn-speak" onclick="speakTime()">🔊 读给我听</button>
+    </div>
+
+<script>
+    const clock = document.getElementById('clock');
+    const hourHand = document.getElementById('hour-hand');
+    const minHand = document.getElementById('min-hand');
+    const digitalDisplay = document.getElementById('digital');
+    const descDisplay = document.getElementById('description');
+
+    let currentHours = 10;
+    let currentMinutes = 10;
+    let activeHand = null;
+
+    // 1. 初始化时钟刻度
+    function initClock() {
+        for (let i = 1; i <= 12; i++) {
+            const num = document.createElement('div');
+            num.className = 'number';
+            num.innerText = i;
+            const angle = (i * 30) * (Math.PI / 180);
+            const radius = 130;
+            const x = Math.sin(angle) * radius;
+            const y = -Math.cos(angle) * radius;
+            num.style.transform = `translate(${x}px, ${y}px)`;
+            clock.appendChild(num);
+        }
+        
+        // 生成分钟提示（0, 5, 10...）
+        for (let i = 0; i < 60; i += 5) {
+            const minNum = document.createElement('div');
+            minNum.className = 'min-number';
+            minNum.innerText = i;
+            const angle = (i * 6) * (Math.PI / 180);
+            const radius = 165;
+            const x = Math.sin(angle) * radius;
+            const y = -Math.cos(angle) * radius;
+            minNum.style.transform = `translate(${x}px, ${y}px)`;
+            clock.appendChild(minNum);
+        }
+        updateClockUI();
+    }
+
+    // 2. 交互逻辑
+    function getAngle(x, y) {
+        const rect = clock.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const angle = Math.atan2(y - centerY, x - centerX) * (180 / Math.PI);
+        return (angle + 90 + 360) % 360; // 转换为0-360度，12点方向为0
+    }
+
+    const handleStart = (e) => {
+        const pointer = e.touches ? e.touches[0] : e;
+        const angle = getAngle(pointer.clientX, pointer.clientY);
+        
+        // 简单判断距离哪个针更近，或者根据点击位置分配
+        // 为了方便孩子，我们优先判定分针（较长）
+        const hourAngle = (currentHours % 12) * 30 + currentMinutes * 0.5;
+        const minAngle = currentMinutes * 6;
+
+        const diffMin = Math.abs(angle - minAngle);
+        if (diffMin < 20 || diffMin > 340) {
+            activeHand = 'min';
+        } else {
+            activeHand = 'hour';
+        }
+    };
+
+    const handleMove = (e) => {
+        if (!activeHand) return;
+        e.preventDefault();
+        const pointer = e.touches ? e.touches[0] : e;
+        const angle = getAngle(pointer.clientX, pointer.clientY);
+
+        if (activeHand === 'min') {
+            const newMinutes = Math.round(angle / 6) % 60;
+            // 联动检测：跨越12点时增加/减少小时
+            if (currentMinutes === 59 && newMinutes === 0) currentHours = (currentHours + 1) % 24;
+            if (currentMinutes === 0 && newMinutes === 59) currentHours = (currentHours + 23) % 24;
+            currentMinutes = newMinutes;
+        } else {
+            currentHours = Math.floor(angle / 30);
+            if (currentHours === 0) currentHours = 12;
+        }
+        updateClockUI();
+    };
+
+    const handleEnd = () => {
+        activeHand = null;
+    };
+
+    // 3. 更新界面
+    function updateClockUI() {
+        // 分针角度
+        const mAngle = currentMinutes * 6;
+        // 时针角度 = 小时*30 + 分钟带来的偏移(每分钟0.5度)
+        const hAngle = (currentHours % 12) * 30 + (currentMinutes * 0.5);
+
+        minHand.style.transform = `rotate(${mAngle}deg)`;
+        hourHand.style.transform = `rotate(${hAngle}deg)`;
+
+        // 数字显示
+        const displayH = currentHours.toString().padStart(2, '0');
+        const displayM = currentMinutes.toString().padStart(2, '0');
+        digitalDisplay.innerText = `${displayH}:${displayM}`;
+        
+        descDisplay.innerHTML = `<span class="label-hour">${currentHours}</span> 时 <span class="label-min">${currentMinutes}</span> 分`;
+    }
+
+    // 4. 语音播报
+    function speakTime() {
+        const text = `现在是 ${currentHours}点 ${currentMinutes === 0 ? '整' : currentMinutes + '分'}`;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // 事件绑定
+    clock.addEventListener('mousedown', handleStart);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleEnd);
+
+    clock.addEventListener('touchstart', handleStart, {passive: false});
+    window.addEventListener('touchmove', handleMove, {passive: false});
+    window.addEventListener('touchend', handleEnd);
+
+    initClock();
+</script>
+</body>
+</html>

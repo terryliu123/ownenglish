@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>原生JS中国象棋</title>
+    <style>
+        :root {
+            --board-color: #f9d38d;
+            --line-color: #333;
+            --red-piece: #d32f2f;
+            --black-piece: #212121;
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #444;
+            font-family: "Microsoft YaHei", sans-serif;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        #status {
+            color: white;
+            margin: 15px 0;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5rem;
+        }
+
+        /* 棋盘容器：保持 9:10 比例 */
+        .chess-container {
+            position: relative;
+            width: 95vw;
+            max-width: 450px;
+            aspect-ratio: 9 / 10;
+            background-color: var(--board-color);
+            border: 2px solid #000;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            user-select: none;
+        }
+
+        /* 绘制背景线 (SVG) */
+        .board-bg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+        }
+
+        /* 棋格点容器（用于响应点击） */
+        .slots-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            z-index: 2;
+        }
+
+        .slot {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 棋子样式 */
+        .piece {
+            width: 85%;
+            height: 85%;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #333;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: min(6vw, 28px);
+            font-weight: bold;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.1s;
+            z-index: 3;
+        }
+
+        .piece.red { color: var(--red-piece); border-color: var(--red-piece); }
+        .piece.black { color: var(--black-piece); border-color: var(--black-piece); }
+        .piece.selected { 
+            transform: scale(1.15); 
+            box-shadow: 0 0 15px #ffff00;
+            border-width: 3px;
+        }
+
+        .controls { margin-top: 20px; }
+        button {
+            padding: 10px 25px;
+            font-size: 1rem;
+            background-color: #8b4513;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">红方先行</div>
+
+    <div class="chess-container">
+        <!-- 背景线 -->
+        <svg class="board-bg" viewBox="0 0 90 100" xmlns="http://www.w3.org/2000/svg">
+            <g stroke="#333" stroke-width="0.5" fill="none">
+                <!-- 纵线 -->
+                <path d="M5 5 L5 95 M15 5 L15 45 M15 55 L15 95 M25 5 L25 45 M25 55 L25 95 M35 5 L35 45 M35 55 L35 95 M45 5 L45 45 M45 55 L45 95 M55 5 L55 45 M55 55 L55 95 M65 5 L65 45 M65 55 L65 95 M75 5 L75 45 M75 55 L75 95 M85 5 L85 95" />
+                <!-- 横线 -->
+                <path d="M5 5 L85 5 M5 15 L85 15 M5 25 L85 25 M5 35 L85 35 M5 45 L85 45 M5 55 L85 55 M5 65 L85 65 M5 75 L85 75 M5 85 L85 85 M5 95 L85 95" />
+                <!-- 九宫格斜线 -->
+                <path d="M35 5 L55 25 M55 5 L35 25 M35 75 L55 95 M55 75 L35 95" />
+            </g>
+            <text x="25" y="52" font-size="6" fill="#333" font-family="cursive">楚河</text>
+            <text x="55" y="52" font-size="6" fill="#333" font-family="cursive">漢界</text>
+        </svg>
+
+        <!-- 棋子层 -->
+        <div class="slots-layer" id="board"></div>
+    </div>
+
+    <div class="controls">
+        <button onclick="initGame()">重新开始</button>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        
+        // 棋子定义 (红方大写，黑方小写)
+        // R:车, N:马, B:相, A:仕, K:帅, C:炮, P:兵
+        const initialLayout = [
+            ['r','n','b','a','k','a','b','n','r'],
+            [null,null,null,null,null,null,null,null,null],
+            [null,'c',null,null,null,null,null,'c',null],
+            ['p',null,'p',null,'p',null,'p',null,'p'],
+            [null,null,null,null,null,null,null,null,null],
+            // --- 楚河汉界 ---
+            [null,null,null,null,null,null,null,null,null],
+            ['P',null,'P',null,'P',null,'P',null,'P'],
+            [null,'C',null,null,null,null,null,'C',null],
+            [null,null,null,null,null,null,null,null,null],
+            ['R','N','B','A','K','A','B','N','R']
+        ];
+
+        const pieceNames = {
+            'r':'車','n':'馬','b':'象','a':'士','k':'將','c':'砲','p':'卒',
+            'R':'俥','N':'傌','B':'相','A':'仕','K':'帥','C':'炮','P':'兵'
+        };
+
+        let board = [];
+        let turn = 'red'; // red | black
+        let selected = null;
+
+        function initGame() {
+            board = initialLayout.map(row => [...row]);
+            turn = 'red';
+            selected = null;
+            updateStatus();
+            render();
+        }
+
+        function updateStatus() {
+            statusEl.innerText = turn === 'red' ? "红方回合" : "黑方回合";
+            statusEl.style.color = turn === 'red' ? "var(--red-piece)" : "#000";
+        }
+
+        function render() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 10; r++) {
+                for (let c = 0; c < 9; c++) {
+                    const slot = document.createElement('div');
+                    slot.className = 'slot';
+                    
+                    const pieceKey = board[r][c];
+                    if (pieceKey) {
+                        const pEl = document.createElement('div');
+                        const isRed = pieceKey === pieceKey.toUpperCase();
+                        pEl.className = `piece ${isRed ? 'red' : 'black'}`;
+                        if (selected && selected.r === r && selected.c === c) pEl.classList.add('selected');
+                        pEl.innerText = pieceNames[pieceKey];
+                        slot.appendChild(pEl);
+                    }
+
+                    slot.onclick = () => handleMove(r, c);
+                    boardEl.appendChild(slot);
+                }
+            }
+        }
+
+        function handleMove(r, c) {
+            const piece = board[r][c];
+            const isRedPiece = piece && piece === piece.toUpperCase();
+
+            if (selected) {
+                if (piece && ((turn === 'red' && isRedPiece) || (turn === 'black' && !isRedPiece))) {
+                    // 换选棋子
+                    selected = {r, c};
+                } else {
+                    // 尝试移动
+                    if (canMove(selected.r, selected.c, r, c)) {
+                        board[r][c] = board[selected.r][selected.c];
+                        board[selected.r][selected.c] = null;
+                        turn = turn === 'red' ? 'black' : 'red';
+                        selected = null;
+                        updateStatus();
+                    } else {
+                        selected = null;
+                    }
+                }
+            } else {
+                if (piece && ((turn === 'red' && isRedPiece) || (turn === 'black' && !isRedPiece))) {
+                    selected = {r, c};
+                }
+            }
+            render();
+        }
+
+        // 核心规则引擎 (简化版)
+        function canMove(sr, sc, tr, tc) {
+            const p = board[sr][sc];
+            const type = p.toLowerCase();
+            const dr = tr - sr;
+            const dc = tc - sc;
+            const absDr = Math.abs(dr);
+            const absDc = Math.abs(dc);
+
+            // 1. 基本：不能原地踏步
+            if (dr === 0 && dc === 0) return false;
+
+            switch(type) {
+                case 'r': // 车
+                    if (dr !== 0 && dc !== 0) return false;
+                    return countPieces(sr, sc, tr, tc) === 0;
+                
+                case 'n': // 马
+                    if (!((absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2))) return false;
+                    // 蹩马腿
+                    const mr = sr + (absDr === 2 ? dr / 2 : 0);
+                    const mc = sc + (absDc === 2 ? dc / 2 : 0);
+                    return !board[mr][mc];
+
+                case 'c': // 炮
+                    if (dr !== 0 && dc !== 0) return false;
+                    const count = countPieces(sr, sc, tr, tc);
+                    if (!board[tr][tc]) return count === 0; // 不吃子时像车
+                    return count === 1; // 吃子时需跳过一个
+
+                case 'k': // 将/帅
+                    if (absDr + absDc !== 1) return false;
+                    if (tc < 3 || tc > 5) return false; // 九宫格宽
+                    return p === 'K' ? tr >= 7 : tr <= 2; // 九宫格高
+
+                case 'a': // 士
+                    if (absDr !== 1 || absDc !== 1) return false;
+                    if (tc < 3 || tc > 5) return false;
+                    return p === 'A' ? tr >= 7 : tr <= 2;
+
+                case 'b': // 象
+                    if (absDr !== 2 || absDc !== 2) return false;
+                    if (p === 'B' && tr < 5) return false; // 不能过河
+                    if (p === 'b' && tr > 4) return false;
+                    return !board[sr + dr/2][sc + dc/2]; // 塞象眼
+
+                case 'p': // 兵
+                    const isRed = p === 'P';
+                    if (isRed) {
+                        if (dr > 0) return false; // 不能后退
+                        if (sr >= 5 && dc !== 0) return false; // 未过河不能横走
+                    } else {
+                        if (dr < 0) return false;
+                        if (sr <= 4 && dc !== 0) return false;
+                    }
+                    return absDr + absDc === 1;
+            }
+            return false;
+        }
+
+        function countPieces(sr, sc, tr, tc) {
+            let count = 0;
+            const stepR = sr === tr ? 0 : (tr > sr ? 1 : -1);
+            const stepC = sc === tc ? 0 : (tc > sc ? 1 : -1);
+            let r = sr + stepR;
+            let c = sc + stepC;
+            while (r !== tr || c !== tc) {
+                if (board[r][c]) count++;
+                r += stepR;
+                c += stepC;
+            }
+            return count;
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

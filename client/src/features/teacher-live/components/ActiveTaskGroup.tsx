@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { getTaskQuestionText } from '../../tasks/task-formatting'
 import { getTaskTypeConfig } from '../../tasks/task-config'
+import { getTaskTypeLabel } from '../../tasks/task-helpers'
 import type { LiveTaskGroupSession } from '../types'
 
 interface ActiveTaskGroupProps {
@@ -15,14 +16,14 @@ interface ActiveTaskGroupProps {
 
 const getTaskTypeIcon = (type: string) => {
   const defaultIcons: Record<string, string> = {
-    single_choice: '📝',
-    multiple_choice: '📝',
-    true_false: '✅',
-    fill_blank: '📝',
+    single_choice: '🔹',
+    multiple_choice: '🔹',
+    true_false: '✔',
+    fill_blank: '🔹',
     matching: '🔗',
-    reading: '📖',
+    reading: '📉',
   }
-  return getTaskTypeConfig(type)?.icon || defaultIcons[type] || '❓'
+  return getTaskTypeConfig(type)?.icon || defaultIcons[type] || '✦'
 }
 
 export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
@@ -47,15 +48,14 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
               className="ghost-button py-1 px-3 text-xs"
               onClick={() => setShowTaskPreview(true)}
             >
-              {t('live.enterClass')}
+              {t('teacherLive.viewActiveTask')}
             </button>
           </div>
         </div>
 
-        {/* Task group stats */}
         <div className="flex gap-4 mb-4">
           <div className="meta-chip">
-            📋 {tWithParams('teacherLive.taskCountLabel', { count: currentTaskGroup.tasks.length })}
+            {tWithParams('teacherLive.taskCountLabel', { count: currentTaskGroup.tasks.length })}
           </div>
           <div className="meta-chip">
             {tWithParams('teacherLive.submittedSummary', {
@@ -65,13 +65,15 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
           </div>
         </div>
 
-        {/* Task list */}
         <div className="space-y-3 mb-4">
           {currentTaskGroup.tasks.map((task, index) => (
             <div
               key={task.task_id}
               className="p-3 rounded-xl"
-              style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(24,36,58,0.08)' }}
+              style={{
+                background: 'rgba(255,255,255,0.5)',
+                border: '1px solid rgba(24,36,58,0.08)',
+              }}
             >
               <div className="flex items-center gap-3">
                 <span
@@ -82,7 +84,8 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
                 </span>
                 <div className="flex-1">
                   <p className="truncate">
-                    {getTaskTypeIcon(task.type)} {getTaskQuestionText(task.question) || `${t('task.question')} ${index + 1}`}
+                    {getTaskTypeIcon(task.type)}{' '}
+                    {getTaskQuestionText(task.question) || `${t('task.question')} ${index + 1}`}
                   </p>
                   {taskGroupEnded && (
                     <p className="text-xs text-green-600">
@@ -95,7 +98,6 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
           ))}
         </div>
 
-        {/* Action buttons */}
         <div className="action-stack">
           {taskGroupEnded ? (
             <button className="solid-button" disabled>
@@ -109,7 +111,6 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
         </div>
       </div>
 
-      {/* Task preview modal */}
       {showTaskPreview && (
         <div className="modal-overlay" style={{ zIndex: 120 }}>
           <div
@@ -124,7 +125,7 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
                 </p>
               </div>
               <button className="icon-button" onClick={() => setShowTaskPreview(false)}>
-                ✕
+                ×
               </button>
             </div>
             <div className="space-y-3">
@@ -132,7 +133,10 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
                 <div
                   key={task.task_id}
                   className="p-4 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.5)', border: '1px solid rgba(24,36,58,0.08)' }}
+                  style={{
+                    background: 'rgba(255,255,255,0.5)',
+                    border: '1px solid rgba(24,36,58,0.08)',
+                  }}
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <span
@@ -161,18 +165,4 @@ export const ActiveTaskGroup: React.FC<ActiveTaskGroupProps> = ({
       )}
     </section>
   )
-}
-
-// Helper function for task type label
-function getTaskTypeLabel(type: string, t: (key: string) => string, fallback: string): string {
-  const labels: Record<string, string> = {
-    single_choice: t('taskType.singleChoice') || '单选题',
-    multiple_choice: t('taskType.multipleChoice') || '多选题',
-    true_false: t('taskType.trueFalse') || '判断题',
-    fill_blank: t('taskType.fillBlank') || '填空题',
-    matching: t('taskType.matching') || '配对题',
-    sorting: t('taskType.sorting') || '排序题',
-    image_understanding: t('taskType.imageUnderstanding') || '图片理解',
-  }
-  return labels[type] || fallback
 }

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>开普勒望远镜原理演示</title>
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "Heiti SC", sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* 主容器 */
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 1. 头部标题 */
+        header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #eaeaea;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .badge {
+            font-size: 0.85rem;
+            color: #666;
+            background-color: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 6px;
+        }
+
+        /* 2. 中间实验演示区 */
+        .simulation-stage {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            background-color: #B5CFA5; /* 还原参考图的护眼绿背景 */
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 播放按钮 */
+        .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 64px;
+            height: 64px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .play-btn:hover {
+            background-color: rgba(0, 0, 0, 0.6);
+            transform: translate(-50%, -50%) scale(1.05);
+        }
+
+        .play-btn::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #fff;
+            margin-left: 5px;
+        }
+
+        /* 3. 尾部说明 */
+        footer {
+            padding: 25px 30px;
+            background-color: #fff;
+        }
+
+        footer p {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: #444;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .highlight {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .book-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-size: 0.8rem;
+            color: #888;
+            line-height: 1.5;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 头部 -->
+    <header>
+        <h1>开普勒望远镜</h1>
+        <span class="badge">可交互式微课件</span>
+    </header>
+
+    <!-- 中间演示区 -->
+    <div class="simulation-stage" id="stage">
+        <canvas id="opticalCanvas"></canvas>
+        <div class="play-btn" id="playBtn" onclick="startAnimation()"></div>
+    </div>
+
+    <!-- 尾部说明 -->
+    <footer>
+        <p>
+            望远镜由两组透镜组成，靠近眼睛的为<span class="highlight">目镜</span>，靠近被观测物体的为<span class="highlight">物镜</span>。
+            物镜的作用使远处的物体在焦点附近成<span class="highlight">缩小的实像</span>，
+            调节目镜，使经过物镜所成的像在目镜的一倍焦距内，这样得到一个<span class="highlight">放大的虚像</span>。
+            (注：开普勒望远镜成倒立的像)。
+        </p>
+        <div class="book-info">
+            <strong>适配教科书：</strong><br>
+            沪科版 / 沪粤版 / 苏教版 / 教科版(2024) / 人教版(2024) / 浙教版 / 沪粤版(2024) / 教科版 / 苏科版 / 苏科版(2024) / 人教版 / 沪教版
+        </div>
+    </footer>
+</div>
+
+<script>
+    const canvas = document.getElementById('opticalCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = document.getElementById('stage');
+    const playBtn = document.getElementById('playBtn');
+
+    let width, height;
+    let progress = 0;
+    let isAnimating = false;
+    let animationId;
+
+    // 初始化画布
+    function resize() {
+        width = stage.clientWidth;
+        height = stage.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        drawScene(0);
+    }
+    window.addEventListener('resize', resize);
+    
+    // 启动动画
+    function startAnimation() {
+        if (isAnimating) return;
+        isAnimating = true;
+        playBtn.style.display = 'none';
+        progress = 0;
+        animate();
+    }
+
+    function animate() {
+        progress += 0.008; // 动画速度
+        if (progress > 1.1) {
+            progress = 1.1; // 保持结束状态
+            // isAnimating = false; // 如果想循环播放可重置
+            // playBtn.style.display = 'flex';
+        } else {
+            animationId = requestAnimationFrame(animate);
+        }
+        drawScene(progress);
+    }
+
+    // 绘制主场景
+    function drawScene(animProgress) {
+        ctx.clearRect(0, 0, width, height);
+        const centerY = height / 2;
+
+        // --- 坐标定义 ---
+        // 1. 物体（树）
+        const objX = width * 0.15;
+        // 2. 最终虚像（倒立大树，虚影）
+        const virtualImgX = width * 0.35;
+        // 3. 物镜（大凸透镜）
+        const lens1X = width * 0.52;
+        // 4. 中间实像（倒立小树）
+        const realImgX = width * 0.65;
+        // 5. 目镜（小凸透镜）
+        const lens2X = width * 0.75;
+        // 6. 焦点位置
+        const focusX = realImgX; // 物镜焦点和目镜焦点重合处
+
+        // --- 绘制光轴 ---
+        ctx.beginPath();
+        ctx.setLineDash([6, 6]);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // --- 绘制物体：左侧实物树 ---
+        drawTree(objX, centerY, 1, 1, false);
+
+        // --- 绘制最终虚像：中间倒立大树 (半透明) ---
+        // 在参考图中，这个虚像位于物镜和物体之间
+        drawTree(virtualImgX, centerY, 1.2, 0.4, true);
+
+        // --- 绘制中间实像：两镜之间倒立小树 ---
+        // 只有光线到达这里时才完全显示，或者一直半透明显示
+        const realImgOpacity = animProgress > 0.5 ? Math.min((animProgress - 0.5) * 4, 1) : 0.2;
+        drawTree(realImgX, centerY, 0.4, realImgOpacity, true);
+
+        // --- 绘制焦点 F1 ---
+        // 物镜右焦点 / 目镜左焦点
+        drawPoint(focusX, centerY, '#FFA500', 'F₁'); // 橙色点
+        // 物镜左焦点示意
+        drawPoint(lens1X - (focusX - lens1X), centerY, '#800080', ''); // 紫色点
+        // 目镜右焦点示意
+        drawPoint(lens2X + (lens2X - focusX), centerY, '#FFA500', 'F₁'); // 橙色点
+
+        // --- 绘制透镜 ---
+        // 物镜 (大)
+        drawLens(lens1X, centerY, 220, 24);
+        // 目镜 (小)
+        drawLens(lens2X, centerY, 160, 24);
+
+        // --- 绘制光线动画 ---
+        if (animProgress > 0) {
+            drawLightPath(objX, centerY, lens1X, realImgX, lens2X, animProgress);
+        }
+    }
+
+    // 绘制树木
+    function drawTree(x, y, scale, opacity, inverted) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, inverted ? -scale : scale); // 倒立处理
+        ctx.globalAlpha = opacity;
+
+        // 树干
+        ctx.fillStyle = '#8B5A2B';
+        ctx.fillRect(-6, -20, 12, 20);
+
+        // 树冠 (三层三角形)
+        ctx.fillStyle = '#6B8E23'; // 橄榄绿
+        
+        // 下层
+        ctx.beginPath();
+        ctx.moveTo(-30, -20);
+        ctx.lineTo(30, -20);
+        ctx.lineTo(0, -55);
+        ctx.fill();
+
+        // 中层
+        ctx.beginPath();
+        ctx.moveTo(-25, -45);
+        ctx.lineTo(25, -45);
+        ctx.lineTo(0, -75);
+        ctx.fill();
+
+        // 上层
+        ctx.beginPath();
+        ctx.moveTo(-18, -65);
+        ctx.lineTo(18, -65);
+        ctx.lineTo(0, -90);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 绘制凸透镜
+    function drawLens(x, y, h, w) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+        // 绘制椭圆模拟透镜
+        ctx.ellipse(0, 0, w/2, h/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // 绘制点和标签
+    function drawPoint(x, y, color, label) {
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (label) {
+            ctx.fillStyle = '#333';
+            ctx.font = 'italic 16px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y - 15);
+        }
+    }
+
+    // 绘制光路
+    function drawLightPath(objX, centerY, l1X, realImgX, l2X, progress) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+
+        // 树顶高度（假设）
+        const treeTopH = 90; 
+        const startPoint = { x: objX, y: centerY - treeTopH };
+        
+        // 倒立实像顶点位置 (根据相似三角形，简单估算比例)
+        // 物镜成倒立实像
+        const midPoint = { x: realImgX, y: centerY + (treeTopH * 0.4) };
+
+        // 1. 平行光轴入射 -> 经过物镜 -> 过焦点(实像点)
+        drawLineAnim(startPoint.x, startPoint.y, l1X, startPoint.y, progress, 0, 0.3); // 入射
+        drawLineAnim(l1X, startPoint.y, midPoint.x, midPoint.y, progress, 0.3, 0.6); // 折射到实像
+
+        // 2. 过光心入射 -> 直线传播
+        drawLineAnim(startPoint.x, startPoint.y, l1X, centerY, progress, 0, 0.3); // 入射光心
+        drawLineAnim(l1X, centerY, midPoint.x, midPoint.y, progress, 0.3, 0.6); // 出射到实像
+
+        // 3. 从实像经过目镜 -> 平行射出 (开普勒望远镜原理：实像在目镜焦点上)
+        // 从实像点出发，射向目镜
+        // 光线A：平行于主轴射向目镜
+        const eyeInY1 = midPoint.y;
+        drawLineAnim(midPoint.x, midPoint.y, l2X, eyeInY1, progress, 0.6, 0.8);
+        // 光线A出射：过目镜右焦点(屏幕外)或者平行(视具体调焦)
+        // 为了演示，画平行光出射示意进入眼睛
+        drawLineAnim(l2X, eyeInY1, width, eyeInY1 * 1.2, progress, 0.8, 1.0); // 略微发散示意虚像
+
+        // 光线B：过目镜光心
+        drawLineAnim(midPoint.x, midPoint.y, l2X, centerY, progress, 0.6, 0.8);
+        drawLineAnim(l2X, centerY, width, centerY - (midPoint.y - centerY)*0.5, progress, 0.8, 1.0);
+
+        ctx.restore();
+    }
+
+    // 分段绘制线条动画辅助函数
+    // p: 当前总进度, startP/endP: 该线段在总进度中的起止区间
+    function drawLineAnim(x1, y1, x2, y2, p, startP, endP) {
+        if (p < startP) return;
+        
+        const sectionProgress = Math.min(1, (p - startP) / (endP - startP));
+        
+        const currentX = x1 + (x2 - x1) * sectionProgress;
+        const currentY = y1 + (y2 - y1) * sectionProgress;
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(currentX, currentY);
+        ctx.stroke();
+    }
+
+    // 启动
+    resize();
+
+</script>
+
+</body>
+</html>

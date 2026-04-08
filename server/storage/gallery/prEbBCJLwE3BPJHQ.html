@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emoji分类游戏</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tallwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f0f7ff;
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .game-container {
+            max-width: 900px;
+            width: 100%;
+            background-color: #fff;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            margin-top: 20px;
+        }
+        
+        .category {
+            border-radius: 15px;
+            padding: 15px;
+            margin: 0 10px;
+            transition: all 0.3s ease;
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .categories-container {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        
+        .category-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+            padding: 10px;
+            border-radius: 10px;
+            color: white;
+        }
+        
+        .category-animals {
+            background-color: #ff9a9e;
+        }
+        
+        .category-fruits {
+            background-color: #a0e7e5;
+        }
+        
+        .category-vegetables {
+            background-color: #b5ead7;
+        }
+        
+        .emoji-item {
+            font-size: 2.5rem;
+            cursor: grab;
+            transition: all 0.3s ease;
+            text-align: center;
+            padding: 10px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 5px;
+            user-select: none;
+        }
+        
+        .emoji-item:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .emoji-item.dragging {
+            opacity: 0.7;
+            transform: scale(1.2);
+        }
+        
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .category-dropzone {
+            min-height: 120px;
+            border: 3px dashed #ccc;
+            border-radius: 15px;
+            padding: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .category-dropzone.highlight {
+            border-color: #666;
+            background-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .score-display {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            background-color: #ffd166;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: inline-block;
+        }
+        
+        .game-title {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #3a86ff;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .game-instructions {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        .celebration {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+        
+        .celebration.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+        
+        .celebration-text {
+            font-size: 3rem;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .celebration-emoji {
+            font-size: 5rem;
+            animation: bounce 1s infinite alternate;
+        }
+        
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-20px); }
+        }
+        
+        .reset-btn {
+            background-color: #3a86ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+        
+        .reset-btn:hover {
+            background-color: #2667cc;
+            transform: scale(1.05);
+        }
+        
+        @media (max-width: 768px) {
+            .categories-container {
+                flex-direction: column;
+            }
+            
+            .category {
+                margin: 10px 0;
+            }
+            
+            .emoji-item {
+                font-size: 2rem;
+                padding: 8px;
+            }
+            
+            .emoji-grid {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+                gap: 10px;
+            }
+            
+            .game-title {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="game-title">Emoji分类游戏</h1>
+        <p class="game-instructions">将下面的emoji拖拽到正确的分类中</p>
+        
+        <div class="score-display">得分: <span id="score">0</span>/18</div>
+        
+        <div class="emoji-grid" id="emoji-grid">
+            <!-- Emoji将通过JS动态生成 -->
+        </div>
+        
+        <div class="categories-container">
+            <div class="category">
+                <div class="category-title category-animals">动物 🐾</div>
+                <div class="category-dropzone" id="animals-dropzone" data-category="animals"></div>
+            </div>
+            
+            <div class="category">
+                <div class="category-title category-fruits">水果 🍎</div>
+                <div class="category-dropzone" id="fruits-dropzone" data-category="fruits"></div>
+            </div>
+            
+            <div class="category">
+                <div class="category-title category-vegetables">蔬菜 🥦</div>
+                <div class="category-dropzone" id="vegetables-dropzone" data-category="vegetables"></div>
+            </div>
+        </div>
+        
+        <button class="reset-btn" id="reset-btn">重新开始</button>
+    </div>
+    
+    <div class="celebration" id="celebration">
+        <div class="celebration-text">恭喜你完成了所有分类！</div>
+        <div class="celebration-emoji">🎉</div>
+        <button class="reset-btn">再玩一次</button>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Emoji数据
+            const emojis = [
+                { emoji: '🐶', category: 'animals', name: '狗' },
+                { emoji: '🐱', category: 'animals', name: '猫' },
+                { emoji: '🐭', category: 'animals', name: '老鼠' },
+                { emoji: '🐹', category: 'animals', name: '仓鼠' },
+                { emoji: '🐰', category: 'animals', name: '兔子' },
+                { emoji: '🦊', category: 'animals', name: '狐狸' },
+                { emoji: '🍎', category: 'fruits', name: '苹果' },
+                { emoji: '🍌', category: 'fruits', name: '香蕉' },
+                { emoji: '🍇', category: 'fruits', name: '葡萄' },
+                { emoji: '🍓', category: 'fruits', name: '草莓' },
+                { emoji: '🍊', category: 'fruits', name: '橙子' },
+                { emoji: '🍑', category: 'fruits', name: '桃子' },
+                { emoji: '🥦', category: 'vegetables', name: '西兰花' },
+                { emoji: '🥕', category: 'vegetables', name: '胡萝卜' },
+                { emoji: '🌽', category: 'vegetables', name: '玉米' },
+                { emoji: '🍆', category: 'vegetables', name: '茄子' },
+                { emoji: '🥒', category: 'vegetables', name: '黄瓜' },
+                { emoji: '🥬', category: 'vegetables', name: '生菜' }
+            ];
+            
+            // 游戏状态
+            let score = 0;
+            let draggedItem = null;
+            
+            // 初始化游戏
+            function initGame() {
+                score = 0;
+                updateScore();
+                
+                // 清空所有区域
+                document.getElementById('emoji-grid').innerHTML = '';
+                document.getElementById('animals-dropzone').innerHTML = '';
+                document.getElementById('fruits-dropzone').innerHTML = '';
+                document.getElementById('vegetables-dropzone').innerHTML = '';
+                
+                // 随机排序emoji
+                const shuffledEmojis = [...emojis].sort(() => Math.random() - 0.5);
+                
+                // 创建emoji元素
+                shuffledEmojis.forEach(emojiData => {
+                    const emojiElement = document.createElement('div');
+                    emojiElement.className = 'emoji-item';
+                    emojiElement.innerHTML = emojiData.emoji;
+                    emojiElement.setAttribute('draggable', 'true');
+                    emojiElement.dataset.category = emojiData.category;
+                    emojiElement.dataset.name = emojiData.name;
+                    
+                    // 添加拖拽事件
+                    emojiElement.addEventListener('dragstart', handleDragStart);
+                    
+                    document.getElementById('emoji-grid').appendChild(emojiElement);
+                });
+                
+                // 隐藏庆祝弹窗
+                document.getElementById('celebration').classList.remove('show');
+            }
+            
+            // 更新分数显示
+            function updateScore() {
+                document.getElementById('score').textContent = score;
+                
+                // 检查是否完成所有分类
+                if (score === emojis.length) {
+                    setTimeout(() => {
+                        document.getElementById('celebration').classList.add('show');
+                    }, 500);
+                }
+            }
+            
+            // 拖拽开始
+            function handleDragStart(e) {
+                draggedItem = e.target;
+                e.target.classList.add('dragging');
+                
+                // 设置拖拽数据
+                e.dataTransfer.setData('text/plain', e.target.dataset.category);
+                e.dataTransfer.effectAllowed = 'move';
+            }
+            
+            // 拖拽结束
+            function handleDragEnd(e) {
+                e.target.classList.remove('dragging');
+            }
+            
+            // 拖拽进入放置区域
+            function handleDragEnter(e) {
+                e.preventDefault();
+                if (e.target.classList.contains('category-dropzone')) {
+                    e.target.classList.add('highlight');
+                }
+            }
+            
+            // 拖拽离开放置区域
+            function handleDragLeave(e) {
+                if (e.target.classList.contains('category-dropzone')) {
+                    e.target.classList.remove('highlight');
+                }
+            }
+            
+            // 拖拽在放置区域上移动
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            }
+            
+            // 放置
+            function handleDrop(e) {
+                e.preventDefault();
+                e.target.classList.remove('highlight');
+                
+                const dropzone = e.target.closest('.category-dropzone');
+                if (!dropzone) return;
+                
+                const category = dropzone.dataset.category;
+                
+                // 检查分类是否正确
+                if (draggedItem.dataset.category === category) {
+                    // 正确分类
+                    dropzone.appendChild(draggedItem);
+                    score++;
+                    updateScore();
+                    
+                    // 添加正确反馈动画
+                    gsap.to(draggedItem, {
+                        scale: 1.2,
+                        backgroundColor: '#a0e7a0',
+                        duration: 0.3,
+                        yoyo: true,
+                        repeat: 1
+                    });
+                } else {
+                    // 错误分类
+                    gsap.to(draggedItem, {
+                        x: [-10, 10, -10, 10, 0],
+                        duration: 0.5,
+                        backgroundColor: '#ff9a9e'
+                    });
+                    
+                    setTimeout(() => {
+                        draggedItem.style.backgroundColor = '';
+                    }, 1000);
+                }
+                
+                // 移除拖拽事件，防止重复拖拽
+                draggedItem.removeEventListener('dragstart', handleDragStart);
+                draggedItem.setAttribute('draggable', 'false');
+            }
+            
+            // 为所有放置区域添加事件监听
+            const dropzones = document.querySelectorAll('.category-dropzone');
+            dropzones.forEach(dropzone => {
+                dropzone.addEventListener('dragenter', handleDragEnter);
+                dropzone.addEventListener('dragleave', handleDragLeave);
+                dropzone.addEventListener('dragover', handleDragOver);
+                dropzone.addEventListener('drop', handleDrop);
+            });
+            
+            // 重置按钮
+            document.getElementById('reset-btn').addEventListener('click', initGame);
+            document.querySelector('.celebration .reset-btn').addEventListener('click', function() {
+                document.getElementById('celebration').classList.remove('show');
+                initGame();
+            });
+            
+            // 初始化游戏
+            initGame();
+        });
+    </script>
+</body>
+</html>

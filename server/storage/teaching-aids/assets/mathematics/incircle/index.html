@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：三角形的内切圆</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 黑板背景色 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        canvas {
+            background-color: #333; /* 画布背景 */
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #444;
+            padding: 10px 20px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button, label {
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button {
+            background-color: #00A1E9;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background-color: #008bc9;
+        }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 20px;
+        }
+        
+        /* 点的标签样式 */
+        .label {
+            font-family: "Times New Roman", serif;
+            font-style: italic;
+            font-weight: bold;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>作三角形的内切圆</h1>
+
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showBisectors"> 显示角平分线 (作图原理)
+        </label>
+        <label>
+            <input type="checkbox" id="showRadius" checked> 显示垂直半径
+        </label>
+        <button onclick="resetTriangle()">重置形状</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="info">
+        拖动顶点 A、B、C 可改变三角形形状，内切圆会自动更新。
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    const checkboxBisectors = document.getElementById('showBisectors');
+    const checkboxRadius = document.getElementById('showRadius');
+
+    // 初始顶点坐标
+    let points = {
+        A: { x: 400, y: 100 },
+        B: { x: 200, y: 400 },
+        C: { x: 600, y: 400 }
+    };
+
+    let draggingPoint = null;
+
+    // 辅助函数：计算两点距离
+    function dist(p1, p2) {
+        return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
+    }
+
+    // 辅助函数：计算三角形面积 (Heron's formula components)
+    function getTriangleParams() {
+        const a = dist(points.B, points.C); // BC边长
+        const b = dist(points.A, points.C); // AC边长
+        const c = dist(points.A, points.B); // AB边长
+        const p = a + b + c; // 周长
+        const s = p / 2; // 半周长
+        const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
+        const r = area / s; // 内切圆半径
+
+        // 内心坐标公式: (a*Ax + b*Bx + c*Cx) / p
+        const ox = (a * points.A.x + b * points.B.x + c * points.C.x) / p;
+        const oy = (a * points.A.y + b * points.B.y + c * points.C.y) / p;
+
+        return { a, b, c, r, O: { x: ox, y: oy } };
+    }
+
+    // 绘制函数
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const { a, b, c, r, O } = getTriangleParams();
+
+        // 1. 绘制角平分线 (如果勾选)
+        if (checkboxBisectors.checked) {
+            ctx.save();
+            ctx.strokeStyle = "#666";
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath(); ctx.moveTo(points.A.x, points.A.y); ctx.lineTo(O.x, O.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(points.B.x, points.B.y); ctx.lineTo(O.x, O.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(points.C.x, points.C.y); ctx.lineTo(O.x, O.y); ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        // 2. 绘制垂直半径 (辅助理解切点)
+        // 计算内心到BC边的投影点
+        if (checkboxRadius.checked) {
+            const proj = getProjection(O, points.B, points.C);
+            ctx.save();
+            ctx.strokeStyle = "#00A1E9";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(O.x, O.y);
+            ctx.lineTo(proj.x, proj.y);
+            ctx.stroke();
+            
+            // 画个小直角符号
+            // (简化处理，仅画个小点表示垂足)
+            ctx.fillStyle = "#00A1E9";
+            ctx.beginPath();
+            ctx.arc(proj.x, proj.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 3. 绘制三角形
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(points.A.x, points.A.y);
+        ctx.lineTo(points.B.x, points.B.y);
+        ctx.lineTo(points.C.x, points.C.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // 4. 绘制内切圆
+        ctx.strokeStyle = "#00A1E9"; // 亮蓝色
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(O.x, O.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // 内切圆填充一点透明色，增加立体感
+        ctx.fillStyle = "rgba(0, 161, 233, 0.1)";
+        ctx.fill();
+
+        // 5. 绘制内心点 O
+        ctx.fillStyle = "#ff3333";
+        ctx.beginPath();
+        ctx.arc(O.x, O.y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 6. 绘制顶点和标签
+        drawPoint(points.A, "A", -10, -10);
+        drawPoint(points.B, "B", -20, 20);
+        drawPoint(points.C, "C", 10, 20);
+        
+        // 绘制O标签
+        ctx.fillStyle = "#fff";
+        ctx.font = "italic bold 24px Times New Roman";
+        ctx.fillText("O", O.x + 10, O.y - 10);
+    }
+
+    // 绘制交互点
+    function drawPoint(p, label, offsetX, offsetY) {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "italic bold 24px Times New Roman";
+        ctx.fillText(label, p.x + offsetX, p.y + offsetY);
+    }
+
+    // 计算点P到线段AB的投影点 (用于绘制垂直半径)
+    function getProjection(P, A, B) {
+        const dx = B.x - A.x;
+        const dy = B.y - A.y;
+        const t = ((P.x - A.x) * dx + (P.y - A.y) * dy) / (dx * dx + dy * dy);
+        return {
+            x: A.x + t * dx,
+            y: A.y + t * dy
+        };
+    }
+
+    function resetTriangle() {
+        points = {
+            A: { x: 400, y: 100 },
+            B: { x: 200, y: 400 },
+            C: { x: 600, y: 400 }
+        };
+        draw();
+    }
+
+    // 鼠标/触摸交互逻辑
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(e);
+        // 检查是否点击了顶点 (半径15px内)
+        ['A', 'B', 'C'].forEach(key => {
+            if (dist(pos, points[key]) < 20) {
+                draggingPoint = key;
+            }
+        });
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (draggingPoint) {
+            const pos = getMousePos(e);
+            // 边界限制，防止跑出画布
+            pos.x = Math.max(10, Math.min(canvas.width - 10, pos.x));
+            pos.y = Math.max(10, Math.min(canvas.height - 10, pos.y));
+            
+            points[draggingPoint] = pos;
+            draw();
+        } else {
+            // 鼠标悬停效果
+            const pos = getMousePos(e);
+            let cursor = 'default';
+            ['A', 'B', 'C'].forEach(key => {
+                if (dist(pos, points[key]) < 20) cursor = 'pointer';
+            });
+            canvas.style.cursor = cursor;
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        draggingPoint = null;
+    });
+
+    // 监听Checkbox变化
+    checkboxBisectors.addEventListener('change', draw);
+    checkboxRadius.addEventListener('change', draw);
+
+    // 初始化绘制
+    draw();
+
+</script>
+
+</body>
+</html>

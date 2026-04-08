@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正切 (Tangent) - 交互式教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #262626; /* 深灰色背景 */
+            font-family: "Times New Roman", serif;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        canvas {
+            display: block;
+            cursor: pointer;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            right: 40px;
+            text-align: right;
+            pointer-events: none;
+        }
+
+        .formula {
+            font-size: 32px;
+            font-family: "Times New Roman", serif;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+
+        .fraction {
+            display: inline-block;
+            text-align: center;
+            vertical-align: middle;
+            margin-left: 5px;
+            font-style: normal;
+        }
+        .fraction > span {
+            display: block;
+            padding: 0 5px;
+        }
+        .fraction span.bottom {
+            border-top: 2px solid #eee;
+        }
+
+        #hint {
+            position: absolute;
+            bottom: 30px;
+            color: #888;
+            font-family: "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 右侧公式展示 -->
+    <div id="ui-layer">
+        <div class="formula">
+            tan <span style="font-family: serif;">α</span> = 
+            <div class="fraction">
+                <span class="top" style="color: #f1c40f">AP</span>
+                <span class="bottom">OA</span>
+            </div>
+             = <span id="tanValue" style="color: #f1c40f"></span>
+        </div>
+    </div>
+
+    <canvas id="mainCanvas"></canvas>
+    <div id="hint">拖动圆弧上的白点改变角度</div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const tanValueSpan = document.getElementById('tanValue');
+
+        // --- 状态变量 ---
+        // 1个单位长度对应的像素值
+        let unit = 200; 
+        // 画布中心原点偏移量
+        let originX, originY;
+        // 当前角度 (弧度)
+        let angle = 55 * (Math.PI / 180);
+        // 交互状态
+        let isDragging = false;
+
+        // --- 初始化与自适应 ---
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            
+            // 鼠标/触摸事件
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('touchstart', e => startDrag(e.touches[0]), {passive: false});
+            
+            window.addEventListener('mousemove', onDrag);
+            window.addEventListener('touchmove', e => onDrag(e.touches[0]), {passive: false});
+            
+            window.addEventListener('mouseup', stopDrag);
+            window.addEventListener('touchend', stopDrag);
+
+            draw();
+        }
+
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // 将原点设置在屏幕左下偏左的位置，留出右上角展示空间
+            originX = canvas.width * 0.3; 
+            originY = canvas.height * 0.7;
+            // 根据屏幕大小调整单位长度
+            unit = Math.min(canvas.width, canvas.height) / 3.5;
+            draw();
+        }
+
+        // --- 交互逻辑 ---
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function updateAngle(pos) {
+            const dx = pos.x - originX;
+            const dy = originY - pos.y; // Canvas Y轴向下，数学Y轴向上，需反转
+            
+            // 计算角度，限制在 -85度 到 85度之间，防止 tan 趋向无穷大画出屏幕
+            let newAngle = Math.atan2(dy, dx);
+            
+            // 限制角度范围 (为了演示效果，主要集中在第一、四象限)
+            const limit = 85 * (Math.PI / 180);
+            if (newAngle > limit) newAngle = limit;
+            if (newAngle < -limit) newAngle = -limit;
+            
+            // 限制必须在右侧 (x > 0)
+            if (Math.abs(newAngle) > Math.PI/2) {
+                // 如果鼠标拖到了左边，简单处理保持在边界
+                newAngle = (newAngle > 0) ? limit : -limit;
+            }
+
+            angle = newAngle;
+            draw();
+        }
+
+        function startDrag(e) {
+            isDragging = true;
+            updateAngle(getMousePos(e));
+        }
+
+        function onDrag(e) {
+            if (!isDragging) return;
+            updateAngle(getMousePos(e));
+        }
+
+        function stopDrag() {
+            isDragging = false;
+        }
+
+        // --- 绘图逻辑 ---
+        function draw() {
+            // 1. 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            // 辅助变量
+            const tanVal = Math.tan(angle);
+            const degVal = (angle * 180 / Math.PI).toFixed(0);
+            
+            // 坐标点计算
+            // Point A (1, 0)
+            const Ax = originX + unit;
+            const Ay = originY;
+            // Point P (1, tan(a))
+            const Px = originX + unit;
+            const Py = originY - tanVal * unit;
+            // Point B (0, tan(a))
+            const Bx = originX;
+            const By = originY - tanVal * unit;
+            // Handle Point (Unit circle intersection)
+            const Hx = originX + Math.cos(angle) * unit;
+            const Hy = originY - Math.sin(angle) * unit;
+
+            // 更新DOM显示的数值
+            tanValueSpan.innerText = tanVal.toFixed(2);
+
+            // --- 绘制 ---
+
+            // 2. 坐标轴
+            ctx.beginPath();
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+            // X轴
+            ctx.moveTo(0, originY);
+            ctx.lineTo(canvas.width, originY);
+            // Y轴
+            ctx.moveTo(originX, 0);
+            ctx.lineTo(originX, canvas.height);
+            ctx.stroke();
+
+            // 箭头与标签
+            ctx.fillStyle = '#aaa';
+            ctx.font = 'italic 20px Times New Roman';
+            ctx.fillText('x', canvas.width - 20, originY + 20);
+            ctx.fillText('y', originX - 20, 20);
+            ctx.fillText('O', originX - 20, originY + 20); // 原点
+
+            // 3. 单位圆弧 (Arc)
+            ctx.beginPath();
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 2;
+            ctx.arc(originX, originY, unit, -Math.PI/2, Math.PI/2, false); // 只画右半边
+            ctx.stroke();
+
+            // 4. 切线 x = 1 (Vertical Line)
+            // 只需要画其中的一段，为了视觉整洁，从 A 往上/下延伸一点
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = '#666';
+            ctx.moveTo(Ax, 0);
+            ctx.lineTo(Ax, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 5. 射线 OP (Ray)
+            ctx.beginPath();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(Px, Py); // 延伸到切线
+            ctx.stroke();
+
+            // 6. 关键线段 AP (Tangent Line Segment) - 高亮
+            ctx.beginPath();
+            ctx.strokeStyle = '#f1c40f'; // 黄色
+            ctx.lineWidth = 4;
+            ctx.moveTo(Ax, Ay);
+            ctx.lineTo(Px, Py);
+            ctx.stroke();
+
+            // 7. 投影虚线 P -> B
+            ctx.beginPath();
+            ctx.strokeStyle = '#ccc';
+            ctx.setLineDash([6, 6]);
+            ctx.lineWidth = 1.5;
+            ctx.moveTo(Px, Py);
+            ctx.lineTo(Bx, By);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 8. 角度标记 (Angle Alpha)
+            const arcRadius = unit * 0.2;
+            ctx.beginPath();
+            ctx.strokeStyle = '#e67e22'; // 橙色
+            ctx.lineWidth = 3;
+            ctx.arc(originX, originY, arcRadius, 0, -angle, (angle > 0)); // Canvas角度顺时针为正，所以取反
+            ctx.stroke();
+            // 填充角度背景
+            ctx.fillStyle = 'rgba(230, 126, 34, 0.2)';
+            ctx.lineTo(originX, originY);
+            ctx.fill();
+            
+            // 角度文字 alpha
+            ctx.fillStyle = '#fff';
+            ctx.font = 'italic 20px Times New Roman';
+            const labelR = arcRadius + 25;
+            // 稍微修正文字位置
+            ctx.fillText('α', originX + Math.cos(-angle/2)*labelR, originY + Math.sin(-angle/2)*labelR);
+
+            // 9. 绘制关键点 (Dots)
+            drawPoint(originX, originY, '#fff'); // O
+            drawPoint(Ax, Ay, '#fff'); // A
+            drawPoint(Px, Py, '#fff'); // P (Solid white small)
+            drawPoint(Bx, By, '#fff'); // B
+            
+            // 交互手柄 (圆弧上的点) - 加大带光晕
+            ctx.beginPath();
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.arc(Hx, Hy, 15, 0, Math.PI*2);
+            ctx.fill();
+            drawPoint(Hx, Hy, '#fff', 6); // Handle center
+
+            // 10. 标签文字 (Labels)
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px Times New Roman';
+            
+            // A (1, 0)
+            ctx.textAlign = 'center';
+            ctx.fillText('A (1, 0)', Ax, Ay + 30);
+            
+            // B (0, val)
+            ctx.textAlign = 'right';
+            ctx.fillText(`B (0, ${tanVal.toFixed(2)})`, Bx - 10, By + 5);
+            
+            // P
+            ctx.textAlign = 'left';
+            ctx.fillText('P', Px + 10, Py - 10);
+
+            // 角度数值 (在虚线旁边或者P点旁边)
+            ctx.fillStyle = '#f1c40f'; // 黄色
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`${degVal}°`, Px + 10, Py + 20);
+        }
+
+        function drawPoint(x, y, color, size = 4) {
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(x, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>

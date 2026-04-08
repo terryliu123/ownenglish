@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>电子三角铁 (Web Audio API)</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #1a1a1a, #333);
+            font-family: Arial, sans-serif;
+            overflow: hidden; /* 防止触摸时滚动 */
+            user-select: none; /* 防止长按选中文本 */
+            -webkit-user-select: none;
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 三角铁主体样式 */
+        #triangle-svg {
+            width: 300px;
+            height: 300px;
+            cursor: pointer;
+            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2));
+            transition: transform 0.1s;
+            touch-action: manipulation; /* 优化触屏响应 */
+        }
+
+        .triangle-shape {
+            fill: none;
+            stroke: #e0e0e0;
+            stroke-width: 15;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            /* 金属光泽模拟 */
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.5));
+        }
+
+        /* 悬挂绳 */
+        .string {
+            stroke: #ffcc00;
+            stroke-width: 4;
+        }
+
+        /* 点击时的动画类 */
+        .hit-anim {
+            animation: vibrate 0.3s cubic-bezier(.36,.07,.19,.97) both;
+            stroke: #fff; /* 点击变亮 */
+        }
+
+        @keyframes vibrate {
+            10%, 90% { transform: translate3d(-1px, 0, 0) rotate(-1deg); }
+            20%, 80% { transform: translate3d(2px, 0, 0) rotate(2deg); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0) rotate(-2deg); }
+            40%, 60% { transform: translate3d(4px, 0, 0) rotate(2deg); }
+        }
+
+        .hint {
+            color: #888;
+            margin-top: 20px;
+            font-size: 14px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="touch-area">
+    <!-- SVG 绘制的三角铁 -->
+    <svg id="triangle-svg" viewBox="0 0 200 200">
+        <!-- 绳子 -->
+        <line x1="100" y1="0" x2="100" y2="40" class="string" />
+        
+        <!-- 三角铁本体 (底部有开口) -->
+        <!-- 路径描述：从左下角开始 -> 顶点 -> 右下角 -> 稍微往左一点(开口) -->
+        <path d="M 40 160 L 100 40 L 160 160 L 110 160" class="triangle-shape" id="metal-part" />
+    </svg>
+    
+    <div class="hint">点击或触摸屏幕演奏</div>
+</div>
+
+<script>
+    // 1. 初始化 Web Audio API Context
+    // 现代浏览器通常需要用户交互后才能恢复 AudioContext
+    let audioCtx;
+
+    function initAudio() {
+        if (!audioCtx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            audioCtx = new AudioContext();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // 2. 声音合成函数 (物理建模合成金属声)
+    function playTriangleSound() {
+        initAudio(); // 确保音频引擎已启动
+
+        const t = audioCtx.currentTime;
+        
+        // 创建主增益节点 (控制总音量)
+        const masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+        masterGain.gain.setValueAtTime(0, t);
+        masterGain.gain.linearRampToValueAtTime(0.6, t + 0.01); // 快速起音 (Attack)
+        masterGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0); // 长尾音 (Decay)
+
+        // 定义三角铁的泛音结构
+        // 三角铁是金属打击乐，包含很多非整数倍的泛音，这使得它听起来像金属
+        const ratios = [1, 2.45, 4.6, 7.8, 11.2]; 
+        const baseFreq = 880; // 基础频率 (A5) - 比较高频
+
+        ratios.forEach((ratio, index) => {
+            const osc = audioCtx.createOscillator();
+            // 使用正弦波或三角波
+            osc.type = index === 0 ? 'sine' : 'triangle'; 
+            osc.frequency.value = baseFreq * ratio;
+
+            // 每个泛音有自己的音量包络
+            const oscGain = audioCtx.createGain();
+            // 高频泛音衰减得比基频快
+            const decayTime = 1.5 / (index + 1) + 0.5; 
+            
+            oscGain.gain.setValueAtTime(0, t);
+            oscGain.gain.linearRampToValueAtTime(0.3 / (index + 1), t + 0.01);
+            oscGain.gain.exponentialRampToValueAtTime(0.001, t + decayTime);
+
+            osc.connect(oscGain);
+            oscGain.connect(masterGain);
+
+            osc.start(t);
+            osc.stop(t + 3.5); // 停止振荡器以释放内存
+        });
+    }
+
+    // 3. 处理交互和动画
+    const touchArea = document.getElementById('touch-area');
+    const metalPart = document.getElementById('metal-part');
+    const triangleSvg = document.getElementById('triangle-svg');
+
+    function triggerInstrument(e) {
+        // 阻止默认行为（防止双击缩放或滚动）
+        if(e.type === 'touchstart') e.preventDefault();
+        
+        // 播放声音
+        playTriangleSound();
+
+        // 播放动画
+        // 移除并重新添加 class 以重置动画
+        triangleSvg.classList.remove('hit-anim');
+        void triangleSvg.offsetWidth; // 触发回流 (Reflow)，这是重置 CSS 动画的关键 trick
+        triangleSvg.classList.add('hit-anim');
+
+        // 简单的颜色闪烁
+        metalPart.style.stroke = "#fff";
+        setTimeout(() => {
+            metalPart.style.stroke = "#e0e0e0";
+        }, 100);
+    }
+
+    // 绑定事件
+    // 使用 touchstart 保证移动端低延迟
+    touchArea.addEventListener('touchstart', triggerInstrument, { passive: false });
+    touchArea.addEventListener('mousedown', triggerInstrument);
+
+    // 键盘支持 (按下任意键也可以响)
+    document.addEventListener('keydown', (e) => {
+        if(e.repeat) return; // 防止长按连发
+        triggerInstrument(e);
+    });
+
+</script>
+
+</body>
+</html>

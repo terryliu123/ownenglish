@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>图斯双环定理 (Tusi Couple) - 数字化教具</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        canvas {
+            background-color: #fff;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: left;
+        }
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .math-box {
+            margin-top: 15px;
+            padding: 10px;
+            background: #eef2f7;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            color: #333;
+        }
+        .highlight { color: #e91e63; font-weight: bold; }
+        .btn {
+            grid-column: span 2;
+            padding: 10px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn:hover { background: #1976d2; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>图斯双环定理 (Tusi Couple)</h2>
+        <p>当小圆半径是大圆的一半并在其内部滚动时，小圆周上的点做直线运动。</p>
+        
+        <canvas id="canvas" width="500" height="500"></canvas>
+
+        <div class="math-box">
+            轨迹点 $P$ 的坐标：<br>
+            <span id="coord-display">X: 0.0, Y: 0.0</span>
+        </div>
+
+        <div class="controls">
+            <div class="slider-group">
+                <label>旋转角度 (θ)</label>
+                <input type="range" id="angleSlider" min="0" max="6.283" step="0.01" value="0">
+            </div>
+            <div class="slider-group">
+                <label>小圆点相位 (改变直径方向)</label>
+                <input type="range" id="phaseSlider" min="0" max="6.283" step="0.01" value="0">
+            </div>
+            <button class="btn" id="toggleAnim">开始/停止 自动旋转</button>
+            <div class="slider-group" style="grid-column: span 2;">
+                <label>点到小圆心的距离 (若不等于半径，则轨迹为椭圆)</label>
+                <input type="range" id="offsetSlider" min="0" max="100" step="1" value="100">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const angleSlider = document.getElementById('angleSlider');
+        const phaseSlider = document.getElementById('phaseSlider');
+        const offsetSlider = document.getElementById('offsetSlider');
+        const toggleBtn = document.getElementById('toggleAnim');
+        const coordDisplay = document.getElementById('coord-display');
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const R = 200; // 大圆半径
+        const r = R / 2; // 小圆半径
+
+        let theta = 0; // 大圆圆心到小圆圆心的连线角度
+        let isAnimating = true;
+        let trace = [];
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const phase = parseFloat(phaseSlider.value);
+            const distFactor = parseFloat(offsetSlider.value) / 100; // 点的偏移距离系数
+
+            // 1. 绘制大圆 (固定)
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, R, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 2. 计算小圆中心坐标
+            // 小圆中心在半径为 r 的圆上运动
+            const smallCenterX = centerX + r * Math.cos(theta);
+            const smallCenterY = centerY + r * Math.sin(theta);
+
+            // 3. 绘制小圆
+            ctx.beginPath();
+            ctx.arc(smallCenterX, smallCenterY, r, 0, Math.PI * 2);
+            ctx.strokeStyle = '#2196f3';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 4. 计算小圆周上的点 P
+            // 根据图斯双环原理，小圆相对于其中心的自转角速度是连线角速度的两倍，且方向相反
+            // P = smallCenter + r * (cos(-theta + phase), sin(-theta + phase))
+            // 简化公式：P_x = r*cos(theta) + r*cos(-theta + phase)
+            const pX = smallCenterX + (r * distFactor) * Math.cos(-theta + phase);
+            const pY = smallCenterY + (r * distFactor) * Math.sin(-theta + phase);
+
+            // 5. 记录并绘制轨迹
+            trace.push({x: pX, y: pY});
+            if (trace.length > 500) trace.shift();
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#e91e63';
+            ctx.lineWidth = 2;
+            for(let i=0; i<trace.length; i++) {
+                ctx.lineTo(trace[i].x, trace[i].y);
+            }
+            ctx.stroke();
+
+            // 6. 绘制连线（直径路径参考线）
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(centerX + R * Math.cos(phase/2), centerY + R * Math.sin(phase/2));
+            ctx.lineTo(centerX - R * Math.cos(phase/2), centerY - R * Math.sin(phase/2));
+            ctx.strokeStyle = '#aaa';
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 7. 绘制关键点和结构线
+            // 绘制半径连线
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(smallCenterX, smallCenterY);
+            ctx.strokeStyle = '#2196f3';
+            ctx.stroke();
+
+            // 绘制点 P
+            ctx.beginPath();
+            ctx.arc(pX, pY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#e91e63';
+            ctx.fill();
+            ctx.strokeStyle = 'white';
+            ctx.stroke();
+
+            // 8. 更新UI显示
+            coordDisplay.innerHTML = `X: ${(pX - centerX).toFixed(1)}, Y: ${(centerY - pY).toFixed(1)}`;
+            
+            if (isAnimating) {
+                theta += 0.02;
+                angleSlider.value = theta % (Math.PI * 2);
+            }
+            requestAnimationFrame(draw);
+        }
+
+        angleSlider.addEventListener('input', (e) => {
+            theta = parseFloat(e.target.value);
+            isAnimating = false;
+        });
+
+        phaseSlider.addEventListener('input', () => {
+            trace = []; // 改变相位时重置轨迹
+        });
+
+        offsetSlider.addEventListener('input', () => {
+            trace = []; // 改变距离时重置轨迹
+        });
+
+        toggleBtn.addEventListener('click', () => {
+            isAnimating = !isAnimating;
+        });
+
+        draw();
+    </script>
+</body>
+</html>

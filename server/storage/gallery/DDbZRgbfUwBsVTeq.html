@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>色光的混合 - 交互式微课件</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --screen-bg: #1a1a1a;
+            --text-color: #ecf0f1;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 1. 顶部标题 */
+        header {
+            width: 100%;
+            background-color: #fff;
+            padding: 15px 0;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        
+        h1 { margin: 0; font-size: 22px; color: #333; }
+        .subtitle { font-size: 12px; color: #7f8c8d; margin-top: 5px; background: #eee; display: inline-block; padding: 2px 8px; border-radius: 4px; }
+
+        /* 2. 中间实验区 */
+        .experiment-container {
+            position: relative;
+            width: 800px;
+            height: 450px;
+            background-color: var(--bg-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧：投影屏幕 */
+        .projection-screen {
+            flex: 2;
+            background-color: #000; /* 暗室效果 */
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            perspective: 800px; /* 透视感 */
+        }
+
+        /* 模拟墙面 */
+        .wall {
+            width: 300px;
+            height: 300px;
+            background: #222;
+            transform: rotateY(15deg); /* 让屏幕稍微侧一点，像原图 */
+            position: relative;
+            border: 2px solid #444;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* 光斑通用样式 - 核心物理模拟 */
+        .light-spot {
+            position: absolute;
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            mix-blend-mode: screen; /* 关键：滤色模式模拟加色法 */
+            filter: blur(10px); /* 边缘羽化，更像光 */
+            opacity: 1;
+            transition: background-color 0.1s;
+        }
+
+        /* 光斑位置 (品字形排列) */
+        .spot-red { top: 20px; left: 60px; background-color: rgb(255, 0, 0); }
+        .spot-green { top: 100px; left: 100px; background-color: rgb(0, 255, 0); }
+        .spot-blue { top: 100px; left: 20px; background-color: rgb(0, 0, 255); }
+
+        /* 右侧：手电筒和控制区 */
+        .controls-area {
+            flex: 1;
+            background-color: #34495e;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 30px;
+            position: relative;
+        }
+
+        /* 手电筒组 */
+        .flashlight-group {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        /* 光束效果 */
+        .beam {
+            position: absolute;
+            right: 110px; /* 手电筒左侧 */
+            top: 50%;
+            transform: translateY(-50%);
+            width: 150px;
+            height: 40px;
+            /* 渐变模拟光束 */
+            background: linear-gradient(to left, rgba(255,255,255,0.2), transparent);
+            clip-path: polygon(0% 0%, 100% 20%, 100% 80%, 0% 100%);
+            pointer-events: none;
+            opacity: 0; /* 默认看不见，调节时显示 */
+            transition: opacity 0.2s;
+        }
+
+        /* 手电筒图标样式 */
+        .flashlight {
+            width: 100px;
+            height: 40px;
+            border-radius: 5px 20px 20px 5px;
+            position: relative;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .flashlight::before { /* 握把 */
+            content: '';
+            position: absolute;
+            right: -10px;
+            width: 15px;
+            height: 20px;
+            background: inherit;
+            filter: brightness(0.8);
+        }
+        
+        /* 滑块样式 */
+        input[type=range] {
+            width: 120px;
+            margin-left: 15px;
+            cursor: pointer;
+        }
+
+        .fl-red { background: #ff6b6b; }
+        .fl-green { background: #51cf66; }
+        .fl-blue { background: #339af0; }
+
+        /* 自动演示按钮 */
+        .btn-auto {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 30px;
+            background: #fff;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #2c3e50;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: transform 0.1s;
+        }
+        .btn-auto:active { transform: translateX(-50%) scale(0.95); }
+
+        /* 结果读数 */
+        .color-value {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-family: monospace;
+            font-size: 12px;
+            background: rgba(0,0,0,0.5);
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        /* 3. 底部说明 */
+        .description {
+            width: 800px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            line-height: 1.8;
+            color: #555;
+            font-size: 15px;
+            border-left: 5px solid #3498db;
+        }
+        .highlight { color: #d35400; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>色光的混合</h1>
+        <span class="subtitle">可交互式微课件</span>
+    </header>
+
+    <div class="experiment-container">
+        <!-- 左侧：投影效果 -->
+        <div class="projection-screen">
+            <div class="color-value" id="colorDisplay">R:255 G:255 B:255</div>
+            <div class="wall">
+                <!-- 三个光斑 -->
+                <div class="light-spot spot-red" id="spotRed"></div>
+                <div class="light-spot spot-green" id="spotGreen"></div>
+                <div class="light-spot spot-blue" id="spotBlue"></div>
+            </div>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <div class="controls-area">
+            <!-- 红色控制 -->
+            <div class="flashlight-group">
+                <div class="beam" style="background: linear-gradient(to left, rgba(255,0,0,0.5), transparent); opacity: 1;"></div>
+                <input type="range" id="rangeRed" min="0" max="255" value="255">
+                <div class="flashlight fl-red">红光</div>
+            </div>
+
+            <!-- 绿色控制 -->
+            <div class="flashlight-group">
+                <div class="beam" style="background: linear-gradient(to left, rgba(0,255,0,0.5), transparent); opacity: 1;"></div>
+                <input type="range" id="rangeGreen" min="0" max="255" value="255">
+                <div class="flashlight fl-green">绿光</div>
+            </div>
+
+            <!-- 蓝色控制 -->
+            <div class="flashlight-group">
+                <div class="beam" style="background: linear-gradient(to left, rgba(0,0,255,0.5), transparent); opacity: 1;"></div>
+                <input type="range" id="rangeBlue" min="0" max="255" value="255">
+                <div class="flashlight fl-blue">蓝光</div>
+            </div>
+
+            <button class="btn-auto" onclick="toggleDemo()">
+                <span id="playIcon">▶</span> 自动演示
+            </button>
+        </div>
+    </div>
+
+    <div class="description">
+        <p>实验证明，红、绿、蓝三种色光无法被分解，而且把这三种色光按不同比例混合后，可以产生各种颜色的光，因此把红、绿、蓝叫做<span class="highlight">色光的三原色</span>。</p>
+        <p>彩色电视机画面上的丰富色彩就是由三原色光混合而成。三原色光中任意两种色光等量相加，则成为三原色光中另一种色光的补色光。</p>
+        <ul>
+            <li>等量的 <span style="color:#e74c3c;font-weight:bold">红光</span> + <span style="color:#2ecc71;font-weight:bold">绿光</span> = <span style="color:#f1c40f;font-weight:bold;background:#333;padding:0 4px;">黄光</span> (互补于蓝光)</li>
+            <li>等量的 <span style="color:#e74c3c;font-weight:bold">红光</span> + <span style="color:#3498db;font-weight:bold">蓝光</span> = <span style="color:#d63031;font-weight:bold;background:#333;padding:0 4px;">品红光</span> (也称洋红，互补于绿光)</li>
+            <li>等量的 <span style="color:#2ecc71;font-weight:bold">绿光</span> + <span style="color:#3498db;font-weight:bold">蓝光</span> = <span style="color:#00d2d3;font-weight:bold;background:#333;padding:0 4px;">青光</span> (互补于红光)</li>
+            <li>三种光等量混合 = <span style="color:#fff;font-weight:bold;background:#333;padding:0 4px;">白光</span></li>
+        </ul>
+        <p>在这个交互素材中，你可以调整右侧滑块改变红、绿、蓝三种色光的比例来观察混合出的颜色变化。</p>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const spotRed = document.getElementById('spotRed');
+        const spotGreen = document.getElementById('spotGreen');
+        const spotBlue = document.getElementById('spotBlue');
+        
+        const rangeRed = document.getElementById('rangeRed');
+        const rangeGreen = document.getElementById('rangeGreen');
+        const rangeBlue = document.getElementById('rangeBlue');
+        
+        const colorDisplay = document.getElementById('colorDisplay');
+        const playIcon = document.getElementById('playIcon');
+
+        // 状态变量
+        let isDemoPlaying = false;
+        let demoInterval;
+
+        // 更新颜色函数
+        function updateLights() {
+            const r = rangeRed.value;
+            const g = rangeGreen.value;
+            const b = rangeBlue.value;
+
+            // 更新光斑颜色 (亮度)
+            spotRed.style.backgroundColor = `rgb(${r}, 0, 0)`;
+            spotGreen.style.backgroundColor = `rgb(0, ${g}, 0)`;
+            spotBlue.style.backgroundColor = `rgb(0, 0, ${b})`;
+
+            // 更新光束透明度 (视觉辅助)
+            document.querySelectorAll('.beam')[0].style.opacity = r / 255;
+            document.querySelectorAll('.beam')[1].style.opacity = g / 255;
+            document.querySelectorAll('.beam')[2].style.opacity = b / 255;
+
+            // 更新读数
+            colorDisplay.textContent = `R:${r} G:${g} B:${b}`;
+        }
+
+        // 绑定事件监听
+        rangeRed.addEventListener('input', updateLights);
+        rangeGreen.addEventListener('input', updateLights);
+        rangeBlue.addEventListener('input', updateLights);
+
+        // 自动演示逻辑
+        function toggleDemo() {
+            if (isDemoPlaying) {
+                // 停止
+                clearInterval(demoInterval);
+                isDemoPlaying = false;
+                playIcon.textContent = "▶";
+            } else {
+                // 开始
+                isDemoPlaying = true;
+                playIcon.textContent = "■";
+                let step = 0;
+                
+                demoInterval = setInterval(() => {
+                    step++;
+                    // 简单的正弦波动画，让三种光交替明暗
+                    const rVal = Math.floor(127.5 + 127.5 * Math.sin(step * 0.05));
+                    const gVal = Math.floor(127.5 + 127.5 * Math.sin(step * 0.07 + 2));
+                    const bVal = Math.floor(127.5 + 127.5 * Math.sin(step * 0.09 + 4));
+
+                    rangeRed.value = rVal;
+                    rangeGreen.value = gVal;
+                    rangeBlue.value = bVal;
+                    updateLights();
+                }, 30);
+            }
+        }
+
+        // 初始化
+        updateLights();
+    </script>
+</body>
+</html>

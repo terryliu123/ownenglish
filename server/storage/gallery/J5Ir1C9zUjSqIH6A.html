@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>伽利略望远镜原理演示</title>
+    <style>
+        /* 全局样式重置 */
+        body, h1, p, div {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* 容器卡片样式 */
+        .container {
+            background-color: white;
+            width: 100%;
+            max-width: 850px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 1. 顶部标题 */
+        header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .tag {
+            font-size: 0.8rem;
+            color: #666;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* 2. 中间实验区 */
+        .experiment-area {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background-color: #B5CFA5; /* 还原参考图的绿色背景 */
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* 播放按钮样式 */
+        .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s;
+            z-index: 10;
+        }
+
+        .play-btn:hover {
+            background-color: rgba(0, 0, 0, 0.6);
+        }
+
+        .play-btn::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            border-left: 18px solid white;
+            margin-left: 4px;
+        }
+
+        /* 3. 尾部说明 */
+        footer {
+            padding: 20px;
+            background-color: #fff;
+        }
+
+        footer p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #444;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .text-highlight {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .book-info {
+            font-size: 0.8rem;
+            color: #888;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 1. 上部标题 -->
+    <header>
+        <h1>伽利略望远镜</h1>
+        <span class="tag">可交互式微课件</span>
+    </header>
+
+    <!-- 2. 中间实验演示区 -->
+    <div class="experiment-area" id="experimentArea">
+        <canvas id="opticalCanvas"></canvas>
+        <div class="play-btn" id="playBtn" onclick="startAnimation()"></div>
+    </div>
+
+    <!-- 3. 尾部说明 -->
+    <footer>
+        <p>
+            展示<span class="text-highlight">伽利略望远镜</span>的结构，帮助学生理解伽利略望远镜的成像原理。
+            该望远镜由一个<span class="text-highlight">凸透镜（物镜）</span>和一个<span class="text-highlight">凹透镜（目镜）</span>组成。
+            光线经过物镜汇聚，但在成像之前被凹透镜截获，经发散后进入人眼，人眼看到的是正立、放大的虚像。
+        </p>
+        <div class="book-info">
+            适配教科书：沪科版 / 沪粤版 / 苏教版 / 教科版(2024) / 人教版(2024) / 浙教版
+        </div>
+    </footer>
+</div>
+
+<script>
+    const canvas = document.getElementById('opticalCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('experimentArea');
+    const playBtn = document.getElementById('playBtn');
+
+    let width, height;
+    let animationProgress = 0;
+    let isAnimating = false;
+    let animationId;
+
+    // 初始化画布尺寸
+    function initCanvas() {
+        width = container.clientWidth;
+        height = container.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        drawScene(0);
+    }
+
+    window.addEventListener('resize', initCanvas);
+
+    // 核心绘图函数
+    function drawScene(progress) {
+        ctx.clearRect(0, 0, width, height);
+        const centerY = height / 2;
+        
+        // 坐标定义 (根据参考图比例)
+        const axisY = centerY;
+        const objX = width * 0.15; // 大树位置
+        const lens1X = width * 0.55; // 凸透镜位置 (物镜)
+        const lens2X = width * 0.68; // 凹透镜位置 (目镜)
+        
+        const f1_dist = 100; // 物镜焦距示意
+        const f2_dist = 40;  // 目镜焦距示意
+
+        // 1. 绘制光轴 (虚线)
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, axisY);
+        ctx.lineTo(width, axisY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 2. 绘制物体：大树 (左侧)
+        drawTree(objX, axisY, 1, 1); // 缩放1，不透明度1
+
+        // 3. 绘制物体：小树 (中间，虚像示意)
+        // 参考图中有一个半透明的小树在中间
+        drawTree(width * 0.4, axisY, 0.4, 0.5); 
+
+        // 4. 绘制焦点 F2 (紫色) - 物镜左侧焦点示意
+        drawPoint(width * 0.38, axisY, '#B030B0', 'F₂');
+
+        // 5. 绘制凸透镜 (物镜)
+        drawConvexLens(lens1X, axisY, 180);
+        // 凸透镜焦点 F1 (紫色)
+        drawPoint(lens1X + 15, axisY, '#B030B0', 'F₁', 15);
+
+        // 6. 绘制凹透镜 (目镜)
+        drawConcaveLens(lens2X, axisY, 140);
+        // 凹透镜光心 (橙色)
+        drawPoint(lens2X, axisY, '#FFA500', '', 0);
+
+        // 7. 绘制右侧焦点 (F1, F2重合处示意)
+        drawPoint(width * 0.8, axisY, '#B030B0', 'F₁', -15); // 上标
+        drawPoint(width * 0.8, axisY, '#555', 'F₂', 15); // 下标
+
+        // 8. 绘制光线动画
+        if (progress > 0) {
+            drawLightRays(objX, axisY, lens1X, lens2X, progress);
+        }
+    }
+
+    // 绘制树木
+    function drawTree(x, y, scale, opacity) {
+        ctx.save();
+        ctx.globalAlpha = opacity;
+        ctx.translate(x, y);
+        ctx.scale(scale, scale);
+
+        // 树干
+        ctx.fillStyle = '#8B4513';
+        ctx.fillRect(-5, -20, 10, 20);
+
+        // 树冠 (三个三角形叠加)
+        ctx.fillStyle = '#558B2F';
+        
+        ctx.beginPath();
+        ctx.moveTo(-25, -20);
+        ctx.lineTo(25, -20);
+        ctx.lineTo(0, -50);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(-20, -40);
+        ctx.lineTo(20, -40);
+        ctx.lineTo(0, -65);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(-15, -60);
+        ctx.lineTo(15, -60);
+        ctx.lineTo(0, -80);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 绘制凸透镜
+    function drawConvexLens(x, y, len) {
+        ctx.save();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        
+        ctx.beginPath();
+        ctx.ellipse(x, y, 15, len/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 标注符号 (箭头朝外)
+        /* 简化的透镜符号 */
+        ctx.beginPath();
+        ctx.moveTo(x, y - len/2);
+        ctx.lineTo(x, y + len/2);
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // 绘制凹透镜
+    function drawConcaveLens(x, y, len) {
+        ctx.save();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        
+        // 简单的凹透镜形状绘制
+        const w = 15;
+        const h = len/2;
+        ctx.beginPath();
+        ctx.moveTo(x - w/2, y - h);
+        ctx.quadraticCurveTo(x + w/2, y, x - w/2, y + h);
+        ctx.lineTo(x + w/2, y + h);
+        ctx.quadraticCurveTo(x - w/2, y, x + w/2, y - h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.restore();
+    }
+
+    // 绘制点和标签
+    function drawPoint(x, y, color, label, labelOffsetY = 20) {
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (label) {
+            ctx.fillStyle = '#333';
+            ctx.font = 'italic 14px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y + labelOffsetY);
+        }
+    }
+
+    // 绘制光线动画逻辑
+    function drawLightRays(objX, centerY, l1X, l2X, progress) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)'; // 黄色光线
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 5]); // 虚线光路
+
+        // 定义光线关键点
+        // 树顶坐标 (假设树高缩放后为80)
+        const topX = objX;
+        const topY = centerY - 80; 
+
+        // 光线1：平行主轴 -> 凸透镜 -> 趋向焦点F1(右侧) -> 被凹透镜折射 -> 平行射出(伽利略模型简化)
+        // 光线2：过光心 -> 直线传播 (此处做简化演示)
+
+        // 为了动画效果，我们分段绘制
+        
+        // 第一段：物体 -> 物镜
+        const p1_endX = l1X;
+        const p1_endY = topY; // 平行光
+        
+        drawLineAnimated(topX, topY, p1_endX, p1_endY, 0, 0.3, progress);
+
+        // 第二段：物镜 -> 目镜 (原本汇聚向右侧焦点，但被目镜截断)
+        // 假设汇聚点在 l2X 右侧一点
+        const focusX = width * 0.8;
+        const focusY = centerY; // 汇聚到轴上
+        
+        // 计算光线在目镜处的截断点 (线性插值)
+        const slope = (focusY - p1_endY) / (focusX - l1X);
+        const p2_endX = l2X;
+        const p2_endY = p1_endY + slope * (l2X - l1X);
+
+        drawLineAnimated(p1_endX, p1_endY, p2_endX, p2_endY, 0.3, 0.6, progress);
+
+        // 第三段：目镜 -> 人眼 (平行射出，示意成正立像)
+        // 伽利略望远镜出射光是平行的（针对无穷远物体）
+        // 这里稍微发散一点点或者平行，为了视觉效果画平行线
+        const p3_endX = width;
+        const p3_endY = p2_endY * 0.8; // 稍微改变角度示意折射
+
+        drawLineAnimated(p2_endX, p2_endY, p3_endX, p3_endY, 0.6, 1.0, progress);
+
+        ctx.restore();
+    }
+
+    // 辅助函数：根据进度绘制线段
+    function drawLineAnimated(x1, y1, x2, y2, startP, endP, currentP) {
+        if (currentP < startP) return;
+        
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        
+        let drawX, drawY;
+        
+        if (currentP >= endP) {
+            drawX = x2;
+            drawY = y2;
+        } else {
+            // 计算当前段的局部进度 (0~1)
+            const localProgress = (currentP - startP) / (endP - startP);
+            drawX = x1 + (x2 - x1) * localProgress;
+            drawY = y1 + (y2 - y1) * localProgress;
+        }
+        
+        ctx.lineTo(drawX, drawY);
+        ctx.stroke();
+    }
+
+    // 动画控制
+    function startAnimation() {
+        if (isAnimating) return;
+        isAnimating = true;
+        playBtn.style.display = 'none'; // 隐藏按钮
+        animationProgress = 0;
+
+        function step() {
+            animationProgress += 0.01; // 动画速度
+            if (animationProgress > 1.2) {
+                animationProgress = 1.2; // 保持最终状态
+                // 动画结束，如果需要循环可以重置，这里保持显示
+                // isAnimating = false;
+                // playBtn.style.display = 'flex'; 
+                drawScene(1); // 确保画完
+                return;
+            }
+            drawScene(Math.min(animationProgress, 1));
+            animationId = requestAnimationFrame(step);
+        }
+        step();
+    }
+
+    // 页面加载完成后绘制初始画面
+    initCanvas();
+
+</script>
+
+</body>
+</html>

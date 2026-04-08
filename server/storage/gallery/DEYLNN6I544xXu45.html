@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>井字棋 - 极简交互版</title>
+    <style>
+        :root {
+            --bg-color: #282c34;
+            --cell-color: #333842;
+            --text-color: #abb2bf;
+            --x-color: #61afef; /* 蓝色 */
+            --o-color: #e06c75; /* 红色 */
+            --win-bg: #98c379;  /* 绿色高亮 */
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: var(--bg-color);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        #status {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        /* 棋盘布局：核心稳定性 */
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            gap: 10px;
+            width: 90vw;
+            max-width: 350px;
+            aspect-ratio: 1 / 1;
+            padding: 10px;
+            background-color: #21252b;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .cell {
+            background-color: var(--cell-color);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 4rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.3s;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .cell:active {
+            transform: scale(0.92);
+        }
+
+        /* X 和 O 的颜色 */
+        .cell.x { color: var(--x-color); }
+        .cell.o { color: var(--o-color); }
+
+        /* 获胜高亮动画 */
+        .cell.winning {
+            background-color: var(--win-bg);
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .controls {
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 30px;
+            font-size: 1.1rem;
+            background-color: transparent;
+            color: white;
+            border: 2px solid #56b6c2;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background-color: #56b6c2;
+            color: #282c34;
+        }
+
+        button:active {
+            transform: translateY(2px);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">轮到 X 玩家</div>
+
+    <div class="board" id="board">
+        <!-- 9个格子由 JS 自动生成 -->
+    </div>
+
+    <div class="controls">
+        <button onclick="resetGame()">重新开始</button>
+    </div>
+
+    <script>
+        const boardEl = document.getElementById('board');
+        const statusEl = document.getElementById('status');
+        
+        let currentPlayer = 'X';
+        let gameState = ["", "", "", "", "", "", "", "", ""];
+        let gameActive = true;
+
+        const winConditions = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], // 横向
+            [0, 3, 6], [1, 4, 7], [2, 5, 8], // 纵向
+            [0, 4, 8], [2, 4, 6]             // 斜向
+        ];
+
+        function createBoard() {
+            boardEl.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.setAttribute('data-index', i);
+                cell.addEventListener('click', () => handleCellClick(cell, i));
+                boardEl.appendChild(cell);
+            }
+        }
+
+        function handleCellClick(cell, index) {
+            if (gameState[index] !== "" || !gameActive) return;
+
+            // 更新数据
+            gameState[index] = currentPlayer;
+            
+            // 更新 UI
+            cell.innerText = currentPlayer;
+            cell.classList.add(currentPlayer.toLowerCase());
+            
+            checkResult();
+        }
+
+        function checkResult() {
+            let roundWon = false;
+            let winningCombo = [];
+
+            for (let i = 0; i < winConditions.length; i++) {
+                const [a, b, c] = winConditions[i];
+                if (gameState[a] && gameState[a] === gameState[b] && gameState[a] === gameState[c]) {
+                    roundWon = true;
+                    winningCombo = [a, b, c];
+                    break;
+                }
+            }
+
+            if (roundWon) {
+                statusEl.innerText = `玩家 ${currentPlayer} 获胜!`;
+                statusEl.style.color = currentPlayer === 'X' ? 'var(--x-color)' : 'var(--o-color)';
+                highlightWinners(winningCombo);
+                gameActive = false;
+                return;
+            }
+
+            // 检查平局
+            if (!gameState.includes("")) {
+                statusEl.innerText = "平局！";
+                statusEl.style.color = "white";
+                gameActive = false;
+                return;
+            }
+
+            // 切换玩家
+            currentPlayer = currentPlayer === "X" ? "O" : "X";
+            statusEl.innerText = `轮到 ${currentPlayer} 玩家`;
+        }
+
+        function highlightWinners(combo) {
+            const cells = document.querySelectorAll('.cell');
+            combo.forEach(index => {
+                cells[index].classList.add('winning');
+            });
+        }
+
+        function resetGame() {
+            currentPlayer = "X";
+            gameState = ["", "", "", "", "", "", "", "", ""];
+            gameActive = true;
+            statusEl.innerText = "轮到 X 玩家";
+            statusEl.style.color = "white";
+            createBoard();
+        }
+
+        // 初始化
+        createBoard();
+    </script>
+</body>
+</html>

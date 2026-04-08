@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>国际象棋 - 稳定布局版</title>
+    <style>
+        :root {
+            --light-sq: #ebecd0;
+            --dark-sq: #779556;
+            --highlight: rgba(255, 255, 0, 0.5);
+            --last-move: rgba(186, 202, 43, 0.6);
+        }
+
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #302e2c;
+            color: white;
+            font-family: -apple-system, system-ui, sans-serif;
+            height: 100vh;
+            justify-content: center;
+        }
+
+        #status {
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            height: 1.5rem; /* 固定高度防止文字切换时页面跳动 */
+        }
+
+        /* 棋盘核心布局 */
+        .board-container {
+            width: 95vw;
+            max-width: 450px;
+            /* 关键：强制宽高比 1:1 */
+            aspect-ratio: 1 / 1; 
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            border: 2px solid #222;
+            box-sizing: border-box;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .square {
+            /* 关键：确保格子大小完全由 grid 定义，不受内容影响 */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-sizing: border-box;
+            cursor: pointer;
+            overflow: hidden; /* 防止大字符溢出 */
+        }
+
+        .square.light { background-color: var(--light-sq); }
+        .square.dark { background-color: var(--dark-sq); }
+
+        /* 棋子样式 */
+        .piece {
+            /* 使用固定单位或容器百分比，确保字符大小一致 */
+            font-size: min(10vw, 45px); 
+            line-height: 1;
+            z-index: 2;
+            transition: transform 0.1s; /* 轻微移动动画 */
+        }
+
+        .piece.white { color: #fff; text-shadow: 1px 1px 2px #000; }
+        .piece.black { color: #000; }
+
+        /* 状态高亮 */
+        .square.selected { background-color: var(--highlight) !important; }
+        
+        /* 移动端控制按钮 */
+        .controls { margin-top: 30px; }
+        button {
+            padding: 12px 30px;
+            font-size: 1rem;
+            background: #81b64c;
+            border: none;
+            color: white;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px #5d8437;
+        }
+        button:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px #5d8437;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="status">白方回合</div>
+
+    <div class="board-container" id="board"></div>
+
+    <div class="controls">
+        <button onclick="initGame()">重新开始</button>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const statusDisplay = document.getElementById('status');
+        
+        const piecesSymbols = {
+            'w-r': '♖', 'w-n': '♘', 'w-b': '♗', 'w-q': '♕', 'w-k': '♔', 'w-p': '♙',
+            'b-r': '♜', 'b-n': '♞', 'b-b': '♝', 'b-q': '♛', 'b-k': '♚', 'b-p': '♟'
+        };
+
+        let board = [];
+        let turn = 'w';
+        let selectedSq = null;
+
+        function initGame() {
+            turn = 'w';
+            selectedSq = null;
+            statusDisplay.innerText = "白方回合";
+            statusDisplay.style.color = "white";
+
+            const layout = [
+                ['b-r','b-n','b-b','b-q','b-k','b-b','b-n','b-r'],
+                ['b-p','b-p','b-p','b-p','b-p','b-p','b-p','b-p'],
+                Array(8).fill(null), Array(8).fill(null), Array(8).fill(null), Array(8).fill(null),
+                ['w-p','w-p','w-p','w-p','w-p','w-p','w-p','w-p'],
+                ['w-r','w-n','w-b','w-q','w-k','w-b','w-n','w-r']
+            ];
+            board = layout.map(row => [...row]);
+            renderBoard();
+        }
+
+        function renderBoard() {
+            boardElement.innerHTML = '';
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const sq = document.createElement('div');
+                    sq.className = `square ${(r + c) % 2 === 0 ? 'light' : 'dark'}`;
+                    
+                    const piece = board[r][c];
+                    if (piece) {
+                        const span = document.createElement('span');
+                        span.className = `piece ${piece.startsWith('w') ? 'white' : 'black'}`;
+                        span.innerText = piecesSymbols[piece];
+                        sq.appendChild(span);
+                    }
+
+                    if (selectedSq && selectedSq.r === r && selectedSq.c === c) {
+                        sq.classList.add('selected');
+                    }
+
+                    // 绑定点击和触摸事件
+                    sq.onclick = (e) => {
+                        e.preventDefault();
+                        handleSquareClick(r, c);
+                    };
+                    
+                    boardElement.appendChild(sq);
+                }
+            }
+        }
+
+        function handleSquareClick(r, c) {
+            const piece = board[r][c];
+
+            if (selectedSq) {
+                if (isValidMove(selectedSq.r, selectedSq.c, r, c)) {
+                    // 执行移动逻辑
+                    board[r][c] = board[selectedSq.r][selectedSq.c];
+                    board[selectedSq.r][selectedSq.c] = null;
+                    
+                    turn = (turn === 'w' ? 'b' : 'w');
+                    selectedSq = null;
+                    statusDisplay.innerText = (turn === 'w' ? "白方回合" : "黑方回合");
+                } else {
+                    // 重新选择
+                    if (piece && piece.startsWith(turn)) {
+                        selectedSq = { r, c };
+                    } else {
+                        selectedSq = null;
+                    }
+                }
+            } else {
+                if (piece && piece.startsWith(turn)) {
+                    selectedSq = { r, c };
+                }
+            }
+            renderBoard();
+        }
+
+        // 基础规则校验
+        function isValidMove(sr, sc, tr, tc) {
+            const piece = board[sr][sc];
+            const target = board[tr][tc];
+            if (target && target.startsWith(turn)) return false;
+
+            const dr = tr - sr;
+            const dc = tc - sc;
+            const absDr = Math.abs(dr);
+            const absDc = Math.abs(dc);
+            const type = piece.split('-')[1];
+
+            switch (type) {
+                case 'p':
+                    const dir = (piece.startsWith('w') ? -1 : 1);
+                    if (dc === 0 && !target) {
+                        if (dr === dir) return true;
+                        if (dr === 2 * dir && ((sr === 6 && dir === -1) || (sr === 1 && dir === 1))) {
+                            return !board[sr + dir][sc];
+                        }
+                    }
+                    if (absDc === 1 && dr === dir && target) return true;
+                    return false;
+                case 'r': return (sr === tr || sc === tc) && isPathClear(sr, sc, tr, tc);
+                case 'n': return (absDr === 2 && absDc === 1) || (absDr === 1 && absDc === 2);
+                case 'b': return (absDr === absDc) && isPathClear(sr, sc, tr, tc);
+                case 'q': return (absDr === absDc || sr === tr || sc === tc) && isPathClear(sr, sc, tr, tc);
+                case 'k': return absDr <= 1 && absDc <= 1;
+            }
+            return false;
+        }
+
+        function isPathClear(sr, sc, tr, tc) {
+            const stepR = (tr === sr) ? 0 : (tr > sr ? 1 : -1);
+            const stepC = (tc === sc) ? 0 : (tc > sc ? 1 : -1);
+            let currR = sr + stepR;
+            let currC = sc + stepC;
+            while (currR !== tr || currC !== tc) {
+                if (board[currR][currC]) return false;
+                currR += stepR;
+                currC += stepC;
+            }
+            return true;
+        }
+
+        initGame();
+    </script>
+</body>
+</html>

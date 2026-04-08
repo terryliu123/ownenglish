@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>一次函数的应用：相遇问题交互演示</title>
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --text-color: #e0e0e0;
+            --accent-color: #4facfe;
+            --grid-color: #444;
+            --red-color: #ff4b4b;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        /* 图表区域 */
+        .graph-panel {
+            flex: 1;
+            min-width: 350px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 350px;
+            display: block;
+        }
+
+        /* 动画演示区域 */
+        .scene-panel {
+            flex: 1;
+            min-width: 350px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .road-container {
+            position: relative;
+            height: 100px;
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+
+        .road-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #fff;
+        }
+
+        .point {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            transition: left 0.1s linear;
+        }
+
+        .point-a { background-color: var(--red-color); box-shadow: 0 0 8px var(--red-color); }
+        .point-b { background-color: var(--red-color); box-shadow: 0 0 8px var(--red-color); }
+
+        .label {
+            position: absolute;
+            top: -30px;
+            transform: translateX(-50%);
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .arrow {
+            position: absolute;
+            top: -10px;
+            width: 40px;
+            height: 2px;
+            background: var(--red-color);
+        }
+        .arrow::after {
+            content: '';
+            position: absolute;
+            border: 4px solid transparent;
+        }
+        .arrow-right::after {
+            border-left-color: var(--red-color);
+            right: -4px;
+            top: -3px;
+        }
+        .arrow-left::after {
+            border-right-color: var(--red-color);
+            left: -4px;
+            top: -3px;
+        }
+
+        /* 距离标注 */
+        .distance-indicator {
+            position: absolute;
+            top: 70%;
+            height: 1px;
+            background: #888;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .distance-indicator::before, .distance-indicator::after {
+            content: '';
+            position: absolute;
+            height: 10px;
+            width: 1px;
+            background: #888;
+            top: -5px;
+        }
+        .distance-indicator::before { left: 0; }
+        .distance-indicator::after { right: 0; }
+        .distance-text {
+            background: #2a2a2a;
+            padding: 0 5px;
+            font-size: 12px;
+            color: #aaa;
+        }
+
+        /* 控制区域 */
+        .controls {
+            width: 100%;
+            max-width: 1200px;
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            width: 200px;
+        }
+
+        .btn {
+            padding: 8px 20px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn:hover { background: #3a8bce; }
+
+        .status-text {
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+        
+        .info-box {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>一次函数的应用：相遇问题可视化</h1>
+
+    <div class="container">
+        <!-- 左侧图表 -->
+        <div class="graph-panel">
+            <canvas id="graphCanvas"></canvas>
+            <div style="position: absolute; top: 10px; left: 20px; font-size: 0.9rem;">S (km)</div>
+            <div style="position: absolute; bottom: 20px; right: 10px; font-size: 0.9rem;">t (h)</div>
+        </div>
+
+        <!-- 右侧演示 -->
+        <div class="scene-panel">
+            <div style="display: flex; justify-content: space-between; padding: 0 10px;">
+                <span>甲地 (A)</span>
+                <span>乙地 (B)</span>
+            </div>
+            <div class="road-container">
+                <div class="road-line"></div>
+                
+                <!-- 物体 A -->
+                <div id="objA" class="point point-a">
+                    <div class="label">A</div>
+                    <div class="arrow arrow-right" style="top: -5px; left: 10px;"></div>
+                </div>
+
+                <!-- 物体 B -->
+                <div id="objB" class="point point-b">
+                    <div class="label">B</div>
+                    <div class="arrow arrow-left" style="top: -5px; right: 10px;"></div>
+                </div>
+
+                <!-- 距离指示器 -->
+                <div id="distIndicator" class="distance-indicator">
+                    <div class="distance-text" id="sceneDistText">1200km</div>
+                </div>
+            </div>
+            <div style="text-align: center;" class="status-text">
+                当前时间: <span id="timeDisplay">0.00</span> h<br>
+                相距: <span id="distDisplay">1200</span> km
+            </div>
+        </div>
+    </div>
+
+    <!-- 控制面板 -->
+    <div class="controls">
+        <div class="control-group">
+            <button class="btn" id="playBtn">播放演示</button>
+        </div>
+        
+        <div class="control-group" style="flex-grow: 1; justify-content: center;">
+            <label>时间进度:</label>
+            <input type="range" id="timeSlider" min="0" max="12" step="0.05" value="0" style="width: 60%;">
+        </div>
+
+        <div style="width: 100%; border-top: 1px solid #555; margin: 10px 0;"></div>
+
+        <!-- 参数设置 -->
+        <div class="control-group">
+            <label>总路程 (km):</label>
+            <input type="number" id="inputTotalS" value="1200" style="width: 60px;">
+        </div>
+        <div class="control-group">
+            <label>速度 A (km/h):</label>
+            <input type="number" id="inputVa" value="300" style="width: 60px;">
+        </div>
+        <div class="control-group">
+            <label>速度 B (km/h):</label>
+            <input type="number" id="inputVb" value="100" style="width: 60px;">
+        </div>
+        <div class="control-group">
+            <button class="btn" id="resetBtn" style="background-color: #555;">重置参数</button>
+        </div>
+    </div>
+    <div class="info-box">
+        * 默认参数模拟图中场景：两地相距1200km，A速300km/h，B速100km/h，3小时相遇。4小时时A到达终点停止。
+    </div>
+
+<script>
+    // 获取DOM元素
+    const canvas = document.getElementById('graphCanvas');
+    const ctx = canvas.getContext('2d');
+    const objA = document.getElementById('objA');
+    const objB = document.getElementById('objB');
+    const distIndicator = document.getElementById('distIndicator');
+    const sceneDistText = document.getElementById('sceneDistText');
+    const timeSlider = document.getElementById('timeSlider');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const distDisplay = document.getElementById('distDisplay');
+    const playBtn = document.getElementById('playBtn');
+    
+    // 输入框
+    const inputTotalS = document.getElementById('inputTotalS');
+    const inputVa = document.getElementById('inputVa');
+    const inputVb = document.getElementById('inputVb');
+    const resetBtn = document.getElementById('resetBtn');
+
+    // 状态变量
+    let params = {
+        totalS: 1200, // 总路程
+        vA: 300,      // A的速度
+        vB: 100,      // B的速度
+        maxT: 12      // 图表最大时间
+    };
+    let currentTime = 0;
+    let isPlaying = false;
+    let animationFrameId;
+
+    // 初始化画布尺寸
+    function resizeCanvas() {
+        const parent = canvas.parentElement;
+        canvas.width = parent.clientWidth;
+        canvas.height = parent.clientHeight;
+        draw();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // 核心数学逻辑：计算任意时刻t时，两车的位置和距离
+    function calculateState(t) {
+        // A的位置：从0出发，不能超过总路程
+        const posA = Math.min(params.totalS, params.vA * t);
+        
+        // B的位置：从总路程出发，不能小于0
+        const posB = Math.max(0, params.totalS - params.vB * t);
+        
+        // 两者距离 S
+        const distance = Math.abs(posA - posB);
+        
+        return { posA, posB, distance };
+    }
+
+    // 绘制图表
+    function drawGraph() {
+        const w = canvas.width;
+        const h = canvas.height;
+        const padding = { left: 50, right: 30, top: 30, bottom: 40 };
+        
+        // 绘图区域宽高
+        const graphW = w - padding.left - padding.right;
+        const graphH = h - padding.top - padding.bottom;
+
+        ctx.clearRect(0, 0, w, h);
+
+        // 1. 绘制坐标轴
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Y轴
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left, h - padding.bottom);
+        // X轴
+        ctx.moveTo(padding.left, h - padding.bottom);
+        ctx.lineTo(w - padding.right, h - padding.bottom);
+        ctx.stroke();
+
+        // 箭头的绘制
+        // Y轴箭头
+        ctx.beginPath();
+        ctx.moveTo(padding.left, padding.top);
+        ctx.lineTo(padding.left - 5, padding.top + 10);
+        ctx.lineTo(padding.left + 5, padding.top + 10);
+        ctx.fill();
+        // X轴箭头
+        ctx.beginPath();
+        ctx.moveTo(w - padding.right, h - padding.bottom);
+        ctx.lineTo(w - padding.right - 10, h - padding.bottom - 5);
+        ctx.lineTo(w - padding.right - 10, h - padding.bottom + 5);
+        ctx.fill();
+
+        // 2. 绘制网格和刻度
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.font = '12px Arial';
+        ctx.fillStyle = '#aaa';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+
+        // X轴刻度 (0 - 12)
+        for(let t=0; t<=params.maxT; t+=2) {
+            const x = padding.left + (t / params.maxT) * graphW;
+            // 线
+            ctx.beginPath();
+            ctx.moveTo(x, h - padding.bottom);
+            ctx.lineTo(x, padding.top);
+            ctx.stroke();
+            // 文字
+            ctx.fillText(t, x, h - padding.bottom + 5);
+        }
+
+        // Y轴刻度 (自动计算合适的间隔)
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        const maxVal = Math.max(params.totalS, 1200); // 确保至少显示到1200
+        const stepY = 250;
+        for(let s=0; s<=maxVal; s+=stepY) {
+            const y = (h - padding.bottom) - (s / maxVal) * graphH;
+            if(y < padding.top) break;
+            // 线
+            ctx.beginPath();
+            ctx.moveTo(padding.left, y);
+            ctx.lineTo(w - padding.right, y);
+            ctx.stroke();
+            // 文字
+            if(s > 0) ctx.fillText(s, padding.left - 5, y);
+        }
+        ctx.fillText("0", padding.left - 5, h - padding.bottom);
+
+        // 3. 绘制函数曲线 S-t
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        
+        // 采样绘制
+        const steps = 200;
+        for(let i=0; i<=steps; i++) {
+            const t = (i / steps) * params.maxT;
+            const state = calculateState(t);
+            const x = padding.left + (t / params.maxT) * graphW;
+            const y = (h - padding.bottom) - (state.distance / maxVal) * graphH;
+            if(i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // 4. 绘制当前时间的点
+        const currState = calculateState(currentTime);
+        const currX = padding.left + (currentTime / params.maxT) * graphW;
+        const currY = (h - padding.bottom) - (currState.distance / maxVal) * graphH;
+
+        ctx.fillStyle = '#ff4b4b';
+        ctx.beginPath();
+        ctx.arc(currX, currY, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 虚线指示
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = '#888';
+        ctx.beginPath();
+        ctx.moveTo(currX, currY);
+        ctx.lineTo(currX, h - padding.bottom); // 垂线到x轴
+        ctx.stroke();
+        
+        // 特殊点标注 (相遇点)
+        const meetTime = params.totalS / (params.vA + params.vB);
+        if(Math.abs(currentTime - meetTime) < 0.1) {
+             ctx.fillStyle = '#fff';
+             ctx.fillText(`(${meetTime.toFixed(2)}, 0)`, currX, currY - 15);
+        } else {
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'left';
+            ctx.fillText(`(${currentTime.toFixed(2)}, ${currState.distance.toFixed(0)})`, currX + 8, currY - 8);
+        }
+        
+        ctx.setLineDash([]);
+    }
+
+    // 更新场景动画
+    function updateScene() {
+        const state = calculateState(currentTime);
+        
+        // 将位置映射到百分比 (0% - 100%)
+        const percentA = (state.posA / params.totalS) * 100;
+        const percentB = (state.posB / params.totalS) * 100;
+
+        objA.style.left = `${percentA}%`;
+        objB.style.left = `${percentB}%`;
+
+        // 更新距离标尺
+        const leftP = Math.min(percentA, percentB);
+        const widthP = Math.abs(percentA - percentB);
+        
+        distIndicator.style.left = `${leftP}%`;
+        distIndicator.style.width = `${widthP}%`;
+        sceneDistText.textContent = state.distance.toFixed(0) + "km";
+        if(state.distance < 50) sceneDistText.style.display = 'none'; // 距离太近隐藏文字
+        else sceneDistText.style.display = 'block';
+
+        // 更新文字数值
+        timeDisplay.textContent = currentTime.toFixed(2);
+        distDisplay.textContent = state.distance.toFixed(0);
+    }
+
+    // 主循环
+    function draw() {
+        drawGraph();
+        updateScene();
+    }
+
+    // 动画循环
+    function animate() {
+        if(!isPlaying) return;
+        
+        currentTime += 0.02; // 播放速度
+        if(currentTime >= params.maxT) {
+            currentTime = params.maxT;
+            isPlaying = false;
+            playBtn.textContent = "重新播放";
+        }
+        
+        timeSlider.value = currentTime;
+        draw();
+        
+        animationFrameId = requestAnimationFrame(animate);
+    }
+
+    // 事件监听
+    timeSlider.addEventListener('input', (e) => {
+        currentTime = parseFloat(e.target.value);
+        if(isPlaying) {
+            isPlaying = false;
+            playBtn.textContent = "播放演示";
+            cancelAnimationFrame(animationFrameId);
+        }
+        draw();
+    });
+
+    playBtn.addEventListener('click', () => {
+        if(isPlaying) {
+            isPlaying = false;
+            playBtn.textContent = "播放演示";
+            cancelAnimationFrame(animationFrameId);
+        } else {
+            if(currentTime >= params.maxT) currentTime = 0;
+            isPlaying = true;
+            playBtn.textContent = "暂停";
+            animate();
+        }
+    });
+
+    // 参数更新处理
+    function updateParams() {
+        params.totalS = parseFloat(inputTotalS.value) || 1200;
+        params.vA = parseFloat(inputVa.value) || 300;
+        params.vB = parseFloat(inputVb.value) || 100;
+        
+        // 如果速度太快，自动增加时间轴的max值，反之减少
+        const estimatedEnd = params.totalS / Math.min(params.vA, params.vB) * 1.2;
+        // 简单的自适应时间轴逻辑
+        if(estimatedEnd < 6) params.maxT = 6;
+        else if(estimatedEnd > 20) params.maxT = 24;
+        else params.maxT = 12;
+
+        timeSlider.max = params.maxT;
+        
+        draw();
+    }
+
+    [inputTotalS, inputVa, inputVb].forEach(inp => {
+        inp.addEventListener('change', updateParams);
+    });
+
+    resetBtn.addEventListener('click', () => {
+        inputTotalS.value = 1200;
+        inputVa.value = 300;
+        inputVb.value = 100;
+        currentTime = 0;
+        timeSlider.value = 0;
+        updateParams();
+    });
+
+    // 启动
+    resizeCanvas();
+    draw();
+
+</script>
+</body>
+</html>

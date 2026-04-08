@@ -15,7 +15,7 @@ from app.db.session import get_db
 from app.api.v1.auth import get_current_user
 from app.core.websocket import manager
 from app.models import (
-    User, LiveChallengeSession, LiveTask, Class, ClassEnrollment, UserRole
+    User, LiveChallengeSession, LiveTask, Class, ClassEnrollment, UserRole, LiveSession
 )
 from app.api.v1.live_challenges import (
     finalize_challenge_scoreboard_from_drafts,
@@ -63,6 +63,19 @@ async def _serialize_challenge_runtime(
     tasks = result.scalars().all()
     participants = await _load_challenge_participants(challenge, db)
     return serialize_challenge_session(challenge, tasks, participants)
+
+
+def _extract_challenge_runtime_fields(challenge_payload: Optional[dict]) -> dict:
+    if not challenge_payload:
+        return {}
+    return {
+        "participant_ids": challenge_payload.get("participant_ids"),
+        "current_round": challenge_payload.get("current_round"),
+        "current_task_id": challenge_payload.get("current_task_id"),
+        "round_status": challenge_payload.get("round_status"),
+        "winner_student_id": challenge_payload.get("winner_student_id"),
+        "lead_student_id": challenge_payload.get("lead_student_id"),
+    }
 
 
 async def _persist_challenge_scoreboard(
@@ -190,6 +203,16 @@ async def create_challenge(
         if not result.scalars().first():
             raise HTTPException(status_code=400, detail="Task group has no tasks")
 
+    # 获取当前活跃的课堂会话
+    active_session_result = await db.execute(
+        select(LiveSession).where(
+            LiveSession.class_id == class_id,
+            LiveSession.status == "active"
+        ).order_by(LiveSession.started_at.desc())
+    )
+    active_session = active_session_result.scalar_one_or_none()
+    live_session_id = active_session.id if active_session else None
+
     challenge = LiveChallengeSession(
         class_id=class_id,
         title=title,
@@ -198,6 +221,7 @@ async def create_challenge(
         participant_ids=participant_ids or [],
         status="draft",
         scoreboard=[],
+        live_session_id=live_session_id,  # 自动关联课堂会话
     )
     db.add(challenge)
     await db.commit()
@@ -336,6 +360,7 @@ async def handle_challenge_submit(
             "challenge": ended_payload,
             "scoreboard": current_scoreboard,
             "status": challenge.status,
+            **_extract_challenge_runtime_fields(ended_payload),
         })
         return
 
@@ -361,6 +386,7 @@ async def handle_challenge_submit(
             "challenge_id": challenge.id,
             "scoreboard": deepcopy(scoreboard),
             "status": challenge.status or "active",
+            **_extract_challenge_runtime_fields(challenge_payload),
         })
         return
 
@@ -434,8 +460,20 @@ async def handle_challenge_submit(
         challenge_status = "ended" if all_submitted else "active"
 
     should_end = challenge_status == "ended"
+    challenge.scoreboard = [dict(entry) for entry in scoreboard]
+    challenge.status = challenge_status
+    runtime_payload = await _serialize_challenge_runtime(challenge, db)
+    runtime_payload["scoreboard"] = deepcopy(scoreboard)
+    runtime_payload["status"] = challenge_status
+    challenge_fields = _extract_challenge_runtime_fields(runtime_payload)
     if should_end:
-        await manager.end_challenge(class_id, challenge.id, scoreboard, status="ended")
+        await manager.end_challenge(
+            class_id,
+            challenge.id,
+            scoreboard,
+            status="ended",
+            challenge_fields=challenge_fields,
+        )
         _bg_scoreboard = deepcopy(scoreboard)
         _bg_challenge_id = challenge.id
 
@@ -454,7 +492,13 @@ async def handle_challenge_submit(
 
         asyncio.create_task(_bg_persist())
     else:
-        await manager.update_challenge_scoreboard(class_id, challenge.id, scoreboard, status="active")
+        await manager.update_challenge_scoreboard(
+            class_id,
+            challenge.id,
+            scoreboard,
+            status="active",
+            challenge_fields=challenge_fields,
+        )
         _bg_scoreboard = deepcopy(scoreboard)
         _bg_challenge_id = challenge.id
 

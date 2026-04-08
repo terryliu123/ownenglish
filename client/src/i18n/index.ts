@@ -15,6 +15,9 @@ import adminMembershipZhCN from './admin-membership-zh-CN.json'
 import miscUiZhCN from './misc-ui-zh-CN.json'
 import coreUiZhCN from './core-ui-zh-CN.json'
 import membershipZhCN from './membership-zh-CN.json'
+import teachingAidsZhCN from './teaching-aids-zh-CN.json'
+import bigscreenActivitiesZhCN from './bigscreen-activities-zh-CN.json'
+import classroomZhCN from './classroom-zh-CN.json'
 
 export type Language = 'zh-CN'
 
@@ -38,7 +41,7 @@ function deepMerge<T extends Record<string, unknown>>(base: T, override: Record<
 }
 
 const resources = {
-  'zh-CN': [zhCN, studyPackZhCN, studyPackResultsZhCN, studyPackUiOverrideZhCN, classZhCN, contentMediaZhCN, taskGroupReadingZhCN, taskLiveUiZhCN, taskSortingZhCN, taskChallengeZhCN, taskUiOverrideZhCN, sharedUiZhCN, adminHomeZhCN, adminMembershipZhCN, miscUiZhCN, coreUiZhCN, membershipZhCN].reduce(
+  'zh-CN': [zhCN, studyPackZhCN, studyPackResultsZhCN, studyPackUiOverrideZhCN, classZhCN, contentMediaZhCN, taskGroupReadingZhCN, taskLiveUiZhCN, taskSortingZhCN, taskChallengeZhCN, taskUiOverrideZhCN, sharedUiZhCN, adminHomeZhCN, adminMembershipZhCN, miscUiZhCN, coreUiZhCN, membershipZhCN, teachingAidsZhCN, bigscreenActivitiesZhCN, classroomZhCN].reduce(
     (accumulator, resource) => deepMerge(accumulator, resource as Record<string, unknown>),
     {} as Record<string, unknown>,
   ),

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { membershipService, type MembershipPlanData, type MembershipSnapshot, type PaymentOrderData } from '../../services/api'
 import { useTranslation } from '../../i18n/useTranslation'
 
@@ -122,7 +123,7 @@ export default function TeacherMembership() {
   )
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="membership" />}>
+    <Layout sidebar={<TeacherSidebar activePage="membership" />} leftSidebar={<TeacherLeftSidebar activePage="membership" />}>
       <section className="panel-head">
         <div>
           <p className="eyebrow">{t('membership.centerEntry')}</p>

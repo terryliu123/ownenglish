@@ -1,0 +1,131 @@
+<meta charset="UTF-8">
+<svg width="600" height="500" viewBox="0 0 600 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 定义箭头 -->
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0,0 L0,10 L10,5 z" fill="#e53935" />
+    </marker>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+      <path d="M0,0 L0,10 L10,5 z" fill="#1e88e5" />
+    </marker>
+    
+    <!-- 定义渐变 -->
+    <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#cfd8dc;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#90a4ae;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#cfd8dc;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="100%" height="100%" fill="#f5f5f5"/>
+  
+  <!-- 标题 -->
+  <text x="300" y="40" text-anchor="middle" font-family="Arial" font-size="24" font-weight="bold" fill="#333">动滑轮演示 (Movable Pulley)</text>
+
+  <!-- 天花板/固定支架 -->
+  <rect x="150" y="60" width="300" height="10" fill="#546e7a"/>
+  <line x1="270" y1="60" x2="270" y2="70" stroke="#333" stroke-width="4"/> <!-- 挂钩 -->
+
+  <!-- 动态部分 -->
+  <g>
+    <!-- 绳子 (使用路径动画) -->
+    <!-- 路径逻辑：从固定点下垂 -> 绕过滑轮 -> 向上延伸 -->
+    <path id="rope" fill="none" stroke="#795548" stroke-width="6" stroke-linecap="round">
+      <animate attributeName="d" 
+        dur="4s" 
+        repeatCount="indefinite"
+        values="
+          M 270,70 L 270,350 A 30,30 0 0,0 330,350 L 330,250;
+          M 270,70 L 270,150 A 30,30 0 0,0 330,150 L 330,-150;
+          M 270,70 L 270,150 A 30,30 0 0,0 330,150 L 330,-150;
+          M 270,70 L 270,350 A 30,30 0 0,0 330,350 L 330,250
+        "
+        keyTimes="0; 0.4; 0.6; 1"
+        calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1"
+      />
+    </path>
+
+    <!-- 滑轮组件组 (随重物移动) -->
+    <g id="pulleySystem">
+      <!-- 动画控制 Y 轴位移 -->
+      <animateTransform attributeName="transform"
+        attributeType="XML"
+        type="translate"
+        dur="4s"
+        repeatCount="indefinite"
+        values="0,0; 0,-200; 0,-200; 0,0"
+        keyTimes="0; 0.4; 0.6; 1"
+        calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1"
+      />
+
+      <!-- 滑轮本体 -->
+      <!-- 初始位置中心在 (300, 350) -->
+      <circle cx="300" cy="350" r="30" fill="#fff" stroke="#555" stroke-width="3"/>
+      <circle cx="300" cy="350" r="5" fill="#333"/>
+      
+      <!-- 挂钩连接件 -->
+      <path d="M 300,350 L 300,390" stroke="#555" stroke-width="4"/>
+      
+      <!-- 重物 G -->
+      <rect x="270" y="390" width="60" height="60" fill="url(#metal)" stroke="#546e7a" stroke-width="2"/>
+      <text x="300" y="430" text-anchor="middle" font-family="Arial" font-size="24" fill="#fff" font-weight="bold">G</text>
+      
+      <!-- 重力箭头 -->
+      <line x1="300" y1="450" x2="300" y2="480" stroke="#1e88e5" stroke-width="3" marker-end="url(#arrowBlue)"/>
+    </g>
+
+    <!-- 拉力手/箭头 (跟随绳子末端) -->
+    <g>
+       <!-- 初始位置在绳子末端 (330, 250) -->
+       <animateTransform attributeName="transform"
+        attributeType="XML"
+        type="translate"
+        dur="4s"
+        repeatCount="indefinite"
+        values="0,0; 0,-400; 0,-400; 0,0"
+        keyTimes="0; 0.4; 0.6; 1"
+        calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1"
+      />
+      <!-- 拉力 F 箭头 -->
+      <line x1="330" y1="250" x2="330" y2="200" stroke="#e53935" stroke-width="3" marker-end="url(#arrowRed)"/>
+      <text x="345" y="230" font-family="Arial" font-size="20" fill="#e53935" font-weight="bold">F</text>
+    </g>
+  </g>
+
+  <!-- 辅助标尺与公式 -->
+  <g transform="translate(450, 350)">
+    <!-- 静态基准线 -->
+    <line x1="-40" y1="0" x2="40" y2="0" stroke="#999" stroke-dasharray="5,5"/>
+    <text x="50" y="5" font-family="Arial" font-size="14" fill="#777">起点</text>
+    
+    <!-- 动态高度标尺 -->
+    <g>
+       <animateTransform attributeName="transform" type="translate" dur="4s" repeatCount="indefinite" 
+        values="0,0; 0,-200; 0,-200; 0,0" 
+        keyTimes="0; 0.4; 0.6; 1"
+        calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1"
+       />
+       <line x1="-40" y1="0" x2="40" y2="0" stroke="#1e88e5" stroke-dasharray="5,5"/>
+       <text x="50" y="5" font-family="Arial" font-size="14" fill="#1e88e5">h (物体高度)</text>
+    </g>
+    
+    <!-- 动态绳子标尺 -->
+    <g>
+       <animateTransform attributeName="transform" type="translate" dur="4s" repeatCount="indefinite" 
+        values="0,0; 0,-400; 0,-400; 0,0" 
+        keyTimes="0; 0.4; 0.6; 1"
+        calcMode="spline" keySplines="0.4 0 0.2 1; 0 0 1 1; 0.4 0 0.2 1"
+       />
+       <text x="50" y="-85" font-family="Arial" font-size="14" fill="#e53935">S (绳子距离)</text>
+       <text x="50" y="-65" font-family="Arial" font-size="12" fill="#e53935">= 2h</text>
+    </g>
+  </g>
+
+  <!-- 知识点文本 -->
+  <rect x="50" y="200" width="130" height="100" rx="10" fill="#fff" stroke="#ccc"/>
+  <text x="60" y="230" font-family="Arial" font-size="16" fill="#333" font-weight="bold">省力原理：</text>
+  <text x="60" y="260" font-family="Arial" font-size="14" fill="#555">拉力 F = G / 2</text>
+  <text x="60" y="290" font-family="Arial" font-size="14" fill="#555">距离 S = 2 × h</text>
+
+</svg>

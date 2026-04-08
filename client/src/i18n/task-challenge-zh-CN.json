@@ -1,6 +1,7 @@
 {
   "challenge": {
     "createFailed": "创建竞技失败，请稍后重试。",
+    "activeConflict": "当前课堂已有进行中的任务或挑战，请先结束后再发起新的竞技。",
     "unsupportedTypesAlert": "当前任务组包含暂不支持竞技的题型：{{types}}",
     "unsupportedTypesInline": "当前任务组包含暂不支持竞技的题型：{{types}}。请调整任务组后再发起挑战。",
     "duelParticipantCountAlert": "双人 PK 需要选择 2 名学生。",
@@ -29,6 +30,8 @@
     "selectBuzzQuestion": "选择抢答题目",
     "selectDuelParticipants": "选择 PK 学生",
     "selectDuelDescription": "当前已选择 {{count}} / 2 人。",
+    "searchStudents": "搜索学生姓名",
+    "noMatchingStudents": "没有匹配的学生",
     "selected": "已选中",
     "clickToSelect": "点击选择",
     "confirmStart": "确认开始",

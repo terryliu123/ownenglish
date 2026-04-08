@@ -2,6 +2,13 @@ import React from 'react'
 import { getTaskTypeLabel } from '../../tasks/task-helpers'
 import { getTaskQuestionText } from '../../tasks/task-formatting'
 import { TaskQuestionImage } from '../../tasks/task-preview'
+import {
+  getChallengeLeader,
+  getSingleQuestionWinnerEntry,
+  hasChallengeEntryActivity,
+  isChallengeFinished,
+  sortChallengeScoreboardEntries,
+} from '../../live-runtime/challengeRuntime'
 import type { LiveChallengeSession } from '../types'
 import { formatChallengeDuration } from '../hooks/useChallenges'
 
@@ -12,6 +19,7 @@ interface ChallengePanelProps {
   onDismissChallenge: () => void
   t: (key: string) => string
   tWithParams: (key: string, params: Record<string, string | number>) => string
+  variant?: 'compact' | 'board'
 }
 
 export const ChallengePanel: React.FC<ChallengePanelProps> = ({
@@ -21,21 +29,16 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
   onDismissChallenge,
   t,
   tWithParams,
+  variant = 'compact',
 }) => {
   if (!currentChallenge) return null
+  const isFinished = isChallengeFinished(currentChallenge)
 
   const isDuelLikeChallenge =
     currentChallenge?.mode === 'duel' || currentChallenge?.mode === 'single_question_duel'
   const isSingleQuestionDuel = currentChallenge?.mode === 'single_question_duel'
 
-  const duelEntries = isDuelLikeChallenge
-    ? [...currentChallenge.scoreboard].sort((left, right) => {
-        const leftRank = left.rank ?? Number.MAX_SAFE_INTEGER
-        const rightRank = right.rank ?? Number.MAX_SAFE_INTEGER
-        if (leftRank !== rightRank) return leftRank - rightRank
-        return (right.correct_count ?? 0) - (left.correct_count ?? 0)
-      })
-    : []
+  const duelEntries = isDuelLikeChallenge ? sortChallengeScoreboardEntries(currentChallenge.scoreboard) : []
 
   const currentChallengeModeLabel =
     currentChallenge?.mode === 'single_question_duel'
@@ -44,19 +47,12 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
         ? t('challenge.duelMode')
         : t('challenge.classChallengeMode')
 
-  const duelLeader =
-    duelEntries.length === 2 && (duelEntries[0].correct_count ?? 0) !== (duelEntries[1].correct_count ?? 0)
-      ? duelEntries[0]
-      : null
+  const duelLeader = getChallengeLeader(currentChallenge)
 
-  const singleQuestionWinner = isSingleQuestionDuel
-    ? duelEntries.find((entry) => entry.student_id === currentChallenge?.winner_student_id) ||
-      duelEntries.find((entry) => Boolean(entry.first_correct_at)) ||
-      null
-    : null
+  const singleQuestionWinner = isSingleQuestionDuel ? getSingleQuestionWinnerEntry(currentChallenge) : null
 
   const singleQuestionDraw = Boolean(
-    isSingleQuestionDuel && currentChallenge && currentChallenge.status === 'ended' && !singleQuestionWinner
+    isSingleQuestionDuel && currentChallenge && isFinished && !singleQuestionWinner
   )
 
   const duelProgressIndex = isDuelLikeChallenge
@@ -85,9 +81,60 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
       : []
 
   const classChallengeWinner = classChallengeTopThree[0] ?? null
+  const isBoardVariant = variant === 'board'
 
   const renderDuelEntryCard = (entry: (typeof duelEntries)[0], index: number) => {
     const isLeader = duelLeader?.student_id === entry.student_id
+    const hasResult =
+      hasChallengeEntryActivity(entry)
+    const duelStatusText = isSingleQuestionDuel
+      ? singleQuestionWinner?.student_id === entry.student_id
+        ? t('challenge.singleQuestionWon')
+        : entry.eliminated_for_round
+          ? t('challenge.failedThisRound')
+          : singleQuestionDraw
+            ? t('challenge.singleQuestionDraw')
+            : isFinished
+              ? t('challenge.finishedStatus')
+              : t('challenge.roundWaiting')
+      : isFinished
+        ? hasResult
+          ? t('challenge.submittedStatus')
+          : t('challenge.finishedStatus')
+        : entry.locked || entry.eliminated_for_round
+          ? t('challenge.finishedStatus')
+          : entry.submitted
+            ? t('challenge.submittedStatus')
+            : t('challenge.waitingStatus')
+    const duelSecondaryText = isFinished
+      ? isSingleQuestionDuel
+        ? singleQuestionWinner
+          ? singleQuestionWinner.student_id === entry.student_id
+            ? t('challenge.winner')
+            : entry.eliminated_for_round
+              ? t('challenge.failedThisRound')
+              : t('challenge.finishedStatus')
+          : t('challenge.drawResult')
+        : duelLeader
+          ? isLeader
+            ? t('challenge.winner')
+            : hasResult
+              ? t('challenge.finishedStatus')
+              : t('challenge.finishedStatus')
+          : t('challenge.drawResult')
+      : isSingleQuestionDuel
+        ? singleQuestionWinner
+          ? singleQuestionWinner.student_id === entry.student_id
+            ? t('challenge.leading')
+            : t('challenge.chasing')
+          : entry.eliminated_for_round
+            ? t('challenge.failedThisRound')
+            : t('challenge.roundWaiting')
+        : isLeader
+          ? t('challenge.leading')
+          : duelLeader
+            ? t('challenge.chasing')
+            : t('challenge.tied')
 
     return (
       <div
@@ -109,7 +156,7 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
               {index === 0 ? t('challenge.leftLane') : t('challenge.rightLane')}
             </p>
             <h3
-              className="text-3xl font-semibold mt-3"
+              className={`${isBoardVariant ? 'text-3xl' : 'text-2xl'} font-semibold mt-3`}
               style={{
                 color: '#fff',
                 letterSpacing: '-0.04em',
@@ -133,7 +180,7 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className={`grid gap-3 mb-5 ${isBoardVariant ? 'grid-cols-3' : 'grid-cols-1 sm:grid-cols-3'}`}>
           <div
             className="rounded-2xl px-4 py-3 min-w-0"
             style={{ background: 'rgba(255,255,255,0.08)' }}
@@ -170,57 +217,28 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
         </div>
 
         <div
-          className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
+          className={`rounded-2xl px-4 py-3 ${isBoardVariant ? 'space-y-2 min-[1800px]:flex min-[1800px]:items-center min-[1800px]:justify-between min-[1800px]:gap-3' : 'space-y-2'}`}
           style={{ background: 'rgba(255,255,255,0.06)' }}
         >
-          <span style={{ color: 'rgba(255,255,255,0.68)' }}>
-            {isSingleQuestionDuel
-              ? singleQuestionWinner?.student_id === entry.student_id
-                ? t('challenge.singleQuestionWon')
-                : entry.eliminated_for_round
-                  ? t('challenge.failedThisRound')
-                  : singleQuestionDraw
-                    ? t('challenge.singleQuestionDraw')
-                    : t('challenge.waitingStatus')
-              : entry.submitted
-                ? t('challenge.submittedStatus')
-                : t('challenge.waitingStatus')}
+          <span
+            className="block text-sm leading-6"
+            style={{ color: 'rgba(255,255,255,0.68)', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+          >
+            {duelStatusText}
           </span>
-          {currentChallenge?.status === 'ended' ? (
+          {isFinished ? (
             <span
-              className="text-sm font-semibold shrink-0"
+              className={`text-sm font-semibold ${isBoardVariant ? 'shrink-0' : 'block'}`}
               style={{ color: isLeader ? '#86efac' : 'rgba(255,255,255,0.62)' }}
             >
-              {isSingleQuestionDuel
-                ? singleQuestionWinner
-                  ? singleQuestionWinner.student_id === entry.student_id
-                    ? t('challenge.winner')
-                    : t('challenge.finishedStatus')
-                  : t('challenge.drawResult')
-                : duelLeader
-                  ? isLeader
-                    ? t('challenge.winner')
-                    : t('challenge.finishedStatus')
-                  : t('challenge.drawResult')}
+              {duelSecondaryText}
             </span>
           ) : (
             <span
-              className="text-sm shrink-0"
+              className={`text-sm ${isBoardVariant ? 'shrink-0' : 'block'}`}
               style={{ color: isLeader ? '#86efac' : 'rgba(255,255,255,0.52)' }}
             >
-              {isSingleQuestionDuel
-                ? singleQuestionWinner
-                  ? singleQuestionWinner.student_id === entry.student_id
-                    ? t('challenge.leading')
-                    : t('challenge.chasing')
-                  : entry.eliminated_for_round
-                    ? t('challenge.failedThisRound')
-                    : t('challenge.roundWaiting')
-                : isLeader
-                  ? t('challenge.leading')
-                  : duelLeader
-                    ? t('challenge.chasing')
-                    : t('challenge.tied')}
+              {duelSecondaryText}
             </span>
           )}
         </div>
@@ -239,13 +257,13 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`status-badge ${currentChallenge.status === 'ended' ? 'muted' : 'active'}`}>
-              {currentChallenge.status === 'ended' ? t('challenge.ended') : t('challenge.active')}
+            <span className={`status-badge ${isFinished ? 'muted' : 'active'}`}>
+              {isFinished ? t('challenge.ended') : t('challenge.active')}
             </span>
             <button className="ghost-button py-2 px-4 text-sm" onClick={onOpenBoard}>
               {t('challenge.openBoard')}
             </button>
-            {currentChallenge.status !== 'ended' ? (
+            {!isFinished ? (
               <button className="ghost-button py-2 px-4 text-sm" onClick={onEndChallenge}>
                 {t('challenge.endChallenge')}
               </button>
@@ -304,11 +322,11 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
                 boxShadow: '0 30px 80px rgba(15, 23, 42, 0.22)',
               }}
             >
-              <div className="grid lg:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] gap-4 items-stretch">
+              <div className="grid grid-cols-1 gap-4 min-[1800px]:grid-cols-[minmax(0,1fr)_140px_minmax(0,1fr)] min-[1800px]:items-stretch">
                 {leftDuelEntry ? renderDuelEntryCard(leftDuelEntry, 0) : <div />}
                 <div className="flex flex-col items-center justify-center gap-4">
                   <div
-                    className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-black"
+                    className="w-20 h-20 min-[1800px]:w-24 min-[1800px]:h-24 rounded-full flex items-center justify-center text-2xl min-[1800px]:text-3xl font-black"
                     style={{
                       color: '#fff',
                       background: 'radial-gradient(circle at 30% 30%, rgba(56,189,248,0.95), rgba(14,116,144,0.88))',
@@ -324,7 +342,7 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
                     >
                       {isSingleQuestionDuel ? t('challenge.singleQuestionResult') : t('challenge.currentLead')}
                     </p>
-                    <p className="text-sm font-semibold" style={{ color: '#fff' }}>
+                    <p className="text-sm font-semibold" style={{ color: '#fff', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
                       {isSingleQuestionDuel
                         ? singleQuestionWinner?.student_name ||
                           (singleQuestionDraw ? t('challenge.singleQuestionDraw') : t('challenge.tieState'))
@@ -339,12 +357,16 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
             {duelCurrentTask && (
               <div
                 className="rounded-[24px] p-5"
-                style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(24,36,58,0.08)' }}
+                style={{
+                  background: 'rgba(255,255,255,0.78)',
+                  border: '1px solid rgba(24,36,58,0.08)',
+                  color: 'var(--ink)',
+                }}
               >
                 <div className="flex items-start justify-between gap-4 mb-4">
                   <div>
                     <p className="eyebrow">{t('challenge.onScreenPrompt')}</p>
-                    <h4 className="text-lg font-semibold">
+                    <h4 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>
                       {tWithParams('challenge.questionFocus', {
                         current: duelProgressIndex + 1,
                         total: currentChallenge.tasks.length,
@@ -372,8 +394,9 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
                         key={opt.key}
                         className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-base"
                         style={{
-                          background: 'rgba(255,255,255,0.6)',
+                          background: 'rgba(255,255,255,0.66)',
                           border: '1px solid rgba(24,36,58,0.08)',
+                          color: 'var(--ink)',
                         }}
                       >
                         <span
@@ -382,7 +405,9 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
                         >
                           {opt.key}
                         </span>
-                        <span>{typeof opt.text === 'string' ? opt.text : getTaskQuestionText({ text: opt.text })}</span>
+                        <span style={{ color: 'var(--ink)' }}>
+                          {typeof opt.text === 'string' ? opt.text : getTaskQuestionText({ text: opt.text })}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -396,13 +421,14 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
                         key={pidx}
                         className="flex items-center gap-3 px-4 py-2 rounded-xl text-sm"
                         style={{
-                          background: 'rgba(255,255,255,0.6)',
+                          background: 'rgba(255,255,255,0.66)',
                           border: '1px solid rgba(24,36,58,0.08)',
+                          color: 'var(--ink)',
                         }}
                       >
-                        <span className="font-medium">{pair.left}</span>
+                        <span className="font-medium" style={{ color: 'var(--ink)' }}>{pair.left}</span>
                         <span style={{ color: 'var(--muted)' }}>→</span>
-                        <span className="font-medium">{pair.right}</span>
+                        <span className="font-medium" style={{ color: 'var(--ink)' }}>{pair.right}</span>
                       </div>
                     ))}
                   </div>
@@ -453,7 +479,7 @@ export const ChallengePanel: React.FC<ChallengePanelProps> = ({
               </div>
             )}
 
-            {currentChallenge.status === 'ended' && (
+            {isFinished && (
               <div
                 className="rounded-3xl p-5"
                 style={{ background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(24,36,58,0.08)' }}

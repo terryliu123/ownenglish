@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>大号数字化钟琴</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --screw-color: #bdc3c7;
+            /* 定义基础尺寸变量，方便统一调整 */
+            --bar-width: 90px;  /* 宽度翻倍 */
+            --gap-size: 16px;   /* 间距翻倍 */
+        }
+        
+        body {
+            margin: 0;
+            height: 100vh;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow: hidden; /* 防止滚动 */
+            touch-action: none; 
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1 {
+            color: #ecf0f1;
+            margin-bottom: 2vh;
+            font-size: 2.5rem; /* 标题放大 */
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            pointer-events: none;
+        }
+
+        .glockenspiel-frame {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #34495e;
+            padding: 30px; /* 边框加厚 */
+            border-radius: 25px; /* 圆角变大 */
+            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+            gap: var(--gap-size);
+            
+            /* 关键：虽然尺寸很大，但限制最大宽高不能超过屏幕，保证能完整显示 */
+            max-width: 95vw;
+            max-height: 85vh;
+        }
+
+        /* 琴键通用样式 */
+        .bar {
+            width: var(--bar-width);
+            border-radius: 15px; /* 圆角变大 */
+            position: relative;
+            cursor: pointer;
+            box-shadow: 0 6px 10px rgba(0,0,0,0.3), inset 0 3px 8px rgba(255,255,255,0.4);
+            transition: transform 0.1s, filter 0.1s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            
+            /* Flex-shrink 允许琴键在屏幕太窄时自动变瘦 */
+            flex-shrink: 1; 
+        }
+
+        /* 琴键上的螺丝钉装饰 (放大) */
+        .bar::before, .bar::after {
+            content: '';
+            position: absolute;
+            width: 16px; /* 螺丝变大 */
+            height: 16px;
+            background: var(--screw-color);
+            border-radius: 50%;
+            box-shadow: inset 2px 2px 4px rgba(0,0,0,0.5);
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .bar::before { top: 20px; }
+        .bar::after { bottom: 20px; }
+
+        .bar-label { font-size: 3rem; margin-bottom: 5px; pointer-events: none; line-height: 1;}
+        .bar-sub { font-size: 1.5rem; opacity: 0.9; pointer-events: none;}
+
+        /* 按下效果 */
+        .bar.active {
+            transform: scale(0.96);
+            filter: brightness(1.3);
+            box-shadow: 0 0 25px rgba(255, 255, 255, 0.7);
+        }
+
+        /* 琴键高度定义 (在原基础上翻倍) */
+        /* C5: 260 -> 520 */
+        .bar[data-note="C5"] { height: 520px; background: #e74c3c; } 
+        /* D5: 245 -> 490 */
+        .bar[data-note="D5"] { height: 490px; background: #e67e22; }
+        /* E5: 230 -> 460 */
+        .bar[data-note="E5"] { height: 460px; background: #f1c40f; color: #333; }
+        /* F5: 215 -> 430 */
+        .bar[data-note="F5"] { height: 430px; background: #2ecc71; }
+        /* G5: 200 -> 400 */
+        .bar[data-note="G5"] { height: 400px; background: #1abc9c; }
+        /* A5: 185 -> 370 */
+        .bar[data-note="A5"] { height: 370px; background: #3498db; }
+        /* B5: 170 -> 340 */
+        .bar[data-note="B5"] { height: 340px; background: #9b59b6; }
+        /* C6: 155 -> 310 */
+        .bar[data-note="C6"] { height: 310px; background: #c0392b; }
+
+        .hint {
+            margin-top: 20px;
+            color: #95a5a6;
+            font-size: 1.2rem;
+        }
+
+        /* 强制自适应：如果屏幕高度不够 520px，琴键会自动变短 */
+        @media (max-height: 650px) {
+            .glockenspiel-frame { height: 80vh; align-items: center; }
+            .bar { height: 100% !important; max-height: unset; }
+            /* 当强制缩放时，通过 margin-top 模拟高低阶梯感 (简单的视觉补偿) */
+            .bar:nth-child(1) { height: 100% !important; }
+            .bar:nth-child(2) { height: 94% !important; }
+            .bar:nth-child(3) { height: 88% !important; }
+            .bar:nth-child(4) { height: 82% !important; }
+            .bar:nth-child(5) { height: 76% !important; }
+            .bar:nth-child(6) { height: 70% !important; }
+            .bar:nth-child(7) { height: 64% !important; }
+            .bar:nth-child(8) { height: 58% !important; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>快乐钟琴 (大号版)</h1>
+
+<div class="glockenspiel-frame" id="instrument">
+    <div class="bar" data-note="C5" data-freq="523.25">
+        <span class="bar-label">1</span>
+        <span class="bar-sub">Do</span>
+    </div>
+    <div class="bar" data-note="D5" data-freq="587.33">
+        <span class="bar-label">2</span>
+        <span class="bar-sub">Re</span>
+    </div>
+    <div class="bar" data-note="E5" data-freq="659.25">
+        <span class="bar-label">3</span>
+        <span class="bar-sub">Mi</span>
+    </div>
+    <div class="bar" data-note="F5" data-freq="698.46">
+        <span class="bar-label">4</span>
+        <span class="bar-sub">Fa</span>
+    </div>
+    <div class="bar" data-note="G5" data-freq="783.99">
+        <span class="bar-label">5</span>
+        <span class="bar-sub">Sol</span>
+    </div>
+    <div class="bar" data-note="A5" data-freq="880.00">
+        <span class="bar-label">6</span>
+        <span class="bar-sub">La</span>
+    </div>
+    <div class="bar" data-note="B5" data-freq="987.77">
+        <span class="bar-label">7</span>
+        <span class="bar-sub">Si</span>
+    </div>
+    <div class="bar" data-note="C6" data-freq="1046.50">
+        <span class="bar-label">1̇</span>
+        <span class="bar-sub">Do</span>
+    </div>
+</div>
+
+<div class="hint">手指滑动或点击演奏</div>
+
+<script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = new AudioContext();
+
+    function ensureAudioContext() {
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playNote(frequency) {
+        ensureAudioContext();
+        const t = audioCtx.currentTime;
+
+        const masterGain = audioCtx.createGain();
+        masterGain.connect(audioCtx.destination);
+        
+        // 放大后的视觉对应听觉：声音稍微调大一点点，延音稍微加长一点
+        masterGain.gain.setValueAtTime(0, t);
+        masterGain.gain.linearRampToValueAtTime(0.8, t + 0.005); 
+        masterGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5); // 延音加长到2.5秒
+
+        const osc1 = audioCtx.createOscillator();
+        osc1.type = 'sine';
+        osc1.frequency.value = frequency;
+        osc1.connect(masterGain);
+
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.value = frequency * 2.8; 
+        const osc2Gain = audioCtx.createGain();
+        osc2Gain.gain.value = 0.15; 
+        osc2.connect(osc2Gain);
+        osc2Gain.connect(masterGain);
+
+        osc1.start(t);
+        osc2.start(t);
+        
+        osc1.stop(t + 3.0);
+        osc2.stop(t + 3.0);
+        
+        setTimeout(() => {
+            masterGain.disconnect();
+        }, 3100);
+    }
+
+    const keys = document.querySelectorAll('.bar');
+    const instrument = document.getElementById('instrument');
+    let lastTouchedElement = null;
+
+    function triggerKey(keyElement) {
+        if (!keyElement || !keyElement.classList.contains('bar')) return;
+        
+        const freq = parseFloat(keyElement.dataset.freq);
+        playNote(freq);
+
+        keyElement.classList.add('active');
+        setTimeout(() => keyElement.classList.remove('active'), 150);
+    }
+
+    function handleTouchStart(e) {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            if (element) {
+                const bar = element.closest('.bar');
+                if (bar) triggerKey(bar);
+            }
+        }
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            
+            if (element) {
+                const bar = element.closest('.bar');
+                if (bar && bar !== lastTouchedElement) {
+                    triggerKey(bar);
+                    lastTouchedElement = bar;
+                }
+            }
+        }
+    }
+
+    function handleTouchEnd(e) {
+        lastTouchedElement = null;
+    }
+
+    instrument.addEventListener('touchstart', handleTouchStart, { passive: false });
+    instrument.addEventListener('touchmove', handleTouchMove, { passive: false });
+    instrument.addEventListener('touchend', handleTouchEnd);
+    
+    // 鼠标支持
+    let isMouseDown = false;
+    instrument.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        const bar = e.target.closest('.bar');
+        if (bar) triggerKey(bar);
+    });
+    window.addEventListener('mouseup', () => { isMouseDown = false; lastTouchedElement = null; });
+    instrument.addEventListener('mousemove', (e) => {
+        if (!isMouseDown) return;
+        const bar = e.target.closest('.bar');
+        if (bar && bar !== lastTouchedElement) {
+            triggerKey(bar);
+            lastTouchedElement = bar;
+        }
+    });
+</script>
+
+</body>
+</html>

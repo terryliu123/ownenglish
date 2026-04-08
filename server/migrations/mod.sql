@@ -1,0 +1,1 @@
+  UPDATE classes SET ai_settings = NULL;

@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电流的奥秘 - 可视化解释</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e6e6e6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        .hero {
+            background: radial-gradient(circle at 50% 100%, #2a4365 0%, #1a365d 100%);
+        }
+        .electron {
+            width: 12px;
+            height: 12px;
+            background: #4fd1c5;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 15px #4fd1c5;
+        }
+        .wire {
+            position: relative;
+            height: 4px;
+            background: linear-gradient(90deg, #4a5568 0%, #718096 50%, #4a5568 100%);
+            border-radius: 2px;
+        }
+        .atom {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(113, 128, 150, 0.2);
+            border: 2px solid #718096;
+            position: relative;
+        }
+        .nucleus {
+            width: 12px;
+            height: 12px;
+            background: #f56565;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .circuit-element {
+            background: rgba(74, 85, 104, 0.3);
+            border: 1px solid #4a5568;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .circuit-element:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+        h1, h2, h3 {
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 700;
+        }
+        .highlight {
+            color: #4fd1c5;
+        }
+    </style>
+</head>
+<body>
+    <!-- 
+        设计思路：
+        1. 主题定位：将抽象的电流概念可视化，通过互动动画和比喻帮助理解
+        2. 视觉风格：采用深色科技感背景，突出电子流动的视觉效果
+        3. 内容结构：
+           - 引入部分：用比喻解释电流
+           - 原子结构可视化：展示电子在导体中的运动
+           - 电压与电流关系：用水流比喻解释
+           - 完整电路演示：互动电路模拟
+           - 实际应用：日常生活中的电流
+        4. 交互元素：
+           - 电子流动动画
+           - 可交互的电路模拟
+           - 动态图表展示电流特性
+        5. 响应式设计：确保在移动设备上也能良好展示
+    -->
+
+    <header class="hero py-20 px-6 relative overflow-hidden">
+        <div class="max-w-6xl mx-auto text-center relative z-10">
+            <h1 class="text-4xl md:text-6xl font-bold mb-6">电流的<span class="highlight">奥秘</span></h1>
+            <p class="text-xl md:text-2xl max-w-3xl mx-auto mb-10">电子如何在导体中流动形成电流？让我们用生动的方式揭开这个物理现象的面纱</p>
+            <div class="flex justify-center space-x-4">
+                <button id="startDemo" class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 transform hover:scale-105">
+                    <i class="fas fa-play mr-2"></i>开始演示
+                </button>
+                <button class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-full transition-all duration-300">
+                    <i class="fas fa-book mr-2"></i>了解更多
+                </button>
+            </div>
+        </div>
+        <div id="floatingElectrons"></div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6 py-12">
+        <section class="mb-20">
+            <div class="flex flex-col md:flex-row items-center gap-10">
+                <div class="md:w-1/2">
+                    <h2 class="text-3xl font-bold mb-6">电流就像<span class="highlight">水管中的水流</span></h2>
+                    <p class="text-lg mb-6">想象电流就像水流通过管道。电压相当于水压，推动电子流动；电阻就像管道中的狭窄部分，阻碍水流；而电流就是实际流动的水量。</p>
+                    <div class="bg-gray-800 p-6 rounded-xl mb-6">
+                        <div class="flex items-center mb-4">
+                            <div class="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center mr-4">
+                                <i class="fas fa-bolt text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">电压</h3>
+                                <p class="text-sm text-gray-400">推动电子流动的力量</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center mb-4">
+                            <div class="w-10 h-10 bg-red-500 rounded-full flex items-center justify-center mr-4">
+                                <i class="fas fa-tint text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">电流</h3>
+                                <p class="text-sm text-gray-400">电子流动的实际数量</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center mr-4">
+                                <i class="fas fa-filter text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">电阻</h3>
+                                <p class="text-sm text-gray-400">阻碍电子流动的因素</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="md:w-1/2 relative">
+                    <div id="waterFlowChart" class="h-80"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-20">
+            <h2 class="text-3xl font-bold mb-10 text-center">导体中的<span class="highlight">电子运动</span></h2>
+            <div class="bg-gray-800 rounded-xl p-8 mb-10">
+                <div class="wire-container relative mb-8">
+                    <div class="wire mb-10"></div>
+                    <div class="flex justify-between px-4">
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                        </div>
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                        </div>
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                        </div>
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                        </div>
+                        <div class="atom">
+                            <div class="nucleus"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button id="showElectronFlow" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-full transition-all duration-300">
+                        <i class="fas fa-atom mr-2"></i>显示电子流动
+                    </button>
+                </div>
+            </div>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-random text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">无电压时的随机运动</h3>
+                    <p>在没有电压时，导体中的电子做无规则的热运动，不形成定向电流。</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-long-arrow-alt-right text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">施加电压后的定向运动</h3>
+                    <p>当施加电压后，电子在电场力作用下获得定向移动的净速度，形成电流。</p>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-xl">
+                    <div class="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mb-4">
+                        <i class="fas fa-tachometer-alt text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-3">漂移速度</h3>
+                    <p>电子的定向移动速度(漂移速度)其实很慢，大约每小时几厘米，但电场传播接近光速。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-20">
+            <h2 class="text-3xl font-bold mb-10 text-center">完整<span class="highlight">电路</span>中的电流</h2>
+            <div class="bg-gray-800 rounded-xl p-8 mb-10">
+                <div class="circuit-diagram relative h-64 mb-8">
+                    <div class="absolute left-0 top-1/2 transform -translate-y-1/2 w-full">
+                        <div class="flex items-center justify-center">
+                            <div class="circuit-element w-20 h-20 flex items-center justify-center">
+                                <i class="fas fa-battery-three-quarters text-3xl text-yellow-400"></i>
+                            </div>
+                            <div class="wire flex-1 h-1 mx-4"></div>
+                            <div class="circuit-element w-20 h-20 flex items-center justify-center">
+                                <i class="fas fa-lightbulb text-3xl text-yellow-200"></i>
+                            </div>
+                            <div class="wire flex-1 h-1 mx-4"></div>
+                            <div class="circuit-element w-20 h-20 flex items-center justify-center">
+                                <i class="fas fa-sliders-h text-3xl text-blue-400"></i>
+                            </div>
+                            <div class="wire flex-1 h-1 mx-4"></div>
+                            <div class="circuit-element w-20 h-20 flex items-center justify-center">
+                                <i class="fas fa-battery-three-quarters text-3xl text-yellow-400"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap justify-center gap-4">
+                    <button id="increaseVoltage" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full">
+                        <i class="fas fa-plus mr-2"></i>增加电压
+                    </button>
+                    <button id="decreaseVoltage" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full">
+                        <i class="fas fa-minus mr-2"></i>减少电压
+                    </button>
+                    <button id="increaseResistance" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full">
+                        <i class="fas fa-plus mr-2"></i>增加电阻
+                    </button>
+                    <button id="decreaseResistance" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full">
+                        <i class="fas fa-minus mr-2"></i>减少电阻
+                    </button>
+                </div>
+                <div class="mt-6">
+                    <div id="ohmsLawChart" class="h-64"></div>
+                </div>
+            </div>
+            <div class="text-center">
+                <div class="inline-block bg-gray-800 px-6 py-3 rounded-full mb-6">
+                    <span class="font-bold">欧姆定律:</span> 
+                    <span class="highlight mx-2">电流(I) = 电压(V) / 电阻(R)</span>
+                </div>
+                <p class="max-w-3xl mx-auto">在电路中，电流的大小由电压和电阻共同决定。电压是推动力，电阻是阻碍力，两者共同决定了电子流动的速率。</p>
+            </div>
+        </section>
+
+        <section class="mb-20">
+            <h2 class="text-3xl font-bold mb-10 text-center">日常生活中的<span class="highlight">电流</span></h2>
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-gray-800 rounded-xl p-6 text-center hover:bg-gray-700 transition-all duration-300">
+                    <div class="w-16 h-16 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-mobile-alt text-2xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">智能手机</h3>
+                    <p class="text-sm">约0.5-2安培的电流为手机充电</p>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-6 text-center hover:bg-gray-700 transition-all duration-300">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-lightbulb text-2xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">LED灯泡</h3>
+                    <p class="text-sm">仅需0.01-0.1安培就能发光</p>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-6 text-center hover:bg-gray-700 transition-all duration-300">
+                    <div class="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-plug text-2xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">家用插座</h3>
+                    <p class="text-sm">提供10-20安培的电流</p>
+                </div>
+                <div class="bg-gray-800 rounded-xl p-6 text-center hover:bg-gray-700 transition-all duration-300">
+                    <div class="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-car text-2xl text-white"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">电动汽车</h3>
+                    <p class="text-sm">充电时电流可达32安培以上</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-gray-900 py-12 px-6">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <h2 class="text-2xl font-bold mb-2">电流的<span class="highlight">奥秘</span></h2>
+                    <p class="text-gray-400">用可视化方式理解物理现象</p>
+                </div>
+                <div class="flex space-x-6">
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <i class="fab fa-github text-2xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <i class="fab fa-twitter text-2xl"></i>
+                    </a>
+                    <a href="#" class="text-gray-400 hover:text-white transition-colors duration-300">
+                        <i class="fab fa-youtube text-2xl"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-500 text-sm">
+                <p>© 2023 电流可视化项目. 所有权利保留.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // 创建浮动电子背景
+        function createFloatingElectrons() {
+            const container = document.getElementById('floatingElectrons');
+            for (let i = 0; i < 15; i++) {
+                const electron = document.createElement('div');
+                electron.className = 'electron';
+                electron.style.left = `${Math.random() * 100}%`;
+                electron.style.top = `${Math.random() * 100}%`;
+                container.appendChild(electron);
+                
+                gsap.to(electron, {
+                    x: `${(Math.random() - 0.5) * 100}`,
+                    y: `${(Math.random() - 0.5) * 100}`,
+                    duration: 5 + Math.random() * 10,
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "sine.inOut"
+                });
+            }
+        }
+
+        // 初始化水流比喻图表
+        function initWaterFlowChart() {
+            Highcharts.chart('waterFlowChart', {
+                chart: {
+                    type: 'areaspline',
+                    backgroundColor: 'transparent',
+                    plotBorderWidth: 0,
+                    plotShadow: false
+                },
+                title: {
+                    text: '电压、电阻与电流的关系',
+                    style: {
+                        color: '#e6e6e6',
+                        fontFamily: "'Noto Sans SC', sans-serif"
+                    }
+                },
+                subtitle: {
+                    text: '水流比喻: 电压=水压, 电阻=管道狭窄度, 电流=水流',
+                    style: {
+                        color: '#a0aec0',
+                        fontFamily: "'Noto Sans SC', sans-serif"
+                    }
+                },
+                xAxis: {
+                    categories: ['低压', '中压', '高压'],
+                    labels: {
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    lineColor: '#4a5568'
+                },
+                yAxis: {
+                    title: {
+                        text: '流量/电流',
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    labels: {
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    gridLineColor: '#4a5568'
+                },
+                legend: {
+                    itemStyle: {
+                        color: '#a0aec0',
+                        fontWeight: 'normal'
+                    }
+                },
+                plotOptions: {
+                    areaspline: {
+                        fillOpacity: 0.5,
+                        marker: {
+                            enabled: false
+                        }
+                    }
+                },
+                series: [{
+                    name: '宽管道(低电阻)',
+                    data: [3, 12, 50],
+                    color: '#4fd1c5'
+                }, {
+                    name: '中等管道(中电阻)',
+                    data: [2, 8, 30],
+                    color: '#4299e1'
+                }, {
+                    name: '窄管道(高电阻)',
+                    data: [1, 4, 15],
+                    color: '#f56565'
+                }],
+                credits: {
+                    enabled: false
+                }
+            });
+        }
+
+        // 电子流动动画
+        function showElectronFlow() {
+            const wire = document.querySelector('.wire');
+            const electrons = [];
+            
+            // 创建电子
+            for (let i = 0; i < 8; i++) {
+                const electron = document.createElement('div');
+                electron.className = 'electron';
+                electron.style.left = `${-20 + i * 15}px`;
+                electron.style.top = '-5px';
+                wire.appendChild(electron);
+                electrons.push(electron);
+                
+                // 设置动画延迟，使电子流动看起来更自然
+                gsap.to(electron, {
+                    x: '+=500',
+                    duration: 3,
+                    repeat: -1,
+                    ease: "none",
+                    delay: i * 0.2
+                });
+            }
+            
+            // 高亮导线
+            gsap.to(wire, {
+                background: 'linear-gradient(90deg, #4a5568 0%, #4fd1c5 50%, #4a5568 100%)',
+                duration: 0.5,
+                yoyo: true,
+                repeat: 1
+            });
+        }
+
+        // 欧姆定律图表
+        function initOhmsLawChart() {
+            const chart = Highcharts.chart('ohmsLawChart', {
+                chart: {
+                    type: 'spline',
+                    backgroundColor: 'transparent',
+                    animation: false
+                },
+                title: {
+                    text: '欧姆定律模拟',
+                    style: {
+                        color: '#e6e6e6',
+                        fontFamily: "'Noto Sans SC', sans-serif"
+                    }
+                },
+                xAxis: {
+                    title: {
+                        text: '电压 (V)',
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    min: 1,
+                    max: 10,
+                    labels: {
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    lineColor: '#4a5568'
+                },
+                yAxis: {
+                    title: {
+                        text: '电流 (I)',
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    min: 0,
+                    max: 10,
+                    labels: {
+                        style: {
+                            color: '#a0aec0'
+                        }
+                    },
+                    gridLineColor: '#4a5568'
+                },
+                legend: {
+                    enabled: false
+                },
+                series: [{
+                    name: '电流',
+                    data: [],
+                    color: '#4fd1c5',
+                    marker: {
+                        enabled: false
+                    }
+                }],
+                credits: {
+                    enabled: false
+                }
+            });
+
+            // 初始数据
+            updateOhmsLawChart(chart, 5, 2);
+            
+            // 按钮交互
+            let voltage = 5;
+            let resistance = 2;
+            
+            document.getElementById('increaseVoltage').addEventListener('click', () => {
+                if (voltage < 10) {
+                    voltage += 1;
+                    updateOhmsLawChart(chart, voltage, resistance);
+                }
+            });
+            
+            document.getElementById('decreaseVoltage').addEventListener('click', () => {
+                if (voltage > 1) {
+                    voltage -= 1;
+                    updateOhmsLawChart(chart, voltage, resistance);
+                }
+            });
+            
+            document.getElementById('increaseResistance').addEventListener('click', () => {
+                if (resistance < 5) {
+                    resistance += 1;
+                    updateOhmsLawChart(chart, voltage, resistance);
+                }
+            });
+            
+            document.getElementById('decreaseResistance').addEventListener('click', () => {
+                if (resistance > 1) {
+                    resistance -= 1;
+                    updateOhmsLawChart(chart, voltage, resistance);
+                }
+            });
+        }
+
+        function updateOhmsLawChart(chart, voltage, resistance) {
+            const data = [];
+            for (let v = 1; v <= voltage; v++) {
+                data.push([v, v / resistance]);
+            }
+            
+            chart.series[0].setData(data);
+            chart.xAxis[0].setExtremes(1, Math.max(voltage, 2));
+            
+            // 更新灯泡亮度
+            const brightness = Math.min(100, (voltage / resistance) * 10);
+            document.querySelector('.fa-lightbulb').style.filter = `brightness(${brightness}%)`;
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            createFloatingElectrons();
+            initWaterFlowChart();
+            initOhmsLawChart();
+            
+            // 按钮事件
+            document.getElementById('showElectronFlow').addEventListener('click', showElectronFlow);
+            document.getElementById('startDemo').addEventListener('click', () => {
+                gsap.to(window, {
+                    scrollTo: { y: ".electron-flow-section", offsetY: 20 },
+                    duration: 1
+                });
+            });
+        });
+    </script>
+</body>
+</html>

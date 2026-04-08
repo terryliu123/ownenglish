@@ -50,29 +50,131 @@ export function formatChoiceAnswer(answer: unknown, options?: { key: string; tex
     .join(' / ')
 }
 
+export type MatchingAnswerDisplayRow = {
+  leftText: string
+  rightText: string
+  leftIndex: number | null
+  rightIndex: number | null
+}
+
+function findMatchingPairIndex(
+  ref: unknown,
+  pairs: { left: unknown; right: unknown }[],
+  side: 'left' | 'right',
+) {
+  if (typeof ref === 'number' && Number.isInteger(ref) && ref >= 0 && ref < pairs.length) {
+    return ref
+  }
+
+  const normalizedRef = String(ref ?? '').trim()
+  if (!normalizedRef) {
+    return -1
+  }
+
+  const numericRef = Number(normalizedRef)
+  if (Number.isInteger(numericRef) && numericRef >= 0 && numericRef < pairs.length) {
+    return numericRef
+  }
+
+  return pairs.findIndex((pair) => extractTaskTextContent(pair?.[side]).trim() === normalizedRef)
+}
+
+function buildMatchingRowsFromArray(
+  answer: unknown[],
+  pairs: { left: unknown; right: unknown }[],
+) {
+  return answer
+    .map((leftRef, rightIndex) => {
+      const rightText = extractTaskTextContent(pairs[rightIndex]?.right)
+      const leftIndex = findMatchingPairIndex(leftRef, pairs, 'left')
+      const leftText = leftIndex >= 0
+        ? extractTaskTextContent(pairs[leftIndex]?.left)
+        : String(leftRef ?? '').trim()
+
+      if (!leftText || !rightText) {
+        return null
+      }
+
+      const row: MatchingAnswerDisplayRow = {
+        leftText,
+        rightText,
+        leftIndex: leftIndex >= 0 ? leftIndex : null,
+        rightIndex,
+      }
+
+      return row
+    })
+    .filter((row): row is MatchingAnswerDisplayRow => Boolean(row))
+}
+
+function buildMatchingRowsFromObject(
+  answer: Record<string, unknown>,
+  pairs: { left: unknown; right: unknown }[],
+) {
+  return Object.entries(answer)
+    .map(([leftRef, rightRef]) => {
+      const leftIndex = findMatchingPairIndex(leftRef, pairs, 'left')
+      const rightIndex = findMatchingPairIndex(rightRef, pairs, 'right')
+      const leftText = leftIndex >= 0
+        ? extractTaskTextContent(pairs[leftIndex]?.left)
+        : String(leftRef ?? '').trim()
+      const rightText = rightIndex >= 0
+        ? extractTaskTextContent(pairs[rightIndex]?.right)
+        : String(rightRef ?? '').trim()
+
+      if (!leftText || !rightText) {
+        return null
+      }
+
+      const row: MatchingAnswerDisplayRow = {
+        leftText,
+        rightText,
+        leftIndex: leftIndex >= 0 ? leftIndex : null,
+        rightIndex: rightIndex >= 0 ? rightIndex : null,
+      }
+
+      return row
+    })
+    .filter((row): row is MatchingAnswerDisplayRow => Boolean(row))
+}
+
+export function resolveMatchingAnswerRows(
+  answer: unknown,
+  pairs?: { left: unknown; right: unknown }[],
+  options?: { fallbackToPairs?: boolean },
+) {
+  if (!pairs?.length) {
+    return [] as MatchingAnswerDisplayRow[]
+  }
+
+  const normalizedAnswer = unwrapAnswerValue(answer)
+  let rows: MatchingAnswerDisplayRow[] = []
+
+  if (Array.isArray(normalizedAnswer)) {
+    rows = buildMatchingRowsFromArray(normalizedAnswer, pairs)
+  } else if (normalizedAnswer && typeof normalizedAnswer === 'object') {
+    rows = buildMatchingRowsFromObject(normalizedAnswer as Record<string, unknown>, pairs)
+  }
+
+  if (!rows.length && options?.fallbackToPairs) {
+    rows = pairs.map((pair, index) => ({
+      leftText: extractTaskTextContent(pair.left),
+      rightText: extractTaskTextContent(pair.right),
+      leftIndex: index,
+      rightIndex: index,
+    }))
+  }
+
+  return rows
+}
+
 export function formatMatchingAnswer(
   answer: unknown,
   translate: (key: string) => string,
   pairs?: { left: unknown; right: unknown }[],
 ) {
-  if (!Array.isArray(answer) || !pairs?.length) {
-    return Array.isArray(answer) ? answer.join(', ') : String(answer ?? '')
-  }
-
-  const rows = answer
-    .map((leftIndex: any, rightIndex: number) => {
-      const normalizedLeftIndex = Number(leftIndex)
-      if (Number.isNaN(normalizedLeftIndex) || normalizedLeftIndex < 0) {
-        return null
-      }
-      const leftText = extractTaskTextContent(pairs[normalizedLeftIndex]?.left)
-      const rightText = extractTaskTextContent(pairs[rightIndex]?.right)
-      if (!leftText || !rightText) {
-        return null
-      }
-      return `${leftText} -> ${rightText}`
-    })
-    .filter(Boolean)
+  const rows = resolveMatchingAnswerRows(answer, pairs)
+    .map((row) => `${row.leftText} -> ${row.rightText}`)
 
   return rows.length ? rows.join(' / ') : translate('task.unanswered')
 }

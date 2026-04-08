@@ -161,11 +161,15 @@ export interface MembershipSnapshot {
     max_students_per_class: number | null
     max_task_groups: number | null
     max_study_packs: number | null
+    max_bigscreen_content_assets: number | null
+    max_bigscreen_activity_packs: number | null
   }
   usage: {
     class_count: number
     task_group_count: number
     study_pack_count: number
+    bigscreen_content_asset_count: number
+    bigscreen_activity_pack_count: number
   }
   wechat_pay_configured?: boolean
 }
@@ -221,6 +225,136 @@ export interface AdminWeChatPaySettingItem {
 export interface AdminMembershipConfigResponse {
   plans: AdminMembershipPlanConfig[]
   wechat_pay_settings: AdminWeChatPaySettingItem[]
+}
+
+export interface TeachingAidCategory {
+  code: string
+  label: string
+}
+
+export interface TeachingAid {
+  id: string
+  name: string
+  slug: string
+  category_code: string
+  category_label: string
+  summary?: string | null
+  cover_image_url?: string | null
+  diagram_image_url?: string | null
+  entry_file: string
+  storage_path: string
+  source_filename?: string | null
+  status: 'draft' | 'active' | 'archived'
+  tags: string[]
+  source_type: string
+  teacher_id?: string | null
+  share_code?: string | null
+  is_public?: boolean
+  created_at?: string | null
+  updated_at?: string | null
+  last_used_at?: string | null
+}
+
+export interface TeachingAidSessionLaunchResponse {
+  session_id: string
+  entry_url: string
+  expires_at: string
+}
+
+export interface TeachingAidManifestSyncResponse {
+  schema_version: number
+  base_path: string
+  manifest_path: string
+  categories: TeachingAidCategory[]
+  total: number
+  created: number
+  updated: number
+  failed: number
+  missing_existing: string[]
+  errors: Array<{ slug: string; reason: string }>
+}
+
+export interface TeachingAidBatchStatusResponse {
+  updated: number
+  status: TeachingAid['status']
+  items: TeachingAid[]
+}
+
+export type BigscreenContentType = 'matching' | 'sorting' | 'classification'
+export type BigscreenActivityType = 'duel'
+export type BigscreenParticipantMode = 'student_vs_student' | 'team_vs_team' | 'anonymous_side'
+export type BigscreenResourceStatus = 'draft' | 'active' | 'archived'
+export type BigscreenSessionStatus = 'pending' | 'running' | 'paused' | 'ended' | 'cancelled'
+
+export interface BigscreenContentAsset {
+  id: string
+  teacher_id: string
+  title: string
+  content_type: BigscreenContentType
+  payload: Record<string, unknown>
+  difficulty?: string | null
+  tags: string[]
+  supports_device_interaction: boolean
+  supports_bigscreen_interaction: boolean
+  supports_competition: boolean
+  source_type: string
+  status: BigscreenResourceStatus
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface BigscreenActivityPack {
+  id: string
+  teacher_id: string
+  title: string
+  activity_type: BigscreenActivityType
+  participant_mode: BigscreenParticipantMode
+  content_asset_refs: string[]
+  round_count: number
+  time_limit_seconds?: number | null
+  scoring_rule: string
+  win_rule: string
+  status: BigscreenResourceStatus
+  content_assets?: BigscreenContentAsset[] | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface BigscreenParticipantSide {
+  id: string
+  label: string
+  type: 'student' | 'team' | 'anonymous_side'
+  member_ids: string[]
+  display_color: string
+}
+
+export interface BigscreenScoreEntry {
+  side_id: string
+  label: string
+  score: number
+  round_wins: number
+  completed_count: number
+  total_time_ms: number
+}
+
+export interface BigscreenActivitySession {
+  id: string
+  teacher_id: string
+  class_id: string
+  activity_pack_id: string
+  activity_type: BigscreenActivityType
+  status: BigscreenSessionStatus
+  participant_sides: BigscreenParticipantSide[]
+  current_round: number
+  current_asset_id?: string | null
+  scoreboard: BigscreenScoreEntry[]
+  result_summary?: Record<string, unknown>
+  lead_side_id?: string | null
+  started_at?: string | null
+  ended_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+  activity_pack?: BigscreenActivityPack | null
 }
 
 export const membershipService = {
@@ -283,6 +417,261 @@ export const adminService = {
   },
 }
 
+export const teachingAidService = {
+  listAdmin: async (params?: { keyword?: string; category?: string; status?: string }): Promise<{ items: TeachingAid[] }> => {
+    const response = await api.get('/teaching-aids', { params })
+    return response.data
+  },
+
+  getById: async (id: string): Promise<TeachingAid> => {
+    const response = await api.get(`/teaching-aids/${id}`)
+    return response.data
+  },
+
+  update: async (
+    id: string,
+    data: Partial<Pick<TeachingAid, 'name' | 'category_code' | 'category_label' | 'summary' | 'source_filename' | 'tags'>>
+  ): Promise<TeachingAid> => {
+    const response = await api.put(`/teaching-aids/${id}`, data)
+    return response.data
+  },
+
+  updateStatus: async (id: string, status: TeachingAid['status']): Promise<TeachingAid> => {
+    const response = await api.put(`/teaching-aids/${id}/status`, { status })
+    return response.data
+  },
+
+  updateStatusBatch: async (ids: string[], status: TeachingAid['status']): Promise<TeachingAidBatchStatusResponse> => {
+    const response = await api.post('/teaching-aids/status/batch', { ids, status })
+    return response.data
+  },
+
+  syncManifest: async (): Promise<TeachingAidManifestSyncResponse> => {
+    const response = await api.post('/teaching-aids/sync-manifest')
+    return response.data
+  },
+
+  getLibrary: async (params?: { keyword?: string; category?: string }): Promise<{ items: TeachingAid[] }> => {
+    const response = await api.get('/teaching-aids/library', { params })
+    return response.data
+  },
+
+  getRecentLibrary: async (): Promise<{ items: TeachingAid[] }> => {
+    const response = await api.get('/teaching-aids/library/recent')
+    return response.data
+  },
+
+  getCategories: async (): Promise<{ items: TeachingAidCategory[] }> => {
+    const response = await api.get('/teaching-aids/categories')
+    return response.data
+  },
+
+  launch: async (id: string): Promise<TeachingAidSessionLaunchResponse> => {
+    const response = await api.post(`/teaching-aids/${id}/launch`)
+    return response.data
+  },
+
+  getCoverUrl: (id: string): string => {
+    return `${API_BASE_URL}/teaching-aids/${id}/cover`
+  },
+
+  create: async (data: {
+    name: string
+    slug: string
+    category_code: string
+    category_label: string
+    summary?: string
+    tags?: string[]
+  }): Promise<TeachingAid> => {
+    const response = await api.post('/teaching-aids', data)
+    return response.data
+  },
+
+  uploadFiles: async (id: string, files: File[]): Promise<{ uploaded: string[]; storage_path: string }> => {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+    const response = await api.post(`/teaching-aids/${id}/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  validate: async (id: string): Promise<{ valid: boolean; entry_file_exists: boolean; errors: string[]; files: string[] }> => {
+    const response = await api.post(`/teaching-aids/${id}/validate`)
+    return response.data
+  },
+
+  delete: async (id: string): Promise<{ deleted: boolean }> => {
+    const response = await api.delete(`/teaching-aids/${id}`)
+    return response.data
+  },
+
+  // Teacher-specific methods
+  listTeacherAids: async (): Promise<TeachingAid[]> => {
+    const response = await api.get('/teacher/teaching-aids')
+    return response.data
+  },
+
+  uploadTeacherZip: async (params: {
+    name: string
+    category_code: string
+    category_label: string
+    summary?: string
+    zipFile: File
+  }): Promise<{
+    id: string
+    name: string
+    slug: string
+    category_code: string
+    category_label: string
+    status: string
+    share_code: string
+    entry_file: string
+  }> => {
+    const formData = new FormData()
+    formData.append('file', params.zipFile)
+    formData.append('name', params.name)
+    formData.append('category_code', params.category_code)
+    formData.append('category_label', params.category_label)
+    if (params.summary) {
+      formData.append('summary', params.summary)
+    }
+    const response = await api.post('/teacher/teaching-aids/upload-zip', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  uploadTeacherHtml: async (params: {
+    name: string
+    category_code: string
+    category_label: string
+    summary?: string
+    htmlFile: File
+  }): Promise<{
+    id: string
+    name: string
+    slug: string
+    category_code: string
+    category_label: string
+    status: string
+    share_code: string
+    entry_file: string
+  }> => {
+    const formData = new FormData()
+    formData.append('file', params.htmlFile)
+    formData.append('name', params.name)
+    formData.append('category_code', params.category_code)
+    formData.append('category_label', params.category_label)
+    if (params.summary) {
+      formData.append('summary', params.summary)
+    }
+    const response = await api.post('/teacher/teaching-aids/upload-html', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+
+  updateTeacherAid: async (
+    id: string,
+    data: Partial<Pick<TeachingAid, 'name' | 'category_code' | 'category_label' | 'summary' | 'tags'>>
+  ): Promise<TeachingAid> => {
+    const response = await api.patch(`/teacher/teaching-aids/${id}`, data)
+    return response.data
+  },
+
+  deleteTeacherAid: async (id: string): Promise<{ deleted: boolean }> => {
+    const response = await api.delete(`/teacher/teaching-aids/${id}`)
+    return response.data
+  },
+
+  generateShareLink: async (id: string): Promise<{ share_code: string; share_url: string }> => {
+    const response = await api.post(`/teacher/teaching-aids/${id}/generate-share-link`)
+    return response.data
+  },
+
+  importByShareCode: async (shareCode: string): Promise<TeachingAid> => {
+    const response = await api.get(`/teacher/teaching-aids/import/${shareCode}`)
+    return response.data
+  },
+}
+
+export const bigscreenActivityService = {
+  listAssets: async (params?: { content_type?: string; status?: string }): Promise<{ items: BigscreenContentAsset[] }> => {
+    const response = await api.get('/bigscreen-activities/assets', { params })
+    return response.data
+  },
+
+  getAsset: async (id: string): Promise<BigscreenContentAsset> => {
+    const response = await api.get(`/bigscreen-activities/assets/${id}`)
+    return response.data
+  },
+
+  createAsset: async (data: Omit<BigscreenContentAsset, 'id' | 'teacher_id' | 'created_at' | 'updated_at'>): Promise<BigscreenContentAsset> => {
+    const response = await api.post('/bigscreen-activities/assets', data)
+    return response.data
+  },
+
+  updateAsset: async (
+    id: string,
+    data: Omit<BigscreenContentAsset, 'id' | 'teacher_id' | 'created_at' | 'updated_at'>
+  ): Promise<BigscreenContentAsset> => {
+    const response = await api.put(`/bigscreen-activities/assets/${id}`, data)
+    return response.data
+  },
+
+  listPacks: async (params?: { status?: string }): Promise<{ items: BigscreenActivityPack[] }> => {
+    const response = await api.get('/bigscreen-activities/packs', { params })
+    return response.data
+  },
+
+  getPack: async (id: string): Promise<BigscreenActivityPack> => {
+    const response = await api.get(`/bigscreen-activities/packs/${id}`)
+    return response.data
+  },
+
+  createPack: async (data: Omit<BigscreenActivityPack, 'id' | 'teacher_id' | 'content_assets' | 'created_at' | 'updated_at'>): Promise<BigscreenActivityPack> => {
+    const response = await api.post('/bigscreen-activities/packs', data)
+    return response.data
+  },
+
+  updatePack: async (
+    id: string,
+    data: Omit<BigscreenActivityPack, 'id' | 'teacher_id' | 'content_assets' | 'created_at' | 'updated_at'>
+  ): Promise<BigscreenActivityPack> => {
+    const response = await api.put(`/bigscreen-activities/packs/${id}`, data)
+    return response.data
+  },
+
+  launchPack: async (packId: string, data: { class_id: string; participant_sides: BigscreenParticipantSide[] }): Promise<BigscreenActivitySession> => {
+    const response = await api.post(`/bigscreen-activities/packs/${packId}/launch`, data)
+    return response.data
+  },
+
+  getSession: async (sessionId: string): Promise<BigscreenActivitySession> => {
+    const response = await api.get(`/bigscreen-activities/sessions/${sessionId}`)
+    return response.data
+  },
+
+  controlSession: async (sessionId: string, action: 'start' | 'pause' | 'resume' | 'end' | 'cancel'): Promise<BigscreenActivitySession> => {
+    const response = await api.post(`/bigscreen-activities/sessions/${sessionId}/control`, { action })
+    return response.data
+  },
+
+  submitRoundResult: async (
+    sessionId: string,
+    data: {
+      round_number: number
+      scoreboard: BigscreenScoreEntry[]
+      winner_side_id?: string | null
+      round_summary?: Record<string, unknown>
+    }
+  ): Promise<BigscreenActivitySession> => {
+    const response = await api.post(`/bigscreen-activities/sessions/${sessionId}/round-result`, data)
+    return response.data
+  },
+}
+
 export const classService = {
   getAll: async () => {
     const response = await api.get('/classes')
@@ -327,6 +716,24 @@ export const classService = {
 
   leave: async (id: string) => {
     const response = await api.post(`/classes/${id}/leave`)
+    return response.data
+  },
+
+  // 学生端 AI 设置
+  getClassAiSettings: async (classId: string) => {
+    const response = await api.get(`/classes/${classId}/ai-settings`)
+    return response.data
+  },
+
+  updateClassAiSettings: async (classId: string, settings: {
+    enabled?: boolean
+    system_prompt?: string
+    max_output_length?: number
+    show_reasoning?: boolean
+    photo_qa_enabled?: boolean
+    free_question_enabled?: boolean
+  }) => {
+    const response = await api.put(`/classes/${classId}/ai-settings`, settings)
     return response.data
   },
 }
@@ -432,6 +839,13 @@ export const liveService = {
   deleteTaskGroupShare: async (shareId: string) => {
     const response = await api.delete(`/live/task-groups/shares/${shareId}`)
     return response.data
+  },
+}
+
+export const liveTaskSubmissionService = {
+  deleteTaskGroupSubmissions: async (groupId: string, sessionId?: string) => {
+    const params = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ''
+    await api.delete(`/live/task-groups/${groupId}/submissions${params}`)
   },
 }
 
@@ -923,7 +1337,7 @@ export interface AiImportTaskGroupData {
   title: string
   raw_text: string
   target_group_id?: string
-  task_mode?: 'objective' | 'reading'
+  task_mode?: 'objective' | 'reading' | 'experiment'
   randomize_answer_position?: boolean
 }
 
@@ -932,7 +1346,7 @@ export interface AiGenerateTaskGroupData {
   title: string
   prompt: string
   target_group_id?: string
-  task_mode?: 'objective' | 'reading'
+  task_mode?: 'objective' | 'reading' | 'experiment'
   question_count?: number
   difficulty?: 'easy' | 'medium' | 'hard'
   types?: string[]
@@ -949,6 +1363,13 @@ export const liveTaskService = {
 
   getTaskGroup: async (groupId: string): Promise<LiveTaskGroup> => {
     const response = await api.get(`/live/task-groups/${groupId}`)
+    return response.data
+  },
+
+  publishTaskGroup: async (groupId: string, totalCountdown?: number | null) => {
+    const response = await api.post(`/live/task-groups/${groupId}/publish`, {
+      total_countdown: totalCountdown ?? null,
+    })
     return response.data
   },
 
@@ -983,7 +1404,7 @@ export const liveTaskService = {
         class_id: string
         title: string
         target_group_id?: string
-        task_mode?: 'objective' | 'reading'
+        task_mode?: 'objective' | 'reading' | 'experiment'
         randomize_answer_position?: boolean
       }
     ): Promise<LiveTaskGroup> => {
@@ -1042,6 +1463,12 @@ export const liveTaskService = {
 
   getClassTaskHistory: async (classId: string) => {
     const response = await api.get(`/live/classes/${classId}/task-history`)
+    return response.data
+  },
+
+  // Danmu API
+  getSessionDanmu: async (sessionId: string): Promise<{ items: Array<{ id: string; sender_name: string; content: string; created_at: string }>; total: number }> => {
+    const response = await api.get(`/live/sessions/${sessionId}/danmu`)
     return response.data
   },
 

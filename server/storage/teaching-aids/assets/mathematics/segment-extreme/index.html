@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：双线段最值（垂线段最短）</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 黑板背景 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: default;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            background-color: #2a2a2a;
+            display: block;
+        }
+
+        .info {
+            font-size: 15px;
+            color: #aaa;
+            text-align: center;
+            max-width: 650px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .highlight {
+            color: #FFD700;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>双线段最值探究</h1>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="info">
+        拖动 <span class="highlight">点 E</span> 在边 AB 上移动。<br>
+        观察：当 <span class="highlight">CE</span> 与 AB 垂直（角度为90°）时，CE 的长度数值最小。
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // 颜色配置
+    const COLORS = {
+        shape: '#00A1E9', // 平行四边形边框蓝
+        lineCE: '#FFD700', // 动线段黄
+        dashed: '#888',
+        text: '#eee',
+        angleNormal: 'rgba(255, 255, 255, 0.2)',
+        angle90: 'rgba(100, 255, 100, 0.4)'
+    };
+
+    // 顶点坐标
+    const A = { x: 300, y: 100 };
+    const B = { x: 150, y: 400 };
+    const C = { x: 550, y: 400 };
+    // D 根据平行四边形法则计算: D = C + (A - B)
+    const D = { x: 550 + (300 - 150), y: 100 };
+
+    // 动点 E (初始在 AB 中点)
+    let E = { x: (A.x + B.x)/2, y: (A.y + B.y)/2 };
+    // t值表示 E 在 AB 上的比例 (0~1)
+    let t = 0.5;
+
+    let isDragging = false;
+
+    // --- 数学工具 ---
+
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    // 向量点积
+    function dot(v1, v2) { return v1.x * v2.x + v1.y * v2.y; }
+    // 向量模长
+    function mag(v) { return Math.sqrt(v.x**2 + v.y**2); }
+
+    // 投影点限制在线段上
+    function updateE(mouseX, mouseY) {
+        // 向量 AB
+        const AB = { x: B.x - A.x, y: B.y - A.y };
+        // 向量 AM (M为鼠标)
+        const AM = { x: mouseX - A.x, y: mouseY - A.y };
+        
+        // 计算投影比例 t = (AM · AB) / |AB|^2
+        const ab2 = AB.x**2 + AB.y**2;
+        let newT = dot(AM, AB) / ab2;
+        
+        // 限制 t 在 [0, 1] 之间
+        newT = Math.max(0, Math.min(1, newT));
+        t = newT;
+
+        // 更新 E 坐标
+        E.x = A.x + t * AB.x;
+        E.y = A.y + t * AB.y;
+    }
+
+    // 计算 CE 与 EB 的夹角 (角度制)
+    function getAngle() {
+        // 向量 EC
+        const vecEC = { x: C.x - E.x, y: C.y - E.y };
+        // 向量 EB (或者 EA，取决于我们要显示的夹角，这里显示下方的角)
+        const vecEB = { x: B.x - E.x, y: B.y - E.y };
+
+        // 如果 E 和 B 重合，防除零
+        if (t > 0.99) return 0; 
+
+        const cosTheta = dot(vecEC, vecEB) / (mag(vecEC) * mag(vecEB));
+        // 限制数值防误差
+        const clampedCos = Math.max(-1, Math.min(1, cosTheta));
+        return Math.acos(clampedCos) * (180 / Math.PI);
+    }
+
+    // --- 绘图 ---
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制对角线 (辅助线)
+        ctx.lineWidth = 1;
+        // AC (虚线)
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = COLORS.dashed;
+        ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(C.x, C.y); ctx.stroke();
+        // BD (实线) - 截图里似乎是实线，或者是更密的虚线，这里用实线区分
+        ctx.setLineDash([]); 
+        ctx.strokeStyle = "#bbb";
+        ctx.beginPath(); ctx.moveTo(B.x, B.y); ctx.lineTo(D.x, D.y); ctx.stroke();
+
+        // P点 (对角线交点)
+        const P = { x: (A.x+C.x)/2, y: (A.y+C.y)/2 };
+        ctx.fillStyle = "#aaa";
+        ctx.beginPath(); ctx.arc(P.x, P.y, 3, 0, Math.PI*2); ctx.fill();
+        ctx.fillText("P", P.x - 5, P.y + 20);
+
+        // 2. 绘制平行四边形 ABCD
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = COLORS.shape;
+        ctx.beginPath();
+        ctx.moveTo(A.x, A.y);
+        ctx.lineTo(B.x, B.y);
+        ctx.lineTo(C.x, C.y);
+        ctx.lineTo(D.x, D.y);
+        ctx.closePath();
+        ctx.stroke();
+
+        // 3. 绘制动线段 CE
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = COLORS.lineCE;
+        ctx.beginPath();
+        ctx.moveTo(C.x, C.y);
+        ctx.lineTo(E.x, E.y);
+        ctx.stroke();
+
+        // 4. 绘制角度标记
+        const angle = getAngle();
+        const isPerpendicular = Math.abs(angle - 90) < 1; // 1度容差
+
+        drawAngleMark(E, B, C, angle, isPerpendicular);
+
+        // 5. 绘制点和标签
+        drawPoint(A, "A", -10, -10);
+        drawPoint(B, "B", -10, 20);
+        drawPoint(C, "C", 10, 20);
+        drawPoint(D, "D", 10, -10);
+        
+        // 动点 E
+        ctx.beginPath();
+        ctx.arc(E.x, E.y, 8, 0, Math.PI*2);
+        ctx.fillStyle = "rgba(255, 255, 255, 0.3)"; // 光晕
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(E.x, E.y, 5, 0, Math.PI*2);
+        ctx.fillStyle = "#fff";
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 18px Arial";
+        ctx.fillText("E", E.x - 25, E.y + 5);
+
+        // 6. 显示长度数值
+        // 为了显示得像教材，我们把像素距离除以一个比例系数，比如50
+        const displayLen = (dist(C, E) / 50).toFixed(4);
+        ctx.fillStyle = COLORS.lineCE;
+        ctx.font = "italic bold 20px Times New Roman";
+        // 放在线段中点下方
+        const midCE = { x: (C.x + E.x)/2, y: (C.y + E.y)/2 };
+        ctx.fillText(`CE = ${displayLen}`, midCE.x + 10, midCE.y + 20);
+
+        // 如果最短，提示文字
+        if (isPerpendicular) {
+            ctx.fillStyle = "#4CAF50";
+            ctx.font = "16px Arial";
+            ctx.fillText("(最小值)", midCE.x + 10, midCE.y + 40);
+        }
+    }
+
+    // 绘制角 E
+    function drawAngleMark(center, pLine, pOut, degrees, is90) {
+        const radius = 25;
+        const angleStart = Math.atan2(pLine.y - center.y, pLine.x - center.x);
+        const angleEnd = Math.atan2(pOut.y - center.y, pOut.x - center.x);
+
+        ctx.beginPath();
+        if (is90) {
+            // 画直角符号
+            ctx.fillStyle = COLORS.angle90;
+            ctx.strokeStyle = "#4CAF50";
+            // 简单的正方形绘制逻辑需要旋转，这里用扇形简化，或者绘制折线
+            // 绘制扇形并填充绿色
+            ctx.moveTo(center.x, center.y);
+            ctx.arc(center.x, center.y, radius, angleStart, angleEnd, false); // false = 顺时针? 取决于坐标
+            ctx.lineTo(center.x, center.y);
+            ctx.fill();
+        } else {
+            // 普通弧线
+            ctx.fillStyle = COLORS.angleNormal;
+            ctx.moveTo(center.x, center.y);
+            ctx.arc(center.x, center.y, radius, angleStart, angleEnd, true); // true for inner angle usually
+            ctx.fill();
+        }
+
+        // 角度文字
+        ctx.fillStyle = is90 ? "#4CAF50" : "#fff";
+        ctx.font = "14px Arial";
+        ctx.fillText(Math.round(degrees) + "°", center.x + 15, center.y + 35);
+    }
+
+    function drawPoint(p, label, offX, offY) {
+        ctx.fillStyle = "#fff";
+        ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
+        ctx.font = "italic 18px Times New Roman";
+        ctx.fillText(label, p.x + offX, p.y + offY);
+    }
+
+    // --- 交互 ---
+
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    canvas.addEventListener('mousedown', e => {
+        const pos = getMousePos(e);
+        if (dist(pos, E) < 20) {
+            isDragging = true;
+            canvas.style.cursor = 'grabbing';
+        }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        const pos = getMousePos(e);
+        
+        // 鼠标悬停样式
+        if (!isDragging) {
+            canvas.style.cursor = dist(pos, E) < 20 ? 'grab' : 'default';
+        }
+
+        if (isDragging) {
+            updateE(pos.x, pos.y);
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+        canvas.style.cursor = 'default';
+    });
+    
+    // 触摸支持
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const pos = { x: touch.clientX - rect.left, y: touch.clientY - rect.top };
+        if (dist(pos, E) < 30) isDragging = true;
+    }, {passive: false});
+
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (isDragging) {
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            updateE(touch.clientX - rect.left, touch.clientY - rect.top);
+            draw();
+        }
+    }, {passive: false});
+    
+    window.addEventListener('touchend', () => isDragging = false);
+
+    // 初始化
+    draw();
+
+</script>
+</body>
+</html>

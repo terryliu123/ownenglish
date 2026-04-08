@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>单词魔法师：终极优化版</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            font-family: 'Comic Sans MS', 'Arial Rounded MT Bold', sans-serif;
+            background-color: #E0F7FA;
+            display: flex; height: 100vh; overflow: hidden;
+            touch-action: none; 
+        }
+
+        #game-container {
+            width: 100%; height: 100%; position: relative;
+            background-image: linear-gradient(#4FC3F7 0%, #E1F5FE 60%, #81C784 100%);
+            overflow: hidden;
+        }
+
+        /* --- 侧边栏 (改为抽屉式悬浮) --- */
+        #sidebar {
+            position: absolute;
+            right: 0; top: 0; bottom: 0;
+            width: 260px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            z-index: 100;
+            /* 动画效果 */
+            transform: translateX(100%); 
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+            backdrop-filter: blur(10px);
+        }
+
+        /* 激活状态：滑入 */
+        #sidebar.active { transform: translateX(0); }
+
+        /* --- 顶部 UI 栏 --- */
+        #ui-layer {
+            position: absolute; 
+            top: 20px; 
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex; gap: 8px; z-index: 50;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 8px 12px; border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 95%; max-width: 650px; justifyContent: center;
+            align-items: center;
+        }
+
+        input {
+            flex: 1; padding: 10px; font-size: 18px;
+            border: 2px solid #B2EBF2; border-radius: 10px; outline: none;
+        }
+        input:focus { border-color: #00BCD4; background: #fff; }
+
+        button {
+            padding: 0 15px; height: 44px;
+            font-size: 16px; font-weight: bold;
+            background-color: #00BCD4; color: white;
+            border: none; border-radius: 10px; cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s;
+        }
+        button:active { background-color: #00838F; transform: scale(0.95); }
+        
+        #btn-reset { background-color: #FF7043; }
+        #btn-toggle-dict { background-color: #7E57C2; font-size: 20px; padding: 0 12px; }
+
+        /* --- 虚拟触控 (底部) --- */
+        .touch-controls {
+            position: absolute; bottom: 40px; width: 100%;
+            padding: 0 30px; box-sizing: border-box;
+            display: flex; justify-content: space-between;
+            pointer-events: none; z-index: 40;
+        }
+        .control-group { pointer-events: auto; display: flex; gap: 20px; }
+        .touch-btn {
+            width: 70px; height: 70px;
+            background: rgba(255, 255, 255, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 30px; user-select: none;
+            backdrop-filter: blur(4px); transition: background 0.1s;
+        }
+        .touch-btn:active { background: rgba(255, 255, 255, 0.8); transform: scale(0.9); }
+
+        /* 遮罩层 (点击侧边栏外部关闭) */
+        #overlay-mask {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.3); z-index: 90;
+            display: none;
+        }
+
+        /* 单词标签 */
+        .category-group h3 {
+            margin: 15px 0 5px 0; font-size: 15px;
+            color: #00838F; border-bottom: 2px solid #E0F7FA;
+        }
+        .word-tag {
+            display: inline-block; background: #E0F7FA; color: #006064;
+            padding: 6px 10px; margin: 3px; border-radius: 8px;
+            font-size: 14px; cursor: pointer; border: 1px solid transparent;
+        }
+        .word-tag:hover { background: #B2EBF2; border-color: #00BCD4; }
+
+        #win-msg {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5vw; color: #FFD700;
+            text-shadow: 2px 2px 0 #FF5722, 0 0 20px white;
+            font-weight: bold; display: none;
+            z-index: 110; pointer-events: none; white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 遮罩层 -->
+    <div id="overlay-mask" onclick="toggleSidebar(false)"></div>
+
+    <div id="game-container">
+        <div id="win-msg">🏆 YOU DID IT! 🏆</div>
+
+        <!-- 顶部输入栏 -->
+        <div id="ui-layer">
+            <button id="btn-toggle-dict" onclick="toggleSidebar()" title="Open Backpack">📖</button>
+            <input type="text" id="input-word" placeholder="Type word..." autocomplete="off">
+            <button onclick="handleSpawn()">Create</button>
+            <button id="btn-reset" onclick="resetGame()">Reset</button>
+        </div>
+
+        <!-- 底部虚拟触控 -->
+        <div class="touch-controls">
+            <div class="control-group">
+                <div class="touch-btn" id="btn-left">⬅️</div>
+                <div class="touch-btn" id="btn-right">➡️</div>
+            </div>
+            <div class="control-group">
+                <div class="touch-btn" id="btn-jump">🦘</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 侧边栏 (抽屉) -->
+    <div id="sidebar">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2 style="margin:0; color:#00BCD4;">🎒 Backpack</h2>
+            <button onclick="toggleSidebar(false)" style="background:none; color:#999; font-size:20px; padding:0;">✖️</button>
+        </div>
+        <p style="font-size:12px; color:#666; margin:5px 0 15px 0;">Tap a word to create it!</p>
+        <div id="dictionary-content"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. 词汇库
+        // ==========================================
+        const WORD_DB = {};
+        function addWords(category, type, wordsMap) {
+            for (let word in wordsMap) WORD_DB[word] = { e: wordsMap[word], t: type, c: category };
+        }
+
+        addWords('Animals', 'animal', {
+            'ant':'🐜', 'bear':'🐻', 'bee':'🐝', 'bird':'🐦', 'butterfly':'🦋', 'cat':'🐱', 'chicken':'🐔', 
+            'cow':'🐄', 'crab':'🦀', 'crocodile':'🐊', 'deer':'🦌', 'dog':'🐶', 'dolphin':'🐬', 'dragon':'🐉', 
+            'duck':'🦆', 'eagle':'🦅', 'elephant':'🐘', 'fish':'🐟', 'fox':'🦊', 'frog':'🐸', 'giraffe':'🦒', 
+            'goat':'🐐', 'gorilla':'🦍', 'hamster':'🐹', 'hedgehog':'🦔', 'hippo':'🦛', 'horse':'🐎', 'kangaroo':'🦘', 
+            'koala':'🐨', 'ladybug':'🐞', 'lion':'🦁', 'lizard':'🦎', 'monkey':'🐵', 'mouse':'🐭', 'octopus':'🐙', 
+            'owl':'🦉', 'panda':'🐼', 'penguin':'🐧', 'pig':'🐷', 'rabbit':'🐰', 'rat':'🐀', 'shark':'🦈', 
+            'sheep':'🐑', 'shrimp':'🦐', 'snail':'🐌', 'snake':'🐍', 'spider':'🕷️', 'squirrel':'🐿️', 'swan':'🦢', 
+            'tiger':'🐯', 'turtle':'🐢', 'whale':'🐳', 'wolf':'🐺', 'zebra':'🦓', 'dinosaur':'🦕', 'unicorn':'🦄'
+        });
+
+        addWords('Food', 'food', {
+            'apple':'🍎', 'banana':'🍌', 'bread':'🍞', 'broccoli':'🥦', 'burger':'🍔', 'cake':'🍰', 'candy':'🍬', 
+            'carrot':'🥕', 'cheese':'🧀', 'cherry':'🍒', 'chocolate':'🍫', 'cookie':'🍪', 'corn':'🌽', 'cucumber':'🥒', 
+            'donut':'🍩', 'egg':'🥚', 'fries':'🍟', 'grape':'🍇', 'honey':'🍯', 'hotdog':'🌭', 'ice cream':'🍦', 
+            'lemon':'🍋', 'meat':'🥩', 'milk':'🥛', 'mushroom':'🍄', 'noodles':'🍜', 'onion':'🧅', 'orange':'🍊', 
+            'peach':'🍑', 'pear':'🍐', 'pineapple':'🍍', 'pizza':'🍕', 'potato':'🥔', 'pumpkin':'🎃', 'rice':'🍚', 
+            'salad':'🥗', 'sandwich':'🥪', 'soup':'🍲', 'strawberry':'🍓', 'sushi':'🍣', 'tomato':'🍅', 'water':'💧', 
+            'watermelon':'🍉', 'eggplant':'🍆', 'avocado':'🥑', 'bacon':'🥓', 'beer':'🍺', 'coffee':'☕', 'tea':'🍵'
+        });
+
+        addWords('Nature', 'static', {
+            'tree':'🌳', 'flower':'🌹', 'grass':'🌿', 'mountain':'⛰️', 'rock':'🪨', 'cactus':'🌵', 'bamboo':'🎋',
+            'rose':'🌹', 'sunflower':'🌻', 'tulip':'🌷', 'leaf':'🍃', 'fire':'🔥', 'stone':'🪨'
+        });
+        addWords('Nature', 'float', {
+            'sun':'☀️', 'moon':'🌙', 'star':'⭐', 'cloud':'☁️', 'rain':'🌧️', 'snow':'❄️', 'wind':'💨', 
+            'rainbow':'🌈', 'lightning':'⚡', 'planet':'🪐', 'earth':'🌍'
+        });
+
+        addWords('Transport', 'heavy', {
+            'ambulance':'🚑', 'bike':'🚲', 'boat':'🛶', 'bus':'🚌', 'car':'🚗', 'fire engine':'🚒', 
+            'helicopter':'🚁', 'motorcycle':'🏍️', 'plane':'✈️', 'police car':'🚓', 'rocket':'🚀', 
+            'scooter':'🛴', 'ship':'🚢', 'taxi':'🚕', 'tractor':'🚜', 'train':'🚆', 'truck':'🚚', 'ufo':'🛸'
+        });
+
+        addWords('Objects', 'item', {
+            'bag':'🎒', 'ball':'⚽', 'balloon':'🎈', 'basket':'🧺', 'bed':'🛏️', 'bell':'🔔', 'book':'📖', 
+            'box':'📦', 'brush':'🖌️', 'camera':'📷', 'candle':'🕯️', 'chair':'🪑', 'clock':'⏰', 'computer':'💻', 
+            'crayon':'🖍️', 'cup':'☕', 'desk':'🏫', 'door':'🚪', 'drum':'🥁', 'envelope':'✉️', 'eraser':'✏️', 
+            'fan':'🌀', 'flag':'🚩', 'gift':'🎁', 'glasses':'👓', 'guitar':'🎸', 'hat':'🎩', 'key':'🔑', 
+            'kite':'🪁', 'lamp':'💡', 'laptop':'💻', 'lock':'🔒', 'map':'🗺️', 'mirror':'🪞', 'money':'💰', 
+            'notebook':'📓', 'pen':'🖊️', 'pencil':'✏️', 'phone':'📱', 'piano':'🎹', 'pillow':'枕', 'present':'🎁', 
+            'radio':'📻', 'ring':'💍', 'robot':'🤖', 'ruler':'📏', 'scissors':'✂️', 'shoe':'👟', 'sock':'🧦', 
+            'sofa':'🛋️', 'spoon':'🥄', 'table':'🔲', 'teddy':'🧸', 'telescope':'🔭', 'tent':'⛺', 'toilet':'🚽', 
+            'toothbrush':'🪥', 'toy':'🤖', 'trash':'🗑️', 'umbrella':'☂️', 'vase':'🏺', 'violin':'🎻', 'watch':'⌚', 
+            'window':'🪟', 'ladder':'🪜', 'brick':'🧱'
+        });
+
+        // 属性修正
+        function safeUpdateType(words, newType) {
+            words.forEach(k => { if (WORD_DB[k]) WORD_DB[k].t = newType; });
+        }
+        safeUpdateType(['elephant', 'hippo', 'cow', 'horse', 'bear', 'whale', 'dinosaur', 'rock', 'stone', 'car', 'bus', 'train', 'piano', 'box', 'brick'], 'heavy');
+        safeUpdateType(['bird', 'bee', 'butterfly', 'eagle', 'owl', 'dragon', 'bat'], 'float_slow');
+        safeUpdateType(['plane', 'helicopter', 'rocket', 'ufo', 'balloon', 'kite'], 'float');
+        safeUpdateType(['ladder', 'bridge', 'ruler', 'pen', 'pencil', 'train', 'door'], 'long');
+        safeUpdateType(['ball', 'basketball', 'football'], 'bouncy');
+
+        // ==========================================
+        // 2. 物理引擎
+        // ==========================================
+        const Engine = Matter.Engine, Render = Matter.Render, Runner = Matter.Runner,
+              Bodies = Matter.Bodies, Composite = Matter.Composite, Events = Matter.Events,
+              Body = Matter.Body, Vector = Matter.Vector, MouseConstraint = Matter.MouseConstraint,
+              Mouse = Matter.Mouse;
+
+        const engine = Engine.create();
+        const world = engine.world;
+        const container = document.getElementById('game-container');
+        let width = container.clientWidth;
+        let height = container.clientHeight;
+
+        const render = Render.create({
+            element: container, engine: engine,
+            options: { width: width, height: height, wireframes: false, background: 'transparent' }
+        });
+
+        const mouse = Mouse.create(render.canvas);
+        const mouseConstraint = MouseConstraint.create(engine, {
+            mouse: mouse, constraint: { stiffness: 0.2, render: { visible: false } }
+        });
+        Composite.add(world, mouseConstraint);
+
+        // ==========================================
+        // 3. 游戏逻辑
+        // ==========================================
+        let player, star;
+        let gameObjects = [];
+
+        function initLevel() {
+            Composite.clear(world);
+            engine.events = {};
+            gameObjects = [];
+            document.getElementById('win-msg').style.display = 'none';
+            Composite.add(world, mouseConstraint);
+
+            const ground = Bodies.rectangle(width/2, height + 40, width, 100, { isStatic: true, render: { fillStyle: '#66BB6A' } });
+            const leftWall = Bodies.rectangle(-40, height/2, 80, height * 4, { isStatic: true });
+            const rightWall = Bodies.rectangle(width+40, height/2, 80, height * 4, { isStatic: true });
+            const platform = Bodies.rectangle(width - 120, height * 0.4, 180, 20, { 
+                isStatic: true, render: { fillStyle: '#8D6E63' }, chamfer: { radius: 10 }
+            });
+
+            player = Bodies.rectangle(100, height - 100, 40, 60, { 
+                inertia: Infinity, friction: 0.01, render: { opacity: 0 } 
+            });
+
+            star = Bodies.circle(width - 120, height * 0.4 - 50, 30, { 
+                isStatic: true, isSensor: true, render: { opacity: 0 }
+            });
+
+            Composite.add(world, [ground, leftWall, rightWall, platform, player, star]);
+        }
+
+        // --- 生成核心逻辑 (焦点回归) ---
+        function handleSpawn() {
+            const input = document.getElementById('input-word');
+            const rawWord = input.value.trim().toLowerCase();
+            
+            if (!rawWord) return;
+            let word = rawWord;
+            if (!WORD_DB[word] && word.endsWith('s') && WORD_DB[word.slice(0, -1)]) word = word.slice(0, -1);
+
+            if (WORD_DB[word]) {
+                spawnObject(word);
+                input.value = '';
+                // 关键：保持焦点
+                input.focus();
+            } else {
+                input.style.borderColor = 'red';
+                setTimeout(() => input.style.borderColor = '#B2EBF2', 500);
+            }
+        }
+
+        document.getElementById('input-word').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') handleSpawn();
+        });
+
+        function spawnObject(word) {
+            if (!player) return;
+            const data = WORD_DB[word];
+            const x = player.position.x + 50;
+            const y = player.position.y - 120;
+            let body;
+            const common = { label: 'Object', render: { opacity: 0 } };
+
+            if (data.t === 'heavy') {
+                body = Bodies.rectangle(x, y, 70, 70, { ...common, density: 0.01, friction: 0.5 }); body.size = 60;
+            } else if (data.t === 'light' || data.t === 'float_slow') {
+                body = Bodies.circle(x, y, 35, { ...common, density: 0.0005, frictionAir: 0.02, restitution: 0.5 }); body.isFloatSlow = true; body.size = 50;
+            } else if (data.t === 'float') {
+                body = Bodies.circle(x, y, 35, { ...common, density: 0.0001, frictionAir: 0.08 }); body.isFloating = true; body.size = 50;
+            } else if (data.t === 'long') {
+                body = Bodies.rectangle(x, y, 140, 25, { ...common, density: 0.002, friction: 0.3 }); body.size = 60;
+            } else if (data.t === 'bouncy') {
+                body = Bodies.circle(x, y, 30, { ...common, restitution: 0.95 }); body.size = 45;
+            } else {
+                body = Bodies.circle(x, y, 30, { ...common, density: 0.001, restitution: 0.2 }); body.size = 45;
+            }
+            body.emoji = data.e; body.text = word;
+            Composite.add(world, body); gameObjects.push(body);
+        }
+
+        // ==========================================
+        // 4. UI 交互 (侧边栏)
+        // ==========================================
+        function toggleSidebar(forceState) {
+            const sidebar = document.getElementById('sidebar');
+            const mask = document.getElementById('overlay-mask');
+            const isActive = sidebar.classList.contains('active');
+            
+            if (forceState === false || isActive) {
+                sidebar.classList.remove('active');
+                mask.style.display = 'none';
+            } else {
+                sidebar.classList.add('active');
+                mask.style.display = 'block';
+            }
+        }
+
+        // 初始化侧边栏单词
+        function initDictionary() {
+            const container = document.getElementById('dictionary-content');
+            const categories = {};
+            for (let word in WORD_DB) {
+                const cat = WORD_DB[word].c || 'Other';
+                if (!categories[cat]) categories[cat] = [];
+                categories[cat].push(word);
+            }
+            for (let cat in categories) {
+                const group = document.createElement('div');
+                group.className = 'category-group';
+                const title = document.createElement('h3'); title.innerText = cat;
+                group.appendChild(title);
+                categories[cat].sort().forEach(word => {
+                    const tag = document.createElement('span');
+                    tag.className = 'word-tag';
+                    tag.innerText = `${word} ${WORD_DB[word].e}`;
+                    tag.onclick = () => {
+                        document.getElementById('input-word').value = word;
+                        toggleSidebar(false); // 选词后自动关闭侧边栏
+                        // 选词后不自动生成，让学生点击按钮或回车，增强记忆
+                        // 也可以直接 handleSpawn() 如果想要更快的节奏
+                        document.getElementById('input-word').focus(); 
+                    };
+                    group.appendChild(tag);
+                });
+                container.appendChild(group);
+            }
+        }
+
+        // ==========================================
+        // 5. 控制与循环
+        // ==========================================
+        const keys = { Left: false, Right: false, Up: false };
+        function bindTouch(id, key) {
+            const btn = document.getElementById(id);
+            btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[key] = true; btn.style.background = 'rgba(255,255,255,0.8)'; });
+            btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; btn.style.background = 'rgba(255,255,255,0.4)'; });
+            btn.addEventListener('mousedown', (e) => { keys[key] = true; });
+            btn.addEventListener('mouseup', (e) => { keys[key] = false; });
+        }
+        bindTouch('btn-left', 'Left'); bindTouch('btn-right', 'Right'); bindTouch('btn-jump', 'Up');
+
+        window.addEventListener('keydown', e => {
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.Left = true;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.Right = true;
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.Up = true;
+        });
+        window.addEventListener('keyup', e => {
+            if (e.code === 'KeyA' || e.code === 'ArrowLeft') keys.Left = false;
+            if (e.code === 'KeyD' || e.code === 'ArrowRight') keys.Right = false;
+            if (e.code === 'KeyW' || e.code === 'ArrowUp') keys.Up = false;
+        });
+
+        Events.on(engine, 'beforeUpdate', () => {
+            if (!player) return;
+            if (keys.Left) Body.setVelocity(player, { x: -5, y: player.velocity.y });
+            if (keys.Right) Body.setVelocity(player, { x: 5, y: player.velocity.y });
+            if (keys.Up && Math.abs(player.velocity.y) < 0.5) Body.setVelocity(player, { x: player.velocity.x, y: -12 });
+
+            gameObjects.forEach(obj => {
+                if (obj.isFloating) Body.applyForce(obj, obj.position, { x: 0, y: -obj.mass * 0.0012 });
+                if (obj.isFloatSlow) Body.applyForce(obj, obj.position, { x: 0, y: -obj.mass * 0.0006 });
+            });
+
+            if (star && Vector.magnitude(Vector.sub(player.position, star.position)) < 50) {
+                document.getElementById('win-msg').style.display = 'block';
+            }
+        });
+
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            gameObjects.forEach(obj => {
+                ctx.save(); ctx.translate(obj.position.x, obj.position.y); ctx.rotate(obj.angle);
+                ctx.font = `${obj.size}px Arial`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(obj.emoji, 0, 0);
+                ctx.rotate(-obj.angle); ctx.fillStyle = '#455A64'; ctx.font = 'bold 16px Comic Sans MS';
+                ctx.shadowColor = "white"; ctx.shadowBlur = 4;
+                ctx.fillText(obj.text, 0, -obj.size/1.5 - 5);
+                ctx.restore();
+            });
+            if (player) {
+                ctx.save(); ctx.translate(player.position.x, player.position.y);
+                ctx.font = "60px Arial"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                if(keys.Left) ctx.scale(-1, 1);
+                ctx.fillText("🧑", 0, 0); ctx.restore();
+            }
+            if (star) {
+                ctx.save(); ctx.translate(star.position.x, star.position.y);
+                ctx.font = "50px Arial"; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText("⭐", 0, 0); ctx.restore();
+            }
+        });
+
+        function resetGame() { initLevel(); }
+
+        window.onload = function() {
+            initDictionary();
+            initLevel();
+            Render.run(render);
+            const runner = Runner.create();
+            Runner.run(runner, engine);
+        };
+        window.addEventListener('resize', () => {
+            width = container.clientWidth; height = container.clientHeight;
+            render.canvas.width = width; render.canvas.height = height;
+            resetGame();
+        });
+    </script>
+</body>
+</html>

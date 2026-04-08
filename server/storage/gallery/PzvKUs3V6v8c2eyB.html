@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>种子萌发的条件</title>
+    <style>
+        :root {
+            --bg-sky: #87CEEB;
+            --glass-border: #fff;
+            --glass-surface: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.1) 100%);
+            --soil-dry: #795548;
+            --soil-wet: #4E342E;
+            --cotton-color: #ECEFF1;
+            --panel-bg: rgba(255, 248, 225, 0.95);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f0f4c3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* 1. 顶部标题 */
+        .header {
+            width: 100%;
+            height: 60px;
+            background: #43a047;
+            color: white;
+            display: flex;
+            align-items: center;
+            padding-left: 40px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 2. 主舞台 */
+        .stage {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            margin-top: 20px;
+            background: linear-gradient(to bottom, #81D4FA 0%, #81D4FA 50%, #8BC34A 50%, #689F38 100%);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }
+
+        /* === 优化后的温室 (3D 拟真风格) === */
+        .greenhouse-container {
+            position: absolute;
+            left: 120px;
+            bottom: 60px;
+            width: 550px;
+            height: 400px;
+            /* 透视容器 */
+            perspective: 1200px;
+            transform-style: preserve-3d;
+        }
+
+        /* 温室主体 */
+        .gh-structure {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transform: rotateX(5deg); /* 微微俯视 */
+        }
+
+        /* 地基 */
+        .gh-base {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            height: 30px;
+            background: #5D4037;
+            border-bottom: 5px solid #3E2723;
+            border-radius: 4px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            z-index: 1;
+        }
+
+        /* 玻璃房框架 */
+        .gh-frame-front {
+            position: absolute;
+            bottom: 40px;
+            left: 20px;
+            width: 510px;
+            height: 280px;
+            border: 6px solid var(--glass-border);
+            background: var(--glass-surface);
+            z-index: 10; /* 最前面 */
+            pointer-events: none; /* 让点击穿透到内部 */
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.5);
+        }
+        /* 玻璃反光条 */
+        .gh-frame-front::after {
+            content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.4) 45%, transparent 50%);
+        }
+
+        /* 屋顶 (三角形结构) */
+        .gh-roof {
+            position: absolute;
+            top: 10px; left: 10px;
+            width: 530px; height: 80px;
+            z-index: 9;
+            display: flex;
+        }
+        .gh-roof-panel {
+            flex: 1;
+            background: rgba(255,255,255,0.3);
+            border: 4px solid #fff;
+            border-bottom: none;
+            transform-origin: bottom;
+        }
+        .gh-roof-left { transform: skewX(25deg); border-right: none; }
+        .gh-roof-right { transform: skewX(-25deg); border-left: none; }
+
+        /* 内部后墙 (背景) */
+        .gh-back-wall {
+            position: absolute;
+            bottom: 40px; left: 30px;
+            width: 490px; height: 280px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 0;
+        }
+
+        /* 土壤层/种植床 */
+        .soil-layer {
+            position: absolute;
+            bottom: 45px; left: 30px;
+            width: 490px; height: 25px;
+            background: var(--soil-dry);
+            border-radius: 4px;
+            z-index: 2;
+            transition: background-color 1s;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .soil-layer.wet { background: var(--soil-wet); }
+        .soil-layer.cotton { background: var(--cotton-color); }
+
+        /* 种子容器 */
+        .seed-bed {
+            position: absolute;
+            bottom: 70px; left: 40px; right: 40px;
+            height: 200px;
+            display: flex; flex-wrap: wrap; align-content: flex-end; justify-content: center;
+            gap: 5px; z-index: 5;
+        }
+        /* 种子与芽 (样式保持) */
+        .seed {
+            width: 16px; height: 12px;
+            background: #795548;
+            border-radius: 50% 50% 40% 40%;
+            position: relative; transition: all 0.5s;
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        .sprout {
+            position: absolute; top: -15px; left: 4px; width: 0; height: 0;
+            border-left: 4px solid transparent; border-right: 4px solid transparent;
+            border-bottom: 15px solid #76FF03;
+            transform: scale(0); transform-origin: bottom center;
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            filter: drop-shadow(0 2px 1px rgba(0,0,0,0.2));
+        }
+        .seed.germinated .sprout { transform: scale(1); }
+        .seed-bed.count-1 .seed { transform: scale(3); margin-bottom: 30px; }
+        .seed-bed.count-10 .seed { transform: scale(1.5); margin: 5px; }
+        .seed-bed.count-100 .seed { transform: scale(0.8); margin: 1px; }
+
+        /* === 优化的水泵与喷淋系统 === */
+        
+        /* 喷淋管 (在温室顶部) */
+        .sprinkler-pipe {
+            position: absolute; top: 95px; left: 30px;
+            width: 490px; height: 6px;
+            background: #555; border-radius: 3px;
+            z-index: 8; display: flex; justify-content: space-around;
+        }
+        .sprinkler-head {
+            width: 8px; height: 6px; background: #333; margin-top: 2px;
+        }
+        
+        /* 喷水动画容器 */
+        .rain-container {
+            position: absolute; top: 100px; left: 30px;
+            width: 490px; height: 230px;
+            overflow: hidden; pointer-events: none; z-index: 7;
+            display: none;
+        }
+        /* 雨滴粒子 */
+        .rain-drop {
+            position: absolute;
+            width: 2px; height: 10px;
+            background: #29B6F6;
+            opacity: 0.8;
+            animation: rain-fall 0.6s linear infinite;
+        }
+        @keyframes rain-fall {
+            0% { transform: translateY(-10px); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(230px); opacity: 0; }
+        }
+        /* 激活喷淋 */
+        .rain-container.active { display: block; }
+
+        /* 实体水泵 */
+        .pump-station {
+            position: absolute; right: 140px; bottom: 40px;
+            width: 80px; height: 60px; cursor: pointer; z-index: 20;
+        }
+        .pump-body {
+            width: 60px; height: 50px; background: #455A64;
+            border-radius: 5px; border: 2px solid #263238;
+            position: absolute; bottom: 0; left: 10px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        }
+        .pump-wheel {
+            width: 30px; height: 30px; background: #90A4AE;
+            border-radius: 50%; border: 4px solid #37474F;
+            position: absolute; top: 10px; left: 25px;
+        }
+        .pump-wheel::after {
+            content:''; position:absolute; top:50%; left:0; width:100%; height:4px; background:#37474F; transform:translateY(-50%);
+        }
+        .pump-pipe-connect {
+            position: absolute; top: 20px; left: -40px;
+            width: 50px; height: 10px; background: #78909C; z-index: -1; transform: rotate(10deg);
+        }
+        /* 水泵开启状态 */
+        .pump-station.active .pump-wheel { animation: spin 0.5s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .pump-light {
+            position: absolute; top: 5px; right: 5px; width: 6px; height: 6px; background: #333; border-radius: 50%;
+        }
+        .pump-station.active .pump-light { background: #00E676; box-shadow: 0 0 5px #00E676; }
+
+        /* === 其他控制组件 === */
+
+        /* 灯光 */
+        .lamp-cord { position: absolute; top: 0; left: 250px; width: 2px; height: 100px; background: #333; z-index: 8; }
+        .lamp-bulb {
+            position: absolute; top: 100px; left: 235px; width: 30px; height: 20px;
+            background: #424242; border-radius: 10px 10px 0 0; z-index: 8; cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .lamp-cone {
+             position: absolute; top: 120px; left: 225px; width: 50px; height: 15px;
+             background: #616161; border-radius: 0 0 25px 25px; z-index: 8; pointer-events: none;
+        }
+        .lamp-light-beam {
+            position: absolute; top: 135px; left: 150px; width: 200px; height: 250px;
+            background: radial-gradient(ellipse at top, rgba(255,235,59,0.5), transparent 70%);
+            display: none; z-index: 7; pointer-events: none; mix-blend-mode: overlay;
+        }
+        .lamp-bulb.on .lamp-cone { background: #FFCA28; }
+        .lamp-bulb.on ~ .lamp-light-beam { display: block; }
+
+        /* UI 面板 */
+        .seed-selector {
+            position: absolute; left: 20px; top: 150px;
+            background: white; padding: 10px; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .seed-btn {
+            display: block; width: 60px; margin: 5px 0; padding: 5px;
+            background: #eee; border: 1px solid #ddd; cursor: pointer; text-align: center; font-size: 12px;
+        }
+        .seed-btn.active { background: #8BC34A; color: white; border-color: #689F38; }
+
+        .thermometer-container {
+            position: absolute; right: 280px; top: 150px;
+            height: 250px; width: 40px; background: rgba(255,255,255,0.8);
+            border-radius: 20px; display: flex; justify-content: center;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+        .thermometer-bar { position: relative; width: 10px; height: 200px; background: #ddd; margin-top: 25px; border-radius: 5px; }
+        .thermometer-fill {
+            position: absolute; bottom: 0; width: 100%; height: 50%;
+            background: linear-gradient(to top, #2196F3, #F44336);
+            border-radius: 5px; transition: height 0.2s;
+        }
+        .temp-slider { position: absolute; top: 0; left: -15px; width: 40px; height: 200px; opacity: 0; cursor: ns-resize; }
+        .temp-display { position: absolute; top: -30px; width: 60px; text-align: center; font-weight: bold; color: #333; background: white; padding: 2px; border-radius: 4px; }
+
+        .dashboard {
+            position: absolute; right: 20px; top: 20px;
+            width: 180px; background: var(--panel-bg);
+            border: 4px solid #8D6E63; border-radius: 8px; padding: 15px; font-size: 14px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+        }
+        .dash-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px dashed #ccc; padding-bottom: 4px; }
+        .dash-val { font-weight: bold; color: #d84315; }
+
+        /* 播放按钮 */
+        .play-btn {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 80px; height: 80px; background: rgba(0,0,0,0.5);
+            border: 4px solid white; border-radius: 50%;
+            cursor: pointer; display: flex; justify-content: center; align-items: center;
+            z-index: 100; transition: all 0.2s;
+        }
+        .play-btn:hover { background: rgba(0,0,0,0.7); transform: translate(-50%, -50%) scale(1.1); }
+        .play-btn svg { fill: white; width: 40px; height: 40px; margin-left: 5px; }
+        .play-btn.hidden { display: none; }
+
+        .soil-toggle { position: absolute; left: 20px; bottom: 20px; background: #fff; padding: 8px 15px; border-radius: 20px; font-size: 14px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 20; font-weight: bold; color: #5D4037;}
+        .soil-toggle:hover { background: #f5f5f5; }
+        .air-toggle { position: absolute; top: 100px; left: 20px; background: rgba(255,255,255,0.9); padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; z-index: 20; border:1px solid #ccc;}
+
+        /* 指南 */
+        .guide {
+            width: 900px; margin-top: 20px; background: white; padding: 20px; border-radius: 10px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        }
+        .guide h3 { margin-top: 0; color: #2E7D32; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .guide p { font-size: 14px; line-height: 1.6; color: #555; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        🌱 种子萌发的条件
+    </div>
+
+    <div class="stage">
+        
+        <!-- 3D温室容器 -->
+        <div class="greenhouse-container">
+            <div class="gh-structure">
+                <!-- 灯光 -->
+                <div class="lamp-cord"></div>
+                <div class="lamp-bulb" id="lampBulb" onclick="toggleLight()" title="点击开关灯">
+                    <div class="lamp-cone"></div>
+                </div>
+                <div class="lamp-light-beam"></div>
+
+                <!-- 喷淋系统 -->
+                <div class="sprinkler-pipe">
+                    <div class="sprinkler-head"></div><div class="sprinkler-head"></div>
+                    <div class="sprinkler-head"></div><div class="sprinkler-head"></div>
+                </div>
+                <div class="rain-container" id="rainContainer">
+                    <!-- 雨滴由JS生成 -->
+                </div>
+
+                <!-- 建筑结构 -->
+                <div class="gh-roof">
+                    <div class="gh-roof-panel gh-roof-left"></div>
+                    <div class="gh-roof-panel gh-roof-right"></div>
+                </div>
+                <div class="gh-back-wall"></div>
+                <div class="gh-frame-front"></div>
+                
+                <!-- 土壤/基质 -->
+                <div class="soil-layer" id="soilLayer"></div>
+                <div class="gh-base"></div>
+                
+                <!-- 种子区域 -->
+                <div class="seed-bed count-10" id="seedBed"></div>
+            </div>
+        </div>
+
+        <!-- 水泵控制 (优化) -->
+        <div class="pump-station" id="waterPump" onclick="toggleWater()" title="点击启动水泵">
+            <div class="pump-pipe-connect"></div>
+            <div class="pump-body">
+                <div class="pump-light"></div>
+                <div class="pump-wheel"></div>
+            </div>
+            <div style="position:absolute; bottom:-20px; width:100%; text-align:center; color:white; font-size:12px; text-shadow:0 1px 2px black;">供水系统</div>
+        </div>
+
+        <!-- 左侧控制 -->
+        <div class="seed-selector">
+            <div style="font-size:12px; margin-bottom:5px; font-weight:bold; color:#555;">种子数量</div>
+            <div class="seed-btn" onclick="setSeedCount(1)">1 粒</div>
+            <div class="seed-btn active" onclick="setSeedCount(10)">10 粒</div>
+            <div class="seed-btn" onclick="setSeedCount(100)">100 粒</div>
+        </div>
+
+        <div class="air-toggle" onclick="toggleAir()">空气状态: <span id="airText" style="color:blue;">正常</span></div>
+        <div class="soil-toggle" onclick="toggleSoil()">🔄 切换基质: <span id="soilText">土壤</span></div>
+
+        <!-- 右侧控制 -->
+        <div class="thermometer-container">
+            <div class="temp-display"><span id="tempVal">22</span>°C</div>
+            <div class="thermometer-bar">
+                <div class="thermometer-fill" id="tempFill" style="height: 60%;"></div>
+            </div>
+            <input type="range" class="temp-slider" min="-5" max="45" value="22" oninput="updateTemp(this.value)">
+        </div>
+        <div style="position:absolute; right:270px; top:410px; color:#fff; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,0.5);">温度调节</div>
+
+        <!-- 数据面板 -->
+        <div class="dashboard">
+            <div class="dash-row"><span>空气</span><span class="dash-val" id="dashAir">有</span></div>
+            <div class="dash-row"><span>光照</span><span class="dash-val" id="dashLight">无</span></div>
+            <div class="dash-row"><span>水分</span><span class="dash-val" id="dashWater">无</span></div>
+            <div class="dash-row"><span>土壤/基质</span><span class="dash-val" id="dashSoil">土壤</span></div>
+            <div class="dash-row"><span>温度</span><span class="dash-val"><span id="dashTemp">22</span>°C</span></div>
+            <div style="margin-top:10px; text-align:center; background:#3E2723; color:white; padding:5px; border-radius:4px;">
+                发芽种子数: <span id="resultCount">0</span>
+            </div>
+        </div>
+
+        <!-- 播放按钮 -->
+        <div class="play-btn" id="playBtn" onclick="startExperiment()">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+
+    </div>
+
+    <div class="guide">
+        <h3>📖 使用指南</h3>
+        <p>本实验旨在探究种子萌发所需的外部条件。请调整以下参数进行观察：</p>
+        <p>
+            1. <strong>供水系统</strong>：点击右下角的“水泵”图标，温室顶部会喷水，土壤变深色。<br>
+            2. <strong>温度调节</strong>：拖动右侧温度计，寻找最适合发芽的温度区间。<br>
+            3. <strong>光照与基质</strong>：点击吊灯开关灯，或点击左下角切换土壤/棉花，验证它们是否为必要条件。<br>
+            4. <strong>开始实验</strong>：设置完毕后，点击中间的播放按钮，观察种子是否发芽。
+        </p>
+    </div>
+
+    <script>
+        const state = {
+            seeds: 10, temp: 22, hasWater: false, hasLight: false, hasAir: true, hasSoil: true, isRunning: false
+        };
+
+        window.onload = () => {
+            renderSeeds();
+            createRainDrops(); // 初始化雨滴DOM
+        };
+
+        // 生成雨滴DOM，避免运行时频繁操作DOM
+        function createRainDrops() {
+            const container = document.getElementById('rainContainer');
+            for(let i=0; i<30; i++) {
+                const drop = document.createElement('div');
+                drop.className = 'rain-drop';
+                drop.style.left = Math.random() * 100 + '%';
+                drop.style.animationDelay = Math.random() * 0.5 + 's';
+                drop.style.animationDuration = (0.4 + Math.random() * 0.3) + 's';
+                container.appendChild(drop);
+            }
+        }
+
+        function renderSeeds() {
+            const bed = document.getElementById('seedBed');
+            bed.innerHTML = '';
+            bed.className = `seed-bed count-${state.seeds}`;
+            for(let i=0; i<state.seeds; i++) {
+                const seed = document.createElement('div');
+                seed.className = 'seed';
+                seed.innerHTML = '<div class="sprout"></div>';
+                if(state.seeds > 1) seed.style.transform += ` rotate(${Math.random()*20 - 10}deg)`;
+                bed.appendChild(seed);
+            }
+            document.getElementById('resultCount').innerText = '0';
+        }
+
+        function resetIfRunning() {
+            if(state.isRunning) {
+                state.isRunning = false;
+                document.getElementById('playBtn').classList.remove('hidden');
+                document.querySelectorAll('.seed').forEach(s => {
+                    s.classList.remove('germinated');
+                    s.style.backgroundColor = '#795548';
+                });
+                document.getElementById('resultCount').innerText = '0';
+            }
+        }
+
+        // 交互函数
+        function updateTemp(val) {
+            resetIfRunning();
+            state.temp = parseInt(val);
+            document.getElementById('tempVal').innerText = state.temp;
+            document.getElementById('dashTemp').innerText = state.temp;
+            document.getElementById('tempFill').style.height = ((state.temp + 5) / 50 * 100) + '%';
+        }
+
+        function toggleWater() {
+            resetIfRunning();
+            state.hasWater = !state.hasWater;
+            document.getElementById('dashWater').innerText = state.hasWater ? '有' : '无';
+            
+            const pump = document.getElementById('waterPump');
+            const rain = document.getElementById('rainContainer');
+            const soil = document.getElementById('soilLayer');
+
+            if(state.hasWater) {
+                pump.classList.add('active');
+                rain.classList.add('active');
+                soil.classList.add('wet');
+            } else {
+                pump.classList.remove('active');
+                rain.classList.remove('active');
+                soil.classList.remove('wet');
+            }
+        }
+
+        function toggleLight() {
+            resetIfRunning();
+            state.hasLight = !state.hasLight;
+            document.getElementById('dashLight').innerText = state.hasLight ? '有' : '无';
+            const bulb = document.getElementById('lampBulb');
+            if(state.hasLight) bulb.classList.add('on'); else bulb.classList.remove('on');
+        }
+
+        function toggleAir() {
+            resetIfRunning();
+            state.hasAir = !state.hasAir;
+            document.getElementById('airText').innerText = state.hasAir ? '正常' : '真空';
+            document.getElementById('airText').style.color = state.hasAir ? 'blue' : 'red';
+            document.getElementById('dashAir').innerText = state.hasAir ? '有' : '无';
+        }
+
+        function toggleSoil() {
+            resetIfRunning();
+            state.hasSoil = !state.hasSoil;
+            const txt = state.hasSoil ? '土壤' : '棉花';
+            document.getElementById('soilText').innerText = txt;
+            document.getElementById('dashSoil').innerText = txt;
+            
+            const layer = document.getElementById('soilLayer');
+            if(state.hasSoil) layer.className = 'soil-layer' + (state.hasWater ? ' wet' : '');
+            else layer.className = 'soil-layer cotton' + (state.hasWater ? ' wet' : '');
+        }
+
+        function setSeedCount(count) {
+            resetIfRunning();
+            state.seeds = count;
+            document.querySelectorAll('.seed-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderSeeds();
+        }
+
+        function startExperiment() {
+            if(state.isRunning) return;
+            state.isRunning = true;
+            document.getElementById('playBtn').classList.add('hidden');
+
+            let germinationRate = 0;
+            // 发芽逻辑：需要水 + 空气，温度在适宜范围内
+            if (state.hasWater && state.hasAir) {
+                if (state.temp < 0 || state.temp > 40) germinationRate = 0;
+                else if (state.temp >= 20 && state.temp <= 25) germinationRate = 0.95;
+                else if (state.temp >= 10 && state.temp < 20) germinationRate = 0.6 + (state.temp - 10) * 0.03;
+                else if (state.temp > 25 && state.temp <= 35) germinationRate = 0.9 - (state.temp - 25) * 0.04;
+                else germinationRate = 0.1;
+            } else {
+                germinationRate = 0;
+            }
+
+            const seedsElements = document.querySelectorAll('.seed');
+            let germinatedCount = 0;
+
+            seedsElements.forEach((seed) => {
+                if (Math.random() < germinationRate) {
+                    germinatedCount++;
+                    setTimeout(() => seed.classList.add('germinated'), 300 + Math.random() * 1000);
+                } else {
+                    setTimeout(() => seed.style.backgroundColor = '#3E2723', 1000);
+                }
+            });
+
+            setTimeout(() => {
+                const resultEl = document.getElementById('resultCount');
+                let current = 0;
+                if(germinatedCount === 0) resultEl.innerText = 0;
+                else {
+                    const interval = setInterval(() => {
+                        if(current < germinatedCount) {
+                            current++; resultEl.innerText = current;
+                        } else {
+                            clearInterval(interval);
+                        }
+                    }, 20);
+                }
+            }, 500);
+        }
+    </script>
+</body>
+</html>

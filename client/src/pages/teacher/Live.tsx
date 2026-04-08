@@ -1,3 +1,4 @@
+import { useState, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
 import { useAppStore } from '../../stores/app-store'
@@ -14,6 +15,7 @@ import {
   SingleQuestionDuelModal,
   HistoryList,
 } from '../../features/teacher-live'
+import type { DanmuConfig } from '../../features/danmu'
 
 export default function TeacherLive() {
   useAppStore()
@@ -37,7 +39,30 @@ export default function TeacherLive() {
     pendingShareRequests, setPendingShareRequests, isWsReady, ws, handleClassChange, handleEndSession,
     handleEndTaskGroup, onPublish, onStartChallenge, setClassPresence, loadClassPresence,
     formatHistoryItemTime, compareHistoryItems, getHistoryItemKey, onEnterActiveTask, onEndActiveTask,
+    isHistoryItemViewable,
   } = useTeacherLivePage()
+
+  // Danmu state
+  const [danmuConfig, setDanmuConfig] = useState<DanmuConfig>({
+    enabled: false,
+    showStudent: true,
+    showSource: false,
+    speed: 'medium',
+    density: 'medium',
+    area: 'bottom',
+  })
+
+  const handleDanmuConfigChange = useCallback((config: DanmuConfig) => {
+    setDanmuConfig(config)
+    ws.sendDanmuConfig(config)
+  }, [ws])
+
+  // Sync danmu_config from server (roomInfo) to local state
+  useEffect(() => {
+    if (roomInfo?.danmu_config) {
+      setDanmuConfig(roomInfo.danmu_config as DanmuConfig)
+    }
+  }, [roomInfo?.danmu_config])
 
   // Loading / Error states
   if (loading) return (<Layout sidebar={<TeacherSidebar activePage="live" />}><div className="surface-card p-12 text-center"><p style={{ color: 'var(--muted)' }}>{t('common.loading')}</p></div></Layout>)
@@ -50,10 +75,17 @@ export default function TeacherLive() {
         classroomStudentCount={classPresence?.classroom_student_count ?? roomInfo?.student_count ?? 0}
         onlineStudentCount={classPresence?.online_student_count ?? 0} wsStatus={ws.status}
         onRefresh={() => { ws.getRoomInfo(); loadClassPresence(currentClassId).then((p) => p && setClassPresence(p)) }} t={t}
-        onSwitchToWhiteboard={() => navigate('/teacher/whiteboard')} />
+        onSwitchToWhiteboard={() => navigate('/teacher/whiteboard')}
+        danmuEnabled={danmuConfig.enabled}
+        onToggleDanmu={() => handleDanmuConfigChange({ ...danmuConfig, enabled: !danmuConfig.enabled })} />
 
-      <StudentList onlineStudents={classPresence?.online_students ?? []} classroomStudents={classPresence?.classroom_students ?? []}
-        onEndSession={() => { if (window.confirm(t('teacherLive.endClassConfirm'))) handleEndSession() }} t={t} tWithParams={tWithParams} />
+      <StudentList classroomStudents={classPresence?.classroom_students ?? []}
+        onEndSession={() => { if (window.confirm(t('teacherLive.endClassConfirm'))) handleEndSession() }} t={t} tWithParams={tWithParams}
+        danmuConfig={danmuConfig}
+        onDanmuToggle={(enabled) => handleDanmuConfigChange({ ...danmuConfig, enabled })}
+        onDanmuSpeedChange={(speed) => handleDanmuConfigChange({ ...danmuConfig, speed: speed as any })}
+        onDanmuAreaChange={(area) => handleDanmuConfigChange({ ...danmuConfig, area: area as any })}
+        onDanmuClear={() => ws.clearDanmu()} />
 
       <ShareRequestsPanel shareRequests={pendingShareRequests}
         onApprove={(shareId, comment) => { ws.approveShare(shareId, comment); setPendingShareRequests((prev) => prev.filter((r) => r.share_id !== shareId)) }}
@@ -102,8 +134,9 @@ export default function TeacherLive() {
             {showHistoryPreviewExpanded && (
               <>
                 <div className="space-y-3">
-                  {taskHistory
+                  {[...taskHistory]
                     .filter(item => item.status === 'ended')
+                    .sort(compareHistoryItems)
                     .slice(0, 5)
                     .map((item, index) => (
                     <div
@@ -149,12 +182,14 @@ export default function TeacherLive() {
                           </span>
                           <button
                             className="ghost-button py-1.5 px-3 text-sm"
+                            disabled={!isHistoryItemViewable(item)}
                             onClick={() => { setSelectedHistoryItem(item); setShowHistoryAnalysis(true) }}
                           >
                             {t('teacherLive.viewAnalysis')}
                           </button>
                           <button
                             className="solid-button py-1.5 px-3 text-sm"
+                            disabled={!isHistoryItemViewable(item)}
                             onClick={() => { setSelectedHistoryItem(item); setShowDetailView(true) }}
                           >
                             {t('teacherLive.viewDetails')}
@@ -192,6 +227,7 @@ export default function TeacherLive() {
           formatHistoryItemTime={formatHistoryItemTime}
           compareHistoryItems={compareHistoryItems}
           getHistoryItemKey={getHistoryItemKey}
+          isHistoryItemViewable={isHistoryItemViewable}
           t={t}
           tWithParams={tWithParams}
         />
@@ -215,8 +251,8 @@ export default function TeacherLive() {
         onToggleParticipant={handleToggleSingleQuestionParticipant} onConfirm={onConfirmSingleQuestionDuel} t={t} tWithParams={tWithParams} />
 
       {showChallengeBoard && currentChallenge && (
-        <div className="fixed inset-0" style={{ zIndex: 140, background: 'radial-gradient(circle at top, rgba(14,165,233,0.22), transparent 40%), linear-gradient(160deg, #08111f 0%, #10203a 38%, #08111f 100%)', color: '#f8fafc' }}>
-          <div className="h-full overflow-auto px-8 py-8"><div className="mx-auto max-w-7xl">
+        <div className="fixed inset-0" style={{ zIndex: 1300, background: 'radial-gradient(circle at top, rgba(14,165,233,0.22), transparent 40%), linear-gradient(160deg, #08111f 0%, #10203a 38%, #08111f 100%)', color: '#f8fafc' }}>
+          <div className="h-full overflow-auto px-8 pt-20 pb-8 md:pt-8"><div className="mx-auto max-w-7xl">
             <div className="flex items-start justify-between gap-6 mb-8">
               <div><p className="text-xs uppercase tracking-[0.32em] mb-3" style={{ color: 'rgba(255,255,255,0.46)' }}>{t('challenge.liveBoardTitle')}</p><h2 className="text-5xl font-black leading-tight" style={{ letterSpacing: '-0.04em' }}>{currentChallenge.title}</h2></div>
               <div className="flex items-center gap-3"><button className="ghost-button py-2 px-4 text-sm" onClick={handleCloseChallengeBoard}>{t('challenge.closeBoard')}</button></div>

@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用拼图表达整式的运算 - 交互教具</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Times New Roman", serif;
+            background-color: #2c2c2c;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            user-select: none; /* 防止拖拽时选中文字 */
+        }
+
+        /* 左侧画板区域 */
+        #workspace {
+            flex: 1;
+            position: relative;
+            background-color: #1e1e1e;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* SVG 样式 */
+        svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grid-line {
+            stroke: #333;
+            stroke-width: 1;
+        }
+
+        /* 图形样式 */
+        .shape {
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 2px;
+            cursor: grab;
+            transition: fill-opacity 0.2s;
+        }
+        .shape:hover {
+            stroke: #fff;
+            stroke-width: 3px;
+        }
+        .shape:active {
+            cursor: grabbing;
+        }
+
+        /* 标签文字 */
+        .label-text {
+            font-style: italic;
+            font-size: 18px;
+            fill: #fff;
+            pointer-events: none; /* 文字不阻挡鼠标事件 */
+            text-anchor: middle;
+            dominant-baseline: middle;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        
+        .side-label {
+            font-size: 14px;
+            fill: #aaa;
+            pointer-events: none;
+            text-anchor: middle;
+        }
+
+        /* 右侧控制栏 */
+        #sidebar {
+            width: 280px;
+            background-color: #252525;
+            border-left: 1px solid #444;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+            z-index: 10;
+        }
+
+        .header {
+            font-family: "Microsoft YaHei", sans-serif;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        .header h2 { font-size: 18px; margin: 0; color: #ddd; }
+        .header p { font-size: 12px; color: #888; margin: 5px 0 0 0; }
+
+        /* 形状选择区 */
+        .palette {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-content: flex-start;
+            padding-top: 10px;
+        }
+
+        .palette-item {
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .palette-item:hover {
+            transform: scale(1.05);
+        }
+        /* 用CSS画简单的预览图 */
+        .preview-shape {
+            border: 2px solid rgba(255,255,255,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-style: italic;
+            color: rgba(255,255,255,0.9);
+            font-size: 14px;
+        }
+
+        /* 底部控制区 */
+        .controls {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #444;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 10px;
+            transition: background 0.3s;
+        }
+        
+        .btn-clear {
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .btn-clear:hover { background-color: #fff; }
+
+        /* 开关样式 */
+        .toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ccc;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #555;
+            transition: .4s;
+            border-radius: 20px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider { background-color: #2196F3; }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* 提示文字 */
+        .hint {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.3);
+            font-family: "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="workspace">
+        <div class="hint">双击图形旋转 | 拖拽移动 | 自动吸附</div>
+        <svg id="mainSvg">
+            <!-- 定义网格图案 -->
+            <defs>
+                <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#2a2a2a" stroke-width="1"/>
+                </pattern>
+            </defs>
+            <!-- 背景网格 -->
+            <rect width="100%" height="100%" fill="url(#grid)" />
+            
+            <!-- 动态添加的形状将放在这里 -->
+            <g id="shapesLayer"></g>
+        </svg>
+    </div>
+
+    <div id="sidebar">
+        <div class="header">
+            <h2>图形选择区</h2>
+            <p>点击添加图形进行拼图</p>
+        </div>
+
+        <div class="palette" id="palette">
+            <!-- JavaScript 会自动填充这里 -->
+        </div>
+
+        <div class="controls">
+            <div class="toggle-container">
+                <span>显示面积 (Area)</span>
+                <label class="switch">
+                    <input type="checkbox" id="toggleArea" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="toggle-container">
+                <span>显示边长 (Side)</span>
+                <label class="switch">
+                    <input type="checkbox" id="toggleSide" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <br>
+            <button class="btn btn-clear" id="clearBtn">清空画布</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 配置与数据 ---
+        const UNIT = 20; // 网格单元像素大小
+        // 定义代数长度对应的像素单位 (a=5格, b=3格, c=2格)
+        const DIMENSIONS = {
+            'a': 5 * UNIT, // 100px
+            'b': 3 * UNIT, // 60px
+            'c': 2 * UNIT  // 40px
+        };
+
+        // 定义图形模板
+        const SHAPE_TYPES = [
+            { id: 'a_sq', w: 'a', h: 'a', color: 'rgba(255, 165, 0, 0.4)', border: '#ffa500', label: 'a²' }, // Orange
+            { id: 'b_sq', w: 'b', h: 'b', color: 'rgba(255, 99, 71, 0.4)', border: '#ff6347', label: 'b²' },  // Red
+            { id: 'ab',   w: 'a', h: 'b', color: 'rgba(147, 112, 219, 0.4)', border: '#9370db', label: 'ab' }, // Purple
+            { id: 'ac',   w: 'a', h: 'c', color: 'rgba(30, 144, 255, 0.4)', border: '#1e90ff', label: 'ac' },  // Blue
+            { id: 'bc',   w: 'b', h: 'c', color: 'rgba(60, 179, 113, 0.4)', border: '#3cb371', label: 'bc' },  // Green
+            { id: 'c_sq', w: 'c', h: 'c', color: 'rgba(100, 100, 100, 0.4)', border: '#aaa', label: 'c²' }    // Grey
+        ];
+
+        let shapes = []; // 存储画布上的所有形状
+        let shapeCounter = 0;
+        let isDragging = false;
+        let selectedShape = null;
+        let offset = { x: 0, y: 0 };
+
+        const svg = document.getElementById('mainSvg');
+        const shapesLayer = document.getElementById('shapesLayer');
+        const palette = document.getElementById('palette');
+        
+        // --- 2. 初始化侧边栏 ---
+        function initPalette() {
+            SHAPE_TYPES.forEach(type => {
+                const div = document.createElement('div');
+                div.className = 'palette-item';
+                
+                const wPx = DIMENSIONS[type.w] * 0.6; // 缩小一点用于预览
+                const hPx = DIMENSIONS[type.h] * 0.6;
+                
+                div.style.width = `${wPx}px`;
+                div.style.height = `${hPx}px`;
+                
+                const preview = document.createElement('div');
+                preview.className = 'preview-shape';
+                preview.style.width = '100%';
+                preview.style.height = '100%';
+                preview.style.backgroundColor = type.color;
+                preview.style.borderColor = type.border;
+                preview.innerText = type.label;
+                
+                div.appendChild(preview);
+                
+                // 点击侧边栏项，添加到画布中心
+                div.onclick = () => addShapeToCanvas(type);
+                
+                palette.appendChild(div);
+            });
+        }
+
+        // --- 3. 核心逻辑：添加与渲染 ---
+
+        function addShapeToCanvas(type) {
+            const id = `shape_${shapeCounter++}`;
+            const shapeData = {
+                id: id,
+                ...type,
+                x: 100, // 初始位置
+                y: 100,
+                currentW: DIMENSIONS[type.w],
+                currentH: DIMENSIONS[type.h],
+                dimW: type.w, // 记录是 'a' 还是 'b'
+                dimH: type.h
+            };
+            
+            shapes.push(shapeData);
+            renderShape(shapeData);
+        }
+
+        // 渲染单个图形到 SVG
+        function renderShape(data) {
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.setAttribute("id", data.id);
+            g.setAttribute("transform", `translate(${data.x}, ${data.y})`);
+            g.setAttribute("class", "shape-group");
+            g.style.cursor = "move";
+
+            // 1. 矩形主体
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("width", data.currentW);
+            rect.setAttribute("height", data.currentH);
+            rect.setAttribute("fill", data.color);
+            rect.setAttribute("stroke", data.border);
+            rect.setAttribute("class", "shape");
+            
+            // 2. 面积标签 (中心)
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", data.currentW / 2);
+            text.setAttribute("y", data.currentH / 2);
+            text.setAttribute("class", "label-text area-label");
+            // 构建标签：例如 a * b -> ab
+            // 简单的逻辑：如果是 a*a -> a², 否则组合字母
+            text.textContent = getAreaLabel(data.dimW, data.dimH);
+            
+            // 3. 边长标签 (Side Labels)
+            // 左侧边
+            const leftLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            leftLabel.setAttribute("x", -10);
+            leftLabel.setAttribute("y", data.currentH / 2);
+            leftLabel.setAttribute("class", "side-label");
+            leftLabel.textContent = data.dimH;
+
+            // 顶部边
+            const topLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            topLabel.setAttribute("x", data.currentW / 2);
+            topLabel.setAttribute("y", -8);
+            topLabel.setAttribute("class", "side-label");
+            topLabel.textContent = data.dimW;
+
+            g.appendChild(rect);
+            g.appendChild(text);
+            g.appendChild(leftLabel);
+            g.appendChild(topLabel);
+
+            // 事件绑定
+            g.addEventListener('mousedown', (e) => startDrag(e, data));
+            g.addEventListener('dblclick', (e) => rotateShape(data));
+
+            shapesLayer.appendChild(g);
+            updateVisibility(); // 确保新图形遵循当前的开关状态
+        }
+
+        function getAreaLabel(w, h) {
+            if (w === h) return `${w}²`;
+            // 字母排序，比如 c 和 a -> ac
+            const arr = [w, h].sort();
+            return arr.join('');
+        }
+
+        // --- 4. 交互逻辑 (拖拽 & 旋转) ---
+
+        function startDrag(e, data) {
+            isDragging = true;
+            selectedShape = data;
+            
+            // 将当前图形移到图层最上方
+            const el = document.getElementById(data.id);
+            shapesLayer.appendChild(el);
+
+            // 计算鼠标点击位置相对于图形左上角的偏移
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+            
+            offset.x = svgP.x - data.x;
+            offset.y = svgP.y - data.y;
+        }
+
+        function rotateShape(data) {
+            // 交换宽和高
+            [data.currentW, data.currentH] = [data.currentH, data.currentW];
+            [data.dimW, data.dimH] = [data.dimH, data.dimW];
+
+            // 移除旧的 DOM，重新渲染
+            const el = document.getElementById(data.id);
+            if(el) el.remove();
+            renderShape(data);
+        }
+
+        // 全局鼠标移动
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging || !selectedShape) return;
+
+            e.preventDefault();
+            const pt = svg.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            const svgP = pt.matrixTransform(svg.getScreenCTM().inverse());
+
+            // 更新数据位置
+            selectedShape.x = svgP.x - offset.x;
+            selectedShape.y = svgP.y - offset.y;
+
+            // 更新 DOM 位置
+            const el = document.getElementById(selectedShape.id);
+            if (el) {
+                el.setAttribute("transform", `translate(${selectedShape.x}, ${selectedShape.y})`);
+            }
+        });
+
+        // 全局鼠标松开 (吸附逻辑)
+        window.addEventListener('mouseup', () => {
+            if (isDragging && selectedShape) {
+                // 吸附到最近的网格 (UNIT = 20)
+                const snappedX = Math.round(selectedShape.x / UNIT) * UNIT;
+                const snappedY = Math.round(selectedShape.y / UNIT) * UNIT;
+                
+                selectedShape.x = snappedX;
+                selectedShape.y = snappedY;
+
+                // 动画效果更新位置
+                const el = document.getElementById(selectedShape.id);
+                if (el) {
+                    el.setAttribute("transform", `translate(${selectedShape.x}, ${selectedShape.y})`);
+                }
+            }
+            isDragging = false;
+            selectedShape = null;
+        });
+
+        // --- 5. 界面控制 ---
+
+        // 清空
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            shapes = [];
+            shapesLayer.innerHTML = '';
+            shapeCounter = 0;
+        });
+
+        // 显隐开关
+        const toggleArea = document.getElementById('toggleArea');
+        const toggleSide = document.getElementById('toggleSide');
+
+        function updateVisibility() {
+            const areaLabels = document.querySelectorAll('.area-label');
+            const sideLabels = document.querySelectorAll('.side-label');
+
+            areaLabels.forEach(el => el.style.opacity = toggleArea.checked ? '1' : '0');
+            sideLabels.forEach(el => el.style.opacity = toggleSide.checked ? '1' : '0');
+        }
+
+        toggleArea.addEventListener('change', updateVisibility);
+        toggleSide.addEventListener('change', updateVisibility);
+
+        // 初始化
+        initPalette();
+
+    </script>
+</body>
+</html>

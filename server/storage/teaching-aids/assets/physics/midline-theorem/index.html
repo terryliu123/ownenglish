@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角形中位线定理：旋转法证明</title>
+    <style>
+        :root {
+            --bg-color: #1e1e24;
+            --text-color: #e0e0e0;
+            --accent-color: #ffcc00; /* 黄色重点 */
+            --main-stroke: #ffffff;
+            --fill-color: rgba(100, 149, 237, 0.2); /* 浅蓝填充 */
+            --highlight-fill: rgba(255, 204, 0, 0.3); /* 黄色填充 */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        h1 { margin: 15px 0; font-weight: normal; font-size: 1.4rem; }
+
+        .canvas-container {
+            position: relative;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            background: #2a2a30;
+        }
+
+        canvas {
+            display: block;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .controls {
+            margin-top: 20px;
+            width: 90%;
+            max-width: 600px;
+            background: #333;
+            padding: 20px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        input[type=range] {
+            flex-grow: 1;
+            height: 6px;
+            background: #555;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .explanation {
+            background: rgba(0,0,0,0.3);
+            padding: 10px;
+            border-radius: 5px;
+            border-left: 4px solid var(--accent-color);
+            min-height: 60px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .btn {
+            background: #4a90e2;
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            align-self: flex-start;
+        }
+        .btn:hover { background: #357abd; }
+
+        /* Math symbols */
+        .math { font-family: 'Times New Roman', serif; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <h1>三角形中位线定理：旋转变换证明</h1>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="slider-container">
+            <span>旋转进度:</span>
+            <input type="range" id="angleSlider" min="0" max="180" value="0">
+            <span id="angleText">0°</span>
+        </div>
+        
+        <button class="btn" id="animBtn">播放动画</button>
+
+        <div class="explanation" id="explainText">
+            拖动滑块或点击播放。已知 <span class="math">D, E</span> 分别是 <span class="math">AB, AC</span> 的中点。
+            <br>目标：证明 <span class="math">DE // BC</span> 且 <span class="math">DE = 1/2 BC</span>。
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('angleSlider');
+    const angleText = document.getElementById('angleText');
+    const explainText = document.getElementById('explainText');
+    const animBtn = document.getElementById('animBtn');
+
+    // 几何参数
+    const offset = { x: 300, y: 250 }; // 画布中心附近
+    // 定义三角形ABC的顶点 (相对坐标)
+    const A = { x: 0, y: -150 };
+    const B = { x: -160, y: 100 };
+    const C = { x: 120, y: 100 };
+
+    // 当前状态
+    let rotationAngle = 0; // 0 - 180
+    let isAnimating = false;
+
+    // 辅助函数：坐标变换
+    function toCanvas(pt) {
+        return { x: pt.x + offset.x, y: pt.y + offset.y };
+    }
+
+    function midPoint(p1, p2) {
+        return { x: (p1.x + p2.x)/2, y: (p1.y + p2.y)/2 };
+    }
+
+    function rotatePoint(pt, center, angleDeg) {
+        const rad = angleDeg * Math.PI / 180;
+        const dx = pt.x - center.x;
+        const dy = pt.y - center.y;
+        return {
+            x: center.x + dx * Math.cos(rad) - dy * Math.sin(rad),
+            y: center.y + dx * Math.sin(rad) + dy * Math.cos(rad)
+        };
+    }
+
+    // 绘制函数
+    function drawLine(p1, p2, color="#fff", width=2, dashed=false) {
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        if(dashed) ctx.setLineDash([5, 5]);
+        else ctx.setLineDash([]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    function drawPoint(pt, label, color="#ff5555") {
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 5, 0, Math.PI*2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.stroke();
+        
+        if (label) {
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 16px Arial";
+            // 简单的标签避让逻辑
+            let lx = pt.x, ly = pt.y - 15;
+            if(label === 'B' || label === 'F') ly += 35;
+            if(label === 'C' || label === 'Q') ly += 35;
+            ctx.fillText(label, lx - 5, ly);
+        }
+    }
+
+    function drawMark(p1, p2, type) {
+        const mid = midPoint(p1, p2);
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        const nx = -dy / len * 8; // 法向量
+        const ny = dx / len * 8;
+
+        ctx.strokeStyle = "#aaa";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        if (type === 1) { // 单杠
+            ctx.moveTo(mid.x - nx, mid.y - ny);
+            ctx.lineTo(mid.x + nx, mid.y + ny);
+        } else if (type === 2) { // 双杠
+            const off = 3;
+            const ux = dx/len * off; 
+            const uy = dy/len * off;
+            ctx.moveTo(mid.x - ux - nx, mid.y - uy - ny);
+            ctx.lineTo(mid.x - ux + nx, mid.y - uy + ny);
+            ctx.moveTo(mid.x + ux - nx, mid.y + uy - ny);
+            ctx.lineTo(mid.x + ux + nx, mid.y + uy + ny);
+        }
+        ctx.stroke();
+    }
+
+    function drawPoly(points, fillColor, strokeColor) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+        if(strokeColor) {
+            ctx.strokeStyle = strokeColor;
+            ctx.stroke();
+        }
+    }
+
+    // 主渲染循环
+    function render() {
+        // 清空
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 计算实际坐标
+        const cA = toCanvas(A);
+        const cB = toCanvas(B);
+        const cC = toCanvas(C);
+        const cD = midPoint(cA, cB);
+        const cE = midPoint(cA, cC);
+        
+        // 旋转后的点 (ADE 绕 E 旋转)
+        // 目标: 将 ADE 旋转 180度 得到 QCE (Q是D的对应点, C是A的对应点)
+        // 动态点
+        const rA = rotatePoint(cA, cE, rotationAngle);
+        const rD = rotatePoint(cD, cE, rotationAngle);
+        const rE = cE; // 中心不动
+        
+        const cQ = rotatePoint(cD, cE, 180); // 最终位置 Q
+
+        // --- 1. 绘制背景三角形 ABC ---
+        drawPoly([cA, cB, cC], "rgba(100, 149, 237, 0.1)", "#888");
+
+        // --- 2. 绘制平行四边形辅助线 (当接近180度时) ---
+        if (rotationAngle > 10) {
+            // 连接 BQ, QC
+            drawLine(cB, cQ, "rgba(255,255,255,0.3)", 1, true);
+            drawLine(cC, cQ, "rgba(255,255,255,0.3)", 1, true);
+            drawLine(cD, cQ, "rgba(255,204,0,0.5)", 1, true); // 长底边
+        }
+        
+        // 如果完全旋转到位，高亮平行四边形 DBCQ
+        if (rotationAngle >= 179) {
+            drawPoly([cD, cB, cC, cQ], "rgba(255, 255, 255, 0.1)", null);
+            // 强调平行边
+            drawLine(cD, cB, "#4a90e2", 3);
+            drawLine(cQ, cC, "#4a90e2", 3);
+            drawLine(cB, cC, "#4a90e2", 3);
+            drawLine(cD, cQ, "#ffcc00", 3); // 整个上底
+        }
+
+        // --- 3. 绘制静态几何标记 ---
+        // D是AB中点
+        drawMark(cA, cD, 2);
+        drawMark(cD, cB, 2);
+        // E是AC中点
+        drawMark(cA, cE, 1);
+        drawMark(cE, cC, 1);
+
+        // --- 4. 绘制动态三角形 ADE (黄色) ---
+        ctx.save();
+        drawPoly([rA, rD, rE], "rgba(255, 204, 0, 0.4)", "#ffcc00");
+        ctx.restore();
+
+        // --- 5. 绘制点和标签 ---
+        drawPoint(cA, "A");
+        drawPoint(cB, "B");
+        drawPoint(cC, "C");
+        drawPoint(cD, "D", "#ffcc00");
+        drawPoint(cE, "E", "#ffcc00");
+        
+        if (rotationAngle > 5) {
+             drawPoint(cQ, "Q", "#888");
+        }
+
+        // --- 更新解说文字 ---
+        updateText();
+    }
+
+    function updateText() {
+        let html = "";
+        if (rotationAngle < 5) {
+            html = `连接 <span class="math">DE</span> 并延长。我们要证明 <span class="math">DE</span> 与 <span class="math">BC</span> 的关系。<br>方法：将 <span class="math">△ADE</span> 绕点 <span class="math">E</span> 旋转 <span class="math">180°</span>。`;
+        } else if (rotationAngle < 175) {
+            html = `旋转中... <br>观察点 <span class="math">A</span> 移动到了点 <span class="math">C</span> (因为 <span class="math">AE=EC</span>)。<br>点 <span class="math">D</span> 旋转到了新位置 <span class="math">Q</span>。`;
+        } else {
+            html = `旋转完成。<span class="math">△ADE ≌ △CQE</span>。<br>
+            1. <span class="math">AD = CQ</span>，且 <span class="math">AD = DB</span> => <span class="math">DB = CQ</span>。<br>
+            2. <span class="math">∠A = ∠ECQ</span> => <span class="math">AB // CQ</span>。<br>
+            结论：四边形 <span class="math">DBCQ</span> 是平行四边形。故 <span class="math">DQ = BC</span> 且 <span class="math">DQ // BC</span>。<br>
+            因为 <span class="math">DE = 1/2 DQ</span>，所以 <span class="math">DE = 1/2 BC</span>。`;
+        }
+        explainText.innerHTML = html;
+    }
+
+    // 交互逻辑
+    slider.addEventListener('input', (e) => {
+        rotationAngle = parseInt(e.target.value);
+        angleText.innerText = rotationAngle + "°";
+        render();
+    });
+
+    // 动画逻辑
+    function animate() {
+        if(rotationAngle < 180) {
+            rotationAngle += 2;
+            if(rotationAngle > 180) rotationAngle = 180;
+            slider.value = rotationAngle;
+            angleText.innerText = rotationAngle + "°";
+            render();
+            requestAnimationFrame(animate);
+        } else {
+            isAnimating = false;
+            animBtn.innerText = "重置";
+        }
+    }
+
+    animBtn.addEventListener('click', () => {
+        if (rotationAngle >= 180) {
+            rotationAngle = 0;
+            slider.value = 0;
+            angleText.innerText = "0°";
+            render();
+            animBtn.innerText = "播放动画";
+        } else {
+            if (!isAnimating) {
+                isAnimating = true;
+                animate();
+            }
+        }
+    });
+
+    // 初始化
+    render();
+
+</script>
+</body>
+</html>

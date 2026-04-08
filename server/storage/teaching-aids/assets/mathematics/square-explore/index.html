@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探索正方形中的小正方形</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f0f9ff;
+            color: #333;
+            overflow-x: hidden;
+        }
+        .serif {
+            font-family: 'Noto Serif SC', serif;
+        }
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            transition: transform 0.5s ease-in-out;
+            padding: 2rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        .slide-content {
+            max-width: 900px;
+            margin: 0 auto;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .grid-container {
+            display: grid;
+            gap: 2px;
+            margin: 20px auto;
+            border: 2px solid #3b82f6;
+        }
+        .grid-cell {
+            background-color: #bfdbfe;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        .grid-cell.highlight {
+            background-color: #ef4444;
+        }
+        .grid-cell.diagonal {
+            background-color: #10b981;
+        }
+        .nav-dots {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: rgba(255,255,255,0.5);
+            margin: 10px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .nav-dot.active {
+            background-color: white;
+            transform: scale(1.3);
+        }
+        .slide-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0,0,0,0.5);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            z-index: 100;
+        }
+        .formula-box {
+            background-color: rgba(255,255,255,0.9);
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        .toggle-buttons {
+            display: flex;
+            justify-content: center;
+            margin: 15px 0;
+        }
+        .toggle-btn {
+            padding: 8px 15px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toggle-btn.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <!-- 导航点 -->
+    <div class="nav-dots">
+        <div class="nav-dot active" data-slide="0"></div>
+        <div class="nav-dot" data-slide="1"></div>
+        <div class="nav-dot" data-slide="2"></div>
+        <div class="nav-dot" data-slide="3"></div>
+        <div class="nav-dot" data-slide="4"></div>
+        <div class="nav-dot" data-slide="5"></div>
+    </div>
+
+    <!-- 幻灯片指示器 -->
+    <div class="slide-indicator">
+        <span id="current-slide">1</span> / <span id="total-slides">6</span>
+    </div>
+
+    <!-- 幻灯片1：封面 -->
+    <div class="slide" id="slide-0" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: white;">
+        <div class="slide-content">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-5xl font-bold mb-6 serif">探索正方形中的<span class="text-yellow-300">小正方形</span></h1>
+                <p class="text-xl mb-8">从不同角度发现数学规律</p>
+                <div class="flex justify-center">
+                    <div class="grid-container" style="grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px);">
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell highlight"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                        <div class="grid-cell"></div>
+                    </div>
+                </div>
+                <button class="mt-8 bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold py-3 px-6 rounded-full transition transform hover:scale-105">
+                    开始探索 <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 幻灯片2：基础概念 -->
+    <div class="slide" id="slide-1" style="background-color: #f0fdf4;">
+        <div class="slide-content">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-green-800 serif">基础<span class="text-blue-600">概念</span></h2>
+            
+            <div class="formula-box">
+                <h3 class="text-xl font-bold mb-4 text-blue-800">正方形中的小正方形数量</h3>
+                <p class="text-gray-700 mb-4">在一个n×n的正方形网格中，可以找到多少个小正方形？</p>
+                
+                <div class="flex flex-col md:flex-row items-center justify-around mb-6">
+                    <div class="mb-4 md:mb-0">
+                        <div class="grid-container" style="grid-template-columns: repeat(2, 40px); grid-template-rows: repeat(2, 40px);">
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                        </div>
+                        <p class="text-center mt-2">2×2 → 4个小正方形</p>
+                    </div>
+                    <div class="mb-4 md:mb-0">
+                        <div class="grid-container" style="grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px);">
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                        </div>
+                        <p class="text-center mt-2">3×3 → 9个小正方形</p>
+                    </div>
+                    <div>
+                        <div class="grid-container" style="grid-template-columns: repeat(4, 40px); grid-template-rows: repeat(4, 40px);">
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                            <div class="grid-cell"></div>
+                        </div>
+                        <p class="text-center mt-2">4×4 → 16个小正方形</p>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-blue-800 font-bold">规律发现：</p>
+                    <p class="text-gray-700">n×n的正方形中包含的小正方形数量为 n²</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 幻灯片3：不同大小的小正方形 -->
+    <div class="slide" id="slide-2" style="background: linear-gradient(to bottom right, #e0f2fe, #bae6fd);">
+        <div class="slide-content">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-blue-800 serif">不同<span class="text-purple-600">大小</span>的小正方形</h2>
+            
+            <div class="formula-box">
+                <h3 class="text-xl font-bold mb-4 text-purple-800">探索不同尺寸的小正方形数量</h3>
+                <p class="text-gray-700 mb-4">在n×n的正方形中，边长为k的小正方形有多少个？</p>
+                
+                <div class="toggle-buttons">
+                    <button class="toggle-btn active" data-size="1">1×1</button>
+                    <button class="toggle-btn" data-size="2">2×2</button>
+                    <button class="toggle-btn" data-size="3">3×3</button>
+                </div>
+                
+                <div class="flex justify-center mb-6">
+                    <div class="grid-container" id="size-demo" style="grid-template-columns: repeat(5, 40px); grid-template-rows: repeat(5, 40px);">
+                        <!-- 动态生成5x5网格 -->
+                    </div>
+                </div>
+                
+                <div class="bg-purple-50 p-4 rounded-lg">
+                    <p class="text-purple-800 font-bold">规律总结：</p>
+                    <p class="text-gray-700">边长为k的小正方形数量 = (n - k + 1) × (n - k + 1)</p>
+                    <p class="text-gray-700 mt-2">总小正方形数量 = 1² + 2² + 3² + ... + n²</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 幻灯片4：奇数求和与平方数 -->
+    <div class="slide" id="slide-3" style="background-color: #fef2f2;">
+        <div class="slide-content">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-red-600 serif">奇数<span class="text-yellow-500">求和</span>与平方数</h2>
+            
+            <div class="formula-box">
+                <h3 class="text-xl font-bold mb-4 text-red-800">连续奇数之和等于平方数</h3>
+                <p class="text-gray-700 mb-4">让我们用图形来理解这个数学规律：</p>
+                
+                <div class="flex flex-col items-center mb-6">
+                    <div class="flex mb-4">
+                        <div class="w-16 h-16 bg-red-400 mr-2 flex items-center justify-center text-white font-bold">1</div>
+                        <div class="text-xl flex items-center mx-2">=</div>
+                        <div class="text-xl flex items-center font-bold">1 = 1²</div>
+                    </div>
+                    
+                    <div class="flex mb-4">
+                        <div class="flex">
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">1</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">3</div>
+                            <div class="w-16 h-16 bg-red-400 mb-1 flex items-center justify-center text-white font-bold">3</div>
+                            <div class="w-16 h-16 bg-red-400 ml-1 mb-1 flex items-center justify-center text-white font-bold">3</div>
+                        </div>
+                        <div class="text-xl flex items-center mx-2">=</div>
+                        <div class="text-xl flex items-center font-bold">1 + 3 = 4 = 2²</div>
+                    </div>
+                    
+                    <div class="flex">
+                        <div class="flex flex-wrap" style="width: 240px;">
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">1</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">3</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">3</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                            <div class="w-16 h-16 bg-red-400 mr-1 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                            <div class="w-16 h-16 bg-red-400 mb-1 flex items-center justify-center text-white font-bold">5</div>
+                        </div>
+                        <div class="text-xl flex items-center mx-2">=</div>
+                        <div class="text-xl flex items-center font-bold">1 + 3 + 5 = 9 = 3²</div>
+                    </div>
+                </div>
+                
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <p class="text-red-800 font-bold">数学规律：</p>
+                    <p class="text-gray-700">1 + 3 + 5 + ... + (2n-1) = n²</p>
+                    <p class="text-gray-700 mt-2">前n个连续奇数之和等于n的平方</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 幻灯片5：对角线上的小正方形 -->
+    <div class="slide" id="slide-4" style="background: linear-gradient(to bottom right, #ecfdf5, #d1fae5);">
+        <div class="slide-content">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-8 text-green-800 serif">对角线上的<span class="text-blue-600">小正方形</span></h2>
+            
+            <div class="formula-box">
+                <h3 class="text-xl font-bold mb-4 text-green-800">探索对角线上的小正方形</h3>
+                <p class="text-gray-700 mb-4">从不同角度观察正方形网格，对角线上的小正方形有什么规律？</p>
+                
+                <div class="toggle-buttons">
+                    <button class="toggle-btn active" data-angle="0">水平/垂直</button>
+                    <button class="toggle-btn" data-angle="45">对角线</button>
+                </div>
+                
+                <div class="flex justify-center mb-6">
+                    <div class="grid-container" id="angle-demo" style="grid-template-columns: repeat(5, 40px); grid-template-rows: repeat(5, 40px);">
+                        <!-- 动态生成5x5网格 -->
+                    </div>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded-lg">
+                    <p class="text-green-800 font-bold">观察发现：</p>
+                    <p class="text-gray-700">从对角线角度看，小正方形的排列也呈现出规律性</p>
+                    <p class="text-gray-700 mt-2">对角线上的小正方形数量与网格大小有关</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 幻灯片6：总结与应用 -->
+    <div class="slide" id="slide-5" style="background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); color: white;">
+        <div class="slide-content text-center">
+            <h2 class="text-4xl md:text-5xl font-bold mb-8 serif">总结与<span class="text-yellow-300">应用</span></h2>
+            
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-white bg-opacity-10 p-8 rounded-xl backdrop-blur-sm mb-8">
+                    <h3 class="text-2xl font-bold mb-4">我们学到了什么？</h3>
+                    <ul class="space-y-3 text-left text-lg">
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-yellow-300 mt-1 mr-3"></i>
+                            <span>n×n的正方形中包含n²个小正方形</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-yellow-300 mt-1 mr-3"></i>
+                            <span>连续奇数之和等于平方数：1+3+5+...+(2n-1)=n²</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-yellow-300 mt-1 mr-3"></i>
+                            <span>从不同角度观察正方形网格可以发现不同规律</span>
+                        </li>
+                        <li class="flex items-start">
+                            <i class="fas fa-check-circle text-yellow-300 mt-1 mr-3"></i>
+                            <span>数形结合帮助我们更直观地理解数学概念</span>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="bg-white bg-opacity-10 p-6 rounded-xl backdrop-blur-sm mb-8">
+                    <h3 class="text-2xl font-bold mb-4">实际应用</h3>
+                    <p class="text-left mb-4">这些规律在计算机图形学、建筑设计、像素艺术等领域都有广泛应用。</p>
+                    <p class="text-left">通过观察图形规律，我们可以发展空间想象能力和逻辑思维能力。</p>
+                </div>
+                
+                <div class="flex justify-center space-x-4">
+                    <button class="bg-yellow-400 hover:bg-yellow-500 text-blue-900 font-bold py-3 px-6 rounded-full transition transform hover:scale-105">
+                        重新学习 <i class="fas fa-redo ml-2"></i>
+                    </button>
+                    <button class="border-2 border-white hover:bg-white hover:text-purple-600 font-bold py-3 px-6 rounded-full transition">
+                        更多探索 <i class="fas fa-pencil-alt ml-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 幻灯片控制
+        document.addEventListener('DOMContentLoaded', function() {
+            const slides = document.querySelectorAll('.slide');
+            const dots = document.querySelectorAll('.nav-dot');
+            const currentSlideEl = document.getElementById('current-slide');
+            const totalSlidesEl = document.getElementById('total-slides');
+            
+            let currentSlide = 0;
+            const totalSlides = slides.length;
+            
+            totalSlidesEl.textContent = totalSlides;
+            
+            // 初始化幻灯片位置
+            function initSlides() {
+                slides.forEach((slide, index) => {
+                    slide.style.transform = `translateX(${index * 100}%)`;
+                });
+            }
+            
+            // 更新幻灯片位置
+            function updateSlidePosition() {
+                slides.forEach((slide, index) => {
+                    slide.style.transform = `translateX(${100 * (index - currentSlide)}%)`;
+                });
+                
+                // 更新导航点
+                dots.forEach((dot, index) => {
+                    if (index === currentSlide) {
+                        dot.classList.add('active');
+                    } else {
+                        dot.classList.remove('active');
+                    }
+                });
+                
+                // 更新当前幻灯片指示器
+                currentSlideEl.textContent = currentSlide + 1;
+            }
+            
+            // 导航点点击事件
+            dots.forEach(dot => {
+                dot.addEventListener('click', function() {
+                    const slideIndex = parseInt(this.getAttribute('data-slide'));
+                    goToSlide(slideIndex);
+                });
+            });
+            
+            // 前往指定幻灯片
+            function goToSlide(slideIndex) {
+                currentSlide = slideIndex;
+                updateSlidePosition();
+            }
+            
+            // 下一张幻灯片
+            function nextSlide() {
+                if (currentSlide < totalSlides - 1) {
+                    currentSlide++;
+                    updateSlidePosition();
+                }
+            }
+            
+            // 上一张幻灯片
+            function prevSlide() {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    updateSlidePosition();
+                }
+            }
+            
+            // 键盘控制
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    nextSlide();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    prevSlide();
+                }
+            });
+            
+            // 触摸滑动控制
+            let touchStartX = 0;
+            let touchEndX = 0;
+            
+            document.addEventListener('touchstart', function(e) {
+                touchStartX = e.changedTouches[0].screenX;
+            }, false);
+            
+            document.addEventListener('touchend', function(e) {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipe();
+            }, false);
+            
+            function handleSwipe() {
+                if (touchEndX < touchStartX - 50) {
+                    nextSlide();
+                } else if (touchEndX > touchStartX + 50) {
+                    prevSlide();
+                }
+            }
+            
+            // 初始化不同大小小正方形的演示网格
+            function initSizeDemo() {
+                const grid = document.getElementById('size-demo');
+                grid.innerHTML = '';
+                
+                const size = 5;
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                // 默认显示1×1
+                highlightSquares(1);
+            }
+            
+            // 高亮特定大小的小正方形
+            function highlightSquares(k) {
+                const cells = document.querySelectorAll('#size-demo .grid-cell');
+                cells.forEach(cell => {
+                    cell.classList.remove('highlight');
+                });
+                
+                const size = 5;
+                for (let i = 0; i <= size - k; i++) {
+                    for (let j = 0; j <= size - k; j++) {
+                        for (let di = 0; di < k; di++) {
+                            for (let dj = 0; dj < k; dj++) {
+                                const cell = document.querySelector(`#size-demo .grid-cell[data-row="${i+di}"][data-col="${j+dj}"]`);
+                                if (cell) {
+                                    cell.classList.add('highlight');
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 初始化角度演示网格
+            function initAngleDemo() {
+                const grid = document.getElementById('angle-demo');
+                grid.innerHTML = '';
+                
+                const size = 5;
+                for (let i = 0; i < size; i++) {
+                    for (let j = 0; j < size; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        cell.dataset.row = i;
+                        cell.dataset.col = j;
+                        grid.appendChild(cell);
+                    }
+                }
+                
+                // 默认显示水平/垂直
+                showHorizontalVertical();
+            }
+            
+            // 显示水平/垂直方向
+            function showHorizontalVertical() {
+                const cells = document.querySelectorAll('#angle-demo .grid-cell');
+                cells.forEach(cell => {
+                    cell.classList.remove('diagonal');
+                });
+            }
+            
+            // 显示对角线方向
+            function showDiagonal() {
+                const cells = document.querySelectorAll('#angle-demo .grid-cell');
+                cells.forEach(cell => {
+                    cell.classList.remove('diagonal');
+                    const row = parseInt(cell.dataset.row);
+                    const col = parseInt(cell.dataset.col);
+                    if (row === col || row + col === 4) {
+                        cell.classList.add('diagonal');
+                    }
+                });
+            }
+            
+            // 切换按钮事件
+            function setupToggleButtons() {
+                // 不同大小小正方形的切换
+                const sizeButtons = document.querySelectorAll('#slide-2 .toggle-btn');
+                sizeButtons.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        sizeButtons.forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        const size = parseInt(this.dataset.size);
+                        highlightSquares(size);
+                    });
+                });
+                
+                // 不同角度的切换
+                const angleButtons = document.querySelectorAll('#slide-4 .toggle-btn');
+                angleButtons.forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        angleButtons.forEach(b => b.classList.remove('active'));
+                        this.classList.add('active');
+                        const angle = parseInt(this.dataset.angle);
+                        if (angle === 0) {
+                            showHorizontalVertical();
+                        } else {
+                            showDiagonal();
+                        }
+                    });
+                });
+            }
+            
+            // 初始化
+            initSlides();
+            updateSlidePosition();
+            initSizeDemo();
+            initAngleDemo();
+            setupToggleButtons();
+        });
+    </script>
+</body>
+</html>

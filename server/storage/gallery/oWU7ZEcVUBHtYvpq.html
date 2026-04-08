@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探究两圆交点轨迹 - 交互实验</title>
+    <style>
+        body {
+            margin: 0;
+            background-color: #262626;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #262626;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* 左侧文字区域 */
+        .info-panel {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            pointer-events: none;
+        }
+        
+        .title { font-size: 22px; font-weight: bold; margin-bottom: 10px; }
+        .desc { font-size: 14px; color: #ccc; line-height: 1.6; margin-bottom: 20px; }
+        .math-eq { 
+            font-family: 'Times New Roman', serif; 
+            font-style: italic; 
+            font-size: 18px; 
+            margin-top: 10px;
+            color: #eee;
+        }
+
+        /* 分析开关 */
+        .switch-container {
+            position: absolute;
+            top: 250px;
+            right: 40px;
+            background: rgba(255,255,255,0.1);
+            padding: 10px 20px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.3s;
+            z-index: 10;
+        }
+        .switch-container:hover { background: rgba(255,255,255,0.2); }
+        
+        .switch-label { margin-right: 10px; font-size: 16px; user-select: none; }
+        
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background-color: #ccc;
+            border-radius: 13px;
+            transition: 0.4s;
+        }
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 22px;
+            height: 22px;
+            background-color: white;
+            border-radius: 50%;
+            transition: 0.4s;
+        }
+        .switch-active .toggle-switch { background-color: #4cd964; }
+        .switch-active .toggle-switch::after { transform: translateX(24px); }
+
+        /* SVG 样式 */
+        svg { width: 100%; height: 100%; }
+        
+        .axis-line { stroke: #7f8c8d; stroke-width: 2; stroke-dasharray: 6, 6; }
+        .dashed-circle { fill: none; stroke: #999; stroke-width: 1.5; stroke-dasharray: 6, 4; opacity: 0.6; }
+        .radius-line { stroke: #f1c40f; stroke-width: 2.5; stroke-linecap: round; }
+        .locus-path { fill: none; stroke: #ff4757; stroke-width: 2.5; stroke-dasharray: 8, 6; opacity: 0; transition: opacity 0.5s; }
+        
+        .point-fixed { fill: #7f8c8d; stroke: #fff; stroke-width: 2; }
+        .point-moving { fill: #2ecc71; stroke: #fff; stroke-width: 2; cursor: default; }
+        
+        .slider-track { stroke: #555; stroke-width: 4; stroke-linecap: round; }
+        .slider-active { stroke: #f1c40f; stroke-width: 4; stroke-linecap: round; }
+        .point-slider { fill: #bdc3c7; stroke: #fff; stroke-width: 2; cursor: col-resize; transition: fill 0.2s;}
+        .point-slider:hover { fill: #fff; }
+        .point-slider.dragging { fill: #f1c40f; cursor: grabbing; }
+
+        text { user-select: none; font-family: 'Times New Roman', serif; font-style: italic; fill: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 左侧信息 -->
+    <div class="info-panel">
+        <div class="title">探究两圆交点轨迹</div>
+        <div class="desc">
+            拖动下方滑块 P 改变半径<br>
+            观察交点 N 的运动轨迹
+        </div>
+        <div class="math-eq">|AB| = 6</div>
+        <div class="math-eq">|F₁F₂| = 4</div>
+    </div>
+
+    <!-- 右侧开关 -->
+    <div class="switch-container" id="analyzeBtn">
+        <div class="switch-label">分析</div>
+        <div class="toggle-switch"></div>
+    </div>
+
+    <!-- 绘图区域 -->
+    <svg viewBox="0 0 800 600" id="mainSvg">
+        <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                <path d="M0,0 L10,5 L0,10" fill="#555" />
+            </marker>
+        </defs>
+
+        <!-- 主视图组 (平移到中心 450, 280) -->
+        <g transform="translate(450, 280)">
+            <!-- 轨迹 (默认隐藏) -->
+            <path id="locusPath" class="locus-path" />
+
+            <!-- 圆 F1 -->
+            <circle id="c1" cx="-100" cy="0" r="100" class="dashed-circle" />
+            <!-- 圆 F2 -->
+            <circle id="c2" cx="100" cy="0" r="200" class="dashed-circle" />
+
+            <!-- 连线 F1-N-F2 -->
+            <path id="triangleLines" d="M -100,0 L 0,-111 L 100,0" class="radius-line" />
+
+            <!-- 焦点 F1, F2 -->
+            <circle cx="-100" cy="0" r="4" class="point-fixed" />
+            <text x="-125" y="25" font-size="18">F₁</text>
+            
+            <circle cx="100" cy="0" r="4" class="point-fixed" />
+            <text x="105" y="25" font-size="18">F₂</text>
+
+            <!-- 交点 N, M -->
+            <circle id="ptN" cx="0" cy="-111" r="6" class="point-moving" />
+            <text id="txtN" x="10" y="-120" font-size="18">N</text>
+            
+            <circle id="ptM" cx="0" cy="111" r="4" class="point-moving" opacity="0.5" />
+            <text id="txtM" x="10" y="130" font-size="18" opacity="0.5">M</text>
+            
+            <!-- 圆心红点 -->
+            <circle cx="0" cy="-50" r="2" fill="red" opacity="0.5" />
+        </g>
+
+        <!-- 底部滑块区域 (平移到 450, 500) -->
+        <g transform="translate(450, 500)">
+            <!-- 虚线轴 -->
+            <line x1="-250" y1="0" x2="250" y2="0" class="axis-line" />
+            <text x="-270" y="5" font-size="18">l</text>
+
+            <!-- 实体线段 AB -->
+            <line x1="-150" y1="0" x2="150" y2="0" class="slider-track" />
+            
+            <!-- 高亮线段 AP (代表半径 r1) -->
+            <line id="lineAP" x1="-150" y1="0" x2="0" y2="0" class="slider-active" />
+            
+            <!-- 端点 A, B -->
+            <circle cx="-150" cy="0" r="6" class="point-fixed" />
+            <text x="-160" y="30" font-size="18">A</text>
+            
+            <circle cx="150" cy="0" r="6" class="point-fixed" />
+            <text x="140" y="30" font-size="18">B</text>
+
+            <!-- 动点 P (滑块) -->
+            <circle id="sliderP" cx="0" cy="0" r="10" class="point-slider" />
+            <text x="-5" y="35" font-size="18">P</text>
+            
+            <!-- 点击判定区 (扩大点P的点击范围) -->
+            <circle id="sliderHitArea" cx="0" cy="0" r="20" fill="transparent" style="cursor: col-resize;" />
+        </g>
+    </svg>
+</div>
+
+<script>
+    // --- 常量定义 ---
+    const SCALE = 50; // 1单位 = 50像素
+    const C = 2 * SCALE; // 半焦距 c=2 (F1F2=4) => 100px
+    const L_TOTAL = 6 * SCALE; // 绳长 2a=6 => 300px
+    const SLIDER_HALF_WIDTH = L_TOTAL / 2; // 150px
+    
+    // 拖动限制：必须满足三角形不等式 |r1 - r2| < 2c
+    // r1 - (L - r1) < 2c  => 2r1 < L + 2c => r1 < (300+200)/2 = 250
+    // (L - r1) - r1 < 2c  => L - 2c < 2r1 => r1 > (300-200)/2 = 50
+    // r1 范围: [50, 250]
+    // 滑块位置 x (相对于中心) = -150 + r1
+    // x 范围: [-100, 100]
+    const DRAG_LIMIT = 100; 
+
+    // --- DOM 元素 ---
+    const sliderP = document.getElementById('sliderP');
+    const sliderHitArea = document.getElementById('sliderHitArea');
+    const lineAP = document.getElementById('lineAP');
+    const c1 = document.getElementById('c1');
+    const c2 = document.getElementById('c2');
+    const ptN = document.getElementById('ptN');
+    const txtN = document.getElementById('txtN');
+    const ptM = document.getElementById('ptM');
+    const txtM = document.getElementById('txtM');
+    const triangleLines = document.getElementById('triangleLines');
+    const locusPath = document.getElementById('locusPath');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+
+    // --- 状态变量 ---
+    let isDragging = false;
+    let isAnalysisOn = false;
+
+    // --- 初始化轨迹 ---
+    // 提前计算椭圆路径数据，但默认不显示
+    function generateEllipsePath() {
+        let path = "";
+        // 椭圆参数方程 x = a*cos(t), y = b*sin(t)
+        // a = 3 (150px), c = 2 (100px), b = sqrt(5) (approx 111.8px)
+        const a = 150;
+        const b = Math.sqrt(a*a - C*C);
+        
+        for (let t = 0; t <= 360; t+=2) {
+            const rad = t * Math.PI / 180;
+            const x = a * Math.cos(rad);
+            const y = b * Math.sin(rad);
+            if (t === 0) path += `M ${x} ${y} `;
+            else path += `L ${x} ${y} `;
+        }
+        path += "Z";
+        locusPath.setAttribute("d", path);
+    }
+    generateEllipsePath();
+
+    // --- 核心逻辑：更新视图 ---
+    function updateView(sliderX) {
+        // 1. 限制滑块范围
+        if (sliderX < -DRAG_LIMIT) sliderX = -DRAG_LIMIT;
+        if (sliderX > DRAG_LIMIT) sliderX = DRAG_LIMIT;
+
+        // 2. 更新底部 UI
+        sliderP.setAttribute('cx', sliderX);
+        sliderHitArea.setAttribute('cx', sliderX); // 判定区跟随
+        lineAP.setAttribute('x2', sliderX);
+
+        // 3. 计算半径
+        // A点在 -150, sliderX 是相对于中心的偏移
+        // r1 = sliderX - (-150) = sliderX + 150
+        const r1 = sliderX + 150;
+        const r2 = L_TOTAL - r1;
+
+        // 4. 更新圆大小
+        c1.setAttribute('r', r1);
+        c2.setAttribute('r', r2);
+
+        // 5. 计算交点坐标
+        // 两个圆心分别是 (-C, 0) 和 (C, 0)
+        // (x + c)^2 + y^2 = r1^2
+        // (x - c)^2 + y^2 = r2^2
+        // 解得: x = (r1^2 - r2^2) / 4c
+        const x = (r1*r1 - r2*r2) / (4 * C);
+        
+        // y = sqrt(r1^2 - (x+c)^2)
+        let term = r1*r1 - (x + C)*(x + C);
+        // 防止浮点误差导致的极小负数
+        if (term < 0) term = 0; 
+        const y = Math.sqrt(term);
+
+        // 6. 更新交点和连线
+        // 只有当三角形能构成时显示交点
+        if (y >= 0) {
+            ptN.setAttribute('cx', x);
+            ptN.setAttribute('cy', -y); // SVG坐标系y向下为正，故取负
+            txtN.setAttribute('x', x + 15);
+            txtN.setAttribute('y', -y - 15);
+
+            ptM.setAttribute('cx', x);
+            ptM.setAttribute('cy', y);
+            txtM.setAttribute('x', x + 15);
+            txtM.setAttribute('y', y + 25);
+
+            triangleLines.setAttribute('d', `M ${-C},0 L ${x},${-y} L ${C},0`);
+        }
+    }
+
+    // --- 事件处理 ---
+    
+    // 1. 拖拽逻辑
+    function startDrag(e) {
+        isDragging = true;
+        sliderP.classList.add('dragging');
+        handleDrag(e);
+    }
+
+    function stopDrag() {
+        isDragging = false;
+        sliderP.classList.remove('dragging');
+    }
+
+    function handleDrag(e) {
+        if (!isDragging) return;
+        
+        // 获取鼠标/触摸点相对于SVG的坐标
+        const svgRect = document.getElementById('mainSvg').getBoundingClientRect();
+        let clientX = e.clientX;
+        if (e.touches && e.touches.length > 0) {
+            clientX = e.touches[0].clientX;
+        }
+
+        // 计算相对于SVG画布的X坐标
+        // 画布宽800，中心450 (因为translate(450, 500))
+        // 比例缩放校正
+        const svgScale = 800 / svgRect.width;
+        const relativeX = (clientX - svgRect.left) * svgScale;
+        
+        // 转换为相对于组原点(450)的坐标
+        let localX = relativeX - 450;
+        
+        updateView(localX);
+    }
+
+    // 绑定滑块事件
+    sliderHitArea.addEventListener('mousedown', startDrag);
+    sliderHitArea.addEventListener('touchstart', startDrag, {passive: false});
+    
+    window.addEventListener('mousemove', handleDrag);
+    window.addEventListener('touchmove', (e) => { if(isDragging) e.preventDefault(); handleDrag(e); }, {passive: false});
+    
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('touchend', stopDrag);
+
+    // 2. 分析开关逻辑
+    analyzeBtn.addEventListener('click', () => {
+        isAnalysisOn = !isAnalysisOn;
+        if (isAnalysisOn) {
+            analyzeBtn.classList.add('switch-active');
+            locusPath.style.opacity = 1;
+        } else {
+            analyzeBtn.classList.remove('switch-active');
+            locusPath.style.opacity = 0;
+        }
+    });
+
+    // --- 初始化 ---
+    // 设置初始位置 P 在中间偏右一点，让三角形显眼
+    updateView(30); 
+
+</script>
+</body>
+</html>

@@ -1,0 +1,98 @@
+<meta charset="UTF-8">
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 定义墙的图案 -->
+    <pattern id="wallPattern" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="20" height="10" fill="#b0bec5" stroke="#78909c" stroke-width="1"/>
+      <line x1="10" y1="0" x2="10" y2="10" stroke="#78909c" stroke-width="1"/>
+    </pattern>
+    
+    <!-- 定义篱笆桩的样式 -->
+    <pattern id="fencePattern" x="0" y="0" width="15" height="10" patternUnits="userSpaceOnUse">
+       <rect x="2" y="0" width="4" height="10" fill="#fff" />
+    </pattern>
+
+    <!-- 箭头标记 -->
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#555" />
+    </marker>
+  </defs>
+
+  <!-- 背景：天空和草地 -->
+  <rect x="0" y="0" width="800" height="500" fill="#e3f2fd"/>
+  <rect x="0" y="150" width="800" height="350" fill="#c8e6c9"/>
+  
+  <!-- 标题 -->
+  <text x="400" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#37474f" font-weight="bold">围长方形问题演示</text>
+
+  <!-- ==================== 情景一：直接围长方形 ==================== -->
+  <g transform="translate(50, 120)">
+    <text x="150" y="-20" text-anchor="middle" font-family="Arial" font-size="20" fill="#2e7d32" font-weight="bold">情景一：四面围篱笆</text>
+    
+    <!-- 草地长方形区域 -->
+    <rect x="0" y="30" width="300" height="200" fill="#81c784" stroke="none"/>
+    
+    <!-- 篱笆 (四面) -->
+    <g stroke="#795548" stroke-width="6" fill="none" stroke-dasharray="15,5">
+      <rect x="0" y="30" width="300" height="200" rx="5"/>
+    </g>
+    
+    <!-- 标注 -->
+    <text x="150" y="130" text-anchor="middle" fill="#fff" font-size="24" font-weight="bold" opacity="0.8">菜地</text>
+    
+    <!-- 尺寸标注线 -->
+    <!-- 长 -->
+    <line x1="0" y1="250" x2="300" y2="250" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="300" y1="250" x2="0" y2="250" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="150" y="270" text-anchor="middle" fill="#555" font-size="16">长 (Length)</text>
+    
+    <!-- 宽 -->
+    <line x1="-20" y1="30" x2="-20" y2="230" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="-20" y1="230" x2="-20" y2="30" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="-30" y="130" text-anchor="middle" fill="#555" font-size="16" transform="rotate(-90, -30, 130)">宽 (Width)</text>
+
+    <!-- 公式 -->
+    <rect x="20" y="290" width="260" height="60" rx="10" fill="#fff" stroke="#2e7d32" stroke-width="2"/>
+    <text x="150" y="315" text-anchor="middle" fill="#333" font-size="16">篱笆总长 = 周长</text>
+    <text x="150" y="338" text-anchor="middle" fill="#d32f2f" font-size="18" font-weight="bold">(长 + 宽) × 2</text>
+  </g>
+
+  <!-- ==================== 情景二：靠墙围长方形 ==================== -->
+  <g transform="translate(450, 120)">
+    <text x="150" y="-20" text-anchor="middle" font-family="Arial" font-size="20" fill="#2e7d32" font-weight="bold">情景二：靠墙围篱笆</text>
+    
+    <!-- 墙体 -->
+    <rect x="-20" y="10" width="340" height="20" fill="url(#wallPattern)" stroke="#546e7a" stroke-width="2"/>
+    <text x="150" y="25" text-anchor="middle" fill="#37474f" font-size="12" font-weight="bold">墙 Wall (不需篱笆)</text>
+
+    <!-- 草地长方形区域 -->
+    <rect x="0" y="30" width="300" height="200" fill="#81c784" stroke="none"/>
+    
+    <!-- 篱笆 (三面：左、下、右) -->
+    <!-- 动画路径：演示围的过程 -->
+    <path d="M0,30 L0,230 L300,230 L300,30" stroke="#795548" stroke-width="6" fill="none" stroke-dasharray="15,5"/>
+    
+    <!-- 标注 -->
+    <text x="150" y="130" text-anchor="middle" fill="#fff" font-size="24" font-weight="bold" opacity="0.8">菜地</text>
+    
+    <!-- 尺寸标注线 -->
+    <!-- 长 (只有下面有) -->
+    <line x1="0" y1="250" x2="300" y2="250" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="300" y1="250" x2="0" y2="250" stroke="#555" stroke-width="2" marker-end="url(#arrow)"/>
+    <text x="150" y="270" text-anchor="middle" fill="#555" font-size="16">长 (Length)</text>
+    
+    <!-- 宽 (两边都有) -->
+    <text x="-15" y="130" text-anchor="middle" fill="#555" font-size="16" transform="rotate(-90, -15, 130)">宽</text>
+    <text x="315" y="130" text-anchor="middle" fill="#555" font-size="16" transform="rotate(90, 315, 130)">宽</text>
+
+    <!-- 提示圆点 -->
+    <circle cx="0" cy="30" r="5" fill="#d32f2f"/>
+    <circle cx="300" cy="30" r="5" fill="#d32f2f"/>
+    
+    <!-- 公式 -->
+    <rect x="20" y="290" width="260" height="60" rx="10" fill="#fff" stroke="#ef6c00" stroke-width="2"/>
+    <text x="150" y="315" text-anchor="middle" fill="#333" font-size="16">篱笆总长 = 三边之和</text>
+    <text x="150" y="338" text-anchor="middle" fill="#d32f2f" font-size="18" font-weight="bold">长 + 宽 × 2</text>
+  </g>
+  
+</svg>

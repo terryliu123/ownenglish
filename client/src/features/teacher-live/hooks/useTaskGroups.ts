@@ -47,7 +47,6 @@ export function useTaskGroups({
   const revertToDraft = useCallback(async (groupId: string) => {
     try {
       await liveTaskService.updateTaskGroup(groupId, { status: 'draft' })
-      // Remove from taskGroups list since draft groups are filtered out
       setTaskGroups((prev) => prev.filter((g) => g.id !== groupId))
       setSelectedGroup((prev) => (prev?.id === groupId ? null : prev))
     } catch (e) {
@@ -77,23 +76,20 @@ export function useTaskGroups({
     [currentTaskGroup, setTaskGroupSubmissions]
   )
 
-  const loadTaskHistory = useCallback(
-    async (classId: string) => {
-      if (!classId) return []
-      try {
-        const response = await liveTaskService.getClassTaskHistory(classId)
-        if (response.history && Array.isArray(response.history)) {
-          console.log('[Task History] Loaded', response.history.length, 'items')
-          return response.history
-        }
-        return []
-      } catch (e) {
-        console.error('Failed to load task history:', e)
-        return []
+  const loadTaskHistory = useCallback(async (classId: string) => {
+    if (!classId) return []
+    try {
+      const response = await liveTaskService.getClassTaskHistory(classId)
+      if (response.history && Array.isArray(response.history)) {
+        console.log('[Task History] Loaded', response.history.length, 'items')
+        return response.history
       }
-    },
-    []
-  )
+      return []
+    } catch (e) {
+      console.error('Failed to load task history:', e)
+      return []
+    }
+  }, [])
 
   const refreshLiveOverview = useCallback(
     async (
@@ -102,6 +98,7 @@ export function useTaskGroups({
         includeTaskGroups?: boolean
         includeTaskHistory?: boolean
         includePresence?: boolean
+        onHistoryLoaded?: (history: TaskHistoryItem[]) => void
       }
     ) => {
       if (!classId) return
@@ -112,12 +109,19 @@ export function useTaskGroups({
       if (options?.includePresence !== false) {
         tasks.push(loadClassPresence(classId))
       }
+      if (options?.includeTaskHistory) {
+        tasks.push(
+          loadTaskHistory(classId).then((history) => {
+            options.onHistoryLoaded?.(history)
+            return history
+          })
+        )
+      }
       await Promise.all(tasks)
     },
-    [loadTaskGroups, loadClassPresence]
+    [loadTaskGroups, loadClassPresence, loadTaskHistory]
   )
 
-  // Load task groups when class changes
   useEffect(() => {
     if (!currentClassId) return
     void loadTaskGroups()
@@ -126,14 +130,14 @@ export function useTaskGroups({
   const handlePublishGroup = useCallback(
     (
       group: LiveTaskGroup,
-      ws: { status: string; publishTaskGroup: (groupId: string, tasks: LiveTask[], totalCountdown: number) => void },
+      ws: { status: string; publishTaskGroup: (groupId: string, totalCountdown: number) => void },
       onSuccess: () => void,
       onError: (message: string) => void
     ) => {
       console.log('[Publish] Publishing group:', group.id)
 
       if (ws.status !== 'connected') {
-        onError('WebSocket未连接')
+        onError('WebSocket 未连接')
         return
       }
       if (!group.tasks || group.tasks.length === 0) {
@@ -152,7 +156,7 @@ export function useTaskGroups({
 
       const totalCountdown = tasks.reduce((sum, t) => sum + t.countdown_seconds, 0) + 30
 
-      ws.publishTaskGroup(group.id, tasks, totalCountdown)
+      ws.publishTaskGroup(group.id, totalCountdown)
       onSuccess()
     },
     []
@@ -175,30 +179,28 @@ export function useTaskGroups({
           title: item.title,
           tasks: item.tasks as LiveTask[],
           total_countdown:
-            item.tasks.reduce(
-              (sum: number, t: any) => sum + (t.countdown_seconds || 30),
-              0
-            ) + 30,
+            item.tasks.reduce((sum: number, t: any) => sum + (t.countdown_seconds || 30), 0) + 30,
         })
-      } else {
-        liveTaskService.getTaskGroup(item.group_id).then((group) => {
-          onLoadGroup(group)
-          const tasks: LiveTask[] = group.tasks.map((task: any, index: number) => ({
-            task_id: task.id,
-            type: task.type,
-            question: task.question as any,
-            countdown_seconds: task.countdown_seconds || 30,
-            order: index + 1,
-            correct_answer: task.correct_answer,
-          }))
-          onSetTaskGroup({
-            group_id: item.group_id,
-            title: item.title,
-            tasks: tasks,
-            total_countdown: tasks.reduce((sum, t) => sum + t.countdown_seconds, 0) + 30,
-          })
-        })
+        return
       }
+
+      liveTaskService.getTaskGroup(item.group_id).then((group) => {
+        onLoadGroup(group)
+        const tasks: LiveTask[] = group.tasks.map((task: any, index: number) => ({
+          task_id: task.id,
+          type: task.type,
+          question: task.question as any,
+          countdown_seconds: task.countdown_seconds || 30,
+          order: index + 1,
+          correct_answer: task.correct_answer,
+        }))
+        onSetTaskGroup({
+          group_id: item.group_id,
+          title: item.title,
+          tasks,
+          total_countdown: tasks.reduce((sum, t) => sum + t.countdown_seconds, 0) + 30,
+        })
+      })
     },
     []
   )

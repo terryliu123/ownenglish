@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>橡皮人 混音器 (带标签)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+
+        :root {
+            --bg-color: #FFE082;
+            --slot-empty: #FFF9C4;
+            --beat-color: #FF7043;
+            --effect-color: #26A69A;
+            --melody-color: #42A5F5;
+            --voice-color: #FFA726;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            user-select: none; 
+            -webkit-user-drag: none; 
+            -webkit-tap-highlight-color: transparent; 
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            height: 100dvh;
+            background: radial-gradient(circle, #FFECB3 0%, #FFD54F 100%);
+            font-family: 'Fredoka', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overscroll-behavior: none;
+            touch-action: none; 
+        }
+
+        header {
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 5px;
+            z-index: 10;
+            flex-shrink: 0;
+        }
+
+        h1 {
+            font-size: 28px;
+            color: #fff;
+            text-shadow: 3px 3px 0px #ff8f00, -1px -1px 0 #fff;
+            margin: 0;
+            letter-spacing: 2px;
+            animation: float 3s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        /* --- 舞台区域 --- */
+        #stage-container {
+            flex: 1;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none; 
+            -ms-overflow-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+        #stage-container::-webkit-scrollbar { display: none; }
+
+        #stage {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            padding: 0 20px;
+            gap: 15px;
+            min-width: min-content;
+            margin: 0 auto;
+            height: 100%;
+        }
+
+        .character {
+            flex-shrink: 0;
+            width: 100px;
+            height: 220px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            transition: transform 0.1s, background-color 0.2s;
+            cursor: grab;
+            margin-bottom: 20px;
+        }
+
+        .character.empty {
+            border: 3px dashed rgba(255,255,255,0.6);
+        }
+        
+        .character.empty::after {
+            content: '+';
+            font-size: 40px;
+            color: rgba(255,255,255,0.5);
+            position: absolute;
+            top: 40%;
+        }
+
+        .character.dragging-source {
+            opacity: 0.4;
+            transform: scale(0.9);
+        }
+
+        /* --- 角色形象 --- */
+        .sprunki-body {
+            width: 90%;
+            height: 60%;
+            background: #555;
+            border-radius: 40px 40px 0 0;
+            position: relative;
+            display: none;
+            border: 4px solid #333;
+            box-shadow: inset -5px 0 10px rgba(0,0,0,0.1);
+            pointer-events: none;
+        }
+
+        .sprunki-head {
+            width: 100%;
+            height: 70px;
+            position: absolute;
+            top: -50px;
+            left: 0;
+            background: inherit;
+            border-radius: 50%;
+            border: 4px solid #333;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .eyes {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .eye {
+            width: 18px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            position: relative;
+            border: 2px solid #333;
+        }
+
+        .pupil {
+            width: 6px;
+            height: 6px;
+            background: #333;
+            border-radius: 50%;
+            position: absolute;
+            top: 8px;
+            right: 4px;
+            animation: lookAround 5s infinite;
+        }
+
+        .mouth {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 10px;
+            background: #333;
+            border-radius: 0 0 20px 20px;
+            transition: height 0.1s;
+        }
+
+        /* --- [新增] 乐器标签样式 --- */
+        .instrument-label {
+            position: absolute;
+            bottom: 40px; /* 位于嘴巴上方 */
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: rgba(0, 0, 0, 0.6);
+            font-size: 16px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            pointer-events: none;
+            z-index: 5;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.2);
+        }
+
+        .character.active .sprunki-body {
+            display: block;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .character.active.bop .sprunki-head { transform: translateY(5px); }
+        .character.active.bop .sprunki-body { transform: scaleY(0.95); }
+
+        /* --- 删除按钮 --- */
+        .remove-btn {
+            position: absolute;
+            bottom: -40px;
+            left: 50%;
+            transform: translateX(-50%) scale(0);
+            width: 32px;
+            height: 32px;
+            background: #ff4d4f;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 20;
+            border: 3px solid white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        
+        .character.active .remove-btn {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+        
+        .remove-btn:active {
+            transform: translateX(-50%) scale(0.9) !important;
+            background: #d32f2f;
+        }
+
+        /* --- 底部素材库 --- */
+        #picker {
+            width: 100%;
+            height: 130px;
+            background: rgba(255, 255, 255, 0.9);
+            border-top: 6px solid #fff;
+            box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px 20px;
+            position: relative;
+            z-index: 20;
+            flex-shrink: 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .icon {
+            flex-shrink: 0;
+            width: 65px;
+            height: 65px;
+            border-radius: 18px;
+            background: #eee;
+            cursor: grab;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 28px;
+            color: white;
+            border: 4px solid rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            position: relative;
+            touch-action: none;
+        }
+
+        .icon:active { transform: scale(0.9); }
+
+        .dragging-mirror {
+            position: fixed;
+            width: 90px;
+            height: 90px;
+            pointer-events: none;
+            z-index: 1000;
+            opacity: 0.9;
+            transform: scale(1.1);
+            border-radius: 50%;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            color: white;
+            border: 4px solid white;
+            left: -999px; 
+            top: -999px;
+        }
+        
+        #delete-zone {
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 80px;
+            background: linear-gradient(to bottom, rgba(255,0,0,0.2), transparent);
+            z-index: 5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #d32f2f;
+            font-weight: bold;
+            font-size: 18px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        body.is-dragging #delete-zone { opacity: 1; }
+
+        .type-beat { background: var(--beat-color); }
+        .type-effect { background: var(--effect-color); }
+        .type-melody { background: var(--melody-color); }
+        .type-voice { background: var(--voice-color); }
+
+        #controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 10px;
+            z-index: 50;
+        }
+
+        .ctrl-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: white;
+            color: #333;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 0 #ddd;
+            transition: 0.1s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .ctrl-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #ddd; }
+        
+        #loader {
+            position: fixed; top:0; left:0; right:0; bottom:0;
+            background: var(--bg-color);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 2000;
+            transition: opacity 0.5s;
+        }
+        .start-btn {
+            padding: 15px 50px;
+            font-size: 24px;
+            font-family: 'Fredoka', sans-serif;
+            background: var(--beat-color);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 6px 0 #D84315;
+        }
+        .start-btn:active { transform: translateY(6px); box-shadow: 0 0 0; }
+
+        @keyframes popIn { 0% { transform: scale(0); } 80% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        @keyframes lookAround { 0%, 40% { transform: translate(0,0); } 45% { transform: translate(-2px, -1px); } 50% { transform: translate(2px, 0); } 100% { transform: translate(0,0); } }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <h1 style="color:#FF7043; margin-bottom: 20px; font-size: 40px;">橡皮人 混音器</h1>
+        <button class="start-btn" onclick="startGame()">▶ 点击开始</button>
+        <p style="color:#666; margin-top:20px; font-size: 14px;">请开启音量</p>
+    </div>
+
+    <div id="delete-zone">松手即可删除</div>
+
+    <header>
+        <h1>橡皮人 混音器</h1>
+    </header>
+
+    <div id="controls">
+        <button class="ctrl-btn" onclick="resetGame()" title="重置/清空">↺</button>
+        <button class="ctrl-btn" onclick="toggleMute()" title="静音">🔊</button>
+    </div>
+
+    <div id="stage-container">
+        <div id="stage">
+            <!-- 舞台将通过 JS 生成 -->
+        </div>
+    </div>
+
+    <div id="picker">
+        <!-- 素材库将通过 JS 生成 -->
+    </div>
+
+<script>
+    // --- 音频引擎 ---
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let ctx;
+    let masterGain;
+    let isMuted = false;
+    let isPlaying = false;
+    let bpm = 120;
+    let nextNoteTime = 0;
+    let timerID;
+    const TOTAL_SLOTS = 9;
+    let activeSlots = Array(TOTAL_SLOTS).fill(null); 
+    let beatCount = 0;
+
+    const SOUNDS = [
+        { id: 'beat1', type: 'beat', color: '#FF7043', icon: '🥁', name: 'Kick', pattern: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
+        { id: 'beat2', type: 'beat', color: '#FF7043', icon: '👟', name: 'Snare', pattern: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0] },
+        { id: 'beat3', type: 'beat', color: '#FF7043', icon: '👏', name: 'Clap', pattern: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0] },
+        { id: 'beat4', type: 'beat', color: '#FF7043', icon: '🎩', name: 'HiHat', pattern: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
+        { id: 'fx1', type: 'effect', color: '#26A69A', icon: '🎹', name: 'Chord', pattern: [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0] },
+        { id: 'fx2', type: 'effect', color: '#26A69A', icon: '👾', name: 'Wobble', pattern: [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0] },
+        { id: 'fx3', type: 'effect', color: '#26A69A', icon: '🔔', name: 'Bell', pattern: [1,0,0,1, 0,0,1,0, 1,0,0,0, 0,1,0,0] },
+        { id: 'mel1', type: 'melody', color: '#42A5F5', icon: '🎺', name: 'Lead', pattern: [1,0,1,0, 1,1,0,0, 1,0,1,0, 0,0,1,0] },
+        { id: 'mel2', type: 'melody', color: '#42A5F5', icon: '🎻', name: 'Bass', pattern: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,1,1] },
+        { id: 'mel3', type: 'melody', color: '#42A5F5', icon: '🕹️', name: 'Arp', pattern: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1] },
+        { id: 'vox1', type: 'voice', color: '#FFA726', icon: '🎤', name: 'Hey', pattern: [1,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0] },
+        { id: 'vox2', type: 'voice', color: '#FFA726', icon: '😲', name: 'Oh', pattern: [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0] },
+        { id: 'vox3', type: 'voice', color: '#FFA726', icon: '🤖', name: 'DaDa', pattern: [1,0,1,0, 0,0,0,0, 1,0,1,0, 0,0,0,0] },
+    ];
+
+    function playTone(freq, type, duration, time, vol=0.1) {
+        if(!ctx) return;
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.connect(gainNode);
+        gainNode.connect(masterGain);
+        gainNode.gain.setValueAtTime(vol, time);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        osc.start(time);
+        osc.stop(time + duration);
+    }
+
+    function playNoise(duration, time, vol=0.2) {
+        if(!ctx) return;
+        const bufferSize = ctx.sampleRate * duration;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = buffer;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 1000;
+        const gainNode = ctx.createGain();
+        gainNode.gain.setValueAtTime(vol, time);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(gainNode);
+        gainNode.connect(masterGain);
+        noise.start(time);
+    }
+
+    function playPopSound() {
+        if(!ctx) return;
+        playTone(400, 'sine', 0.1, ctx.currentTime, 0.2);
+    }
+
+    function triggerSound(soundId, time) {
+        switch(soundId) {
+            case 'beat1': playTone(150, 'sine', 0.1, time, 0.8); playTone(60, 'square', 0.05, time, 0.5); break;
+            case 'beat2': playNoise(0.1, time, 0.5); playTone(200, 'triangle', 0.05, time, 0.3); break;
+            case 'beat3': playNoise(0.05, time, 0.4); setTimeout(() => playNoise(0.05, time+0.01, 0.3), 10); break;
+            case 'beat4': playNoise(0.03, time, 0.15); break;
+            case 'fx1': playTone(330, 'sine', 0.3, time, 0.1); playTone(392, 'sine', 0.3, time, 0.1); playTone(523, 'sine', 0.3, time, 0.1); break;
+            case 'fx2': 
+                const osc = ctx.createOscillator(); const g = ctx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(110, time); osc.frequency.linearRampToValueAtTime(55, time+0.2);
+                g.gain.setValueAtTime(0.1, time); g.gain.linearRampToValueAtTime(0, time+0.2);
+                osc.connect(g); g.connect(masterGain); osc.start(time); osc.stop(time+0.2); break;
+            case 'fx3': playTone(880, 'sine', 0.4, time, 0.1); playTone(1760, 'sine', 0.4, time, 0.05); break;
+            case 'mel1': playTone([440, 523, 587, 659][beatCount % 4], 'triangle', 0.15, time, 0.15); break;
+            case 'mel2': playTone([110, 110, 130, 98][Math.floor(beatCount/4) % 4], 'square', 0.2, time, 0.2); break;
+            case 'mel3': playTone([523, 659, 784, 1046][beatCount % 4], 'sine', 0.1, time, 0.1); break;
+            case 'vox1': playTone(400, 'sawtooth', 0.1, time, 0.2); break;
+            case 'vox2': playTone(200, 'sine', 0.3, time, 0.3); break;
+            case 'vox3': playTone(300, 'square', 0.05, time, 0.1); break;
+        }
+    }
+
+    function scheduler() {
+        while (nextNoteTime < ctx.currentTime + 0.1) {
+            scheduleNote(beatCount, nextNoteTime);
+            nextNoteTime += 60.0 / bpm / 4; 
+            beatCount = (beatCount + 1) % 16;
+        }
+        timerID = requestAnimationFrame(scheduler);
+    }
+
+    function scheduleNote(beatNumber, time) {
+        activeSlots.forEach((soundId, index) => {
+            if (soundId) {
+                const soundData = SOUNDS.find(s => s.id === soundId);
+                if (soundData && soundData.pattern[beatNumber]) {
+                    triggerSound(soundId, time);
+                    setTimeout(() => {
+                        const charDiv = document.querySelector(`.character[data-index="${index}"]`);
+                        if(charDiv) {
+                            charDiv.classList.remove('bop');
+                            void charDiv.offsetWidth; 
+                            charDiv.classList.add('bop');
+                            const mouth = charDiv.querySelector('.mouth');
+                            if(mouth) {
+                                mouth.style.height = '18px';
+                                setTimeout(()=> mouth.style.height='10px', 100);
+                            }
+                        }
+                    }, Math.max(0, (time - ctx.currentTime) * 1000));
+                }
+            }
+        });
+    }
+
+    // --- 游戏逻辑 ---
+
+    function startGame() {
+        const loader = document.getElementById('loader');
+        loader.style.opacity = 0;
+        setTimeout(() => loader.remove(), 500);
+        
+        ctx = new AudioContext();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+
+        masterGain = ctx.createGain();
+        masterGain.gain.value = 0.5;
+        masterGain.connect(ctx.destination);
+        
+        nextNoteTime = ctx.currentTime + 0.1;
+        if(!isPlaying) {
+            isPlaying = true;
+            scheduler();
+        }
+
+        renderStage();
+        renderPicker();
+    }
+
+    function renderStage() {
+        const stage = document.getElementById('stage');
+        stage.innerHTML = '';
+        
+        for(let i=0; i<TOTAL_SLOTS; i++) {
+            const div = document.createElement('div');
+            div.className = 'character empty';
+            div.dataset.index = i;
+            div.innerHTML = ``;
+            
+            div.addEventListener('mousedown', handleStageDragStart);
+            div.addEventListener('touchstart', handleStageDragStart, {passive: false});
+            
+            stage.appendChild(div);
+        }
+
+        stage.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-btn')) {
+                e.stopPropagation();
+                const charDiv = e.target.closest('.character');
+                const idx = parseInt(charDiv.dataset.index);
+                removeCharacter(idx);
+            }
+        });
+    }
+
+    function renderPicker() {
+        const picker = document.getElementById('picker');
+        picker.innerHTML = '';
+        SOUNDS.forEach(sound => {
+            const el = document.createElement('div');
+            el.className = `icon type-${sound.type}`;
+            el.textContent = sound.icon;
+            el.dataset.id = sound.id;
+            el.addEventListener('mousedown', handlePickerDragStart);
+            el.addEventListener('touchstart', handlePickerDragStart, {passive: false});
+            picker.appendChild(el);
+        });
+    }
+
+    // --- 拖拽系统 ---
+
+    let dragData = {
+        active: false,
+        type: null,
+        soundId: null,
+        originIndex: null,
+        mirror: null
+    };
+
+    function getPointerPos(e) {
+        if (e.touches) {
+            return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        return { x: e.clientX, y: e.clientY };
+    }
+
+    function handlePickerDragStart(e) {
+        e.preventDefault(); 
+        const soundId = e.currentTarget.dataset.id;
+        const soundData = SOUNDS.find(s => s.id === soundId);
+        initDrag(e, soundId, soundData, 'new');
+    }
+
+    function handleStageDragStart(e) {
+        const charDiv = e.currentTarget;
+        const index = parseInt(charDiv.dataset.index);
+        
+        if (e.target.classList.contains('remove-btn')) return;
+        if (activeSlots[index] === null) return;
+
+        e.preventDefault();
+        const soundId = activeSlots[index];
+        const soundData = SOUNDS.find(s => s.id === soundId);
+        
+        charDiv.classList.add('dragging-source');
+        initDrag(e, soundId, soundData, 'move', index);
+    }
+
+    function initDrag(e, soundId, soundData, type, originIndex = null) {
+        dragData.active = true;
+        dragData.type = type;
+        dragData.soundId = soundId;
+        dragData.originIndex = originIndex;
+
+        const mirror = document.createElement('div');
+        mirror.className = 'dragging-mirror';
+        mirror.style.backgroundColor = soundData.color;
+        mirror.textContent = soundData.icon;
+        
+        document.body.appendChild(mirror);
+        dragData.mirror = mirror;
+        
+        document.body.classList.add('is-dragging');
+        updateMirrorPos(e);
+
+        document.addEventListener('mousemove', handleGlobalMove);
+        document.addEventListener('touchmove', handleGlobalMove, {passive: false});
+        document.addEventListener('mouseup', handleGlobalEnd);
+        document.addEventListener('touchend', handleGlobalEnd);
+    }
+
+    function updateMirrorPos(e) {
+        if (!dragData.mirror) return;
+        const pos = getPointerPos(e);
+        dragData.mirror.style.left = (pos.x - 45) + 'px';
+        dragData.mirror.style.top = (pos.y - 45) + 'px';
+    }
+
+    function handleGlobalMove(e) {
+        e.preventDefault(); 
+        if (dragData.active) updateMirrorPos(e);
+    }
+
+    function handleGlobalEnd(e) {
+        if (!dragData.active) return;
+
+        const x = e.clientX || (e.changedTouches ? e.changedTouches[0].clientX : 0);
+        const y = e.clientY || (e.changedTouches ? e.changedTouches[0].clientY : 0);
+
+        let droppedSlot = -1;
+        document.querySelectorAll('.character').forEach((char, index) => {
+            const rect = char.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                droppedSlot = index;
+            }
+        });
+
+        if (droppedSlot !== -1) {
+            if (dragData.type === 'move') {
+                removeCharacter(dragData.originIndex, false);
+            }
+            activateCharacter(droppedSlot, dragData.soundId);
+            playPopSound();
+        } else {
+            if (dragData.type === 'move') {
+                removeCharacter(dragData.originIndex, true);
+            }
+        }
+
+        if (dragData.originIndex !== null) {
+             const originChar = document.querySelector(`.character[data-index="${dragData.originIndex}"]`);
+             if(originChar) originChar.classList.remove('dragging-source');
+        }
+
+        if(dragData.mirror) dragData.mirror.remove();
+        document.body.classList.remove('is-dragging');
+        dragData = { active: false, type: null, soundId: null, originIndex: null, mirror: null };
+
+        document.removeEventListener('mousemove', handleGlobalMove);
+        document.removeEventListener('touchmove', handleGlobalMove);
+        document.removeEventListener('mouseup', handleGlobalEnd);
+        document.removeEventListener('touchend', handleGlobalEnd);
+    }
+
+    function activateCharacter(index, soundId) {
+        activeSlots[index] = soundId;
+        const soundData = SOUNDS.find(s => s.id === soundId);
+        const charDiv = document.querySelector(`.character[data-index="${index}"]`);
+        
+        charDiv.classList.remove('empty', 'dragging-source');
+        charDiv.classList.add('active');
+        charDiv.style.backgroundColor = soundData.color;
+
+        // [修改] 注入 instrument-label
+        charDiv.innerHTML = `
+            <div class="sprunki-head" style="background: ${soundData.color}">
+                <div class="eyes">
+                    <div class="eye"><div class="pupil"></div></div>
+                    <div class="eye"><div class="pupil"></div></div>
+                </div>
+            </div>
+            <div class="sprunki-body" style="background: ${soundData.color}">
+                <div class="instrument-label">${soundData.name}</div>
+                <div class="mouth"></div>
+            </div>
+            <div class="remove-btn" title="Remove">×</div>
+        `;
+        
+        charDiv.classList.remove('bop');
+        void charDiv.offsetWidth;
+        charDiv.classList.add('bop');
+    }
+
+    function removeCharacter(index, playSound = true) {
+        if (activeSlots[index] === null) return;
+        
+        activeSlots[index] = null;
+        const charDiv = document.querySelector(`.character[data-index="${index}"]`);
+        
+        if(playSound) playPopSound();
+
+        charDiv.className = 'character empty';
+        charDiv.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+        charDiv.innerHTML = ``;
+    }
+
+    function stopAll() {
+        activeSlots.fill(null);
+        beatCount = 0;
+    }
+
+    function resetGame() {
+        stopAll();
+        document.querySelectorAll('.character').forEach((el, index) => {
+            el.className = 'character empty';
+            el.style.backgroundColor = "rgba(255, 255, 255, 0.3)";
+            el.innerHTML = ``;
+        });
+        playPopSound();
+    }
+
+    function toggleMute() {
+        isMuted = !isMuted;
+        if(ctx) masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.5, ctx.currentTime, 0.1);
+        const btn = document.querySelector('#controls .ctrl-btn:nth-child(2)');
+        btn.textContent = isMuted ? '🔇' : '🔊';
+    }
+
+</script>
+</body>
+</html>

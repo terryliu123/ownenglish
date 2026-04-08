@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>3D 非洲大草原 - 完整生态版</title>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; 
+            background-color: #87CEEB; user-select: none; touch-action: none; 
+            -webkit-user-select: none;
+        }
+        
+        #ui-container {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 95%; max-width: 900px; background: rgba(40, 25, 10, 0.9); 
+            border: 2px solid #d4af37; padding: 10px; border-radius: 16px;
+            display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; 
+            backdrop-filter: blur(8px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); z-index: 100;
+        }
+
+        .card {
+            width: 50px; height: 60px; background: #f4e4bc; border-radius: 8px;
+            cursor: pointer; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; transition: all 0.1s; border: 2px solid transparent;
+            position: relative; -webkit-tap-highlight-color: transparent;
+        }
+        .card:active { transform: scale(0.95); background: #fff; }
+        .card.active { border-color: #ff8800; background: #fff8e1; transform: scale(1.05); }
+        .emoji { font-size: 22px; margin-bottom: 2px; line-height: 1; pointer-events: none; }
+        .label { font-size: 9px; font-weight: bold; color: #5d4037; text-align: center; pointer-events: none; }
+        .card.water-type { background: #e1f5fe; }
+        .card.air-type { background: #e3f2fd; border-color: #90caf9; }
+        .card.tool-type { background: #ffcccc; }
+
+        #hud {
+            position: absolute; top: 15px; left: 15px; pointer-events: none; z-index: 10;
+        }
+        h1 { margin: 0; font-size: 20px; color: #d4af37; text-shadow: 2px 2px 0px #000; font-weight: 900; letter-spacing: 1px; }
+        .sub-text { font-size: 12px; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); margin-top: 4px; }
+        .tip { color: #b9f6ca; font-weight: bold; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 4px; display: inline-block; margin-top: 6px; border: 1px solid #00e676;}
+
+        #loading {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: #87CEEB; display: flex; justify-content: center; align-items: center;
+            font-size: 20px; color: #fff; z-index: 999; font-weight: bold; transition: opacity 0.5s;
+        }
+        
+        .float-emoji {
+            position: absolute; pointer-events: none; animation: floatUp 1.5s forwards; 
+            font-size: 30px; z-index: 50; text-shadow: 0 0 5px black;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading">正在生成初始生态...</div>
+
+    <div id="hud">
+        <h1>🦁 SAVANNA LIFE</h1>
+        <div class="sub-text">单指旋转 | 双指缩放 | 点击放置</div>
+        <div class="sub-text tip">🦅 提示：老鹰会俯冲捕食兔子！</div>
+    </div>
+
+    <div id="ui-container">
+        <div class="card active" onclick="selectTool('baobab')"><div class="emoji">🌳</div><div class="label">猴面包</div></div>
+        <div class="card" onclick="selectTool('acacia')"><div class="emoji">🌿</div><div class="label">金合欢</div></div>
+        <div class="card" onclick="selectTool('bush')"><div class="emoji">🌱</div><div class="label">灌木</div></div>
+        
+        <div class="card" onclick="selectTool('rabbit')"><div class="emoji">🐇</div><div class="label">兔子</div></div>
+        <div class="card" onclick="selectTool('gazelle')"><div class="emoji">🦌</div><div class="label">瞪羚</div></div>
+        <div class="card" onclick="selectTool('zebra')"><div class="emoji">🦓</div><div class="label">斑马</div></div>
+        <div class="card" onclick="selectTool('elephant')"><div class="emoji">🐘</div><div class="label">大象</div></div>
+        <div class="card" onclick="selectTool('rhino')"><div class="emoji">🦏</div><div class="label">犀牛</div></div>
+        <div class="card" onclick="selectTool('giraffe')"><div class="emoji">🦒</div><div class="label">长颈鹿</div></div>
+
+        <div class="card" onclick="selectTool('lion')"><div class="emoji">🦁</div><div class="label">狮子</div></div>
+        <div class="card air-type" onclick="selectTool('eagle')"><div class="emoji">🦅</div><div class="label">老鹰</div></div>
+
+        <div class="card water-type" onclick="selectTool('hippo')"><div class="emoji">🦛</div><div class="label">河马</div></div>
+        <div class="card water-type" onclick="selectTool('croc')"><div class="emoji">🐊</div><div class="label">鳄鱼</div></div>
+
+        <div class="card tool-type" onclick="selectTool('remove')"><div class="emoji">❌</div><div class="label">移除</div></div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let currentTool = 'baobab';
+        let entities = [];
+        let animals = [];
+        
+        let scene, camera, renderer, controls;
+        let raycaster, pointer, placementCursor, groundPlane;
+        let isDragging = false, touchStartTime = 0;
+        const touchStartPos = new THREE.Vector2();
+
+        // 颜色配置
+        const colors = {
+            grass: 0xc2b280, water: 0x4da6ff, trunk: 0x5d4037, baobab: 0x4e342e, 
+            leaves: 0x556b2f, bush: 0x6b8e23, elephant: 0x9e9e9e, rhino: 0x757575, 
+            lion: 0xffb300, lionMane: 0x8d6e63, gazelle: 0xd2691e, giraffe: 0xffcc80, 
+            zebra: 0xffffff, hippo: 0x78909c, croc: 0x2e7d32,
+            rabbit: 0xffffff, eagle: 0x5d4037, eagleHead: 0xffffff
+        };
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 40, 280);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 70, 100);
+            camera.lookAt(0, 0, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambient);
+            const sun = new THREE.DirectionalLight(0xffeebb, 1.3);
+            sun.position.set(80, 120, -60);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+            sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
+            sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
+            scene.add(sun);
+
+            buildEnvironment();
+            spawnDefaultVegetation(); // 初始化生成植被
+
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+            
+            placementCursor = new THREE.Mesh(
+                new THREE.RingGeometry(2.5, 3, 32),
+                new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true, side: THREE.DoubleSide })
+            );
+            placementCursor.rotation.x = -Math.PI / 2;
+            scene.add(placementCursor);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.1;
+            controls.minDistance = 20; controls.maxDistance = 200;
+            controls.rotateSpeed = 0.5; controls.zoomSpeed = 0.8;
+
+            const canvas = renderer.domElement;
+            canvas.addEventListener('pointermove', onPointerMove);
+            canvas.addEventListener('pointerdown', onPointerDown);
+            canvas.addEventListener('pointerup', onPointerUp);
+            window.addEventListener('resize', onResize);
+            window.selectTool = selectTool;
+
+            setTimeout(() => {
+                const loader = document.getElementById('loading');
+                loader.style.opacity = 0;
+                setTimeout(() => loader.style.display = 'none', 500);
+            }, 500);
+        }
+
+        function buildEnvironment() {
+            const group = new THREE.Group();
+            const groundGeo = new THREE.PlaneGeometry(300, 300, 64, 64);
+            const pos = groundGeo.attributes.position;
+            for(let i=0; i<pos.count; i++){
+                const x = pos.getX(i); const y = pos.getY(i); 
+                let z = Math.sin(x*0.03) * Math.cos(y*0.03) * 3; 
+                const river = Math.sin(y * 0.02) * 35;
+                if (Math.abs(x - river) < 18) z = -6; 
+                else if (Math.abs(x - river) < 25) z = THREE.MathUtils.lerp(-6, z, (Math.abs(x - river)-18)/7);
+                pos.setZ(i, z);
+            }
+            groundGeo.computeVertexNormals();
+            groundGeo.rotateX(-Math.PI / 2);
+            groundPlane = new THREE.Mesh(groundGeo, new THREE.MeshStandardMaterial({ color: colors.grass, roughness: 1 }));
+            groundPlane.receiveShadow = true;
+            group.add(groundPlane);
+
+            const water = new THREE.Mesh(
+                new THREE.PlaneGeometry(300, 300),
+                new THREE.MeshStandardMaterial({ color: colors.water, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.75 })
+            );
+            water.rotation.x = -Math.PI / 2; water.position.y = -3;
+            group.add(water);
+
+            const m1 = new THREE.Mesh(new THREE.ConeGeometry(70, 80, 5), new THREE.MeshStandardMaterial({color:0x5d4037, flatShading:true}));
+            m1.position.set(-80, 0, -100);
+            const snow = new THREE.Mesh(new THREE.ConeGeometry(22, 25, 5), new THREE.MeshStandardMaterial({color:0xffffff}));
+            snow.position.set(0, 30, 0);
+            m1.add(snow);
+            group.add(m1);
+
+            scene.add(group);
+        }
+
+        // --- 初始化植被 ---
+        function spawnDefaultVegetation() {
+            for(let i=0; i<60; i++) {
+                const x = (Math.random() - 0.5) * 240;
+                const z = (Math.random() - 0.5) * 240;
+                const h = getTerrainH(x, -z);
+                
+                if(h > -2) { // 只在陆地上生成
+                    const type = Math.random() > 0.8 ? 'acacia' : 'bush'; // 20% 树，80% 草
+                    const ent = createEntity(type, new THREE.Vector3(x, h, z));
+                    scene.add(ent);
+                    entities.push(ent);
+                }
+            }
+        }
+
+        function createEntity(type, pos) {
+            const group = new THREE.Group();
+            group.position.copy(pos);
+            group.rotation.y = Math.random() * Math.PI * 2;
+
+            const addLegs = (color, w, h, dx, dz, y) => {
+                const g = new THREE.Group();
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(w,h,w), new THREE.MeshStandardMaterial({color:color}));
+                const posArr = [[-dx, dz], [dx, dz], [-dx, -dz], [dx, -dz]];
+                posArr.forEach(p => { const l = leg.clone(); l.position.set(p[0], y, p[1]); g.add(l); });
+                return g;
+            };
+
+            switch(type) {
+                // 植被
+                case 'baobab':
+                    const bT = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 2.5, 6, 7), new THREE.MeshStandardMaterial({color:colors.baobab}));
+                    bT.position.y=3; bT.castShadow=true;
+                    const bL = new THREE.Group();
+                    for(let i=0; i<4; i++){
+                        const l = new THREE.Mesh(new THREE.DodecahedronGeometry(1.8), new THREE.MeshStandardMaterial({color:colors.leaves}));
+                        l.position.set((Math.random()-0.5)*3, 6+Math.random(), (Math.random()-0.5)*3);
+                        bL.add(l);
+                    }
+                    group.add(bT, bL);
+                    break;
+                case 'acacia':
+                    const aT = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.5, 6), new THREE.MeshStandardMaterial({color:colors.trunk}));
+                    aT.position.y=3; aT.castShadow=true;
+                    const aL = new THREE.Mesh(new THREE.CylinderGeometry(5, 2, 1.5, 6), new THREE.MeshStandardMaterial({color:colors.leaves, flatShading:true}));
+                    aL.position.y=6; aL.castShadow=true;
+                    group.add(aT, aL);
+                    break;
+                case 'bush':
+                    const bush = new THREE.Mesh(new THREE.DodecahedronGeometry(1.3), new THREE.MeshStandardMaterial({color:colors.bush}));
+                    bush.position.y=0.6; bush.scale.y=0.6; bush.castShadow=true;
+                    group.add(bush);
+                    break;
+
+                // 新增动物：兔子
+                case 'rabbit':
+                    const raB = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.9), new THREE.MeshStandardMaterial({color:colors.rabbit}));
+                    raB.position.y = 0.5; raB.castShadow = true;
+                    const raH = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.5), new THREE.MeshStandardMaterial({color:colors.rabbit}));
+                    raH.position.set(0, 0.8, 0.5);
+                    const raEars = new THREE.Group();
+                    const ear = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.2), new THREE.MeshStandardMaterial({color:colors.rabbit}));
+                    const e1 = ear.clone(); e1.position.set(-0.15, 1.2, 0.5);
+                    const e2 = ear.clone(); e2.position.set(0.15, 1.2, 0.5);
+                    raEars.add(e1, e2);
+                    group.add(raB, raH, raEars);
+                    setupAI(group, 'land', 0.12, 'rabbit'); // 速度很快
+                    break;
+
+                // 新增动物：老鹰
+                case 'eagle':
+                    const eaB = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 1.4), new THREE.MeshStandardMaterial({color:colors.eagle}));
+                    eaB.castShadow = true;
+                    const eaWings = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.1, 1.2), new THREE.MeshStandardMaterial({color:colors.eagle}));
+                    eaWings.position.y = 0.2;
+                    const eaHead = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.6), new THREE.MeshStandardMaterial({color:colors.eagleHead}));
+                    eaHead.position.set(0, 0.3, 0.9);
+                    const eaBeak = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.4), new THREE.MeshStandardMaterial({color:0xffcc00}));
+                    eaBeak.rotation.x = -Math.PI/2; eaBeak.position.set(0, 0.3, 1.3);
+                    group.add(eaB, eaWings, eaHead, eaBeak);
+                    group.position.y += 15; // 初始高度
+                    setupAI(group, 'air', 0.15, 'eagle'); // 飞行单位
+                    break;
+
+                // 原有动物
+                case 'elephant':
+                    const eB = new THREE.Mesh(new THREE.BoxGeometry(3.5, 3, 5), new THREE.MeshStandardMaterial({color:colors.elephant}));
+                    eB.position.y=3.5; eB.castShadow=true;
+                    const eH = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.5, 2.5), new THREE.MeshStandardMaterial({color:colors.elephant}));
+                    eH.position.set(0, 4.5, 3);
+                    const eTr = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 3), new THREE.MeshStandardMaterial({color:colors.elephant}));
+                    eTr.rotation.x=0.5; eTr.position.set(0, 3, 4.8);
+                    group.add(eB, eH, eTr, addLegs(colors.elephant, 0.8, 2.5, 1.2, 1.8, 1.25));
+                    setupAI(group, 'land', 0.03, 'elephant');
+                    break;
+                case 'rhino':
+                    const rB = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 4.5), new THREE.MeshStandardMaterial({color:colors.rhino}));
+                    rB.position.y=2.5; rB.castShadow=true;
+                    const rH = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2, 2.5), new THREE.MeshStandardMaterial({color:colors.rhino}));
+                    rH.position.set(0, 3.2, 3);
+                    const rHorn = new THREE.Mesh(new THREE.ConeGeometry(0.3, 1.5), new THREE.MeshStandardMaterial({color:0xffffff}));
+                    rHorn.rotation.x=0.6; rHorn.position.set(0, 3.8, 4.2);
+                    group.add(rB, rH, rHorn, addLegs(colors.rhino, 0.7, 1.5, 1, 1.5, 0.75));
+                    setupAI(group, 'land', 0.035, 'rhino');
+                    break;
+                case 'gazelle':
+                    const gB = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 2), new THREE.MeshStandardMaterial({color:colors.gazelle}));
+                    gB.position.y=1.8; gB.castShadow=true;
+                    const gN = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.5), new THREE.MeshStandardMaterial({color:colors.gazelle}));
+                    gN.position.set(0, 2.5, 0.8); gN.rotation.x=-0.3;
+                    const gH = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1), new THREE.MeshStandardMaterial({color:0x333333}));
+                    gH.position.set(0, 3.4, 0.7); gH.rotation.x=-0.2;
+                    group.add(gB, gN, gH, addLegs(colors.gazelle, 0.2, 1.8, 0.3, 0.8, 0.9));
+                    setupAI(group, 'land', 0.09, 'gazelle');
+                    break;
+                case 'lion':
+                    const lB = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 2.5), new THREE.MeshStandardMaterial({color:colors.lion}));
+                    lB.position.y=1.4; lB.castShadow=true;
+                    const lH = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), new THREE.MeshStandardMaterial({color:colors.lion}));
+                    lH.position.set(0, 2, 1.5);
+                    const lM = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 0.5), new THREE.MeshStandardMaterial({color:colors.lionMane}));
+                    lM.position.set(0, 2, 1.1);
+                    group.add(lB, lH, lM, addLegs(colors.lion, 0.35, 1.2, 0.5, 1, 0.6));
+                    setupAI(group, 'land', 0.07, 'lion');
+                    break;
+                case 'giraffe':
+                    const jiB = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2, 2.5), new THREE.MeshStandardMaterial({color:colors.giraffe}));
+                    jiB.position.y=3.5; jiB.rotation.x=-0.2; jiB.castShadow=true;
+                    const jiN = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.5, 0.6), new THREE.MeshStandardMaterial({color:colors.giraffe}));
+                    jiN.position.set(0, 6, 1.5); jiN.rotation.x=0.2;
+                    group.add(jiB, jiN, addLegs(colors.giraffe, 0.3, 3.5, 0.8, 1, 1.75));
+                    setupAI(group, 'land', 0.04, 'giraffe');
+                    break;
+                case 'zebra':
+                    const zB = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.6, 2.8), new THREE.MeshStandardMaterial({color:colors.zebra}));
+                    zB.position.y=2; zB.castShadow=true;
+                    const zN = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), new THREE.MeshStandardMaterial({color:colors.zebra}));
+                    zN.position.set(0, 2.8, 1.4); zN.rotation.x=0.5;
+                    const zM = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.5, 0.9), new THREE.MeshStandardMaterial({color:0x222222}));
+                    zM.position.set(0, 3, 1.4); zM.rotation.x=0.5;
+                    group.add(zB, zN, zM, addLegs(colors.zebra, 0.3, 1.8, 0.5, 1.2, 1));
+                    setupAI(group, 'land', 0.06, 'zebra');
+                    break;
+                case 'hippo':
+                    const hB = new THREE.Mesh(new THREE.BoxGeometry(3, 2, 4.5), new THREE.MeshStandardMaterial({color:colors.hippo}));
+                    hB.position.y=0; hB.castShadow=true;
+                    const hH = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2.5), new THREE.MeshStandardMaterial({color:colors.hippo}));
+                    hH.position.set(0, 0.5, 2.5);
+                    const hS = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 1.5), new THREE.MeshStandardMaterial({color:0x8aacc8}));
+                    hS.position.set(0, 0.2, 3.5);
+                    group.add(hB, hH, hS);
+                    setupAI(group, 'water', 0.02, 'hippo');
+                    break;
+                case 'croc':
+                    const cB = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 5), new THREE.MeshStandardMaterial({color:colors.croc}));
+                    cB.position.y=-0.5; 
+                    const cT = new THREE.Mesh(new THREE.ConeGeometry(0.7, 4, 4), new THREE.MeshStandardMaterial({color:colors.croc}));
+                    cT.rotation.x=-Math.PI/2; cT.position.set(0, -0.5, -4);
+                    group.add(cB, cT);
+                    setupAI(group, 'water', 0.03, 'croc');
+                    break;
+            }
+            return group;
+        }
+
+        function setupAI(group, type, speed, species) {
+            group.userData = { 
+                isAnimal: true, type: type, speed: speed, baseSpeed: speed,
+                species: species, turnTimer: 0, targetRot: group.rotation.y, eatCooldown: 0
+            };
+            animals.push(group);
+        }
+
+        function getTerrainH(x, z_flipped) {
+            let h = Math.sin(x*0.03) * Math.cos(z_flipped*0.03) * 3; 
+            const r = Math.sin(z_flipped * 0.02) * 35;
+            if (Math.abs(x - r) < 18) h = -6;
+            else if (Math.abs(x - r) < 25) h = THREE.MathUtils.lerp(-6, h, (Math.abs(x - r)-18)/7);
+            return h;
+        }
+
+        // --- 核心：生态逻辑 ---
+        function updateAnimals() {
+            for (let i = animals.length - 1; i >= 0; i--) {
+                const a = animals[i];
+                const d = a.userData;
+
+                if(d.eatCooldown > 0) d.eatCooldown--;
+
+                let isHunting = false;
+                let targetY = null;
+
+                // 1. 狮子逻辑 (增加吃兔子)
+                if (d.species === 'lion' && d.eatCooldown <= 0) {
+                    let closestPrey = null; let minDistance = 25;
+                    for (let j = 0; j < animals.length; j++) {
+                        const other = animals[j];
+                        if (other !== a && (['gazelle','zebra','rabbit'].includes(other.userData.species))) {
+                            const dist = a.position.distanceTo(other.position);
+                            if (dist < minDistance) { minDistance = dist; closestPrey = other; }
+                        }
+                    }
+                    if (closestPrey) {
+                        isHunting = true;
+                        d.targetRot = Math.atan2(closestPrey.position.x - a.position.x, closestPrey.position.z - a.position.z);
+                        d.speed = d.baseSpeed * 2.2; 
+                        if (minDistance < 3.5) {
+                            showFloatingEmoji(closestPrey.position, '🍖'); showFloatingEmoji(a.position, '🦁 饱了');
+                            removeEntity(closestPrey); d.eatCooldown = 300; d.speed = d.baseSpeed; isHunting = false;
+                        }
+                    }
+                }
+
+                // 2. 老鹰逻辑 (飞行 + 俯冲)
+                if (d.species === 'eagle') {
+                    // 默认高空飞行高度
+                    const groundH = getTerrainH(a.position.x, -a.position.z);
+                    let cruiseAlt = groundH + 15; 
+                    
+                    if(d.eatCooldown <= 0) {
+                        let prey = null; let minD = 40;
+                        for(let j=0; j<animals.length; j++){
+                            const t = animals[j];
+                            if(t.userData.species === 'rabbit'){
+                                const dist = a.position.distanceTo(t.position);
+                                if(dist < minD) { minD = dist; prey = t; }
+                            }
+                        }
+                        if(prey) {
+                            isHunting = true;
+                            d.targetRot = Math.atan2(prey.position.x - a.position.x, prey.position.z - a.position.z);
+                            d.speed = d.baseSpeed * 1.5; // 俯冲加速
+                            targetY = prey.position.y + 1; // 目标高度：地面上方
+                            
+                            if(minD < 3) {
+                                showFloatingEmoji(prey.position, '💀'); showFloatingEmoji(a.position, '🦅 抓到了!');
+                                removeEntity(prey); d.eatCooldown = 400;
+                            }
+                        }
+                    }
+                    
+                    // 飞行高度平滑过渡
+                    const desiredY = isHunting && targetY !== null ? targetY : cruiseAlt;
+                    a.position.y = THREE.MathUtils.lerp(a.position.y, desiredY, 0.05);
+                }
+                
+                // 3. 鳄鱼逻辑
+                if (d.species === 'croc' && d.eatCooldown <= 0) {
+                    for (let j = 0; j < animals.length; j++) {
+                        const other = animals[j];
+                        if (other.userData.type === 'land' && other.position.y < -2.5 
+                            && !['elephant','rhino'].includes(other.userData.species)) {
+                            const dist = a.position.distanceTo(other.position);
+                            if (dist < 4) {
+                                showFloatingEmoji(other.position, '🐊 咬!');
+                                removeEntity(other); d.eatCooldown = 200;
+                            }
+                        }
+                    }
+                }
+
+                if (!isHunting && d.species === 'lion') d.speed = THREE.MathUtils.lerp(d.speed, d.baseSpeed, 0.1);
+
+                // 移动
+                a.translateZ(d.speed);
+                
+                // 地形与转向逻辑
+                if(d.type !== 'air') {
+                    const fwd = new THREE.Vector3(0,0,3).applyAxisAngle(new THREE.Vector3(0,1,0), a.rotation.y);
+                    const nextP = a.position.clone().add(fwd);
+                    const nextH = getTerrainH(nextP.x, -nextP.z);
+                    let turn = false; const mapLimit = 140;
+
+                    if(d.type === 'land') {
+                        if(nextH < -3 || Math.abs(nextP.x) > mapLimit || Math.abs(nextP.z) > mapLimit) turn = true;
+                        a.position.y = THREE.MathUtils.lerp(a.position.y, getTerrainH(a.position.x, -a.position.z), 0.2);
+                    } else {
+                        if(nextH > -4 || Math.abs(nextP.x) > mapLimit || Math.abs(nextP.z) > mapLimit) turn = true;
+                    }
+
+                    if (!isHunting) {
+                        if(turn) { d.targetRot = a.rotation.y + Math.PI; d.turnTimer = 30; } 
+                        else {
+                            d.turnTimer--;
+                            if(d.turnTimer <= 0 && Math.random()>0.95) { // 兔子更神经质
+                                d.targetRot = Math.random() * Math.PI * 2;
+                                d.turnTimer = d.species==='rabbit'?40:100; 
+                            }
+                        }
+                    } else if (turn) { d.targetRot = a.rotation.y + Math.PI; d.eatCooldown = 60; }
+                } else {
+                    // 空中单位转向逻辑 (边界检查)
+                    if(Math.abs(a.position.x)>145 || Math.abs(a.position.z)>145) {
+                        d.targetRot = Math.atan2(-a.position.x, -a.position.z);
+                    } else if(!isHunting && Math.random()>0.99) {
+                         d.targetRot = Math.random() * Math.PI * 2;
+                    }
+                }
+                
+                a.rotation.y += (d.targetRot - a.rotation.y) * (d.species==='rabbit'?0.2:0.05); // 兔子转向快
+                if(d.species!=='croc' && d.type!=='air') a.rotation.z = Math.sin(Date.now()*(d.species==='rabbit'?0.02:0.005) + a.id)*0.02;
+            }
+        }
+
+        function removeEntity(object) {
+            if(!object) return;
+            scene.remove(object);
+            let idx = entities.indexOf(object); if(idx > -1) entities.splice(idx, 1);
+            idx = animals.indexOf(object); if(idx > -1) animals.splice(idx, 1);
+        }
+
+        function showFloatingEmoji(pos, text) {
+            const div = document.createElement('div');
+            div.className = 'float-emoji'; div.innerText = text;
+            const vec = pos.clone(); vec.project(camera);
+            const x = (vec.x * .5 + .5) * window.innerWidth;
+            const y = (-(vec.y * .5) + .5) * window.innerHeight;
+            div.style.left = x + 'px'; div.style.top = y + 'px';
+            document.body.appendChild(div); setTimeout(() => div.remove(), 1500);
+        }
+
+        function selectTool(name) {
+            currentTool = name;
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            if(name === 'remove') placementCursor.material.color.setHex(0xff3333);
+            else if(name === 'hippo' || name === 'croc') placementCursor.material.color.setHex(0x4da6ff);
+            else placementCursor.material.color.setHex(0xffffff);
+        }
+
+        function onPointerDown(e) {
+            if(e.target.closest('.card') || e.target.closest('#ui-container')) return;
+            isDragging = false; touchStartTime = Date.now();
+            touchStartPos.set(e.clientX, e.clientY);
+            updateCursorPosition(e);
+        }
+        function onPointerMove(e) {
+            updateCursorPosition(e);
+            if (Math.abs(e.clientX - touchStartPos.x) > 5 || Math.abs(e.clientY - touchStartPos.y) > 5) isDragging = true;
+        }
+        function onPointerUp(e) {
+            if(isDragging || e.target.closest('.card') || e.target.closest('#ui-container') || Date.now() - touchStartTime > 500) return;
+            handlePlacement();
+        }
+        function updateCursorPosition(e) {
+            pointer.set((e.clientX/window.innerWidth)*2-1, -(e.clientY/window.innerHeight)*2+1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObject(groundPlane);
+            if(hits.length > 0) {
+                const pt = hits[0].point; const h = getTerrainH(pt.x, -pt.z);
+                const isWater = h < -3; const isWaterAni = (currentTool==='hippo'||currentTool==='croc');
+                // 老鹰可以在任何地方放置(会飞到空中)
+                if(currentTool === 'eagle' || currentTool === 'remove') {
+                    placementCursor.position.set(pt.x, h+0.2, pt.z);
+                    placementCursor.material.color.setHex(currentTool==='remove'?0xff3333:0xffffff);
+                } else {
+                    placementCursor.position.set(pt.x, h+0.2, pt.z);
+                    if((isWater && !isWaterAni) || (!isWater && isWaterAni)) placementCursor.material.color.setHex(0xff3333); 
+                    else placementCursor.material.color.setHex(isWaterAni?0x4da6ff:0xffffff);
+                }
+            }
+        }
+
+        function handlePlacement() {
+            raycaster.setFromCamera(pointer, camera);
+            if(currentTool==='remove') {
+                const all=[]; entities.forEach(en=>en.traverse(c=>{if(c.isMesh){c.userData.root=en; all.push(c)}}));
+                const hits = raycaster.intersectObjects(all);
+                if(hits.length>0 && hits[0].object.userData.root) removeEntity(hits[0].object.userData.root);
+                return;
+            }
+            const hits = raycaster.intersectObject(groundPlane);
+            if(hits.length>0) {
+                const pt = hits[0].point; const h = getTerrainH(pt.x, -pt.z);
+                const isWater = h < -3; const isWaterAni = (currentTool==='hippo'||currentTool==='croc');
+                if(currentTool !== 'eagle' && ((isWater && !isWaterAni) || (!isWater && isWaterAni))) return; 
+                
+                pt.y = isWaterAni ? -3.5 : h;
+                const ent = createEntity(currentTool, pt);
+                scene.add(ent); entities.push(ent);
+                ent.scale.set(0,0,0);
+                let s=0; const t=setInterval(()=>{s+=0.2; if(s>=1){ent.scale.set(1,1,1);clearInterval(t)}else ent.scale.set(s,s,s)}, 16);
+            }
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updateAnimals();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

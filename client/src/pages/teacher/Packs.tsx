@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
 import {
   useStudyPacks,
@@ -79,7 +80,7 @@ export default function Packs() {
   const toggleAiPackModuleType = useCallback((types: ModuleType[]) => sp.setAiPackModuleTypes(types), [sp.setAiPackModuleTypes])
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="packs" />}>
+    <Layout sidebar={<TeacherSidebar activePage="packs" />} leftSidebar={<TeacherLeftSidebar activePage="packs" />}>
       <StudyPacksHeader
         packs={sp.packs}
         membership={sp.membership}

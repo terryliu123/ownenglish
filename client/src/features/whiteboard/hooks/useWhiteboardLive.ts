@@ -1,195 +1,431 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
+import axios from 'axios'
 import { useAppStore } from '../../../stores/app-store'
-import { liveTaskService } from '../../../services/api'
-// ClassPresenceInfo not needed - using Maps from hook state
+import { api, liveTaskService } from '../../../services/api'
 import type { LiveTaskGroup } from '../../../services/api'
-import type { LiveChallengeSession } from '../../../services/websocket'
+import type { LiveChallengeSession, TaskHistoryItem } from '../../../services/websocket'
+import type { ActiveDanmu, DanmuConfig, ActiveAtmosphereEffect, AtmosphereEffectType } from '../../danmu/types/danmu'
+import { debugLive } from '../../live-runtime/debug'
+import {
+  isChallengeFinished,
+  normalizeChallengePayload,
+  normalizeRoomInfoPayload,
+} from '../../live-runtime/challengeRuntime'
 
 interface WebSocketMessage {
   type: string
-  data: any
-  timestamp: number
-  userId?: string
+  timestamp?: number
+  [key: string]: unknown
 }
 
 interface StudentSubmission {
   taskId: string
   studentId: string
   studentName: string
-  answer: any
+  answer: unknown
   submittedAt: string
 }
 
+interface LiveRoomStudent {
+  id: string
+  name: string
+  avatar?: string
+  joinedAt?: string
+}
+
+interface ClassroomSessionSummary {
+  id: string
+  class_id: string
+  teacher_id: string
+  title: string | null
+  entry_mode: string
+  status: string
+  started_at: string
+}
+
 export interface WhiteboardLiveState {
-  // 连接状态
   isConnected: boolean
   isConnecting: boolean
   error: string | null
-
-  // 学生状态
-  onlineStudents: Map<string, { id: string; name: string; avatar?: string; joinedAt: string }>
+  roomInfoHydrated: boolean
+  onlineStudents: Map<string, LiveRoomStudent>
   classroomStudents: Map<string, { id: string; name: string }>
   onlineCount: number
   classroomCount: number
-
-  // 任务状态
   activeTaskGroup: LiveTaskGroup | null
   submissions: StudentSubmission[]
   submissionCount: number
-
-  // 分享请求
   pendingShares: any[]
-
-  // 挑战状态
   currentChallenge: LiveChallengeSession | null
+  liveSessionId: string | null
+  currentClassroomSession: ClassroomSessionSummary | null
+  elapsedSeconds: number
+  taskHistory: TaskHistoryItem[]
+  endedTaskGroups: { groupId: string; endedAt: string }[]
+  // 寮瑰箷閰嶇疆
+  danmuConfig: DanmuConfig
+  // 娲昏穬寮瑰箷鍒楄〃
+  activeDanmus: ActiveDanmu[]
+  // 娲昏穬姘寸エ鏁堟灉
+  activeEffects: ActiveAtmosphereEffect[]
 }
 
-const getSharesStorageKey = (classId: string | null) => `whiteboard_shares_${classId || 'global'}`
+function mapStudentsToMap<T extends { id: string; name: string }>(students?: T[]) {
+  return new Map((students || []).map((student) => [student.id, student]))
+}
+
+function buildActiveTaskGroup(classId: string | null, msg: any): LiveTaskGroup {
+  return {
+    id: msg.group_id || msg.id || '',
+    title: msg.title || '',
+    tasks: msg.tasks || [],
+    task_count: msg.tasks?.length || msg.task_count || 0,
+    class_id: classId || '',
+    status: 'ready',
+    created_at: msg.created_at || new Date().toISOString(),
+    updated_at: msg.updated_at,
+  } as LiveTaskGroup
+}
+
+function hasOwnKey(value: unknown, key: string) {
+  return Boolean(value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key))
+}
+
+function getCurrentTaskGroupFromPayload(payload: any) {
+  if (hasOwnKey(payload?.room_state, 'current_task_group')) {
+    return payload.room_state.current_task_group ?? null
+  }
+  if (hasOwnKey(payload, 'current_task_group')) {
+    return payload.current_task_group ?? null
+  }
+  if (hasOwnKey(payload?.room_info?.room_state, 'current_task_group')) {
+    return payload.room_info.room_state.current_task_group ?? null
+  }
+  if (hasOwnKey(payload?.room_info, 'current_task_group')) {
+    return payload.room_info.current_task_group ?? null
+  }
+  return undefined
+}
+
+function getCurrentChallengeFromPayload(payload: any) {
+  if (hasOwnKey(payload?.room_state, 'current_challenge')) {
+    return payload.room_state.current_challenge ?? null
+  }
+  if (hasOwnKey(payload, 'current_challenge')) {
+    return payload.current_challenge ?? null
+  }
+  if (hasOwnKey(payload?.room_info?.room_state, 'current_challenge')) {
+    return payload.room_info.room_state.current_challenge ?? null
+  }
+  if (hasOwnKey(payload?.room_info, 'current_challenge')) {
+    return payload.room_info.current_challenge ?? null
+  }
+  return undefined
+}
+
+function getLiveSessionIdFromPayload(payload: any) {
+  if (hasOwnKey(payload?.room_state, 'live_session_id')) {
+    return payload.room_state.live_session_id ?? null
+  }
+  if (hasOwnKey(payload, 'live_session_id')) {
+    return payload.live_session_id ?? null
+  }
+  if (hasOwnKey(payload?.room_info?.room_state, 'live_session_id')) {
+    return payload.room_info.room_state.live_session_id ?? null
+  }
+  if (hasOwnKey(payload?.room_info, 'live_session_id')) {
+    return payload.room_info.live_session_id ?? null
+  }
+  return undefined
+}
+
+function readJwtExp(token: string | null): number | null {
+  if (!token) return null
+  try {
+    const [, payload] = token.split('.')
+    if (!payload) return null
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = JSON.parse(window.atob(normalized))
+    return typeof decoded.exp === 'number' ? decoded.exp : null
+  } catch {
+    return null
+  }
+}
 
 export function useWhiteboardLive(classId: string | null) {
   const { user, token } = useAppStore()
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const shareFallbackTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const pendingPublishRef = useRef<{
+    groupId: string
+    resolve: () => void
+    reject: (error: Error) => void
+    timeout: ReturnType<typeof setTimeout>
+  } | null>(null)
+  const socketWaitersRef = useRef<Array<{ resolve: () => void; reject: (error: Error) => void }>>([])
   const isConnectingRef = useRef(false)
-
-  // 从 localStorage 加载保存的分享
-  const loadSavedShares = useCallback(() => {
-    if (!classId) return []
-    try {
-      const saved = localStorage.getItem(getSharesStorageKey(classId))
-      console.log('[WhiteboardLive] Loading shares:', { classId, saved: saved ? JSON.parse(saved) : [] })
-      return saved ? JSON.parse(saved) : []
-    } catch (e) {
-      console.error('[WhiteboardLive] Failed to load shares:', e)
-      return []
-    }
-  }, [classId])
 
   const [state, setState] = useState<WhiteboardLiveState>({
     isConnected: false,
     isConnecting: false,
     error: null,
+    roomInfoHydrated: false,
     onlineStudents: new Map(),
     classroomStudents: new Map(),
     onlineCount: 0,
     classroomCount: 0,
+    activeTaskGroup: null,
     submissions: [],
     submissionCount: 0,
-    pendingShares: loadSavedShares(),
-    activeTaskGroup: null,
+    pendingShares: [],
     currentChallenge: null,
+    liveSessionId: null,
+    currentClassroomSession: null,
+    elapsedSeconds: 0,
+    taskHistory: [],
+    endedTaskGroups: [],
+    danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)' },
+    activeEffects: [],
+    activeDanmus: [],
   })
 
-  // 当 classId 变化时，重新加载分享请求
+  const getFreshAccessToken = useCallback(async () => {
+    const currentToken = localStorage.getItem('token') || token
+    if (!currentToken) {
+      return null
+    }
+
+    const exp = readJwtExp(currentToken)
+    const now = Math.floor(Date.now() / 1000)
+    const isExpired = exp !== null && exp <= now
+    const shouldRefresh = exp !== null && exp - now <= 60
+    if (!shouldRefresh) {
+      return currentToken
+    }
+
+    const refreshToken = localStorage.getItem('refresh_token')
+    if (!refreshToken) {
+      return isExpired ? null : currentToken
+    }
+
+    try {
+      const response = await axios.post('/api/v1/auth/refresh', {
+        refresh_token: refreshToken,
+      })
+      const accessToken = response.data?.access_token as string | undefined
+      const nextRefreshToken = response.data?.refresh_token as string | undefined
+      if (!accessToken) {
+        return currentToken
+      }
+
+      localStorage.setItem('token', accessToken)
+      if (nextRefreshToken) {
+        localStorage.setItem('refresh_token', nextRefreshToken)
+      }
+      useAppStore.getState().setToken(accessToken)
+      return accessToken
+    } catch (error) {
+      console.error('[WhiteboardLive] Failed to refresh access token before websocket connect:', error)
+      return isExpired ? null : currentToken
+    }
+  }, [token])
+
   useEffect(() => {
     if (!classId) return
-    const savedShares = loadSavedShares()
-    console.log('[WhiteboardLive] Reloading for classId:', classId, { shares: savedShares })
-    setState(prev => ({ ...prev, pendingShares: savedShares, activeTaskGroup: null, currentChallenge: null }))
-  }, [classId, loadSavedShares])
-
-  // 保存 pendingShares 到 localStorage
-  useEffect(() => {
-    if (!classId) return
-    localStorage.setItem(getSharesStorageKey(classId), JSON.stringify(state.pendingShares))
-  }, [state.pendingShares, classId])
-
-  // 清理存储（下课时调用）
-  const clearShares = useCallback(() => {
-    if (!classId) return
-    localStorage.removeItem(getSharesStorageKey(classId))
-    setState(prev => ({ ...prev, pendingShares: [], activeTaskGroup: null, currentChallenge: null }))
+    setState((prev) => ({
+      ...prev,
+      onlineStudents: new Map(),
+      classroomStudents: new Map(),
+      onlineCount: 0,
+      classroomCount: 0,
+      activeTaskGroup: null,
+      submissions: [],
+      submissionCount: 0,
+      pendingShares: [],
+      currentChallenge: null,
+      liveSessionId: null,
+      currentClassroomSession: null,
+      elapsedSeconds: 0,
+      taskHistory: [],
+      endedTaskGroups: [],
+      error: null,
+      roomInfoHydrated: false,
+      danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)' },
+    activeEffects: [],
+      activeDanmus: [],
+    }))
   }, [classId])
 
-  // 获取 WebSocket URL
-  const getWsUrl = useCallback(() => {
+  const getWsUrl = useCallback((accessToken: string) => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    // Use Vite dev server proxy in development (port 5173)
     const host = window.location.host
-    return `${protocol}//${host}/api/v1/live/ws?token=${token}&class_id=${classId}`
-  }, [token, classId])
+    return `${protocol}//${host}/api/v1/live/ws?token=${encodeURIComponent(accessToken)}&class_id=${encodeURIComponent(classId || '')}`
+  }, [classId])
 
-  // 加载班级 presence 信息
   const loadClassPresence = useCallback(async () => {
     if (!classId) return
     try {
       const presence = await liveTaskService.getClassPresence(classId)
-      setState(prev => ({
+      setState((prev) => ({
         ...prev,
-        onlineStudents: new Map(presence.online_students?.map((s: any) => [s.id, s]) || []),
-        classroomStudents: new Map(presence.classroom_students?.map((s: any) => [s.id, s]) || []),
+        onlineStudents: mapStudentsToMap(
+          (presence.online_students || []).map((student: any) => ({
+            ...student,
+            joinedAt: student.joinedAt || student.joined_at || new Date().toISOString(),
+          })),
+        ),
+        classroomStudents: mapStudentsToMap(presence.classroom_students || []),
         onlineCount: presence.online_student_count || 0,
         classroomCount: presence.classroom_student_count || 0,
       }))
-    } catch (e) {
-      console.error('[WhiteboardLive] Failed to load class presence:', e)
+    } catch (error) {
+      console.error('[WhiteboardLive] Failed to load class presence:', error)
     }
   }, [classId])
 
-  // 处理 WebSocket 消息
-  const handleMessage = useCallback((message: WebSocketMessage) => {
-    console.log('[WhiteboardLive] Received:', message.type, message)
+  const hydrateFromRoomPayload = useCallback((payload: any) => {
+    if (!payload) return
+    const normalizedPayload = normalizeRoomInfoPayload(
+      (payload.room_info ? { ...payload, room_info: payload.room_info } : payload) as Record<string, unknown>,
+    )
+    const roomInfo: any = normalizedPayload
+    const roomState: any = normalizedPayload.room_state || roomInfo.room_state || {}
+    const currentTaskGroup = getCurrentTaskGroupFromPayload(payload)
+    const currentChallenge = getCurrentChallengeFromPayload(normalizedPayload)
+    const liveSessionId = getLiveSessionIdFromPayload(normalizedPayload)
+    const taskHistory =
+      Array.isArray(roomState.task_history)
+        ? roomState.task_history
+        : (Array.isArray(roomInfo.task_history) ? roomInfo.task_history : undefined)
 
-    // 所有消息数据都直接在 message 对象中，不是嵌套在 message.data 中
+    setState((prev) => ({
+      ...prev,
+      onlineStudents: hasOwnKey(roomInfo, 'online_students')
+        ? mapStudentsToMap(
+            (roomInfo.online_students || []).map((student: any) => ({
+              ...student,
+              joinedAt: student.joinedAt || student.joined_at || new Date().toISOString(),
+            })),
+          )
+        : prev.onlineStudents,
+      classroomStudents:
+        hasOwnKey(roomState, 'classroom_students') || hasOwnKey(roomInfo, 'classroom_students')
+          ? mapStudentsToMap(roomState.classroom_students || roomInfo.classroom_students || [])
+          : prev.classroomStudents,
+      onlineCount: hasOwnKey(roomInfo, 'online_student_count')
+        ? Number(roomInfo.online_student_count || 0)
+        : (hasOwnKey(roomInfo, 'student_count') ? Number(roomInfo.student_count || 0) : prev.onlineCount),
+      classroomCount: hasOwnKey(roomInfo, 'classroom_student_count')
+        ? Number(roomInfo.classroom_student_count || 0)
+        : (hasOwnKey(roomInfo, 'student_count') ? Number(roomInfo.student_count || 0) : prev.classroomCount),
+      pendingShares:
+        hasOwnKey(roomState, 'pending_shares') || hasOwnKey(roomInfo, 'pending_shares')
+          ? (Array.isArray(roomState.pending_shares)
+              ? roomState.pending_shares
+              : (Array.isArray(roomInfo.pending_shares) ? roomInfo.pending_shares : []))
+          : prev.pendingShares,
+      submissionCount:
+        currentTaskGroup !== undefined
+          ? (currentTaskGroup ? Number(roomInfo.task_group_submission_count || 0) : 0)
+          : prev.submissionCount,
+      activeTaskGroup: currentTaskGroup !== undefined
+        ? ((currentTaskGroup as LiveTaskGroup | null) ?? null)
+        : prev.activeTaskGroup,
+      currentChallenge: currentChallenge !== undefined
+        ? ((currentChallenge as LiveChallengeSession | null) ?? null)
+        : prev.currentChallenge,
+      liveSessionId: liveSessionId !== undefined ? liveSessionId : prev.liveSessionId,
+      taskHistory: taskHistory !== undefined ? taskHistory : prev.taskHistory,
+      roomInfoHydrated: true,
+      danmuConfig: hasOwnKey(roomInfo, 'danmu_config')
+        ? (roomInfo.danmu_config as typeof prev.danmuConfig)
+        : prev.danmuConfig,
+    }))
+  }, [])
+
+  const settlePendingPublish = useCallback((error?: Error) => {
+    const pending = pendingPublishRef.current
+    if (!pending) return
+    clearTimeout(pending.timeout)
+    pendingPublishRef.current = null
+    if (error) {
+      pending.reject(error)
+      return
+    }
+    pending.resolve()
+  }, [])
+
+  const settleSocketWaiters = useCallback((error?: Error) => {
+    const waiters = socketWaitersRef.current.splice(0, socketWaitersRef.current.length)
+    if (!waiters.length) return
+    if (error) {
+      waiters.forEach((waiter) => waiter.reject(error))
+      return
+    }
+    waiters.forEach((waiter) => waiter.resolve())
+  }, [])
+
+  const handleMessage = useCallback((message: WebSocketMessage) => {
     const msg = message as any
 
     switch (message.type) {
-      case 'presence':
-        // 学生上下线更新
-        if (msg.type === 'student_joined') {
-          setState(prev => {
-            const newOnlineStudents = new Map(prev.onlineStudents)
-            newOnlineStudents.set(msg.student_id, {
-              id: msg.student_id,
-              name: msg.student_name,
-              avatar: msg.avatar,
-              joinedAt: new Date().toISOString(),
-            })
-            // 同时更新 classroomStudents（已进入教室的学生）
-            const newClassroomStudents = new Map(prev.classroomStudents)
-            newClassroomStudents.set(msg.student_id, {
-              id: msg.student_id,
-              name: msg.student_name,
-            })
-            return {
-              ...prev,
-              onlineStudents: newOnlineStudents,
-              onlineCount: newOnlineStudents.size,
-              classroomStudents: newClassroomStudents,
-              classroomCount: newClassroomStudents.size,
-            }
+      case 'connected':
+        setState((prev) => ({ ...prev, roomInfoHydrated: false }))
+        hydrateFromRoomPayload(msg)
+        break
+
+      case 'room_info':
+        hydrateFromRoomPayload(msg.room_info || msg)
+        break
+
+      case 'student_joined':
+        setState((prev) => {
+          const nextOnline = new Map(prev.onlineStudents)
+          nextOnline.set(msg.student_id, {
+            id: msg.student_id,
+            name: msg.student_name,
+            avatar: msg.avatar,
+            joinedAt: new Date().toISOString(),
           })
-        } else if (msg.type === 'student_left') {
-          setState(prev => {
-            const newOnlineStudents = new Map(prev.onlineStudents)
-            newOnlineStudents.delete(msg.student_id)
-            // 同时从 classroomStudents 中移除
-            const newClassroomStudents = new Map(prev.classroomStudents)
-            newClassroomStudents.delete(msg.student_id)
-            return {
-              ...prev,
-              onlineStudents: newOnlineStudents,
-              onlineCount: newOnlineStudents.size,
-              classroomStudents: newClassroomStudents,
-              classroomCount: newClassroomStudents.size,
-            }
+          const nextClassroom = new Map(prev.classroomStudents)
+          nextClassroom.set(msg.student_id, {
+            id: msg.student_id,
+            name: msg.student_name,
           })
-        }
+          return {
+            ...prev,
+            onlineStudents: nextOnline,
+            classroomStudents: nextClassroom,
+            onlineCount: msg.student_count || nextOnline.size,
+            classroomCount: msg.student_count || nextClassroom.size,
+          }
+        })
+        break
+
+      case 'student_left':
+        setState((prev) => {
+          const nextOnline = new Map(prev.onlineStudents)
+          nextOnline.delete(msg.student_id)
+          const nextClassroom = new Map(prev.classroomStudents)
+          nextClassroom.delete(msg.student_id)
+          return {
+            ...prev,
+            onlineStudents: nextOnline,
+            classroomStudents: nextClassroom,
+            onlineCount: msg.student_count || nextOnline.size,
+            classroomCount: msg.student_count || nextClassroom.size,
+          }
+        })
         break
 
       case 'new_task_group':
-        // 新任务组发布（包含 WebSocket 重连后恢复的任务）
-        setState(prev => ({
+        console.log('[WhiteboardLive] new_task_group received (broadcast):', msg.group_id, 'task_count:', msg.tasks?.length)
+        setState((prev) => ({
           ...prev,
-          activeTaskGroup: {
-            id: msg.group_id,
-            title: msg.title,
-            tasks: msg.tasks || [],
-            task_count: msg.tasks?.length || 0,
-            class_id: classId || '',
-            status: 'ready',
-            created_at: new Date().toISOString(),
-          } as LiveTaskGroup,
+          activeTaskGroup: buildActiveTaskGroup(classId, msg),
           currentChallenge: null,
           submissions: [],
           submissionCount: 0,
@@ -197,325 +433,494 @@ export function useWhiteboardLive(classId: string | null) {
         break
 
       case 'task_group_published':
-        // 任务组发布确认 - 服务器返回 group_id 和 task_count
-        // 保持当前 activeTaskGroup（已在 publishTaskGroup 中设置）
-        setState(prev => {
-          // 如果服务器返回了 task_group 对象，使用它；否则保持当前值
-          const taskGroup = msg.task_group || prev.activeTaskGroup
-          return {
-            ...prev,
-            activeTaskGroup: taskGroup,
-            currentChallenge: null,
-            submissions: [],
-            submissionCount: 0,
-          }
-        })
+        console.log('[WhiteboardLive] task_group_published received:', msg.group_id, 'task_count:', msg.task_count)
+        if (pendingPublishRef.current?.groupId === msg.group_id) {
+          settlePendingPublish()
+        }
+        setState((prev) => ({
+          ...prev,
+          activeTaskGroup: (msg.task_group as LiveTaskGroup | undefined) ?? buildActiveTaskGroup(classId, msg),
+          currentChallenge: null,
+          submissions: [],
+          submissionCount: 0,
+        }))
         break
 
       case 'task_group_ended':
-        // 任务组结束
-        setState(prev => ({
+      case 'task_group_results':
+        console.log('[WhiteboardLive] task_group_ended/results received:', msg.group_id)
+        setState((prev) => ({
           ...prev,
           activeTaskGroup: null,
           submissions: [],
           submissionCount: 0,
+          endedTaskGroups: [
+            ...prev.endedTaskGroups,
+            { groupId: msg.group_id, endedAt: new Date().toISOString() },
+          ],
         }))
         break
 
       case 'task_submission':
       case 'new_task_group_submission':
-        // 学生提交答案（单个任务或任务组）
-        setState(prev => ({
+      case 'task_group_submission_received':
+        console.log('[WhiteboardLive] new_task_group_submission received:', msg.type, 'total_submissions:', msg.total_submissions, 'group_id:', msg.group_id, 'student_id:', msg.student_id, 'is_duplicate:', msg.is_duplicate)
+        setState((prev) => ({
           ...prev,
-          submissions: [...prev.submissions, {
-            taskId: msg.task_id,
-            studentId: msg.student_id,
-            studentName: msg.student_name,
-            answer: msg.answer,
-            submittedAt: msg.timestamp || new Date().toISOString(),
-          }],
-          // 使用服务器返回的 total_submissions 或自增
-          submissionCount: msg.total_submissions || prev.submissionCount + 1,
+          submissions: msg.is_duplicate ? prev.submissions : [
+            ...prev.submissions,
+            {
+              taskId: msg.task_id,
+              studentId: msg.student_id,
+              studentName: msg.student_name,
+              answer: msg.answer,
+              submittedAt: msg.timestamp || new Date().toISOString(),
+            },
+          ],
+          submissionCount: msg.total_submissions ?? prev.submissionCount,
         }))
         break
 
       case 'student_share_request':
-        // 学生分享请求
-        console.log('[WhiteboardLive] Student share request received:', msg)
         if (msg.share_id) {
-          setState(prev => {
-            // 检查是否已存在，避免重复添加
-            const exists = prev.pendingShares.some(s => s.share_id === msg.share_id)
-            if (exists) {
-              // 更新现有分享的状态（如果服务器发送了更新）
-              return {
-                ...prev,
-                pendingShares: prev.pendingShares.map(s =>
-                  s.share_id === msg.share_id ? { ...s, ...msg } : s
-                ),
-              }
+          setState((prev) => {
+            const existingIndex = prev.pendingShares.findIndex((share) => share.share_id === msg.share_id)
+            if (existingIndex >= 0) {
+              const nextShares = [...prev.pendingShares]
+              nextShares[existingIndex] = { ...nextShares[existingIndex], ...msg }
+              return { ...prev, pendingShares: nextShares }
             }
-            return {
-              ...prev,
-              pendingShares: [...prev.pendingShares, msg],
-            }
+            return { ...prev, pendingShares: [...prev.pendingShares, msg] }
           })
         }
         break
 
       case 'share_request_response':
-        // 分享请求响应（通过/拒绝）- 从待处理列表移除，避免一直停留在处理中
         if (msg.share_id) {
-          setState(prev => ({
+          const fallbackTimer = shareFallbackTimeoutsRef.current.get(msg.share_id)
+          if (fallbackTimer) {
+            clearTimeout(fallbackTimer)
+            shareFallbackTimeoutsRef.current.delete(msg.share_id)
+          }
+          setState((prev) => ({
             ...prev,
-            pendingShares: prev.pendingShares.filter(s => s.share_id !== msg.share_id),
+            pendingShares: prev.pendingShares.filter((share) => share.share_id !== msg.share_id),
           }))
         }
         break
 
-      case 'error':
-        setState(prev => ({ ...prev, error: msg.message || '未知错误' }))
-        break
-
-      // 挑战消息
       case 'challenge_started':
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
           activeTaskGroup: null,
           submissions: [],
           submissionCount: 0,
-          currentChallenge: msg.challenge as LiveChallengeSession,
+          currentChallenge: normalizeChallengePayload(msg as Record<string, unknown>),
         }))
         break
 
       case 'challenge_progress_updated':
       case 'challenge_scoreboard_updated':
-        setState(prev => {
+        setState((prev) => {
           if (!prev.currentChallenge) return prev
           return {
             ...prev,
             currentChallenge: {
               ...prev.currentChallenge,
-              scoreboard: msg.scoreboard || prev.currentChallenge.scoreboard,
-              status: msg.status || prev.currentChallenge.status,
+              ...normalizeChallengePayload({
+                challenge: prev.currentChallenge,
+                ...msg,
+              } as Record<string, unknown>),
             },
           }
         })
         break
 
       case 'challenge_ended':
-        setState(prev => ({
+        setState((prev) => ({
           ...prev,
-          currentChallenge: {
-            ...(msg.challenge as LiveChallengeSession || prev.currentChallenge) as LiveChallengeSession,
-            scoreboard: msg.scoreboard || (msg.challenge as any)?.scoreboard || prev.currentChallenge?.scoreboard || [],
-            status: msg.status || (msg.challenge as any)?.status || 'ended',
+          currentChallenge: normalizeChallengePayload({
+            challenge: (msg.challenge as LiveChallengeSession) || prev.currentChallenge,
+            ...msg,
+          } as Record<string, unknown>),
+        }))
+        break
+
+      case 'error':
+        settlePendingPublish(new Error(String(msg.message || 'WebSocket error')))
+        setState((prev) => ({ ...prev, error: msg.message || 'WebSocket error' }))
+        break
+
+      case 'submission_error':
+        console.warn('[WhiteboardLive] Submission error:', msg.message, 'group_id:', msg.group_id)
+        break
+
+      case 'danmu_config':
+        setState((prev) => ({
+          ...prev,
+          danmuConfig: {
+            enabled: msg.enabled ?? prev.danmuConfig.enabled,
+            showStudent: msg.showStudent ?? prev.danmuConfig.showStudent,
+            showSource: msg.showSource ?? prev.danmuConfig.showSource,
+            speed: msg.speed ?? prev.danmuConfig.speed,
+            density: msg.density ?? prev.danmuConfig.density,
+            area: msg.area ?? prev.danmuConfig.area,
+            bgColor: (msg as any).bgColor ?? prev.danmuConfig.bgColor,
           },
         }))
         break
-    }
-  }, [])
 
-  // 发送心跳
+      case 'danmu_display': {
+        const newDanmu: ActiveDanmu = {
+          id: `danmu-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          content: msg.content as string,
+          row: msg.row as number,
+          showSource: msg.showSource as boolean,
+          sourceName: msg.sourceName as string | undefined,
+          speed: ((msg.speed as ActiveDanmu['speed']) || 'medium'),
+          bgColor: (msg as any).bgColor as string | undefined,
+        }
+        setState((prev) => {
+          const maxDanmus = 20
+          const updatedDanmus = [...prev.activeDanmus, newDanmu]
+          if (updatedDanmus.length > maxDanmus) {
+            return { ...prev, activeDanmus: updatedDanmus.slice(-maxDanmus) }
+          }
+          return { ...prev, activeDanmus: updatedDanmus }
+        })
+        // Auto-remove after animation duration
+        const speedDuration = { slow: 14000, medium: 9000, fast: 6000 }
+        const duration = speedDuration[newDanmu.speed as keyof typeof speedDuration] || 9000
+        setTimeout(() => {
+          setState((prev) => ({
+            ...prev,
+            activeDanmus: prev.activeDanmus.filter(d => d.id !== newDanmu.id),
+          }))
+        }, duration)
+        break
+      }
+
+      case 'danmu_clear':
+        setState((prev) => ({ ...prev, activeDanmus: [] }))
+        break
+
+      case 'atmosphere_effect': {
+        const msg = message as { type: 'atmosphere_effect'; effect: AtmosphereEffectType; sourceName?: string }
+        const newEffect: ActiveAtmosphereEffect = {
+          id: `effect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          effect: msg.effect,
+          sourceName: msg.sourceName,
+        }
+        setState((prev) => ({
+          ...prev,
+          activeEffects: [...prev.activeEffects, newEffect],
+        }))
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+          setState((prev) => ({
+            ...prev,
+            activeEffects: prev.activeEffects.filter((e) => e.id !== newEffect.id),
+          }))
+        }, 3500)
+        break
+      }
+
+      default:
+        break
+    }
+  }, [classId, hydrateFromRoomPayload, settlePendingPublish])
+
   const startHeartbeat = useCallback(() => {
     heartbeatIntervalRef.current = setInterval(() => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: 'ping' }))
       }
-    }, 30000)
+    }, 25000)
   }, [])
 
-  // 连接 WebSocket
   const connect = useCallback(() => {
-    console.log('[WhiteboardLive] Connect attempt:', { classId, hasToken: !!token, hasUser: !!user })
+    if (!classId || !user || isConnectingRef.current) return
 
-    if (!classId || !token || !user) {
-      console.warn('[WhiteboardLive] Missing required params:', { classId, hasToken: !!token, hasUser: !!user })
+    const existingState = wsRef.current?.readyState
+    if (existingState === WebSocket.OPEN || existingState === WebSocket.CONNECTING) {
       return
     }
-    if (isConnectingRef.current) {
-      console.log('[WhiteboardLive] Already connecting, skipping...')
-      return
-    }
-
-    const wsUrl = getWsUrl()
-    console.log('[WhiteboardLive] Connecting to:', wsUrl.replace(token, '***TOKEN***'))
-
     isConnectingRef.current = true
-    setState(prev => ({ ...prev, isConnecting: true, error: null }))
+    setState((prev) => ({ ...prev, isConnecting: true, error: null }))
 
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
-
-    ws.onopen = () => {
-      console.log('[WhiteboardLive] WebSocket connected')
-      isConnectingRef.current = false
-      setState(prev => ({ ...prev, isConnected: true, isConnecting: false }))
-      startHeartbeat()
-      // 加载初始学生状态
-      loadClassPresence()
-    }
-
-    ws.onclose = (event) => {
-      console.log('[WhiteboardLive] WebSocket disconnected:', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean
-      })
-      isConnectingRef.current = false
-      setState(prev => ({ ...prev, isConnected: false, isConnecting: false }))
-      if (heartbeatIntervalRef.current) {
-        clearInterval(heartbeatIntervalRef.current)
+    void (async () => {
+      const accessToken = await getFreshAccessToken()
+      if (!accessToken) {
+        isConnectingRef.current = false
+        settleSocketWaiters(new Error('Missing access token'))
+        setState((prev) => ({ ...prev, isConnecting: false, error: 'Missing access token' }))
+        return
       }
 
-      // 3秒后自动重连
-      reconnectTimeoutRef.current = setTimeout(() => {
-        connect()
-      }, 3000)
-    }
+      const ws = new WebSocket(getWsUrl(accessToken))
+      wsRef.current = ws
 
-    ws.onerror = (e) => {
-      console.error('[WhiteboardLive] WebSocket error:', e)
-      console.error('[WhiteboardLive] WebSocket readyState:', ws.readyState)
-      console.error('[WhiteboardLive] WebSocket URL:', ws.url.replace(token || '', '***TOKEN***'))
-      isConnectingRef.current = false
-      setState(prev => ({ ...prev, error: '连接错误', isConnecting: false }))
-    }
-
-    ws.onmessage = (event) => {
-      try {
-        const message: WebSocketMessage = JSON.parse(event.data)
-        if (message.type === 'pong') return
-        handleMessage(message)
-      } catch (e) {
-        console.error('[WhiteboardLive] Failed to parse message:', e)
+      ws.onopen = () => {
+        isConnectingRef.current = false
+        debugLive('whiteboard:open', { classId, userId: user?.id })
+        setState((prev) => ({ ...prev, isConnected: true, isConnecting: false }))
+        settleSocketWaiters()
+        startHeartbeat()
+        loadClassPresence()
+        ws.send(JSON.stringify({ type: 'get_room_info' }))
       }
-    }
-  }, [classId, token, user, getWsUrl, startHeartbeat, loadClassPresence])
 
-  // 断开连接
+      ws.onclose = () => {
+          settlePendingPublish(new Error('WebSocket closed'))
+          settleSocketWaiters(new Error('WebSocket closed'))
+          isConnectingRef.current = false
+          debugLive('whiteboard:close', { classId })
+          if (wsRef.current === ws) {
+            wsRef.current = null
+          }
+          setState((prev) => ({ ...prev, isConnected: false, isConnecting: false, roomInfoHydrated: false }))
+        if (heartbeatIntervalRef.current) {
+          clearInterval(heartbeatIntervalRef.current)
+          heartbeatIntervalRef.current = null
+        }
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect()
+        }, 2000)
+      }
+
+      ws.onerror = () => {
+          settlePendingPublish(new Error('WebSocket connection error'))
+          settleSocketWaiters(new Error('WebSocket connection error'))
+          isConnectingRef.current = false
+          debugLive('whiteboard:error', { classId })
+          setState((prev) => ({ ...prev, error: 'WebSocket connection error', isConnecting: false, roomInfoHydrated: false }))
+          try {
+            ws.close()
+          } catch {
+            // ignore
+          }
+        }
+
+      ws.onmessage = (event) => {
+        try {
+          const parsed: WebSocketMessage = JSON.parse(event.data)
+          if (parsed.type === 'pong') return
+          debugLive('whiteboard:message', parsed.type, parsed)
+          handleMessage(parsed)
+        } catch (error) {
+          console.error('[WhiteboardLive] Failed to parse message:', error)
+        }
+      }
+    })()
+  }, [classId, getFreshAccessToken, getWsUrl, handleMessage, loadClassPresence, settlePendingPublish, settleSocketWaiters, startHeartbeat, user])
+
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
     }
     if (heartbeatIntervalRef.current) {
       clearInterval(heartbeatIntervalRef.current)
+      heartbeatIntervalRef.current = null
     }
-    wsRef.current?.close()
-    wsRef.current = null
-  }, [])
+    settlePendingPublish(new Error('WebSocket disconnected'))
+    settleSocketWaiters(new Error('WebSocket disconnected'))
+    shareFallbackTimeoutsRef.current.forEach((timer) => clearTimeout(timer))
+      shareFallbackTimeoutsRef.current.clear()
+      setState((prev) => ({ ...prev, roomInfoHydrated: false }))
+      wsRef.current?.close()
+      wsRef.current = null
+    }, [settlePendingPublish, settleSocketWaiters])
 
-  // 发布任务组
-  const publishTaskGroup = useCallback((taskGroup: LiveTaskGroup) => {
+  const ensureSocketOpen = useCallback(async (timeoutMs = 4000) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      // 构建任务列表数据 - 字段直接放在消息对象中
-      const tasks = (taskGroup.tasks || []).map((task: any) => ({
-        task_id: task.id,
-        type: task.type,
-        question: task.question,
-        countdown_seconds: task.countdown_seconds || 30,
-        correct_answer: task.correct_answer,
-      }))
+      return true
+    }
 
-      wsRef.current.send(JSON.stringify({
+    return await new Promise<boolean>((resolve) => {
+      const activeSocket = wsRef.current
+      const readyState = activeSocket?.readyState
+      if (readyState === WebSocket.CLOSING || readyState === WebSocket.CLOSED) {
+        wsRef.current = null
+      }
+
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.CONNECTING) {
+        connect()
+      }
+
+      const timeout = setTimeout(() => {
+        socketWaitersRef.current = socketWaitersRef.current.filter((waiter) => waiter.resolve !== onResolve)
+        resolve(false)
+      }, timeoutMs)
+
+      const onResolve = () => {
+        clearTimeout(timeout)
+        resolve(true)
+      }
+
+      const onReject = () => {
+        clearTimeout(timeout)
+        resolve(false)
+      }
+
+      socketWaitersRef.current.push({ resolve: onResolve, reject: onReject })
+    })
+  }, [connect])
+
+  const sendMessage = useCallback(
+    async (
+      payload: Record<string, unknown>,
+      options?: { ensureOpen?: boolean; timeoutMs?: number }
+    ) => {
+      if (options?.ensureOpen) {
+        const connected = await ensureSocketOpen(options.timeoutMs ?? 4000)
+        if (!connected) {
+          return false
+        }
+      }
+
+      const socket = wsRef.current
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return false
+      }
+
+      try {
+        socket.send(JSON.stringify(payload))
+        return true
+      } catch (error) {
+        console.warn('[WhiteboardLive] Failed to send message:', payload.type, error)
+        return false
+      }
+    },
+    [ensureSocketOpen],
+  )
+
+  const publishTaskGroup = useCallback(async (taskGroup: LiveTaskGroup) => {
+    const connected = await ensureSocketOpen()
+    if (!connected || wsRef.current?.readyState !== WebSocket.OPEN) {
+      throw new Error('WebSocket not connected')
+    }
+
+    if (pendingPublishRef.current) {
+      settlePendingPublish(new Error('Publish request superseded'))
+    }
+
+    const totalCountdown = Array.isArray(taskGroup.tasks) && taskGroup.tasks.length > 0
+      ? taskGroup.tasks.reduce((sum: number, task: any) => sum + (task.countdown_seconds || 30), 0) + 30
+      : undefined
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        if (pendingPublishRef.current?.groupId === taskGroup.id) {
+          pendingPublishRef.current = null
+          reject(new Error('Publish task group timed out'))
+        }
+      }, 5000)
+
+      pendingPublishRef.current = {
+        groupId: taskGroup.id,
+        resolve,
+        reject,
+        timeout,
+      }
+
+      wsRef.current?.send(JSON.stringify({
         type: 'publish_task_group',
         group_id: taskGroup.id,
-        tasks: tasks,
-        total_countdown: 300,
+        total_countdown: totalCountdown,
       }))
-    }
-    // 同时更新本地状态
-    setState(prev => ({
-      ...prev,
-      activeTaskGroup: taskGroup,
-      submissions: [],
-      submissionCount: 0,
-    }))
-  }, [])
+    })
+  }, [ensureSocketOpen, settlePendingPublish])
 
-  // 结束任务组
   const endTaskGroup = useCallback((groupId: string) => {
+    // Optimistically clear active task group
+    setState((prev) => {
+      if (prev.activeTaskGroup && (prev.activeTaskGroup as any).source_group_id === groupId || prev.activeTaskGroup?.id === groupId) {
+        return { ...prev, activeTaskGroup: null }
+      }
+      return prev
+    })
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'end_task_group',
         group_id: groupId,
       }))
     }
-    setState(prev => ({
-      ...prev,
-      activeTaskGroup: null,
-      submissions: [],
-      submissionCount: 0,
-    }))
   }, [])
 
-  // 结束课堂（下课）- 通知所有学生退出
   const endSession = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'end_session',
-      }))
+      wsRef.current.send(JSON.stringify({ type: 'end_session' }))
     }
   }, [])
 
-  // 处理分享请求
   const handleShare = useCallback((shareId: string, action: 'approve' | 'reject', comment?: string) => {
-    // 如果 WebSocket 未连接，先不更新状态，避免卡住
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('[WhiteboardLive] Cannot handle share: WebSocket not open')
       return
     }
-    // 更新本地状态为处理中，等待服务器确认
-    setState(prev => ({
+
+    setState((prev) => ({
       ...prev,
-      pendingShares: prev.pendingShares.map(s =>
-        s.share_id === shareId
-          ? { ...s, status: action === 'approve' ? 'approving' : 'rejecting', teacher_comment: comment }
-          : s
+      pendingShares: prev.pendingShares.map((share) =>
+        share.share_id === shareId
+          ? { ...share, status: action === 'approve' ? 'approving' : 'rejecting', teacher_comment: comment }
+          : share,
       ),
     }))
-    // 发送 WebSocket 消息
-    const payload: any = {
+
+    wsRef.current.send(JSON.stringify({
       type: action === 'approve' ? 'approve_share' : 'reject_share',
       share_id: shareId,
-    }
-    if (action === 'approve' && comment) {
-      payload.teacher_comment = comment
-    }
-    wsRef.current.send(JSON.stringify(payload))
-    // 3 秒后若仍卡在处理中，自动恢复为 pending，避免服务器未响应时永久卡住
-    setTimeout(() => {
-      setState(prev => ({
+      ...(action === 'approve' && comment ? { teacher_comment: comment } : {}),
+    }))
+
+    const fallbackTimer = setTimeout(() => {
+      setState((prev) => ({
         ...prev,
-        pendingShares: prev.pendingShares.map(s =>
-          s.share_id === shareId && (s.status === 'approving' || s.status === 'rejecting')
-            ? { ...s, status: 'pending' }
-            : s
+        pendingShares: prev.pendingShares.map((share) =>
+          share.share_id === shareId && (share.status === 'approving' || share.status === 'rejecting')
+            ? { ...share, status: 'pending' }
+            : share,
         ),
       }))
+      shareFallbackTimeoutsRef.current.delete(shareId)
     }, 3000)
+
+    shareFallbackTimeoutsRef.current.set(shareId, fallbackTimer)
   }, [])
 
-  // 挑战：开始
   const startChallenge = useCallback((challengeId: string) => {
+    console.log('[WhiteboardLive] startChallenge called:', challengeId, 'WebSocket state:', wsRef.current?.readyState)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'start_challenge', challenge_id: challengeId }))
+      console.log('[WhiteboardLive] start_challenge message sent')
+    } else {
+      console.error('[WhiteboardLive] WebSocket not open, cannot start challenge. State:', wsRef.current?.readyState)
+      throw new Error('WebSocket鏈繛鎺ワ紝鏃犳硶鍚姩鎸戞垬')
     }
   }, [])
 
-  // 挑战：结束
   const endChallenge = useCallback((challengeId: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'end_challenge', challenge_id: challengeId }))
     }
   }, [])
 
-  // 挑战：清除
   const clearChallenge = useCallback(() => {
-    setState(prev => ({ ...prev, currentChallenge: null }))
+    setState((prev) => {
+      if (!prev.currentChallenge) return prev
+      return isChallengeFinished(prev.currentChallenge)
+        ? { ...prev, currentChallenge: null }
+        : prev
+    })
   }, [])
 
-  // 初始连接
+  const clearShares = useCallback(() => {
+    shareFallbackTimeoutsRef.current.forEach((timer) => clearTimeout(timer))
+    shareFallbackTimeoutsRef.current.clear()
+    setState((prev) => ({ ...prev, pendingShares: [] }))
+  }, [])
+
   useEffect(() => {
     connect()
     return () => {
@@ -523,12 +928,117 @@ export function useWhiteboardLive(classId: string | null) {
     }
   }, [connect, disconnect])
 
-  // 定期刷新学生状态（每15秒）
   useEffect(() => {
     if (!classId) return
-    const interval = setInterval(loadClassPresence, 15000)
+    const interval = setInterval(loadClassPresence, 5000)
     return () => clearInterval(interval)
   }, [classId, loadClassPresence])
+
+  useEffect(() => {
+    if (!classId) {
+      setState((prev) => ({
+        ...prev,
+        liveSessionId: null,
+        currentClassroomSession: null,
+        elapsedSeconds: 0,
+      }))
+      return
+    }
+
+    let cancelled = false
+
+    const loadActiveSession = async () => {
+      try {
+        const response = await api.get(`/live/sessions/active?class_id=${classId}`)
+        const session = (response.data || null) as ClassroomSessionSummary | null
+        if (cancelled) return
+        setState((prev) => ({
+          ...prev,
+          liveSessionId: session?.id ?? prev.liveSessionId ?? null,
+          currentClassroomSession: session,
+          elapsedSeconds: session ? prev.elapsedSeconds : 0,
+        }))
+      } catch (error) {
+        console.error('[WhiteboardLive] Failed to fetch active classroom session:', error)
+        if (cancelled) return
+        setState((prev) => ({
+          ...prev,
+          currentClassroomSession: null,
+          elapsedSeconds: prev.liveSessionId ? prev.elapsedSeconds : 0,
+        }))
+      }
+    }
+
+    void loadActiveSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [classId, state.liveSessionId])
+
+  useEffect(() => {
+    if (!state.currentClassroomSession || state.currentClassroomSession.status !== 'active') {
+      setState((prev) => (prev.elapsedSeconds === 0 ? prev : { ...prev, elapsedSeconds: 0 }))
+      return
+    }
+
+    const startedAt = new Date(state.currentClassroomSession.started_at).getTime()
+    const updateElapsed = () => {
+      const elapsed = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
+      setState((prev) => (prev.elapsedSeconds === elapsed ? prev : { ...prev, elapsedSeconds: elapsed }))
+    }
+
+    updateElapsed()
+    const timer = setInterval(updateElapsed, 1000)
+    return () => clearInterval(timer)
+  }, [state.currentClassroomSession])
+
+  // 寮瑰箷鎺у埗
+  const sendDanmuConfig = (config: Partial<DanmuConfig> & { enabled: boolean }) => {
+    void sendMessage({ type: 'danmu_config', ...config })
+  }
+  const getRoomInfo = () => sendMessage({ type: 'get_room_info' }, { ensureOpen: true })
+  const triggerDanmu = (content: string) => {
+    void sendMessage({ type: 'danmu_trigger', content })
+  }
+  const clearDanmu = () => {
+    void sendMessage({ type: 'danmu_clear' })
+  }
+
+  const sendAtmosphereEffect = (effect: AtmosphereEffectType) => {
+    void sendMessage({ type: 'atmosphere_effect', effect })
+  }
+
+  const startClassroomSession = useCallback(async (title?: string) => {
+    if (!classId) return null
+    const response = await api.post('/live/sessions/start', {
+      class_id: classId,
+      title,
+      entry_mode: 'whiteboard',
+    })
+    const session = (response.data || null) as ClassroomSessionSummary | null
+    setState((prev) => ({
+      ...prev,
+      liveSessionId: session?.id ?? prev.liveSessionId,
+      currentClassroomSession: session,
+      elapsedSeconds: 0,
+    }))
+    void getRoomInfo()
+    return session
+  }, [classId])
+
+  const endClassroomSession = useCallback(async () => {
+    const sessionId = state.currentClassroomSession?.id || state.liveSessionId
+    if (!sessionId) return
+    await api.post(`/live/sessions/${sessionId}/end`, {})
+    setState((prev) => ({
+      ...prev,
+      liveSessionId: null,
+      currentClassroomSession: null,
+      elapsedSeconds: 0,
+    }))
+    void getRoomInfo()
+  }, [state.currentClassroomSession?.id, state.liveSessionId])
 
   return {
     ...state,
@@ -539,9 +1049,17 @@ export function useWhiteboardLive(classId: string | null) {
     handleShare,
     clearShares,
     refreshPresence: loadClassPresence,
+    getRoomInfo,
     startChallenge,
     endChallenge,
     clearChallenge,
     endSession,
+    sendDanmuConfig,
+    triggerDanmu,
+    clearDanmu,
+    sendAtmosphereEffect,
+    startClassroomSession,
+    endClassroomSession,
+    ensureSocketOpen,
   }
 }

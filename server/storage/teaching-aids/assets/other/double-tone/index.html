@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>大号数字化双响筒</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --wood-light: #e5c29f;
+            --wood-dark: #8b5a2b;
+            --wood-border: #5d3a1a;
+            --shadow: rgba(0, 0, 0, 0.4);
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--bg-color);
+            font-family: "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        h1 {
+            color: #fff;
+            margin-bottom: 2vh; /* 使用视口单位，让布局更灵活 */
+            font-size: clamp(1.5rem, 4vw, 2.5rem); /* 字体大小随屏幕变化 */
+            opacity: 0.9;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        /* 乐器容器 - 核心修改区域 */
+        #instrument-container {
+            position: relative;
+            
+            /* 基础宽度设为 640px (原版是320px)，即放大一倍 */
+            width: 640px; 
+            
+            /* 保持宽高比 2:1 (320:160) */
+            aspect-ratio: 2 / 1;
+            
+            /* 响应式限制：宽度不超过屏幕宽度的 95% */
+            max-width: 95vw;
+            
+            /* 高度限制：防止在扁平屏幕上太高 */
+            max-height: 60vh;
+            
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            
+            /* 即使在小屏幕上，也确保居中 */
+            margin: 0 auto;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 20px 15px var(--shadow)); /* 阴影也稍微加深 */
+        }
+
+        .tone-zone {
+            cursor: pointer;
+            transition: transform 0.05s ease-out, filter 0.05s;
+            transform-origin: center;
+            /* 消除移动端点击高亮背景 */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .tone-zone.active {
+            transform: scale(0.96) translateY(4px); /* 动作幅度稍微加大 */
+            filter: brightness(1.15);
+        }
+
+        .label {
+            font-size: 24px; /* 字体稍微加大 */
+            font-weight: bold;
+            fill: var(--wood-border);
+            opacity: 0.8;
+            pointer-events: none;
+            font-family: sans-serif;
+        }
+
+        .instruction {
+            margin-top: 30px;
+            color: #bdc3c7;
+            font-size: 1rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>双响筒</h1>
+
+    <div id="instrument-container">
+        <!-- viewBox 保持不变，通过外层容器放大 -->
+        <svg viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg">
+            
+            <!-- 渐变定义 -->
+            <defs>
+                <linearGradient id="woodGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#f0d5b5;stop-opacity:1" /> <!-- 稍微调亮一点木纹 -->
+                    <stop offset="50%" style="stop-color:#d4a778;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#a67c52;stop-opacity:1" />
+                </linearGradient>
+            </defs>
+
+            <!-- 连接杆 -->
+            <rect x="150" y="10" width="20" height="140" rx="5" fill="#4a2e15" />
+
+            <!-- 左侧：低音筒 (大) -->
+            <g id="btn-low" class="tone-zone" role="button" aria-label="低音">
+                <rect x="5" y="30" width="140" height="100" rx="12" 
+                      fill="url(#woodGradient)" stroke="#4a2e15" stroke-width="4"/>
+                <rect x="15" y="75" width="120" height="12" rx="3" fill="#36200d"/>
+                <!-- 高光细节 -->
+                <path d="M15 40 L135 40" stroke="#fff" stroke-width="3" opacity="0.25" stroke-linecap="round"/>
+                <text x="75" y="115" text-anchor="middle" class="label">低 Low</text>
+            </g>
+
+            <!-- 右侧：高音筒 (小) -->
+            <g id="btn-high" class="tone-zone" role="button" aria-label="高音">
+                <rect x="175" y="40" width="140" height="80" rx="12" 
+                      fill="url(#woodGradient)" stroke="#4a2e15" stroke-width="4"/>
+                <rect x="185" y="75" width="120" height="12" rx="3" fill="#36200d"/>
+                <!-- 高光细节 -->
+                <path d="M185 50 L305 50" stroke="#fff" stroke-width="3" opacity="0.25" stroke-linecap="round"/>
+                <text x="245" y="110" text-anchor="middle" class="label">高 High</text>
+            </g>
+
+        </svg>
+    </div>
+
+    <div class="instruction">点击 / 触摸 / 键盘(← →) 演奏</div>
+
+<script>
+    let audioCtx;
+    
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // 声音合成参数优化
+    function playWoodTone(frequency) {
+        initAudio();
+        const t = audioCtx.currentTime;
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
+
+        // 调整音色：结合三角波和带通滤波，模拟木质空腔
+        osc.type = 'triangle'; 
+        
+        filter.type = 'bandpass';
+        filter.frequency.value = frequency;
+        filter.Q.value = 1.2; // 调整共鸣宽度
+
+        osc.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        // 频率微降模拟敲击时的音高弯曲
+        osc.frequency.setValueAtTime(frequency, t);
+        osc.frequency.exponentialRampToValueAtTime(frequency * 0.95, t + 0.1);
+
+        // 打击乐包络：极快起音，短促衰减
+        gainNode.gain.setValueAtTime(0, t);
+        gainNode.gain.linearRampToValueAtTime(1.0, t + 0.005);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
+
+        osc.start(t);
+        osc.stop(t + 0.25);
+    }
+
+    const btnLow = document.getElementById('btn-low');
+    const btnHigh = document.getElementById('btn-high');
+
+    function trigger(type, element) {
+        element.classList.remove('active');
+        void element.offsetWidth; // 强制重绘，允许连续动画
+        element.classList.add('active');
+        setTimeout(() => element.classList.remove('active'), 100);
+
+        // 音高设置：低音筒更低沉，高音筒更清脆
+        if (type === 'low') {
+            playWoodTone(750); 
+        } else {
+            playWoodTone(1100);
+        }
+    }
+
+    function bindEvents(elem, type) {
+        elem.addEventListener('touchstart', (e) => {
+            e.preventDefault(); 
+            trigger(type, elem);
+        }, { passive: false });
+
+        elem.addEventListener('mousedown', (e) => {
+            trigger(type, elem);
+        });
+    }
+
+    bindEvents(btnLow, 'low');
+    bindEvents(btnHigh, 'high');
+
+    document.addEventListener('keydown', (e) => {
+        if (e.repeat) return;
+        if (['ArrowLeft', 'a', 'A'].includes(e.key)) trigger('low', btnLow);
+        if (['ArrowRight', 'd', 'D'].includes(e.key)) trigger('high', btnHigh);
+    });
+
+</script>
+</body>
+</html>

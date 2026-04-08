@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
 import {
   classService,
@@ -356,7 +357,7 @@ export default function TeacherTaskGroups() {
   const canUseAi = membership?.can_use_ai ?? false
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="task-groups" />}>
+    <Layout sidebar={<TeacherSidebar activePage="task-groups" />} leftSidebar={<TeacherLeftSidebar activePage="task-groups" />}>
       <div className="panel-page">
         {/* 深蓝顶栏 */}
         <section className="surface-card mb-4 mt-4" style={{ background: 'linear-gradient(135deg, #18324a 0%, #2a4a6a 100%)' }}>
@@ -1039,7 +1040,7 @@ function Step2AddTasks({
 }) {
   const { t, tWithParams } = useTranslation()
   const [loading, setLoading] = useState(false)
-  const [taskMode, setTaskMode] = useState<'objective' | 'reading'>('objective')
+  const [taskMode, setTaskMode] = useState<'objective' | 'reading' | 'experiment'>('objective')
 
   // 手动创建表单状态
   const [manualType, setManualType] = useState('single_choice')
@@ -1048,6 +1049,8 @@ function Step2AddTasks({
   const [manualPrompt, setManualPrompt] = useState<Record<string, unknown>>(EMPTY_TIPTAP_DOC)
   const [manualAnswerRequired, setManualAnswerRequired] = useState(true)
   const [manualHtmlUrl, setManualHtmlUrl] = useState('')
+  const [manualTeachingAidId, setManualTeachingAidId] = useState<string | null>(null)
+  const [manualTeachingAidName, setManualTeachingAidName] = useState('')
   const [manualOptions, setManualOptions] = useState(['', '', '', ''])
   const [manualAnswer, setManualAnswer] = useState('A')
   const [manualBlanks, setManualBlanks] = useState([''])
@@ -1068,7 +1071,10 @@ function Step2AddTasks({
     if (taskMode === 'reading' && !isReadingType(manualType)) {
       setManualType('reading')
     }
-    if (taskMode === 'objective' && isReadingType(manualType)) {
+    if (taskMode === 'experiment' && manualType !== 'experiment') {
+      setManualType('experiment')
+    }
+    if (taskMode === 'objective' && (isReadingType(manualType) || manualType === 'experiment')) {
       setManualType('single_choice')
     }
   }, [taskMode, manualType])
@@ -1086,6 +1092,8 @@ function Step2AddTasks({
     setManualPrompt(EMPTY_TIPTAP_DOC)
     setManualAnswerRequired(true)
     setManualHtmlUrl('')
+    setManualTeachingAidId(null)
+    setManualTeachingAidName('')
     setManualOptions(['', '', '', ''])
     setManualAnswer('A')
     setManualBlanks([''])
@@ -1123,6 +1131,8 @@ function Step2AddTasks({
         manualOptions,
         manualAnswer,
         manualHtmlUrl,
+        manualTeachingAidId,
+        manualTeachingAidName,
         manualCountdown,
         manualBlanks,
         manualPairs,
@@ -1161,8 +1171,8 @@ function Step2AddTasks({
           target_group_id: g.id,
           task_mode: taskMode,
           prompt: aiPrompt,
-          question_count: taskMode === 'reading' ? 1 : aiCount,
-          types: taskMode === 'reading' ? ['reading'] : undefined,
+          question_count: taskMode === 'reading' || taskMode === 'experiment' ? 1 : aiCount,
+          types: taskMode === 'reading' ? ['reading'] : taskMode === 'experiment' ? ['experiment'] : undefined,
         })
         if (i === 0) {
           allTasks = result.tasks || []
@@ -1236,6 +1246,7 @@ function Step2AddTasks({
         {([
           { id: 'objective', label: t('taskGroupReading.modeObjective') },
           { id: 'reading', label: t('taskGroupReading.modeReading') },
+          { id: 'experiment', label: t('taskGroupReading.experiment') },
         ] as const).map((mode) => (
           <button
             key={mode.id}
@@ -1330,6 +1341,10 @@ function Step2AddTasks({
             setManualPairs={setManualPairs}
             manualHtmlUrl={manualHtmlUrl}
             setManualHtmlUrl={setManualHtmlUrl}
+            manualTeachingAidId={manualTeachingAidId}
+            setManualTeachingAidId={setManualTeachingAidId}
+            manualTeachingAidName={manualTeachingAidName}
+            setManualTeachingAidName={setManualTeachingAidName}
             loading={loading}
             onSubmit={handleManualSubmit}
             moveManualOption={moveManualOption}
@@ -1339,7 +1354,7 @@ function Step2AddTasks({
         {createMethod === 'ai-generate' && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-              {taskMode === 'reading' ? t('taskGroupReading.readingImportHint') : t('taskGroupReading.objectiveGenerateHint')}
+              {taskMode === 'reading' ? t('taskGroupReading.readingImportHint') : taskMode === 'experiment' ? t('taskGroupReading.experimentImportHint') : t('taskGroupReading.objectiveGenerateHint')}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">{t('taskGroup.describeRequirement')}</label>
@@ -1348,12 +1363,14 @@ function Step2AddTasks({
                 onChange={(e) => setAiPrompt(e.target.value)}
                 placeholder={taskMode === 'reading'
                   ? t('taskGroupReading.readingGeneratePlaceholder')
+                  : taskMode === 'experiment'
+                  ? t('taskGroupReading.experimentGeneratePlaceholder')
                   : t('taskGroup.requirementPlaceholder')}
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 bg-white"
                 rows={4}
               />
             </div>
-            {taskMode !== 'reading' && (
+            {taskMode !== 'reading' && taskMode !== 'experiment' && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">{t('taskGroup.questionCount_label')}</label>
               <input
@@ -1381,14 +1398,14 @@ function Step2AddTasks({
             {!importedTasks ? (
               <>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
-                  {t('taskGroupReading.readingImportHint')}
+                  {taskMode === 'reading' ? t('taskGroupReading.readingImportHint') : taskMode === 'experiment' ? t('taskGroupReading.experimentImportHint') : t('taskGroupReading.objectiveImportHint')}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">{t('taskGroup.pasteContent')}</label>
                   <textarea
                     value={importText}
                     onChange={(e) => setImportText(e.target.value)}
-                    placeholder={taskMode === 'reading' ? t('taskGroupReading.readingPassagePlaceholder') : t('taskGroup.pasteContentPlaceholder')}
+                    placeholder={taskMode === 'reading' ? t('taskGroupReading.readingPassagePlaceholder') : taskMode === 'experiment' ? t('taskGroupReading.experimentUrlPlaceholder') : t('taskGroup.pasteContentPlaceholder')}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-green-500 focus:ring-2 focus:ring-green-200 bg-white font-mono text-sm"
                     rows={10}
                   />

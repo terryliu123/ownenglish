@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>詹天佑人字形铁路展示</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1E40AF',
+                        secondary: '#3B82F6',
+                        accent: '#F97316',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .track-gradient {
+                background: linear-gradient(to right, #94a3b8 0%, #64748b 50%, #94a3b8 100%);
+            }
+            .text-shadow {
+                text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .transition-smooth {
+                transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+    <!-- 顶部导航 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-train text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-neutral">詹天佑人字形铁路展示</h1>
+            </div>
+            <nav>
+                <ul class="flex space-x-6">
+                    <li><a href="#simulation" class="text-neutral hover:text-primary transition-smooth">模拟演示</a></li>
+                    <li><a href="#explanation" class="text-neutral hover:text-primary transition-smooth">原理说明</a></li>
+                    <li><a href="#history" class="text-neutral hover:text-primary transition-smooth">历史背景</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- 介绍部分 -->
+        <section class="mb-12 text-center">
+            <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold text-neutral mb-4">人字形铁路</h2>
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto">詹天佑在1905-1909年主持修建京张铁路时，为克服南口至八达岭段的险峻地形而设计的创新铁路线路。</p>
+        </section>
+
+        <!-- 模拟部分 -->
+        <section id="simulation" class="mb-16 bg-white rounded-xl shadow-lg p-6 transform hover:shadow-xl transition-smooth">
+            <h3 class="text-2xl font-bold text-neutral mb-6 flex items-center">
+                <i class="fa fa-play-circle text-primary mr-2"></i>
+                交互式模拟演示
+            </h3>
+            
+            <div class="flex flex-col lg:flex-row gap-8">
+                <!-- 模拟画布 -->
+                <div class="lg:w-4/5 relative bg-slate-100 rounded-lg overflow-hidden p-4 border border-slate-200">
+                    <div class="text-sm text-slate-500 mb-2">拖动火车模型了解运行原理</div>
+                    <div id="railway-container" class="w-full aspect-[4/3] bg-gradient-to-b from-blue-50 to-blue-100 rounded-lg relative overflow-hidden">
+                        <!-- 铁路将由JS绘制 -->
+                        <div id="mountain-bg" class="absolute inset-0">
+                            <svg viewBox="0 0 1000 300" class="w-full h-full">
+                                <path d="M0,300 L200,-100 L500,-210 L800,150 L1000,250 L1000,300 L0,300 Z" fill="#94a3b8"></path>
+                                <path d="M0,200 L160,-190 L500,-120 L750,150 L1000,200 L1000,300 L0,300 Z" fill="#64748b"></path>
+                                <path d="M0,-300 L200,200 L500,150 L800,200 L1000,250 L1000,300 L0,300 Z" fill="#475569"></path>
+                            </svg>
+                        </div>
+                        <div id="track-container" class="absolute inset-0 flex items-center justify-center">
+                            <!-- 轨道将由JS绘制 -->
+                        </div>
+                        <div id="train-container" class="absolute inset-0">
+                            <!-- 火车将由JS添加 -->
+                            <div id="train" class="absolute cursor-move" style="left: 10%; top: 80%;">
+                                <div class="train-body relative">
+                                    <div class="w-20 h-10 bg-accent rounded-t-lg relative">
+                                        <div class="w-4 h-4 bg-yellow-400 rounded-full absolute top-2 right-2"></div>
+                                        <div class="w-3 h-6 bg-neutral absolute bottom-0 left-2"></div>
+                                        <div class="w-16 h-2 bg-slate-700 absolute bottom-0 left-2 rounded-t"></div>
+                                        <div class="w-3 h-3 bg-slate-700 rounded-full absolute -bottom-1.5 left-4"></div>
+                                        <div class="w-3 h-3 bg-slate-700 rounded-full absolute -bottom-1.5 left-12"></div>
+                                    </div>
+                                    <div id="pull-engine" class="w-16 h-6 bg-primary rounded-lg absolute -right-16 top-4 flex items-center justify-center">
+                                        <span class="text-white text-xs font-bold">拉</span>
+                                    </div>
+                                    <div id="push-engine" class="w-16 h-6 bg-secondary rounded-lg absolute -left-16 top-4 flex items-center justify-center">
+                                        <span class="text-white text-xs font-bold">推</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 flex flex-wrap gap-3 justify-center">
+                        <button id="reset-btn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-smooth flex items-center">
+                            <i class="fa fa-refresh mr-2"></i>重置
+                        </button>
+                        <button id="play-btn" class="px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-smooth flex items-center">
+                            <i class="fa fa-play mr-2"></i>自动演示
+                        </button>
+                        <button id="continue-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-smooth flex items-center hidden">
+                            <i class="fa fa-arrow-right mr-2"></i>继续行驶
+                        </button>
+                        <div class="text-sm text-slate-500 flex items-center">
+                            <i class="fa fa-info-circle mr-1"></i>当前位置: <span id="train-position" class="ml-1 font-medium">南口</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 控制面板和说明 -->
+                <div class="lg:w-1/3 space-y-6">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-bold text-primary mb-2 flex items-center">
+                            <i class="fa fa-lightbulb-o mr-2"></i>操作指南
+                        </h4>
+                        <ul class="space-y-2 text-sm text-slate-700">
+                            <li class="flex items-start">
+                                <i class="fa fa-mouse-pointer text-primary mt-1 mr-2"></i>
+                                <span>拖动火车模型沿着轨道移动，观察火车运行方式的变化</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fa fa-play text-primary mt-1 mr-2"></i>
+                                <span>点击"自动演示"按钮观看完整运行过程</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fa fa-refresh text-primary mt-1 mr-2"></i>
+                                <span>点击"重置"按钮将火车放回起点</span>
+                            </li>
+                            <li class="flex items-start">
+                                <i class="fa fa-arrow-right text-primary mt-1 mr-2"></i>
+                                <span>火车到达青龙桥时，点击"继续行驶"按钮切换火车头功能</span>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="bg-white border border-slate-200 rounded-lg p-4">
+                        <h4 class="font-bold text-neutral mb-2 flex items-center">
+                            <i class="fa fa-cogs mr-2"></i>运行原理
+                        </h4>
+                        <div id="explanation-panel" class="text-sm text-slate-700 space-y-3">
+                            <p class="font-medium">南口 (起点)</p>
+                            <p>北上的列车从南口出发，需要克服陡峭的坡度。此时两个火车头协同工作：</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li>前面的火车头负责"拉"</li>
+                                <li>后面的火车头负责"推"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 原理说明 -->
+        <section id="explanation" class="mb-16 space-y-6">
+            <h3 class="text-2xl font-bold text-neutral flex items-center">
+                <i class="fa fa-book text-primary mr-2"></i>
+                人字形铁路原理详解
+            </h3>
+            
+            <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-white rounded-xl shadow p-6 transform hover:shadow-xl transition-smooth">
+                    <h4 class="text-xl font-bold text-neutral mb-4">设计背景</h4>
+                    <p class="text-slate-700 mb-4">
+                        京张铁路南口至八达岭段地形复杂，坡度达到33‰（即每前进1000米，高度上升33米），远超普通铁路的设计标准。传统铁路设计难以解决这一难题。
+                    </p>
+                    <p class="text-slate-700">
+                        詹天佑创造性地设计了"人字形"铁路线路，通过延长线路长度，减小单位距离的坡度，使火车能够安全爬坡。
+                    </p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow p-6 transform hover:shadow-xl transition-smooth">
+                    <h4 class="text-xl font-bold text-neutral mb-4">运行机制</h4>
+                    <p class="text-slate-700 mb-4">
+                        "人字形"铁路的关键创新在于火车运行方向的转换：
+                    </p>
+                    <ol class="list-decimal pl-5 space-y-2 text-slate-700">
+                        <li>列车从南口出发，两个火车头分别在前后协同工作</li>
+                        <li>到达青龙桥人字形岔道口时，列车暂停</li>
+                        <li>前后火车头交换功能：原先拉的改为推，原先推的改为拉</li>
+                        <li>列车折向西北方向继续前进</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow p-6 transform hover:shadow-xl transition-smooth">
+                <h4 class="text-xl font-bold text-neutral mb-4">技术创新与意义</h4>
+                <div class="grid md:grid-cols-3 gap-6">
+                    <div class="flex flex-col items-center text-center p-4">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa fa-chevron-up text-2xl text-primary"></i>
+                        </div>
+                        <h5 class="font-bold text-neutral mb-2">坡度控制</h5>
+                        <p class="text-sm text-slate-600">将最大坡度从33‰降低到25‰，显著提高了行车安全性</p>
+                    </div>
+                    
+                    <div class="flex flex-col items-center text-center p-4">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa fa-arrows-h text-2xl text-primary"></i>
+                        </div>
+                        <h5 class="font-bold text-neutral mb-2">双向运行</h5>
+                        <p class="text-sm text-slate-600">无需掉头即可改变行驶方向，解决了地形限制问题</p>
+                    </div>
+                    
+                    <div class="flex flex-col items-center text-center p-4">
+                        <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                            <i class="fa fa-globe text-2xl text-primary"></i>
+                        </div>
+                        <h5 class="font-bold text-neutral mb-2">历史意义</h5>
+                        <p class="text-sm text-slate-600">中国第一条自主设计和建造的铁路，彰显了中国工程师的智慧</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 历史背景 -->
+        <section id="history" class="mb-16">
+            <h3 class="text-2xl font-bold text-neutral mb-6 flex items-center">
+                <i class="fa fa-history text-primary mr-2"></i>
+                历史背景与詹天佑的贡献
+            </h3>
+            
+            <div class="bg-white rounded-xl shadow p-6 transform hover:shadow-xl transition-smooth">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div class="md:col-span-2">
+                        <h4 class="text-xl font-bold text-neutral mb-4">詹天佑与京张铁路</h4>
+                        <p class="text-slate-700 mb-4">
+                            詹天佑（1861-1919）是中国近代铁路工程专家，被誉为"中国铁路之父"。1905年，清政府任命詹天佑为京张铁路总工程师，主持修建北京至张家口的铁路。
+                        </p>
+                        <p class="text-slate-700 mb-4">
+                            京张铁路是中国第一条完全由本国工程师设计、施工和管理的铁路，全长约200公里。其中，南口至八达岭段地形最为险峻，需要穿越军都山，工程难度极大。
+                        </p>
+                        <p class="text-slate-700">
+                            在设计该段铁路时，詹天佑经过实地勘察，创造性地提出了"人字形"铁路方案，成功解决了坡度难题。京张铁路于1909年建成通车，比原计划提前两年，工程费用也比预算节省了28万两白银。
+                        </p>
+                    </div>
+                    
+                    <div class="flex flex-col">
+                        <div class="bg-slate-100 rounded-lg overflow-hidden mb-4">
+                            <div class="aspect-video bg-slate-200">
+                                <img src="https://img0.baidu.com/it/u=589539172,166754091&fm=253&fmt=auto&app=120&f=JPEG?w=441&h=538" alt="詹天佑画像" class="w-full h-full object-cover">
+                            </div>
+                            <div class="p-4">
+                                <h5 class="font-bold text-neutral">詹天佑（1861-1919）</h5>
+                                <p class="text-sm text-slate-600">中国近代铁路工程的先驱</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h5 class="font-bold text-primary mb-2">历史意义</h5>
+                            <ul class="space-y-2 text-sm text-slate-700">
+                                <li class="flex items-start">
+                                    <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                                    <span>京张铁路的建成标志着中国铁路建设技术的重大突破</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                                    <span>人字形铁路设计是世界铁路工程史上的创新</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                                    <span>增强了民族自信心，推动了中国铁路事业的发展</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="bg-neutral text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="grid md:grid-cols-3 gap-8">
+                <div>
+                    <h4 class="text-lg font-bold mb-4">詹天佑人字形铁路展示</h4>
+                    <p class="text-slate-300 text-sm">
+                        本网站通过交互式模型展示詹天佑设计的人字形铁路原理，帮助用户直观理解这一伟大的工程创新。
+                    </p>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-bold mb-4">相关资源</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="text-slate-300 hover:text-white transition-smooth">京张铁路历史资料</a></li>
+                        <li><a href="#" class="text-slate-300 hover:text-white transition-smooth">詹天佑生平介绍</a></li>
+                        <li><a href="#" class="text-slate-300 hover:text-white transition-smooth">中国铁路发展历程</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-lg font-bold mb-4">关于本项目</h4>
+                    <p class="text-slate-300 text-sm mb-4">
+                        本交互式模型旨在以直观方式展示人字形铁路的运行原理，供学习和科普使用。
+                    </p>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-slate-300 hover:text-white transition-smooth">
+                            <i class="fa fa-github text-xl"></i>
+                        </a>
+                        <a href="#" class="text-slate-300 hover:text-white transition-smooth">
+                            <i class="fa fa-twitter text-xl"></i>
+                        </a>
+                        <a href="#" class="text-slate-300 hover:text-white transition-smooth">
+                            <i class="fa fa-linkedin text-xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="border-t border-slate-700 mt-8 pt-6 text-center text-slate-400 text-sm">
+                <p>&copy; 2025 詹天佑人字形铁路展示 | 版权所有</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const train = document.getElementById('train');
+            const railwayContainer = document.getElementById('railway-container');
+            const trainContainer = document.getElementById('train-container');
+            const trackContainer = document.getElementById('track-container');
+            const resetBtn = document.getElementById('reset-btn');
+            const playBtn = document.getElementById('play-btn');
+            const continueBtn = document.getElementById('continue-btn');
+            const trainPosition = document.getElementById('train-position');
+            const explanationPanel = document.getElementById('explanation-panel');
+            const pullEngine = document.getElementById('pull-engine');
+            const pushEngine = document.getElementById('push-engine');
+            
+            // 轨道关键点 - Z字形路线
+            const trackPoints = [
+                { x: 10, y: 80 },  // 南口 (起点) - 大山左下角
+                { x: 60, y: 60 },  // 爬坡段
+                { x: 80, y: 50 },  // 青龙桥 - 大山右侧中部
+                { x: 55, y: 30 },  // 折向西北
+                { x: 20, y: 10 }   // 八达岭 - 大山左侧上部
+            ];
+
+
+            // { x: 15, y: 65 },  // 南口 (起点) - 大山左
+                // { x: 40, y: 50 },  // 爬坡段
+                // { x: 70, y: 35 },  // 青龙桥 - 大山右侧中部
+                // { x: 50, y: 25 },  // 折向西北
+                // { x: 20, y: 15 }   // 八达岭 - 大山左侧上部
+       
+            // 绘制轨道
+            function drawTrack() {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 100 100');
+                svg.setAttribute('width', '100%');
+                svg.setAttribute('height', '100%');
+                
+                // 绘制山体背景
+                // const mountain = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                // mountain.setAttribute('d', 'M0,100 L20,80 L50,70 L80,80 L100,90 L100,100 L0,100 Z');
+                // mountain.setAttribute('fill', '#94a3b8');
+                // mountain.setAttribute('opacity', '0.3');
+                // svg.appendChild(mountain);
+                
+                // 绘制轨道
+                const track = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                track.setAttribute('d', `M${trackPoints[0].x},${trackPoints[0].y} 
+                                        L${trackPoints[1].x},${trackPoints[1].y}
+                                        L${trackPoints[2].x},${trackPoints[2].y}
+                                        L${trackPoints[3].x},${trackPoints[3].y}
+                                        L${trackPoints[4].x},${trackPoints[4].y}`);
+                track.setAttribute('stroke', '#1F2937');
+                track.setAttribute('stroke-width', '1.5');
+                track.setAttribute('fill', 'none');
+                track.setAttribute('stroke-linecap', 'round');
+                track.setAttribute('stroke-linejoin', 'round');
+                svg.appendChild(track);
+                
+                // 绘制轨道枕木
+                const drawSleepers = (startX, startY, endX, endY, count) => {
+                    for (let i = 0; i < count; i++) {
+                        const t = i / (count - 1);
+                        const x = startX + t * (endX - startX);
+                        const y = startY + t * (endY - startY);
+                        
+                        const sleeper = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        sleeper.setAttribute('x1', x - 1);
+                        sleeper.setAttribute('y1', y - 0.5);
+                        sleeper.setAttribute('x2', x + 1);
+                        sleeper.setAttribute('y2', y + 0.5);
+                        sleeper.setAttribute('stroke', '#78350F');
+                        sleeper.setAttribute('stroke-width', '0.3');
+                        svg.appendChild(sleeper);
+                    }
+                };
+                
+                // 绘制各段轨道枕木
+                drawSleepers(trackPoints[0].x, trackPoints[0].y, trackPoints[1].x, trackPoints[1].y, 10);
+                drawSleepers(trackPoints[1].x, trackPoints[1].y, trackPoints[2].x, trackPoints[2].y, 10);
+                drawSleepers(trackPoints[2].x, trackPoints[2].y, trackPoints[3].x, trackPoints[3].y, 10);
+                drawSleepers(trackPoints[3].x, trackPoints[3].y, trackPoints[4].x, trackPoints[4].y, 10);
+                
+                // 绘制关键点标志
+                trackPoints.forEach((point, index) => {
+                    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    marker.setAttribute('cx', point.x);
+                    marker.setAttribute('cy', point.y);
+                    marker.setAttribute('r', index === 0 || index === 2 || index === 4 ? '1' : '0.5');
+                    marker.setAttribute('fill', index === 0 || index === 4 ? '#3B82F6' : '#F97316');
+                    marker.setAttribute('stroke', '#FFFFFF');
+                    marker.setAttribute('stroke-width', '0.3');
+                    svg.appendChild(marker);
+                    
+                    // 添加标签
+                    if (index === 0 || index === 2 || index === 4) {
+                        const labels = ['南口', '青龙桥', '八达岭'];
+                        const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        label.setAttribute('x', point.x);
+                        label.setAttribute('y', point.y + (index === 2 ? 3 : -2));
+                        label.setAttribute('text-anchor', 'middle');
+                        label.setAttribute('font-size', '1.8');
+                        label.setAttribute('fill', '#1F2937');
+                        label.textContent = labels[index === 0 ? 0 : index === 2 ? 1 : 2];
+                        svg.appendChild(label);
+                    }
+                });
+                
+                trackContainer.appendChild(svg);
+            }
+            
+            // 初始化绘制轨道
+            drawTrack();
+            
+            // 拖动功能实现
+            let isDragging = false;
+            let currentPosition = { x: trackPoints[0].x, y: trackPoints[0].y };
+            let trainAngle = 0;
+            let atQinglongqiao = false;
+            let engineSwitched = false;
+            
+            // 计算两点之间的角度
+            function calculateAngle(x1, y1, x2, y2) {
+                return Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            }
+            
+            // 更新火车位置和角度
+            function updateTrainPosition(x, y) {
+                // 限制在轨道范围内
+                const rect = railwayContainer.getBoundingClientRect();
+                const containerWidth = rect.width;
+                const containerHeight = rect.height;
+                
+                // 转换为百分比坐标
+                const percentX = (x / containerWidth) * 100;
+                const percentY = (y / containerHeight) * 100;
+                
+                // 找到最近的轨道点
+                let minDistance = Infinity;
+                let closestPoint = 0;
+                
+                for (let i = 0; i < trackPoints.length - 1; i++) {
+                    const p1 = trackPoints[i];
+                    const p2 = trackPoints[i + 1];
+                    
+                    // 计算点到线段的距离
+                    const distance = pointToLineDistance(percentX, percentY, p1.x, p1.y, p2.x, p2.y);
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestPoint = i;
+                    }
+                }
+                
+                // 计算在线段上的位置
+                const p1 = trackPoints[closestPoint];
+                const p2 = trackPoints[closestPoint + 1];
+                
+                // 计算投影点
+                const t = Math.max(0, Math.min(1, dotProduct(
+                    percentX - p1.x, percentY - p1.y,
+                    p2.x - p1.x, p2.y - p1.y
+                ) / dotProduct(
+                    p2.x - p1.x, p2.y - p1.y,
+                    p2.x - p1.x, p2.y - p1.y
+                )));
+                
+                const newX = p1.x + t * (p2.x - p1.x)-3;
+                const newY = p1.y + t * (p2.y - p1.y)-3;
+                
+                // 计算角度
+                trainAngle = calculateAngle(p1.x, p1.y, p2.x, p2.y);
+                
+                // 更新火车位置
+                train.style.left = `${newX}%`;
+                train.style.top = `${newY}%`;
+                
+                // 修正：确保火车在青龙桥后不会上下颠倒
+                const trainBody = train.querySelector('.train-body');
+                if (engineSwitched && closestPoint >= 2) {
+                    // 青龙桥后保持火车正常方向
+                    trainBody.style.transform = 'rotate(0deg)';        
+                    // 确保推和拉的字样总是正的
+                    pullEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                    pushEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                } else {
+                    // trainBody.style.transform = `rotate(${trainAngle}deg)`;
+                    trainBody.style.transform = 'rotate(0deg)';        
+                    // 确保推和拉的字样总是正的
+                    pullEngine.style.transform = 'rotate(0deg)'; 
+                    pushEngine.style.transform = 'rotate(0deg)'; 
+                }
+                
+                // 确保推和拉的字样总是正的
+                // pullEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                // pushEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                // trainBody.style.transform= 'rotate(0deg)';
+                
+                // 更新当前位置
+                currentPosition = { x: newX, y: newY };
+                
+                // 检查是否到达青龙桥
+                checkAtQinglongqiao(newX);
+                
+                // 更新说明面板
+                updateExplanationPanel(newX);
+                
+                // 更新位置标签
+                updatePositionLabel(newX);
+            }
+            
+            // 点到线段的距离
+            function pointToLineDistance(px, py, x1, y1, x2, y2) {
+                const A = px - x1;
+                const B = py - y1;
+                const C = x2 - x1;
+                const D = y2 - y1;
+                
+                const dot = A * C + B * D;
+                const lenSq = C * C + D * D;
+                let param = -1;
+                
+                if (lenSq !== 0) param = dot / lenSq;
+                
+                let xx, yy;
+                
+                if (param < 0) {
+                    xx = x1;
+                    yy = y1;
+                } else if (param > 1) {
+                    xx = x2;
+                    yy = y2;
+                } else {
+                    xx = x1 + param * C;
+                    yy = y1 + param * D;
+                }
+                
+                const dx = px - xx;
+                const dy = py - yy;
+                
+                return Math.sqrt(dx * dx + dy * dy);
+            }
+            
+            // 点积
+            function dotProduct(x1, y1, x2, y2) {
+                return x1 * x2 + y1 * y2;
+            }
+            
+            // 检查是否到达青龙桥
+            function checkAtQinglongqiao(x) {
+                if (x >= 75 && x <= 85 && !atQinglongqiao && !engineSwitched) {
+                    atQinglongqiao = true;
+                    continueBtn.classList.remove('hidden');
+                    
+                    if (playInterval) {
+                        clearInterval(playInterval);
+                        playInterval = null;
+                        playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                    }
+                } else if ((x < 75 || x > 85) && atQinglongqiao) {
+                    atQinglongqiao = false;
+                    continueBtn.classList.add('hidden');
+                }
+            }
+            
+            // 切换火车头
+            function switchEngines() {
+                const temp = pullEngine.innerHTML;
+                pullEngine.innerHTML = pushEngine.innerHTML;
+                pushEngine.innerHTML = temp;
+                
+                const tempBg = pullEngine.style.backgroundColor;
+                pullEngine.style.backgroundColor = pushEngine.style.backgroundColor;
+                pushEngine.style.backgroundColor = tempBg;
+                
+                engineSwitched = true;
+                continueBtn.classList.add('hidden');
+            }
+            
+            // 更新位置标签
+            function updatePositionLabel(x) {
+                if (x < 20) {
+                    trainPosition.textContent = '南口';
+                } else if (x < 45) {
+                    trainPosition.textContent = '爬坡段';
+                } else if (x < 85) {
+                    trainPosition.textContent = '青龙桥';
+                } else if (x < 90) {
+                    trainPosition.textContent = '折向西北';
+                } else {
+                    trainPosition.textContent = '八达岭';
+                }
+            }
+            
+            // 更新说明面板
+            function updateExplanationPanel(x) {
+                let explanation = '';
+                
+                if (x < 20) {
+                    explanation = `
+                        <p class="font-medium">南口 (起点)</p>
+                        <p>北上的列车从南口出发，需要克服陡峭的坡度。此时两个火车头协同工作：</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>前面的火车头负责"拉"</li>
+                            <li>后面的火车头负责"推"</li>
+                        </ul>
+                    `;
+                } else if (x < 45) {
+                    explanation = `
+                        <p class="font-medium">爬坡段</p>
+                        <p>列车沿着人字形铁路的第一段爬坡，两个火车头同时发力：</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>前面的火车头通过牵引提供拉力</li>
+                            <li>后面的火车头通过推动提供推力</li>
+                            <li>两者协同作用，使列车能够克服陡峭的坡度</li>
+                        </ul>
+                    `;
+                } else if (x < 85) {
+                    if (!engineSwitched) {
+                        explanation = `
+                            <p class="font-medium">青龙桥 (人字形顶点)</p>
+                            <p>列车到达人字形铁路的顶点，在这里需要改变运行方向：</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li>列车完全停稳后，前后火车头交换功能</li>
+                                <li>原先拉的火车头变为推</li>
+                                <li>原先推的火车头变为拉</li>
+                                <li>这种设计避免了火车掉头的麻烦</li>
+                            </ul>
+                            <p class="mt-2 text-accent font-medium">点击"继续行驶"按钮切换火车头功能</p>
+                        `;
+                    } else {
+                        explanation = `
+                            <p class="font-medium">青龙桥 (人字形顶点)</p>
+                            <p>火车头功能已切换，列车准备继续向西北方向前进：</p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li>此时，原先在前面的火车头变为在后面推</li>
+                                <li>原先在后面的火车头变为在前面拉</li>
+                                <li>通过这种方式，列车成功改变了行驶方向</li>
+                            </ul>
+                        `;
+                    }
+                } else if (x < 90) {
+                    explanation = `
+                        <p class="font-medium">折向西北</p>
+                        <p>列车改变方向后，继续向西北方向前进：</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>此时，原先在前面的火车头变为在后面推</li>
+                            <li>原先在后面的火车头变为在前面拉</li>
+                            <li>通过这种方式，列车成功改变了行驶方向</li>
+                        </ul>
+                    `;
+                } else {
+                    explanation = `
+                        <p class="font-medium">八达岭 (终点)</p>
+                        <p>列车顺利通过人字形铁路，克服了险峻的地形：</p>
+                        <ul class="list-disc pl-5 space-y-1">
+                            <li>詹天佑的人字形铁路设计巧妙地解决了坡度难题</li>
+                            <li>这种设计不仅节省了工程成本，还提高了运营效率</li>
+                            <li>这一创新成为世界铁路工程史上的典范</li>
+                        </ul>
+                    `;
+                }
+                
+                explanationPanel.innerHTML = explanation;
+            }
+            
+            // 重置按钮事件
+            resetBtn.addEventListener('click', function() {
+                // 重置火车位置
+                train.style.left = `${trackPoints[0].x}%`;
+                train.style.top = `${trackPoints[0].y}%`;
+                
+                // 重置火车角度
+                const trainBody = train.querySelector('.train-body');
+                trainBody.style.transform = 'rotate(0deg)';
+                
+                // 重置火车头
+                pullEngine.innerHTML = '<span class="text-white text-xs font-bold">拉</span>';
+                pushEngine.innerHTML = '<span class="text-white text-xs font-bold">推</span>';
+                pullEngine.style.backgroundColor = '#1E40AF';
+                pushEngine.style.backgroundColor = '#3B82F6';
+                pullEngine.style.transform = 'rotate(0deg)';
+                pushEngine.style.transform = 'rotate(0deg)';
+                
+                // 更新当前位置
+                currentPosition = { x: trackPoints[0].x, y: trackPoints[0].y };
+                trainAngle = 0;
+                atQinglongqiao = false;
+                engineSwitched = false;
+                
+                // 更新说明面板
+                updateExplanationPanel(trackPoints[0].x);
+                
+                // 更新位置标签
+                trainPosition.textContent = '南口';
+                
+                // 隐藏继续按钮
+                continueBtn.classList.add('hidden');
+                
+                // 停止自动演示
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                }
+            });
+            
+            // 自动演示
+            let playInterval = null;
+            let playProgress = 0;
+            let playSegment = 0;
+            
+            playBtn.addEventListener('click', function() {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                } else {
+                    playInterval = setInterval(function() {
+                        // 如果在青龙桥且未切换火车头，则暂停
+                        if (playSegment === 2 && playProgress > 70 && !engineSwitched) {
+                            clearInterval(playInterval);
+                            playInterval = null;
+                            playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                            atQinglongqiao = true;
+                            continueBtn.classList.remove('hidden');
+                            return;
+                        }
+                        
+                        playProgress += 0.5;
+                        
+                        if (playProgress >= 100) {
+                            playProgress = 0;
+                            playSegment = (playSegment + 1) % (trackPoints.length - 1);
+                            
+                            // 如果完成了所有段，重置
+                            if (playSegment === 0) {
+                                resetBtn.click();
+                                return;
+                            }
+                        }
+                        
+                        // 计算当前应该在的位置
+                        const p1 = trackPoints[playSegment];
+                        const p2 = trackPoints[playSegment + 1];
+                        
+                        const t = playProgress / 100;
+                        const x = p1.x + t * (p2.x - p1.x)-3;
+                        const y = p1.y + t * (p2.y - p1.y)-3;
+                        
+                        // 更新火车位置
+                        train.style.left = `${x}%`;
+                        train.style.top = `${y}%`;
+                        
+                        // 计算角度
+                        trainAngle = calculateAngle(p1.x, p1.y, p2.x, p2.y);
+                        
+                        // 自动演示部分同理，判断 engineSwitched 状态决定是否旋转火车
+                        const trainBody = train.querySelector('.train-body');
+                        // trainBody.style.transform = `rotate(${trainAngle}deg)`;
+                        
+                        // 确保推和拉的字样总是正的
+                        // pullEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                        // pushEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                        
+                        if (engineSwitched && closestPoint >= 2) {
+                                // 青龙桥后保持火车正常方向
+                                trainBody.style.transform = 'rotate(0deg)';  
+                             // 确保推和拉的字样总是正的
+                                pullEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                                pushEngine.style.transform = `rotate(${-trainAngle}deg)`;
+                         } else {
+                                 trainBody.style.transform = 'rotate(0deg)';  
+                                 pullEngine.style.transform = 'rotate(0deg)'; 
+                                 pushEngine.style.transform = 'rotate(0deg)'; 
+                        }
+
+
+                        
+                        // 更新当前位置
+                        currentPosition = { x, y };
+                        
+                        // 检查是否到达青龙桥
+                        checkAtQinglongqiao(x);
+                        
+                        // 更新说明面板
+                        updateExplanationPanel(x);
+                        
+                        // 更新位置标签
+                        updatePositionLabel(x);
+                    }, 50);
+                    
+                    playBtn.innerHTML = '<i class="fa fa-pause mr-2"></i>暂停演示';
+                }
+            });
+            
+            // 继续行驶按钮事件
+            continueBtn.addEventListener('click', function() {
+                switchEngines();
+                
+                // 如果是自动演示模式，继续
+                if (!playInterval) {
+                    playBtn.click();
+                }
+            });
+            
+            // 拖动事件监听
+            train.addEventListener('mousedown', function(e) {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                }
+                
+                isDragging = true;
+                train.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const rect = railwayContainer.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                updateTrainPosition(x, y);
+            });
+            
+            document.addEventListener('mouseup', function() {
+                isDragging = false;
+                train.style.cursor = 'grab';
+            });
+            
+            // 移动端支持
+            train.addEventListener('touchstart', function(e) {
+                if (playInterval) {
+                    clearInterval(playInterval);
+                    playInterval = null;
+                    playBtn.innerHTML = '<i class="fa fa-play mr-2"></i>自动演示';
+                }
+                
+                isDragging = true;
+                train.style.cursor = 'grabbing';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('touchmove', function(e) {
+                if (!isDragging) return;
+                
+                const rect = railwayContainer.getBoundingClientRect();
+                const touch = e.touches[0];
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+                
+                updateTrainPosition(x, y);
+                e.preventDefault();
+            });
+            
+            document.addEventListener('touchend', function() {
+                isDragging = false;
+                train.style.cursor = 'grab';
+            });
+            
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

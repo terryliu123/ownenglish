@@ -12,6 +12,11 @@ import {
 } from '../../../services/websocket'
 import { classService, authService } from '../../../services/api'
 import type { ClassPresenceInfo } from '../types'
+import { debugLive } from '../../live-runtime/debug'
+import {
+  normalizeChallengePayload,
+  normalizeRoomInfoPayload,
+} from '../../live-runtime/challengeRuntime'
 
 export function useTeacherLive() {
   const { user, token } = useAppStore()
@@ -108,22 +113,6 @@ export function useTeacherLive() {
     setCurrentTask(null)
     setTaskGroupSubmissions(0)
     setTaskGroupEnded(false)
-
-    const newHistoryItem: TaskHistoryItem = {
-      type: 'task_group',
-      session_id: (data as any).session_id ?? null,
-      group_id: data.group_id,
-      title: data.title,
-      task_count: data.tasks.length,
-      tasks: data.tasks.map((task: any) => {
-        const taskId = task?.id ?? task?.task_id
-        return taskId && !task?.id ? { ...task, id: taskId } : task
-      }) as any,
-      published_at: new Date().toISOString(),
-      status: 'active',
-      submissions: 0,
-    }
-    setTaskHistory((prev) => [...prev, newHistoryItem])
   }, [])
 
   const handleNewTaskGroupSubmission = useCallback(
@@ -146,6 +135,7 @@ export function useTeacherLive() {
       setTaskGroupEnded(true)
       setCurrentTaskGroup(null)
       setCurrentTask(null)
+      setTaskGroupSubmissions(0)
 
       setTaskHistory((prev) =>
         prev.map((item) =>
@@ -159,27 +149,48 @@ export function useTeacherLive() {
   )
 
   const handleChallengeStarted = useCallback((challenge: LiveChallengeSession) => {
-    setCurrentChallenge(challenge)
+    setCurrentChallenge(normalizeChallengePayload({ challenge }))
     setCurrentTask(null)
     setCurrentTaskGroup(null)
   }, [])
 
   const handleChallengeScoreboardUpdated = useCallback(
-    (data: { challenge_id: string; scoreboard: any[]; status?: string }) => {
+    (data: {
+      challenge_id: string
+      scoreboard: any[]
+      status?: string
+      participant_ids?: string[]
+      current_round?: number
+      current_task_id?: string | null
+      round_status?: string | null
+      winner_student_id?: string | null
+      lead_student_id?: string | null
+    }) => {
       setCurrentChallenge((prev) => {
         if (!prev || prev.id !== data.challenge_id) return prev
-        return {
-          ...prev,
+        return normalizeChallengePayload({
+          challenge: prev,
           scoreboard: data.scoreboard,
           status: data.status || prev.status,
-        }
+          participant_ids: data.participant_ids ?? prev.participant_ids,
+          current_round: data.current_round ?? prev.current_round,
+          current_task_id:
+            data.current_task_id !== undefined ? data.current_task_id : prev.current_task_id,
+          round_status: data.round_status ?? prev.round_status,
+          winner_student_id:
+            data.winner_student_id !== undefined
+              ? data.winner_student_id
+              : prev.winner_student_id,
+          lead_student_id:
+            data.lead_student_id !== undefined ? data.lead_student_id : prev.lead_student_id,
+        })
       })
     },
     []
   )
 
   const handleChallengeEnded = useCallback((challenge: LiveChallengeSession) => {
-    setCurrentChallenge(challenge)
+    setCurrentChallenge(normalizeChallengePayload({ challenge }))
   }, [])
 
   const handleNewTask = useCallback((task: LiveTask) => {
@@ -266,48 +277,49 @@ export function useTeacherLive() {
 
   const handleRoomInfo = useCallback(
     (info: RoomInfo & { room_state?: RoomState; is_reconnect?: boolean }) => {
-      console.log('[WebSocket] Room info received:', info)
-      setRoomInfo(info)
+      const normalizedInfo = normalizeRoomInfoPayload(info as unknown as Record<string, unknown>)
+      console.log('[WebSocket] Room info received:', normalizedInfo)
+      debugLive('teacher:room_info', normalizedInfo)
+      setRoomInfo(normalizedInfo)
       setIsWsReady(true)
       isConnectingRef.current = false
 
-      if (info.room_state) {
-        const roomState = info.room_state
+      if (normalizedInfo.room_state) {
+        const roomState = normalizedInfo.room_state
 
-        if (roomState.task_history && roomState.task_history.length > 0) {
-          setTaskHistory((prev) => {
-            const serverItems = roomState.task_history
-            const serverIds = new Set(
-              serverItems.map((item: TaskHistoryItem) => item.session_id ?? item.group_id)
-            )
-            const localOnlyItems = prev.filter(
-              (item) => !serverIds.has(item.session_id ?? item.group_id)
-            )
-            return [...localOnlyItems, ...serverItems]
-          })
+        if (Object.prototype.hasOwnProperty.call(roomState, 'task_history')) {
+          setTaskHistory(Array.isArray(roomState.task_history) ? roomState.task_history : [])
         }
 
-        if (roomState.current_task_group) {
-          setCurrentTaskGroup(roomState.current_task_group)
-          setTaskGroupEnded(roomState.current_task_group.status !== 'active')
-          setCurrentTask(null)
+        if ('current_task_group' in roomState) {
+          setCurrentTaskGroup(roomState.current_task_group ?? null)
+          setTaskGroupEnded(roomState.current_task_group?.status !== 'active')
+          setTaskGroupSubmissions(roomState.current_task_group ? (normalizedInfo.task_group_submission_count || 0) : 0)
+          if (roomState.current_task_group) {
+            setCurrentTask(null)
+          }
+        }
+        else {
+          setTaskGroupSubmissions(0)
         }
 
-        if (roomState.current_challenge) {
-          setCurrentChallenge(roomState.current_challenge)
-          setCurrentTask(null)
-          setCurrentTaskGroup(null)
+        if ('current_challenge' in roomState) {
+          setCurrentChallenge(roomState.current_challenge ?? null)
+          if (roomState.current_challenge) {
+            setCurrentTask(null)
+            setCurrentTaskGroup(null)
+          }
         }
 
-        if (roomState.current_task) {
-          setCurrentTask(roomState.current_task)
-          setCurrentTaskGroup(null)
+        if ('current_task' in roomState) {
+          setCurrentTask(roomState.current_task ?? null)
+          if (roomState.current_task) {
+            setCurrentTaskGroup(null)
+          }
         }
 
         const pendingShares = (roomState as unknown as Record<string, unknown>).pending_shares
-        if (Array.isArray(pendingShares) && pendingShares.length > 0) {
-          setPendingShareRequests(pendingShares as any[])
-        }
+        setPendingShareRequests(Array.isArray(pendingShares) ? (pendingShares as any[]) : [])
       }
     },
     []

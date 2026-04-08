@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高保真发动机物理仿真</title>
+    <style>
+        body { 
+            margin: 0; overflow: hidden; background-color: #fdfdfd; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #333;
+        }
+        canvas { display: block; }
+
+        /* --- UI 面板设计 --- */
+        .panel {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(12px);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border: 1px solid #eaeaea;
+        }
+
+        #controls {
+            top: 20px; right: 20px; width: 280px;
+        }
+        
+        h2 { margin: 0 0 5px 0; font-size: 18px; color: #222; letter-spacing: -0.5px; }
+        .subtitle { font-size: 12px; color: #888; margin-bottom: 20px; display: block; }
+
+        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #555; }
+        .val { color: #0066cc; font-family: monospace; }
+
+        input[type=range] {
+            width: 100%; margin-bottom: 15px; cursor: pointer;
+            accent-color: #0066cc;
+        }
+        
+        button {
+            width: 100%; padding: 10px; border: none; background: #222; color: #fff;
+            border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        }
+        button:hover { background: #444; }
+
+        #status {
+            top: 20px; left: 20px; width: 220px;
+        }
+        .legend-row { display: flex; align-items: center; font-size: 12px; margin-bottom: 6px; color: #666; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; margin-right: 10px; }
+        
+        .monitor-box {
+            margin-top: 15px;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+        }
+        .cyl-indicator {
+            display: flex; justify-content: space-between;
+            font-size: 12px; margin-bottom: 4px; padding: 4px 8px;
+            background: #f7f7f7; border-radius: 4px; font-weight: bold;
+        }
+
+        #loading {
+            position: absolute; top:0; left:0; width:100%; height:100%;
+            background: #fff; display: flex; justify-content: center; align-items: center;
+            z-index: 999; font-weight: bold; color: #0066cc;
+        }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loading">校准物理引擎...</div>
+
+    <div id="status" class="panel">
+        <h2>Stroke Monitor</h2>
+        <span class="subtitle">四冲程状态监控</span>
+        
+        <div class="legend-row"><div class="dot" style="background:#2196f3"></div> Intake (进气)</div>
+        <div class="legend-row"><div class="dot" style="background:#ff9800"></div> Compression (压缩)</div>
+        <div class="legend-row"><div class="dot" style="background:#e91e63; box-shadow:0 0 5px #e91e63"></div> Power (做功)</div>
+        <div class="legend-row"><div class="dot" style="background:#757575"></div> Exhaust (排气)</div>
+
+        <div class="monitor-box" id="cyl-list"></div>
+    </div>
+
+    <div id="controls" class="panel">
+        <h2>Control Unit</h2>
+        <span class="subtitle">DOHC Inline-4 Engine</span>
+        
+        <div class="row"><span>Engine Speed</span> <span class="val" id="rpm-val">300 RPM</span></div>
+        <input type="range" id="rpm-slider" min="0" max="1000" value="300" step="10">
+
+        <div class="row"><span>Casing Opacity</span> <span class="val">Glass</span></div>
+        <input type="range" id="opacity-slider" min="0" max="0.5" value="0.1" step="0.05">
+
+        <button id="btn-pause">FREEZE MOTION</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 物理参数 ---
+        const CONFIG = {
+            cylinders: 4,
+            spacing: 16,       // 气缸间距
+            crankRadius: 6,    // 曲柄半径 (决定冲程大小)
+            rodLength: 20,     // 连杆长度 (决定活塞运动范围)
+            pistonRadius: 5.5,
+            boreHeight: 28     // 缸筒高度
+        };
+
+        // 材质定义 (工程风格)
+        const MATS = {
+            steelDark: new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.8, roughness: 0.3 }),
+            steelLight: new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.6, roughness: 0.2 }),
+            aluminum: new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.5, roughness: 0.4 }),
+            glass: new THREE.MeshPhysicalMaterial({ 
+                color: 0xeef7ff, metalness: 0.1, roughness: 0.05, 
+                transparent: true, opacity: 0.1, transmission: 0.98, side: THREE.DoubleSide 
+            }),
+            gas: new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide }),
+            spark: new THREE.PointLight(0xffaa00, 0, 20)
+        };
+
+        // 状态变量
+        let scene, camera, renderer, controls;
+        let engineSpeed = 300;
+        let crankAngle = 0;
+        let isRunning = true;
+        
+        // 存储物理对象引用
+        // 结构: { id, pistonGroup, rodGroup, crankPin(WorldPos), gasMesh, sparkLight, ... }
+        const cylinders = []; 
+        let crankshaftGroup;
+
+        // 点火顺序 1-3-4-2 的相位配置
+        // 机械相位: 曲轴的几何形状 (平面曲轴: 0, 180, 180, 0)
+        // 循环相位: 燃烧循环的起始点 (0, 180, 540, 360) - 对应 1-3-4-2
+        const PHASE_CONFIG = [
+            { mech: 0,          cycle: 0 },             // Cyl 1
+            { mech: Math.PI,    cycle: 3 * Math.PI },   // Cyl 2 (Exhaust start)
+            { mech: Math.PI,    cycle: Math.PI },       // Cyl 3 (Comp start)
+            { mech: 0,          cycle: 2 * Math.PI }    // Cyl 4 (Power start) - wait correction for 1-3-4-2 order
+        ];
+        // 修正循环相位以匹配 1-3-4-2:
+        // 1: Power(0), 3: Comp(PI), 4: Intake(2PI), 2: Exhaust(3PI)? 
+        // 让我们用标准偏移:
+        // Cyl 1: 0
+        // Cyl 2: 3*PI
+        // Cyl 3: 1*PI
+        // Cyl 4: 2*PI
+
+        init();
+        animate();
+
+        function init() {
+            // 1. 场景与相机
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xfcfcfc); // 纯净白
+            scene.fog = new THREE.Fog(0xfcfcfc, 60, 200);
+
+            camera = new THREE.PerspectiveCamera(40, window.innerWidth/window.innerHeight, 0.1, 500);
+            camera.position.set(50, 40, 60);
+
+            // 2. 渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // 3. 灯光 (摄影棚布光)
+            const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambient);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            keyLight.position.set(30, 60, 40);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 2048;
+            keyLight.shadow.mapSize.height = 2048;
+            scene.add(keyLight);
+
+            const fillLight = new THREE.DirectionalLight(0xddeeff, 0.5); // 蓝色补光
+            fillLight.position.set(-30, 20, -30);
+            scene.add(fillLight);
+
+            // 4. 地面 (Shadow Catcher)
+            const planeMat = new THREE.ShadowMaterial({ opacity: 0.08, color: 0x000000 });
+            const plane = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), planeMat);
+            plane.rotation.x = -Math.PI/2;
+            plane.position.y = -15;
+            plane.receiveShadow = true;
+            scene.add(plane);
+
+            const grid = new THREE.GridHelper(200, 20, 0xe0e0e0, 0xf5f5f5);
+            grid.position.y = -15;
+            scene.add(grid);
+
+            // 5. 构建引擎
+            buildEngine();
+            initUI();
+
+            // 6. 控制
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.target.set(0, 5, 0);
+
+            document.getElementById('loading').style.display = 'none';
+            window.addEventListener('resize', onResize);
+        }
+
+        function buildEngine() {
+            const engineRoot = new THREE.Group();
+            scene.add(engineRoot);
+
+            // --- A. 曲轴组 (Rotating Group) ---
+            crankshaftGroup = new THREE.Group();
+            engineRoot.add(crankshaftGroup);
+
+            // 主轴
+            const mainShaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.4, 1.4, CONFIG.spacing * 4 + 10, 32),
+                MATS.steelDark
+            );
+            mainShaft.rotation.z = Math.PI/2;
+            mainShaft.castShadow = true;
+            crankshaftGroup.add(mainShaft);
+
+            // 为每个气缸构建部件
+            for(let i=0; i<CONFIG.cylinders; i++) {
+                const xPos = (i - 1.5) * CONFIG.spacing;
+                const conf = PHASE_CONFIG[i];
+
+                // 1. 曲柄臂与平衡重 (Counterweights) - 物理结构修正
+                const armGroup = new THREE.Group();
+                armGroup.position.x = xPos;
+                armGroup.rotation.x = conf.mech; // 0 或 180度
+                crankshaftGroup.add(armGroup);
+
+                // 两个曲柄臂 (左右各一个)
+                const armGeo = new THREE.BoxGeometry(2, CONFIG.crankRadius*2 + 6, 4); 
+                // 移动几何中心，使其一端连接主轴，一端连接销子，另一端是平衡重
+                // 假设 Box 中心在 (0,0,0)。主轴在 0。销子在 +R。平衡重在 -R。
+                // 我们不需要移动几何中心，直接放。
+                
+                // 左臂
+                const armL = new THREE.Mesh(armGeo, MATS.steelDark);
+                armL.position.x = -2;
+                armL.castShadow = true;
+                
+                // 右臂
+                const armR = armL.clone();
+                armR.position.x = 2;
+                
+                // 平衡重 (半圆柱)
+                const cwGeo = new THREE.CylinderGeometry(4.5, 4.5, 2, 32, 1, false, 0, Math.PI);
+                const cwL = new THREE.Mesh(cwGeo, MATS.steelDark);
+                cwL.position.set(-2, -3, 0); // 放在曲轴下方
+                cwL.rotation.z = Math.PI/2;
+                
+                const cwR = cwL.clone();
+                cwR.position.set(2, -3, 0);
+
+                armGroup.add(armL, armR, cwL, cwR);
+
+                // 曲柄销 (Crank Pin)
+                const pinMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 4, 16), MATS.steelLight);
+                pinMesh.rotation.z = Math.PI/2;
+                pinMesh.position.set(0, CONFIG.crankRadius, 0);
+                armGroup.add(pinMesh);
+
+
+                // --- B. 活塞组 (Sliding Group) ---
+                // 活塞只做 Y 轴平移
+                const pistonGroup = new THREE.Group();
+                pistonGroup.position.x = xPos; 
+                // Y位置将在 animate 中更新
+                engineRoot.add(pistonGroup);
+
+                // 活塞头
+                const pistonHead = new THREE.Mesh(new THREE.CylinderGeometry(CONFIG.pistonRadius, CONFIG.pistonRadius, 6, 32), MATS.aluminum);
+                pistonHead.castShadow = true;
+                pistonGroup.add(pistonHead);
+
+                // 活塞销 (Wrist Pin) - 视觉上的连接点
+                const wristPin = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 8, 16), MATS.steelDark);
+                wristPin.rotation.z = Math.PI/2;
+                pistonGroup.add(wristPin);
+
+
+                // --- C. 连杆 (Connecting Rod) ---
+                // 物理修正：连杆是一个独立的对象，它的位置和旋转完全由两端的销子决定
+                // 我们把它放在 engineRoot 下，通过数学计算每帧更新变换矩阵
+                
+                const rodGroup = new THREE.Group();
+                engineRoot.add(rodGroup);
+
+                // 连杆几何体：创建时让它的长轴沿着 Z 轴，原点在“曲轴端”孔的中心
+                // 这样 lookAt(活塞端) 时就会自然对齐
+                const rodGeo = new THREE.BoxGeometry(2.5, 2.5, CONFIG.rodLength); // 长方体杆身
+                rodGeo.translate(0, 0, CONFIG.rodLength/2); // 移动，使原点在 Z=0，末端在 Z=Length
+
+                const rodBody = new THREE.Mesh(rodGeo, MATS.steelDark);
+                rodBody.castShadow = true;
+                
+                // 连杆大头 (连接曲轴)
+                const bigEnd = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 2.6, 16), MATS.steelDark);
+                bigEnd.rotation.y = Math.PI/2; // 调整圆柱方向匹配销子
+                
+                // 连杆小头 (连接活塞)
+                const smallEnd = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 2.6, 16), MATS.steelDark);
+                smallEnd.rotation.y = Math.PI/2;
+                smallEnd.position.z = CONFIG.rodLength; // 放在杆顶
+
+                rodGroup.add(rodBody, bigEnd, smallEnd);
+
+
+                // --- D. 气缸外壳与燃烧室 ---
+                const wallGroup = new THREE.Group();
+                // 计算气缸顶部的大致位置
+                const topDeadCenterY = CONFIG.crankRadius + CONFIG.rodLength;
+                wallGroup.position.set(xPos, topDeadCenterY - CONFIG.boreHeight/2 + 5, 0);
+                
+                const glassWall = new THREE.Mesh(
+                    new THREE.CylinderGeometry(CONFIG.pistonRadius+0.8, CONFIG.pistonRadius+0.8, CONFIG.boreHeight, 32, 1, true),
+                    MATS.glass
+                );
+                // 添加线框增加工程感
+                const edges = new THREE.LineSegments(new THREE.EdgesGeometry(glassWall.geometry), new THREE.LineBasicMaterial({color:0xaaaaaa, transparent:true, opacity:0.3}));
+                glassWall.add(edges);
+                wallGroup.add(glassWall);
+                engineRoot.add(wallGroup);
+
+                // 气体 Mesh
+                const gasMesh = new THREE.Mesh(
+                    new THREE.CylinderGeometry(CONFIG.pistonRadius-0.1, CONFIG.pistonRadius-0.1, 1, 32).translate(0, 0.5, 0),
+                    MATS.gas.clone()
+                );
+                engineRoot.add(gasMesh);
+
+                // 火花
+                const spark = new THREE.PointLight(0xff5500, 0, 20);
+                spark.position.set(xPos, topDeadCenterY + 6, 0);
+                engineRoot.add(spark);
+
+                // 存储
+                cylinders.push({
+                    index: i,
+                    xPos: xPos,
+                    cycleOffset: conf.cycle,
+                    mechOffset: conf.mech,
+                    piston: pistonGroup,
+                    rod: rodGroup,
+                    gas: gasMesh,
+                    spark: spark,
+                    topY: topDeadCenterY + 5 // 燃烧室顶部绝对位置
+                });
+            }
+        }
+
+        function updatePhysics(dt) {
+            if(!isRunning) return;
+
+            const deltaAngle = (engineSpeed / 60) * Math.PI * 2 * dt;
+            crankAngle += deltaAngle;
+            
+            // 1. 旋转曲轴
+            crankshaftGroup.rotation.x = crankAngle;
+
+            // 2. 解算每个气缸的运动学
+            cylinders.forEach(cyl => {
+                // A. 计算曲柄销 (Crank Pin) 的世界坐标
+                // 曲轴绕X转。销子在局部 (0, R, 0) + 机械偏移
+                // Theta = 当前曲轴角 + 机械偏移
+                const theta = crankAngle + cyl.mechOffset;
+                const pinY = Math.cos(theta) * CONFIG.crankRadius;
+                const pinZ = Math.sin(theta) * CONFIG.crankRadius;
+                
+                // 曲柄销的世界位置 (X不变)
+                const pinPos = new THREE.Vector3(cyl.xPos, pinY, pinZ);
+
+                // B. 计算活塞销 (Wrist Pin) 的位置
+                // 活塞被限制在 X=fixed, Z=0 的直线上，只求 Y
+                // 勾股定理: 连杆投影长度 = sqrt(RodLen^2 - PinZ^2)
+                // PistonY = PinY + 连杆投影长度
+                const vertLen = Math.sqrt(CONFIG.rodLength**2 - pinZ**2);
+                const pistonY = pinY + vertLen;
+                
+                const pistonPos = new THREE.Vector3(cyl.xPos, pistonY, 0);
+
+                // C. 应用变换
+                
+                // 移动活塞
+                cyl.piston.position.y = pistonY;
+
+                // 移动连杆
+                // 核心修正：连杆的位置设为曲柄销位置，然后 LookAt 活塞
+                cyl.rod.position.copy(pinPos);
+                cyl.rod.lookAt(pistonPos);
+                // 注意：我们的连杆几何体是沿 Z 轴生长的，原点在曲轴端。
+                // lookAt 让 Z 轴指向目标，这正是我们想要的！完美对齐。
+
+                // D. 燃烧室逻辑 (四冲程颜色)
+                updateCombustion(cyl, pistonY);
+            });
+        }
+
+        function updateCombustion(cyl, pistonY) {
+            // 循环相位 (0 - 4PI)
+            let cycle = (crankAngle + cyl.cycleOffset) % (4*Math.PI);
+            if(cycle < 0) cycle += 4*Math.PI;
+            const phase = cycle / Math.PI; // 0-4
+
+            // 气体高度
+            const h = Math.max(0.1, cyl.topY - pistonY - 3); // 3是活塞头厚度的一半+余量
+            cyl.gas.position.set(cyl.xPos, pistonY + 3, 0);
+            cyl.gas.scale.y = h;
+
+            const mat = cyl.gas.material;
+            let stateText = "";
+            let colorHex = 0xffffff;
+
+            if (phase < 1) { // Intake
+                stateText = "INTAKE";
+                colorHex = 0x2196f3; // Blue
+                mat.opacity = 0.1 + phase * 0.3;
+            } else if (phase < 2) { // Compress
+                stateText = "COMPRESS";
+                const t = phase - 1;
+                const c = new THREE.Color(0x2196f3).lerp(new THREE.Color(0xff9800), t);
+                mat.color.copy(c);
+                mat.opacity = 0.4 + t * 0.4;
+            } else if (phase < 3) { // Power
+                stateText = "POWER";
+                const t = phase - 2;
+                if(t < 0.1) { // Flash
+                    cyl.spark.intensity = 8;
+                    mat.color.setHex(0xffffaa);
+                    mat.opacity = 0.9;
+                } else {
+                    cyl.spark.intensity = 0;
+                    mat.color.setHex(0xe91e63); // Pinkish Red
+                    mat.opacity = 0.8 - t*0.6;
+                }
+            } else { // Exhaust
+                stateText = "EXHAUST";
+                colorHex = 0x757575; // Grey
+                mat.opacity = 0.3 * (1 - (phase-3));
+            }
+
+            if(phase < 1 || phase >= 3) mat.color.setHex(colorHex);
+
+            // UI Update
+            const ui = document.getElementById(`cyl-ui-${cyl.index}`);
+            if(ui) {
+                ui.innerText = stateText;
+                ui.style.color = (stateText==="POWER"?"#e91e63" : stateText==="INTAKE"?"#2196f3" : stateText==="COMPRESS"?"#ff9800":"#999");
+            }
+        }
+
+        function initUI() {
+            const list = document.getElementById('cyl-list');
+            for(let i=0; i<4; i++) {
+                list.innerHTML += `
+                    <div class="cyl-indicator">
+                        <span>CYL ${i+1}</span>
+                        <span id="cyl-ui-${i}">-</span>
+                    </div>
+                `;
+            }
+
+            document.getElementById('rpm-slider').addEventListener('input', (e)=>{
+                engineSpeed = parseInt(e.target.value);
+                document.getElementById('rpm-val').innerText = engineSpeed + " RPM";
+            });
+            document.getElementById('opacity-slider').addEventListener('input', (e)=>{
+                MATS.glass.opacity = parseFloat(e.target.value);
+            });
+            const btn = document.getElementById('btn-pause');
+            btn.addEventListener('click', ()=>{
+                isRunning = !isRunning;
+                btn.innerText = isRunning ? "FREEZE MOTION" : "RESUME";
+                btn.style.background = isRunning ? "#222" : "#0066cc";
+            });
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            updatePhysics(0.016);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>

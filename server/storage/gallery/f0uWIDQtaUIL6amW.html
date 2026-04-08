@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：图形的平移</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a; /* 深色背景 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden; /* 防止滚动 */
+        }
+
+        h1 {
+            margin-top: 15px;
+            font-weight: 300;
+            font-size: 24px;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: crosshair;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            background-color: #1e1e1e;
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #333;
+            padding: 10px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+            max-width: 700px;
+            line-height: 1.6;
+        }
+
+        .highlight {
+            color: #00E5FF;
+            font-weight: bold;
+        }
+
+        .yellow-text {
+            color: #FFD700;
+            font-weight: bold;
+        }
+
+        /* 简单的按钮样式 */
+        button {
+            background: #444;
+            border: 1px solid #555;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #555; }
+
+    </style>
+</head>
+<body>
+
+    <h1>图形的平移</h1>
+
+    <div class="controls">
+        <span style="font-size:14px; color:#ccc;">
+            平移向量: (<span id="vecX">200</span>, <span id="vecY">-50</span>)
+        </span>
+        <button onclick="resetPosition()">重置位置</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="mainCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="info">
+        <span class="yellow-text">操作说明：</span><br>
+        1. 拖动 <span class="yellow-text">左侧原始点</span> (A,B,C) 改变形状。<br>
+        2. 拖动 <span class="highlight">右侧平移后的图形</span> (A',B',C') 改变平移方向和距离。<br>
+        观察虚线，它们是平行的且长度相等。
+    </div>
+
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const vecXSpan = document.getElementById('vecX');
+    const vecYSpan = document.getElementById('vecY');
+
+    // 颜色配置
+    const COLORS = {
+        grid: '#333',
+        line: '#009688', // 暗青色连线
+        shapeOriginal: 'rgba(255, 255, 255, 0.8)',
+        shapeTranslated: '#00E5FF', // 亮青色
+        dashedLine: '#555', // 虚线颜色
+        vertex: '#FFD700', // 黄色顶点
+        vertexHover: '#FFF'
+    };
+
+    // 状态数据
+    let shape = [
+        { x: 150, y: 350, label: 'A' },
+        { x: 350, y: 350, label: 'B' },
+        { x: 250, y: 150, label: 'C' }
+    ];
+
+    // 平移向量 (dx, dy)
+    let translation = { x: 300, y: -50 };
+
+    // 交互状态
+    let dragging = {
+        active: false,
+        target: null, // 'vertex' or 'translation'
+        index: -1,    // 顶点索引
+        startX: 0,
+        startY: 0
+    };
+
+    // 1. 绘制网格背景
+    function drawGrid() {
+        const step = 50;
+        ctx.beginPath();
+        ctx.strokeStyle = COLORS.grid;
+        ctx.lineWidth = 1;
+
+        for (let x = 0; x <= canvas.width; x += step) {
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+        }
+        for (let y = 0; y <= canvas.height; y += step) {
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+        }
+        ctx.stroke();
+    }
+
+    // 2. 绘制虚线连接 (平移路径)
+    function drawConnectionLines() {
+        ctx.save();
+        ctx.strokeStyle = COLORS.line;
+        ctx.setLineDash([8, 6]); // 虚线样式
+        ctx.lineWidth = 1.5;
+        
+        shape.forEach(p => {
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + translation.x, p.y + translation.y);
+            ctx.stroke();
+        });
+        ctx.restore();
+    }
+
+    // 3. 绘制多边形
+    function drawPolygon(points, color, fillColor, isDashed = false) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.closePath();
+
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = color;
+        if(isDashed) ctx.setLineDash([5,5]);
+        else ctx.setLineDash([]);
+        
+        ctx.stroke();
+
+        if (fillColor) {
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+        }
+    }
+
+    // 4. 绘制顶点
+    function drawVertices(points, labelSuffix = '') {
+        points.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = COLORS.vertex;
+            ctx.fill();
+            
+            // 绘制外圈，增加点击判定视觉
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 文字标签
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(p.label + labelSuffix, p.x + 10, p.y - 10);
+        });
+    }
+
+    // 主绘制循环
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        drawGrid();
+        drawConnectionLines();
+
+        // 构造平移后的点集
+        const translatedShape = shape.map(p => ({
+            x: p.x + translation.x,
+            y: p.y + translation.y,
+            label: p.label
+        }));
+
+        // 绘制原始图形 (稍微暗一点)
+        drawPolygon(shape, 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0.05)');
+        drawVertices(shape);
+
+        // 绘制平移后图形 (高亮色)
+        drawPolygon(translatedShape, COLORS.shapeTranslated, 'rgba(0, 229, 255, 0.1)');
+        drawVertices(translatedShape, "'");
+
+        // 更新UI数值
+        vecXSpan.innerText = Math.round(translation.x);
+        vecYSpan.innerText = Math.round(-translation.y); // Y轴向下为正，通常数学习惯向上为正，取反显示更好理解
+    }
+
+    // --- 交互逻辑 ---
+
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(e);
+        dragging.active = true;
+        dragging.startX = pos.x;
+        dragging.startY = pos.y;
+
+        // 1. 检查是否点击了【原始】图形的顶点 -> 改变形状
+        let hitOriginal = shape.findIndex(p => dist(pos, p) < 15);
+        if (hitOriginal !== -1) {
+            dragging.target = 'original_vertex';
+            dragging.index = hitOriginal;
+            return;
+        }
+
+        // 2. 检查是否点击了【平移后】图形的顶点 -> 改变平移向量
+        // 计算平移后顶点位置
+        let hitTranslated = shape.findIndex(p => dist(pos, {x: p.x + translation.x, y: p.y + translation.y}) < 15);
+        if (hitTranslated !== -1) {
+            dragging.target = 'translation';
+            return;
+        }
+
+        // 3. 检查是否点击了【平移后】图形的内部 -> 整体平移
+        // 简单判定：如果没点到顶点，但离中心近，或者为了简化，没点到顶点就作为平移操作
+        // 这里做一个简单的多边形内点判定太复杂，我们简化为：只要点击了平移图形的附近区域
+        // 为了体验更好，我们优先判定顶点。如果没有点中顶点，我们不再全局拖拽，避免误触。
+        // 仅支持拖拽平移后的“顶点”来平移，或者增加一个拖拽手柄（这里直接用顶点即可，足够直观）。
+        
+        dragging.active = false; // 没点中任何东西
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getMousePos(e);
+
+        // 鼠标悬停效果
+        let hover = false;
+        // 检查原始点
+        if (shape.some(p => dist(pos, p) < 15)) hover = true;
+        // 检查平移点
+        if (shape.some(p => dist(pos, {x: p.x + translation.x, y: p.y + translation.y}) < 15)) hover = true;
+        
+        canvas.style.cursor = hover ? 'pointer' : 'default';
+
+        if (!dragging.active) return;
+
+        const dx = pos.x - dragging.startX;
+        const dy = pos.y - dragging.startY;
+
+        if (dragging.target === 'original_vertex') {
+            // 修改形状
+            shape[dragging.index].x += dx;
+            shape[dragging.index].y += dy;
+        } else if (dragging.target === 'translation') {
+            // 修改平移向量
+            translation.x += dx;
+            translation.y += dy;
+        }
+
+        // 更新起始点，防止飞逸
+        dragging.startX = pos.x;
+        dragging.startY = pos.y;
+
+        draw();
+    });
+
+    window.addEventListener('mouseup', () => {
+        dragging.active = false;
+        dragging.target = null;
+    });
+
+    function resetPosition() {
+        shape = [
+            { x: 150, y: 350, label: 'A' },
+            { x: 350, y: 350, label: 'B' },
+            { x: 250, y: 150, label: 'C' }
+        ];
+        translation = { x: 300, y: -50 };
+        draw();
+    }
+
+    // 初始化
+    draw();
+
+</script>
+</body>
+</html>

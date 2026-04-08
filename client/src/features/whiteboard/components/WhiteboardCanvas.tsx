@@ -84,6 +84,11 @@ export function WhiteboardCanvas({
 
     fabricRef.current = canvas
 
+    // 确保fabric wrapper背景与canvas背景一致
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+    }
+
     // 辅助函数：触发保存
     const triggerSaveNow = () => {
       setTimeout(() => {
@@ -96,18 +101,25 @@ export function WhiteboardCanvas({
     ;(window as any).whiteboardAPI = {
       addText: (text: string, options?: any) => {
         const canvas = fabricRef.current
-        if (!canvas) return
+        if (!canvas) {
+          console.log('[WC] addText failed: canvas not ready')
+          return
+        }
+        // 根据主题选择文字颜色
+        const textColor = theme === 'dark' ? '#e2e8f0' : theme === 'light' ? '#1e293b' : '#7c3aed'
+        const centerX = (canvas.width || 800) / 2 - 200
+        const centerY = (canvas.height || 600) / 2 - 50
         const textObj = new IText(text, {
-          left: options?.left ?? 100,
-          top: options?.top ?? 100,
-          fontSize: options?.fontSize ?? 24,
-          fill: options?.fill ?? '#ffffff',
-          fontFamily: 'system-ui, -apple-system, sans-serif',
+          left: options?.left ?? centerX,
+          top: options?.top ?? centerY,
+          fontSize: options?.fontSize ?? 18,
+          fill: options?.fill ?? textColor,
+          fontFamily: 'Noto Sans SC, sans-serif',
           selectable: true,
-          editable: true,
+          hasControls: true,
+          hasBorders: true,
         })
         canvas.add(textObj)
-        canvas.setActiveObject(textObj)
         canvas.renderAll()
         triggerSaveNow()
       },
@@ -133,6 +145,9 @@ export function WhiteboardCanvas({
         if (!canvas) return
         canvas.clear()
         canvas.backgroundColor = themeConfig.canvasBg
+        if (canvas.wrapperEl) {
+          canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+        }
         canvas.renderAll()
         triggerSaveNow()
       },
@@ -150,6 +165,11 @@ export function WhiteboardCanvas({
         const canvas = fabricRef.current
         if (!canvas) return
         canvas.loadFromJSON(json).then(() => {
+          // 确保加载后背景正确
+          canvas.backgroundColor = themeConfig.canvasBg
+          if (canvas.wrapperEl) {
+            canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+          }
           canvas.renderAll()
           console.log('[WhiteboardCanvas] Canvas data loaded successfully')
         }).catch((e: any) => {
@@ -157,7 +177,31 @@ export function WhiteboardCanvas({
         })
       },
       getCanvas: () => fabricRef.current,
+      toDataURL: (options?: any) => {
+        if (!fabricRef.current) {
+          console.error('[WhiteboardCanvas] toDataURL called but canvas not ready')
+          return null
+        }
+        try {
+          return fabricRef.current.toDataURL(options)
+        } catch (e) {
+          console.error('[WhiteboardCanvas] toDataURL error:', e)
+          return null
+        }
+      },
+      getTextContent: () => {
+        const canvas = fabricRef.current
+        if (!canvas) return ''
+        const texts: string[] = []
+        canvas.forEachObject((obj: any) => {
+          if (obj.type === 'i-text' || obj.type === 'text') {
+            texts.push(obj.text || '')
+          }
+        })
+        return texts.join('\n')
+      },
     }
+    console.log('[WhiteboardCanvas] whiteboardAPI initialized')
 
     // 右键菜单 - 使用原生事件
     const canvasEl = canvasRef.current
@@ -249,6 +293,10 @@ export function WhiteboardCanvas({
 
     currentThemeRef.current = theme
     canvas.backgroundColor = themeConfig.canvasBg
+    // 同时更新wrapper背景
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+    }
     canvas.renderAll()
   }, [theme, themeConfig.canvasBg])
 
@@ -812,6 +860,9 @@ export function WhiteboardCanvas({
     if (!canvas) return
     canvas.clear()
     canvas.backgroundColor = themeConfig.canvasBg
+    if (canvas.wrapperEl) {
+      canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+    }
     canvas.renderAll()
     onElementsChange([])
   }, [onElementsChange, themeConfig.canvasBg])
@@ -848,12 +899,15 @@ export function WhiteboardCanvas({
     <div
       className="absolute inset-0 touch-none"
       style={{
-        background: `
+        backgroundImage: `
           linear-gradient(${themeConfig.canvasGrid} 1px, transparent 1px),
           linear-gradient(90deg, ${themeConfig.canvasGrid} 1px, transparent 1px),
-          ${themeConfig.canvasBg}
+          none
         `,
-        backgroundSize: '20px 20px, 20px 20px, 100% 100%',
+        backgroundSize: '20px 20px, 20px 20px, auto',
+        backgroundPosition: '0 0, 0 0, 0 0',
+        backgroundRepeat: 'repeat, repeat, no-repeat',
+        backgroundColor: themeConfig.canvasBg,
       }}
     >
       <canvas

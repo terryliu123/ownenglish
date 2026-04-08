@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>光学显微镜成像原理</title>
+    <style>
+        /* 全局重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f4f6f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* 主容器 */
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 1. 头部标题 */
+        header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .tag {
+            font-size: 0.9rem;
+            color: #666;
+            background-color: #eee;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+        /* 2. 中间演示区 */
+        .stage {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            background-color: #B5CFA5; /* 还原截图背景色 */
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 播放按钮 */
+        .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70px;
+            height: 70px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .play-btn:hover {
+            background-color: rgba(0, 0, 0, 0.6);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .play-btn::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #fff;
+            margin-left: 6px; /* 视觉修正居中 */
+        }
+
+        /* 3. 尾部说明 */
+        footer {
+            padding: 25px 30px;
+            background-color: #fff;
+        }
+
+        footer p {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #444;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .highlight {
+            color: #2E7D32;
+            font-weight: bold;
+        }
+
+        .book-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #888;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 头部 -->
+    <header>
+        <h1>光学显微镜成像原理</h1>
+        <span class="tag">可交互式微课件</span>
+    </header>
+
+    <!-- 中间演示区 -->
+    <div class="stage" id="stage">
+        <canvas id="microscopeCanvas"></canvas>
+        <div class="play-btn" id="playBtn"></div>
+    </div>
+
+    <!-- 尾部说明 -->
+    <footer>
+        <p>
+            显微镜可以将被检测物体<span class="highlight">放大显示</span>，是通过透镜来实现的，其成像原理主要还是凸透镜成像原理。
+            显微镜有<span class="highlight">物镜</span>和<span class="highlight">目镜</span>2个透镜。
+            物体位于物镜的一倍焦距和二倍焦距之间 ($f < u < 2f$)，成倒立、放大的实像；
+            该实像位于目镜的一倍焦距以内，经过目镜再次放大，最终成<span class="highlight">倒立、放大的虚像</span>。
+        </p>
+        <div class="book-info">
+            <strong>适配教科书：</strong><br>
+            沪科版 / 沪粤版 / 苏教版 / 教科版(2024) / 人教版(2024) / 浙教版 / 沪粤版(2024) / 教科版 / 苏科版 / 苏科版(2024) / 人教版 / 沪教版
+        </div>
+    </footer>
+</div>
+
+<script>
+    const canvas = document.getElementById('microscopeCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = document.getElementById('stage');
+    const playBtn = document.getElementById('playBtn');
+
+    let width, height;
+    let animationProgress = 0;
+    let isAnimating = false;
+    let animationId;
+
+    // 初始化 Canvas 尺寸
+    function resizeCanvas() {
+        width = stage.clientWidth;
+        height = stage.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        drawScene(0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // 启动动画
+    playBtn.addEventListener('click', () => {
+        if (isAnimating) return;
+        isAnimating = true;
+        animationProgress = 0;
+        playBtn.style.display = 'none';
+        animate();
+    });
+
+    function animate() {
+        animationProgress += 0.008; // 动画速度
+        if (animationProgress > 1.2) {
+            animationProgress = 1.2; // 保持结束状态
+            // 动画结束，如果想重置可以解开下面注释
+            // isAnimating = false;
+            // playBtn.style.display = 'flex';
+        } else {
+            animationId = requestAnimationFrame(animate);
+        }
+        drawScene(animationProgress);
+    }
+
+    // 核心绘图函数
+    function drawScene(progress) {
+        ctx.clearRect(0, 0, width, height);
+        const centerY = height / 2;
+
+        // --- 定义关键坐标 ---
+        // 1. 物镜位置
+        const lens1X = width * 0.45; 
+        // 2. 物体位置 (树1) - 放在F和2F之间
+        const objX = width * 0.25; 
+        // 3. 目镜位置
+        const lens2X = width * 0.8;
+        
+        // 焦距示意 (用于绘制焦点)
+        const f1_dist = (lens1X - objX) * 0.7; // 物镜焦距
+        const f2_dist = (lens2X - lens1X) * 0.4; // 目镜焦距
+
+        // 4. 中间像位置 (树2) - 倒立放大实像
+        // 根据透镜公式简单估算位置，放在目镜焦距内
+        const img1X = width * 0.68; 
+        
+        // --- 1. 绘制光轴 ---
+        ctx.beginPath();
+        ctx.setLineDash([8, 6]);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // --- 2. 绘制左侧悬崖装饰 (还原原图左侧) ---
+        drawCliff(0, height, 80);
+
+        // --- 3. 绘制焦点点位 ---
+        // 物镜左侧 2F2, F2
+        drawPoint(lens1X - f1_dist * 2, centerY, '#9C27B0', '2F₂'); 
+        drawPoint(lens1X - f1_dist, centerY, '#9C27B0', 'F₂');
+        // 物镜右侧焦点 (紫色)
+        drawPoint(lens1X + f1_dist, centerY, '#9C27B0', '');
+
+        // 目镜左侧焦点 F1 (橙色)
+        // 中间像应该落在目镜焦点内，所以焦点要在中间像左边一点
+        const eyeFocusLeftX = lens2X - f2_dist;
+        drawPoint(eyeFocusLeftX, centerY, '#FF9800', 'F₁');
+        // 目镜右侧焦点 F1
+        drawPoint(lens2X + f2_dist, centerY, '#FF9800', 'F₁');
+
+        // --- 4. 绘制透镜 ---
+        drawLens(lens1X, centerY, 220, '物镜');
+        drawLens(lens2X, centerY, 260, '目镜');
+
+        // --- 5. 绘制物体 (树1) ---
+        drawTree(objX, centerY, 1, 1, false); // 正常
+
+        // --- 6. 绘制中间实像 (树2) ---
+        // 随着动画进度慢慢显示出来
+        const img1Opacity = progress > 0.5 ? Math.min((progress - 0.5) * 3, 1) : 0.1;
+        drawTree(img1X, centerY, 1.5, img1Opacity, true); // 倒立，放大
+
+        // --- 7. 绘制最终虚像 (树3) ---
+        // 在目镜左侧远处，倒立，巨大
+        const img2Opacity = progress > 0.9 ? Math.min((progress - 0.9) * 3, 0.3) : 0;
+        if(img2Opacity > 0) {
+            drawTree(width * 0.1, centerY, 3, img2Opacity, true); // 倒立，巨大，半透明
+        }
+
+        // --- 8. 绘制光路动画 ---
+        if (progress > 0) {
+            drawLightRays(objX, centerY, lens1X, img1X, lens2X, progress);
+        }
+    }
+
+    // 绘制树木
+    function drawTree(x, y, scale, opacity, inverted) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(scale, inverted ? -scale : scale);
+        ctx.globalAlpha = opacity;
+
+        // 树干
+        ctx.fillStyle = '#8D6E63';
+        ctx.fillRect(-6, -20, 12, 20);
+
+        // 树叶 (三层三角形)
+        ctx.fillStyle = '#689F38'; // 还原截图的绿色
+        
+        const drawTriangle = (yOffset, width, height) => {
+            ctx.beginPath();
+            ctx.moveTo(0, yOffset - height);
+            ctx.lineTo(width / 2, yOffset);
+            ctx.lineTo(-width / 2, yOffset);
+            ctx.fill();
+        };
+
+        drawTriangle(-20, 50, 30);
+        drawTriangle(-35, 40, 25);
+        drawTriangle(-50, 30, 20);
+
+        ctx.restore();
+    }
+
+    // 绘制透镜 (椭圆)
+    function drawLens(x, y, h, type) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 15, h/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // 绘制焦点
+    function drawPoint(x, y, color, label) {
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (label) {
+            ctx.fillStyle = '#444';
+            ctx.font = '14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y + 20);
+        }
+    }
+
+    // 绘制左侧悬崖装饰
+    function drawCliff(x, height, w) {
+        ctx.save();
+        ctx.fillStyle = '#A1887F'; // 泥土色
+        ctx.beginPath();
+        ctx.moveTo(0, height);
+        ctx.lineTo(w, height);
+        ctx.lineTo(w, height * 0.6);
+        ctx.quadraticCurveTo(w - 10, height * 0.58, 0, height * 0.58);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // 绘制光线逻辑
+    function drawLightRays(objX, centerY, lens1X, img1X, lens2X, progress) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+
+        // 树顶坐标 (假设树高缩放前为80)
+        const treeH = 70; 
+        const startX = objX;
+        const startY = centerY - treeH;
+
+        // 像顶坐标 (倒立实像)
+        // 实像高度比例约为1.5
+        const midX = img1X;
+        const midY = centerY + (treeH * 1.5);
+
+        // 1. 第一阶段：物体 -> 物镜
+        // 光线A: 平行主轴
+        drawLineAnim(startX, startY, lens1X, startY, progress, 0, 0.2);
+        // 光线B: 过光心
+        drawLineAnim(startX, startY, lens1X, centerY, progress, 0, 0.2);
+
+        // 2. 第二阶段：物镜 -> 实像 (汇聚)
+        // 光线A折射后过焦点(这里简化直接连到像点)
+        drawLineAnim(lens1X, startY, midX, midY, progress, 0.2, 0.5);
+        // 光线B直线传播
+        drawLineAnim(lens1X, centerY, midX, midY, progress, 0.2, 0.5);
+
+        // 3. 第三阶段：实像 -> 目镜
+        // 光线继续传播
+        // 简单模拟：从实像点射向目镜
+        const eyeInY1 = midY - (midY - startY) * 0.3; // 假定扩散
+        const eyeInY2 = midY + 10;
+        
+        drawLineAnim(midX, midY, lens2X, lens2X - (lens2X-midX)*(midY/midX)*10 + midY, progress, 0.5, 0.7); // 示意光线
+        drawLineAnim(midX, midY, lens2X, centerY + (midY-centerY)*0.8, progress, 0.5, 0.7); // 示意光线
+
+        // 4. 第四阶段：目镜 -> 出射 (平行/发散进入眼睛)
+        // 这里画两条平行线示意成虚像
+        const endX = width;
+        const ray1Y = centerY + (midY-centerY)*0.8;
+        const ray2Y = centerY + (midY-centerY)*1.5;
+        
+        if (progress > 0.7) {
+             drawLineAnim(lens2X, centerY + (midY-centerY)*0.8, endX, ray1Y, progress, 0.7, 1.0);
+             drawLineAnim(lens2X, lens2X - (lens2X-midX)*(midY/midX)*10 + midY, endX, ray2Y, progress, 0.7, 1.0);
+        }
+
+        ctx.restore();
+    }
+
+    // 动画线条辅助函数
+    function drawLineAnim(x1, y1, x2, y2, p, startP, endP) {
+        if (p < startP) return;
+        
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        
+        let currX, currY;
+        
+        if (p >= endP) {
+            currX = x2;
+            currY = y2;
+        } else {
+            const percent = (p - startP) / (endP - startP);
+            currX = x1 + (x2 - x1) * percent;
+            currY = y1 + (y2 - y1) * percent;
+        }
+        
+        ctx.lineTo(currX, currY);
+        ctx.stroke();
+    }
+
+    // 首次渲染
+    resizeCanvas();
+
+</script>
+
+</body>
+</html>

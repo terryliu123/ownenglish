@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>五年级数学 - 掷一掷</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #2d3748;
+            min-height: 100vh;
+        }
+        .dice-container {
+            perspective: 1000px;
+        }
+        .dice {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 1s ease;
+        }
+        .dice-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            background: white;
+            border: 2px solid #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #2d3748;
+            position: absolute;
+        }
+        .front  { transform: translateZ(40px); }
+        .back   { transform: rotateY(180deg) translateZ(40px); }
+        .right  { transform: rotateY(90deg) translateZ(40px); }
+        .left   { transform: rotateY(-90deg) translateZ(40px); }
+        .top    { transform: rotateX(90deg) translateZ(40px); }
+        .bottom { transform: rotateX(-90deg) translateZ(40px); }
+        
+        .face-1 .dot:nth-child(1) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .face-2 .dot:nth-child(1) { top: 25%; left: 25%; }
+        .face-2 .dot:nth-child(2) { bottom: 25%; right: 25%; }
+        .face-3 .dot:nth-child(1) { top: 25%; left: 25%; }
+        .face-3 .dot:nth-child(2) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .face-3 .dot:nth-child(3) { bottom: 25%; right: 25%; }
+        .face-4 .dot:nth-child(1) { top: 25%; left: 25%; }
+        .face-4 .dot:nth-child(2) { top: 25%; right: 25%; }
+        .face-4 .dot:nth-child(3) { bottom: 25%; left: 25%; }
+        .face-4 .dot:nth-child(4) { bottom: 25%; right: 25%; }
+        .face-5 .dot:nth-child(1) { top: 25%; left: 25%; }
+        .face-5 .dot:nth-child(2) { top: 25%; right: 25%; }
+        .face-5 .dot:nth-child(3) { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .face-5 .dot:nth-child(4) { bottom: 25%; left: 25%; }
+        .face-5 .dot:nth-child(5) { bottom: 25%; right: 25%; }
+        .face-6 .dot:nth-child(1) { top: 25%; left: 25%; }
+        .face-6 .dot:nth-child(2) { top: 25%; right: 25%; }
+        .face-6 .dot:nth-child(3) { top: 50%; left: 25%; transform: translateY(-50%); }
+        .face-6 .dot:nth-child(4) { top: 50%; right: 25%; transform: translateY(-50%); }
+        .face-6 .dot:nth-child(5) { bottom: 25%; left: 25%; }
+        .face-6 .dot:nth-child(6) { bottom: 25%; right: 25%; }
+        
+        @keyframes diceRoll {
+            0% { transform: rotateX(0) rotateY(0) rotateZ(0); }
+            100% { transform: rotateX(720deg) rotateY(360deg) rotateZ(180deg); }
+        }
+        .rolling {
+            animation: diceRoll 1s ease-out;
+        }
+        
+        .probability-card {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .probability-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0,0,0,0.1);
+        }
+        
+        .error-message {
+            color: #e53e3e;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            display: none;
+        }
+        
+        .chart-container {
+            min-height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题区 -->
+        <section class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 text-indigo-800">掷一掷</h1>
+            <p class="text-xl text-gray-600">探索骰子中的概率世界</p>
+            <div class="mt-8 flex justify-center">
+                <div class="dice-container">
+                    <div class="dice mx-auto" id="demo-dice">
+                        <div class="dice-face front face-1">
+                            <div class="dot"></div>
+                        </div>
+                        <div class="dice-face back face-2">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <div class="dice-face right face-3">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <div class="dice-face left face-4">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <div class="dice-face top face-5">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                        <div class="dice-face bottom face-6">
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                            <div class="dot"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 概率知识 -->
+        <section class="mb-12 bg-white rounded-xl p-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-6 text-indigo-700 border-b pb-2">📊 骰子概率知识</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="probability-card bg-blue-50 p-4 rounded-lg">
+                    <div class="text-blue-600 font-bold mb-2">单个骰子</div>
+                    <p class="text-gray-700">每个点数出现的概率均等：</p>
+                    <p class="text-xl font-bold text-blue-800">1/6 ≈ 16.67%</p>
+                </div>
+                <div class="probability-card bg-green-50 p-4 rounded-lg">
+                    <div class="text-green-600 font-bold mb-2">两个骰子和</div>
+                    <p class="text-gray-700">和为7的概率最大：</p>
+                    <p class="text-xl font-bold text-green-800">6/36 ≈ 16.67%</p>
+                </div>
+                <div class="probability-card bg-purple-50 p-4 rounded-lg">
+                    <div class="text-purple-600 font-bold mb-2">三个骰子和</div>
+                    <p class="text-gray-700">和为10或11概率最大：</p>
+                    <p class="text-xl font-bold text-purple-800">27/216 ≈ 12.5%</p>
+                </div>
+            </div>
+            
+            <div class="mt-8 chart-container" id="probability-chart"></div>
+        </section>
+
+        <!-- 互动实验 -->
+        <section class="mb-12 bg-white rounded-xl p-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-6 text-indigo-700 border-b pb-2">🎲 互动实验</h2>
+            
+            <div class="flex flex-col md:flex-row items-center justify-between mb-8">
+                <div class="mb-4 md:mb-0">
+                    <label class="block text-gray-700 mb-2">骰子数量：</label>
+                    <select id="dice-count" class="border rounded p-2">
+                        <option value="1">1个骰子</option>
+                        <option value="2" selected>2个骰子</option>
+                        <option value="3">3个骰子</option>
+                    </select>
+                </div>
+                
+                <button id="roll-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-full transition duration-300 flex items-center">
+                    <i class="fas fa-dice mr-2"></i>
+                    掷骰子
+                </button>
+                
+                <div class="mt-4 md:mt-0">
+                    <label class="block text-gray-700 mb-2">实验次数：</label>
+                    <div class="text-xl font-bold text-indigo-800" id="roll-count">0</div>
+                </div>
+            </div>
+            
+            <div class="flex justify-center space-x-8 my-8" id="dice-area">
+                <!-- 骰子将在这里动态生成 -->
+            </div>
+            
+            <div class="bg-gray-100 p-4 rounded-lg">
+                <div class="font-bold text-gray-700 mb-2">本次结果：</div>
+                <div class="text-2xl font-bold text-indigo-800" id="current-result">-</div>
+                <div class="text-sm text-gray-500 mt-1" id="result-detail"></div>
+                <div class="error-message" id="error-message">
+                    <i class="fas fa-exclamation-circle mr-1"></i>
+                    <span>结果计算异常，请重新掷骰子</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 实验数据 -->
+        <section class="mb-12 bg-white rounded-xl p-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-6 text-indigo-700 border-b pb-2">📈 实验数据统计</h2>
+            
+            <div class="mb-4 flex justify-between items-center">
+                <div>
+                    <span class="text-gray-700">总实验次数：</span>
+                    <span class="font-bold" id="total-rolls">0</span>
+                </div>
+                <button id="reset-btn" class="text-red-600 hover:text-red-800">
+                    <i class="fas fa-trash-alt mr-1"></i>清空数据
+                </button>
+            </div>
+            
+            <div class="chart-container" id="experiment-chart"></div>
+            
+            <div class="mt-6 grid md:grid-cols-2 gap-4" id="stats-container">
+                <!-- 统计数据将在这里动态生成 -->
+            </div>
+        </section>
+
+        <!-- 数学思考 -->
+        <section class="bg-white rounded-xl p-6 shadow-md">
+            <h2 class="text-2xl font-bold mb-6 text-indigo-700 border-b pb-2">💡 数学思考</h2>
+            
+            <div class="space-y-4">
+                <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                    <div class="font-bold text-yellow-700 mb-1">思考题1</div>
+                    <p class="text-gray-700">为什么两个骰子的和是7的概率最大？请列出所有可能的组合。</p>
+                </div>
+                
+                <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
+                    <div class="font-bold text-blue-700 mb-1">思考题2</div>
+                    <p class="text-gray-700">如果同时掷3个骰子，哪个和数的概率最大？与你的实验结果一致吗？</p>
+                </div>
+                
+                <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-400">
+                    <div class="font-bold text-green-700 mb-1">思考题3</div>
+                    <p class="text-gray-700">设计一个表格，记录班级同学掷两个骰子的实验数据，比较全班结果与理论概率。</p>
+                </div>
+            </div>
+            
+            <div class="mt-8 bg-indigo-50 p-4 rounded-lg">
+                <h3 class="font-bold text-indigo-700 mb-2">📝 我的发现：</h3>
+                <textarea class="w-full border rounded p-2" rows="3" placeholder="记录你的观察和发现..."></textarea>
+                <button class="mt-2 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">保存笔记</button>
+            </div>
+        </section>
+        
+        <!-- 页脚 -->
+        <footer class="mt-12 text-center text-gray-600 text-sm">
+            <p>五年级数学上册 - 概率与统计实践</p>
+            <p class="mt-1">© 2023 小学数学互动实验室</p>
+        </footer>
+    </div>
+
+    <!-- 将Highcharts脚本放在最后，确保DOM加载完成 -->
+    <script src="https://code.highcharts.com/highcharts.js"></script>
+    <script>
+        // 使用立即执行函数避免全局变量污染
+        (function() {
+            // 初始化变量
+            var rollCount = 0;
+            var resultsHistory = [];
+            const diceFaces = [
+                { transform: 'rotateX(0deg)', class: 'face-1' },       // 1点
+                { transform: 'rotateX(180deg)', class: 'face-6' },      // 2点 - 修正为6点
+                { transform: 'rotateY(-90deg)', class: 'face-3' },     // 3点
+                { transform: 'rotateY(90deg)', class: 'face-4' },      // 4点
+                { transform: 'rotateX(-90deg)', class: 'face-5' },     // 5点
+                { transform: 'rotateX(90deg)', class: 'face-2' }       // 6点 - 修正为2点
+            ];
+            
+            // DOM元素
+            const rollBtn = document.getElementById('roll-btn');
+            const diceCountSelect = document.getElementById('dice-count');
+            const diceArea = document.getElementById('dice-area');
+            const currentResult = document.getElementById('current-result');
+            const resultDetail = document.getElementById('result-detail');
+            const rollCountDisplay = document.getElementById('roll-count');
+            const totalRollsDisplay = document.getElementById('total-rolls');
+            const statsContainer = document.getElementById('stats-container');
+            const resetBtn = document.getElementById('reset-btn');
+            const demoDice = document.getElementById('demo-dice');
+            const errorMessage = document.getElementById('error-message');
+            
+            // 初始化页面
+            document.addEventListener('DOMContentLoaded', function() {
+                // 加载保存的数据
+                loadSavedData();
+                
+                // 初始化骰子显示
+                updateDiceCount();
+                
+                // 设置演示骰子的随机旋转
+                setInterval(() => {
+                    const randomFace = Math.floor(Math.random() * 6) + 1;
+                    rotateDemoDice(randomFace);
+                }, 2000);
+                
+                // 延迟绘制图表，确保DOM已完全加载
+                setTimeout(() => {
+                    // 绘制概率图表
+                    drawProbabilityChart();
+                    // 如果有历史数据，绘制实验图表
+                    if (resultsHistory.length > 0) {
+                        drawExperimentChart();
+                    }
+                }, 100);
+            });
+            
+            // 更新骰子数量
+            diceCountSelect.addEventListener('change', function() {
+                updateDiceCount();
+                drawProbabilityChart();
+                drawExperimentChart();
+            });
+            
+            // 掷骰子按钮事件
+            rollBtn.addEventListener('click', rollDice);
+            
+            // 重置数据按钮事件
+            resetBtn.addEventListener('click', resetData);
+            
+            // 更新骰子数量显示
+            function updateDiceCount() {
+                diceArea.innerHTML = '';
+                const count = parseInt(diceCountSelect.value);
+                
+                for (let i = 0; i < count; i++) {
+                    const diceContainer = document.createElement('div');
+                    diceContainer.className = 'dice-container';
+                    diceContainer.innerHTML = `
+                        <div class="dice" id="dice-${i}">
+                            <div class="dice-face front face-1">
+                                <div class="dot"></div>
+                            </div>
+                            <div class="dice-face back face-2">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                            <div class="dice-face right face-3">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                            <div class="dice-face left face-4">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                            <div class="dice-face top face-5">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                            <div class="dice-face bottom face-6">
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                                <div class="dot"></div>
+                            </div>
+                        </div>
+                    `;
+                    diceArea.appendChild(diceContainer);
+                }
+            }
+            
+            // 掷骰子函数
+            function rollDice() {
+                const count = parseInt(diceCountSelect.value);
+                const diceElements = document.querySelectorAll('#dice-area .dice');
+                const results = [];
+                
+                // 隐藏错误信息
+                errorMessage.style.display = 'none';
+                
+                // 禁用按钮防止连续点击
+                rollBtn.disabled = true;
+                rollBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>掷骰中...';
+                
+                // 为每个骰子添加滚动动画
+                diceElements.forEach((dice, index) => {
+                    dice.classList.add('rolling');
+                    
+                    // 随机决定骰子结果 (1-6)
+                    const result = Math.floor(Math.random() * 6) + 1;
+                    results.push(result);
+                    
+                    // 设置骰子最终显示的面
+                    setTimeout(() => {
+                        dice.classList.remove('rolling');
+                        rotateDice(dice, result);
+                        
+                        // 当最后一个骰子动画结束时显示结果
+                        if (index === diceElements.length - 1) {
+                            showResults(results);
+                        }
+                    }, 1000);
+                });
+            }
+            
+            // 显示结果
+            function showResults(results) {
+                const count = parseInt(diceCountSelect.value);
+                const sum = results.reduce((a, b) => a + b, 0);
+                
+                // 验证结果是否有效
+                if (results.some(r => r < 1 || r > 6) || sum < count || sum > count * 6) {
+                    errorMessage.style.display = 'block';
+                    currentResult.textContent = '-';
+                    resultDetail.textContent = '';
+                } else {
+                    currentResult.textContent = sum;
+                    
+                    // 显示详细结果
+                    if (count > 1) {
+                        resultDetail.textContent = `骰子点数: ${results.join(' + ')} = ${sum}`;
+                    } else {
+                        resultDetail.textContent = '';
+                    }
+                    
+                    // 记录结果
+                    recordResult(sum);
+                }
+                
+                // 恢复按钮状态
+                rollBtn.disabled = false;
+                rollBtn.innerHTML = '<i class="fas fa-dice mr-2"></i>掷骰子';
+            }
+            
+            // 旋转骰子到指定面
+            function rotateDice(diceElement, face) {
+                // 确保face在1-6范围内
+                const validFace = Math.max(1, Math.min(6, face));
+                const transform = diceFaces[validFace - 1].transform;
+                diceElement.style.transform = transform;
+                
+                // 不需要更新骰子面的类，因为HTML结构中已经正确设置了类名
+                // 骰子的旋转是通过3D变换实现的，而不是通过改变类名
+            }
+            
+            // 旋转演示骰子
+            function rotateDemoDice(face) {
+                const validFace = Math.max(1, Math.min(6, face));
+                const transform = diceFaces[validFace - 1].transform;
+                demoDice.style.transform = transform;
+            }
+            
+            // 记录结果
+            function recordResult(sum) {
+                rollCount++;
+                rollCountDisplay.textContent = rollCount;
+                
+                // 添加到历史记录
+                resultsHistory.push(sum);
+                
+                // 更新总实验次数
+                totalRollsDisplay.textContent = resultsHistory.length;
+                
+                // 保存数据到本地存储
+                saveData();
+                
+                // 更新统计数据和图表
+                updateStatistics();
+                drawExperimentChart();
+            }
+            
+            // 更新统计数据
+            function updateStatistics() {
+                const count = parseInt(diceCountSelect.value);
+                const min = count;
+                const max = count * 6;
+                const sumCounts = {};
+                
+                // 初始化计数器
+                for (let i = min; i <= max; i++) {
+                    sumCounts[i] = 0;
+                }
+                
+                // 统计每个和出现的次数
+                resultsHistory.forEach(sum => {
+                    // 确保sum在有效范围内
+                    const validSum = Math.max(min, Math.min(max, sum));
+                    sumCounts[validSum]++;
+                });
+                
+                // 显示统计数据
+                statsContainer.innerHTML = '';
+                
+                // 计算最常出现的和
+                let mostFrequentSum = min;
+                let maxCount = 0;
+                
+                for (const [sum, count] of Object.entries(sumCounts)) {
+                    if (count > maxCount) {
+                        mostFrequentSum = parseInt(sum);
+                        maxCount = count;
+                    }
+                }
+                
+                // 添加统计卡片
+                statsContainer.innerHTML += `
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <div class="text-blue-700 font-bold mb-1">最常出现的和</div>
+                        <div class="text-3xl font-bold text-blue-800">${mostFrequentSum}</div>
+                        <div class="text-sm text-gray-600">出现 ${maxCount} 次</div>
+                    </div>
+                    
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <div class="text-green-700 font-bold mb-1">平均和</div>
+                        <div class="text-3xl font-bold text-green-800">${calculateAverage().toFixed(2)}</div>
+                        <div class="text-sm text-gray-600">理论值 ${(3.5 * count).toFixed(2)}</div>
+                    </div>
+                `;
+            }
+            
+            // 计算平均值
+            function calculateAverage() {
+                if (resultsHistory.length === 0) return 0;
+                
+                const count = parseInt(diceCountSelect.value);
+                const min = count;
+                const max = count * 6;
+                
+                // 过滤无效结果
+                const validResults = resultsHistory.filter(sum => sum >= min && sum <= max);
+                
+                if (validResults.length === 0) return 0;
+                
+                const sum = validResults.reduce((a, b) => a + b, 0);
+                return sum / validResults.length;
+            }
+            
+            // 绘制概率图表
+            function drawProbabilityChart() {
+                const count = parseInt(diceCountSelect.value);
+                const min = count;
+                const max = count * 6;
+                
+                // 计算理论概率
+                const probabilities = calculateTheoreticalProbabilities(count);
+                
+                // 确保图表容器存在
+                const container = document.getElementById('probability-chart');
+                if (!container) return;
+                
+                // 先销毁旧图表
+                if (window.probabilityChart) {
+                    window.probabilityChart.destroy();
+                }
+                
+                // 确保容器有足够的高度
+                container.style.height = '300px';
+                
+                window.probabilityChart = Highcharts.chart('probability-chart', {
+                    chart: {
+                        type: 'column',
+                        backgroundColor: 'transparent'
+                    },
+                    title: {
+                        text: '骰子和的理论概率',
+                        style: {
+                            color: '#2d3748',
+                            fontSize: '16px'
+                        }
+                    },
+                    xAxis: {
+                        categories: Array.from({length: max - min + 1}, (_, i) => i + min),
+                        labels: {
+                            style: {
+                                color: '#4a5568'
+                            }
+                        }
+                    },
+                    yAxis: {
+                        title: {
+                            text: '概率 (%)',
+                            style: {
+                                color: '#4a5568'
+                            }
+                        },
+                        labels: {
+                            style: {
+                                color: '#4a5568'
+                            }
+                        },
+                        gridLineColor: 'rgba(0,0,0,0.05)'
+                    },
+                    legend: {
+                        enabled: false
+                    },
+                    plotOptions: {
+                        column: {
+                            color: '#667eea',
+                            borderRadius: 3
+                        }
+                    },
+                    series: [{
+                        name: '概率',
+                        data: probabilities.map(p => p * 100)
+                    }],
+                    tooltip: {
+                        pointFormat: '<b>{point.y:.2f}%</b>'
+                    }
+                });
+            }
+            
+            // 绘制实验数据图表
+            function drawExperimentChart() {
+                const count = parseInt(diceCountSelect.value);
+                const min = count;
+                const max = count * 6;
+                
+                // 统计每个和出现的次数
+                const sumCounts = {};
+                for (let i = min; i <= max; i++) {
+                    sumCounts[i] = 0;
+                }
+                
+                // 只记录有效结果
+                resultsHistory.forEach(sum => {
+                    if (sum >= min && sum <= max) {
+                        sumCounts[sum]++;
+                    }
+                });
+                
+                // 转换为数组
+                const data = [];
+                for (let i = min; i <= max; i++) {
+                    data.push(sumCounts[i]);
+                }
+                
+                // 确保图表容器存在
+                const container = document.getElementById('experiment-chart');
+                if (!container) return;
+                
+                // 先销毁旧图表
+                if (window.experimentChart) {
+                    window.experimentChart.destroy();
+                }
+                
+                // 确保容器有足够的高度
+                container.style.height = '300px';
+                
+                window.experimentChart = Highcharts.chart('experiment-chart', {
+                    chart: {
+                        type: 'column',
+                        backgroundColor: 'transparent'
+                    },
+                    title: {
+                        text: '实验数据分布',
+                        style: {
+                            color: '#2d3748',
+                            fontSize: '16px'
+                        }
+                    },
+                    xAxis: {
+                        categories: Array.from({length: max - min + 1}, (_, i) => i + min),
+                        labels: {
+                            style: {
+                                color: '#4a5568'
+                            }
+                        }
+                    },
+                    yAxis: {
+                        title: {
+                            text: '出现次数',
+                            style: {
+                                color: '#4a5568'
+                            }
+                        },
+                        labels: {
+                            style: {
+                                color: '#4a5568'
+                            }
+                        },
+                        gridLineColor: 'rgba(0,0,0,0.05)'
+                    },
+                    legend: {
+                        enabled: false
+                    },
+                    plotOptions: {
+                        column: {
+                            color: '#48bb78',
+                            borderRadius: 3
+                        }
+                    },
+                    series: [{
+                        name: '次数',
+                        data: data
+                    }]
+                });
+            }
+            
+            // 计算理论概率
+            function calculateTheoreticalProbabilities(count) {
+                if (count === 1) {
+                    return [1/6, 1/6, 1/6, 1/6, 1/6, 1/6];
+                } else if (count === 2) {
+                    return [
+                        1/36,  // 2
+                        2/36,  // 3
+                        3/36,  // 4
+                        4/36,  // 5
+                        5/36,  // 6
+                        6/36,  // 7
+                        5/36,  // 8
+                        4/36,  // 9
+                        3/36,  // 10
+                        2/36,  // 11
+                        1/36   // 12
+                    ];
+                } else if (count === 3) {
+                    return [
+                        1/216,   // 3
+                        3/216,   // 4
+                        6/216,   // 5
+                        10/216,  // 6
+                        15/216,  // 7
+                        21/216,  // 8
+                        25/216,  // 9
+                        27/216,  // 10
+                        27/216,  // 11
+                        25/216,  // 12
+                        21/216,  // 13
+                        15/216,  // 14
+                        10/216,  // 15
+                        6/216,   // 16
+                        3/216,   // 17
+                        1/216    // 18
+                    ];
+                }
+                return [];
+            }
+            
+            // 保存数据到本地存储
+            function saveData() {
+                localStorage.setItem('diceRollData', JSON.stringify({
+                    rollCount: rollCount,
+                    resultsHistory: resultsHistory
+                }));
+            }
+            
+            // 从本地存储加载数据
+            function loadSavedData() {
+                const savedData = localStorage.getItem('diceRollData');
+                if (savedData) {
+                    const data = JSON.parse(savedData);
+                    rollCount = data.rollCount || 0;
+                    resultsHistory = data.resultsHistory || [];
+                    
+                    rollCountDisplay.textContent = rollCount;
+                    totalRollsDisplay.textContent = resultsHistory.length;
+                    
+                    if (resultsHistory.length > 0) {
+                        updateStatistics();
+                        drawExperimentChart();
+                    }
+                }
+            }
+            
+            // 重置数据
+            function resetData() {
+                if (confirm('确定要清空所有实验数据吗？')) {
+                    rollCount = 0;
+                    resultsHistory = [];
+                    
+                    rollCountDisplay.textContent = '0';
+                    totalRollsDisplay.textContent = '0';
+                    currentResult.textContent = '-';
+                    resultDetail.textContent = '';
+                    errorMessage.style.display = 'none';
+                    
+                    statsContainer.innerHTML = '';
+                    
+                    // 清除本地存储
+                    localStorage.removeItem('diceRollData');
+                    
+                    // 重新绘制图表
+                    drawExperimentChart();
+                }
+            }
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        .card-container {
+            display: flex;
+            gap: 15px;
+            margin: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .card {
+            width: 100px;
+            height: 140px;
+            border: 1px solid #333;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+            font-size: 24px;
+            background-color: #FFEB3B; /* 黄色背景 */
+            position: relative;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+        }
+        .card::before,
+        .card::after {
+            content: attr(data-value);
+            position: absolute;
+            font-size: 18px;
+        }
+        .card::before {
+            top: 5px;
+            left: 5px;
+        }
+        .card::after {
+            bottom: 5px;
+            right: 5px;
+            transform: rotate(180deg);
+        }
+        .suit {
+            font-size: 40px;
+            align-self: center;
+            margin-top: 15px;
+        }
+        .red {
+            color: #FF0000;
+        }
+        .black {
+            color: #000000;
+        }
+        .input-area {
+            text-align: center;
+            margin: 20px;
+        }
+        input {
+            font-size: 18px;
+            padding: 8px;
+            width: 300px;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            font-size: 18px;
+            padding: 8px 20px;
+            margin: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .result {
+            font-size: 20px;
+            margin: 20px;
+            text-align: center;
+            min-height: 30px;
+        }
+        .rules {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center;">24点挑战游戏</h1>
+    <div class="rules">
+        <h3>游戏规则：</h3>
+        <p>使用下方四张牌的点数（A=1，J=11，Q=12，K=13），通过加减乘除和括号组合成24点</p>
+    </div>
+    <div class="card-container" id="cards"></div>
+    <div class="input-area">
+        <input type="text" id="expression" placeholder="输入算式，例如：(3-8/3)*8">
+        <button onclick="validate()">验证答案</button>
+        <button onclick="newGame()">换牌</button>
+    </div>
+    <div class="result" id="result"></div>
+
+    <script>
+        let currentCards = [];
+        const suits = ['spades', 'hearts', 'diamonds', 'clubs'];
+        const suitSymbols = {
+            'spades': '♠',
+            'hearts': '♥',
+            'diamonds': '♦',
+            'clubs': '♣'
+        };
+
+        function createDeck() {
+            let deck = [];
+            suits.forEach(suit => {
+                for(let value=1; value<=13; value++) {
+                    deck.push({suit, value});
+                }
+            });
+            return deck;
+        }
+
+        function shuffle(deck) {
+            for(let i = deck.length-1; i>0; i--) {
+                const j = Math.floor(Math.random()*(i+1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function getDisplayValue(value) {
+            switch(value) {
+                case 1: return 'A';
+                case 11: return 'J';
+                case 12: return 'Q';
+                case 13: return 'K';
+                default: return value;
+            }
+        }
+
+        function renderCards() {
+            const container = document.getElementById('cards');
+            container.innerHTML = '';
+            currentCards.forEach(card => {
+                const cardElement = document.createElement('div');
+                cardElement.className = `card ${['hearts','diamonds'].includes(card.suit) ? 'red' : 'black'}`;
+                cardElement.dataset.value = getDisplayValue(card.value);
+                
+                cardElement.innerHTML = `
+                    <div class="suit">${suitSymbols[card.suit]}</div>
+                `;
+                container.appendChild(cardElement);
+            });
+        }
+
+        function newGame() {
+            let deck = createDeck();
+            shuffle(deck);
+            currentCards = deck.slice(0,4);
+            renderCards();
+            document.getElementById('result').textContent = '';
+            document.getElementById('expression').value = '';
+        }
+
+        function validate() {
+            const input = document.getElementById('expression').value.replace(/\s/g, '');
+            const numbers = input.match(/\d+/g)?.map(Number) || [];
+            const expected = currentCards.map(c => c.value).sort((a,b) => a-b);
+            const inputSorted = [...numbers].sort((a,b) => a-b);
+
+            if (!/^[0-9+\-*/().]+$/.test(input)) {
+                showResult('包含非法字符', false);
+                return;
+            }
+
+            if (JSON.stringify(expected) !== JSON.stringify(inputSorted)) {
+                showResult('数字使用不正确', false);
+                return;
+            }
+
+            try {
+                const result = eval(input);
+                showResult(Math.abs(result - 24) < 0.001 ? '🎉 答案正确！' : `❌ 错误，结果：${result.toFixed(2)}`, 
+                         Math.abs(result - 24) < 0.001);
+            } catch {
+                showResult('无效的算式', false);
+            }
+        }
+
+        function showResult(message, isSuccess) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.style.color = isSuccess ? '#28a745' : '#dc3545';
+        }
+
+        // 初始化游戏
+        newGame();
+    </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR星空粒子：本地极速版</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+        #input-video { display: none; }
+        #output-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; transform: scaleX(-1); }
+        .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; background: radial-gradient(circle, rgba(0, 0, 0, 0) 40%, rgba(0, 15, 30, 0.85) 100%); }
+        .scanlines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; pointer-events: none; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03)); background-size: 100% 3px, 3px 100%; }
+        .ui-layer { position: absolute; width: 100%; height: 100%; z-index: 4; pointer-events: none; color: #fff; text-shadow: 0 0 5px #0ff; transition: opacity 0.5s; }
+        .mode-label { position: absolute; bottom: 60px; width: 100%; text-align: center; font-size: 36px; font-weight: 900; letter-spacing: 8px; opacity: 0.9; text-shadow: 0 0 20px currentColor; }
+        .status-bar { position: absolute; top: 20px; left: 20px; font-size: 12px; color: rgba(255,255,255,0.6); border-left: 2px solid #0ff; padding-left: 10px; background: rgba(0,0,0,0.3); }
+        .instruction-box { position: absolute; top: 20px; right: 20px; text-align: right; font-size: 12px; color: rgba(255,255,255,0.8); background: rgba(0,0,0,0.4); padding: 10px; border-right: 2px solid #0ff; }
+        .loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #0ff; font-size: 16px; z-index: 10; background: rgba(0,0,0,0.9); padding: 30px; border: 1px solid #0ff; letter-spacing: 1px; text-align: center; box-shadow: 0 0 20px rgba(0, 255, 255, 0.2); }
+    </style>
+    
+    <!-- 1. 修改引用路径为本地 js 文件夹 -->
+    <script src="https://www.teachmate.top/gallery/js/camera_utils.js"></script>
+    <script src="https://www.teachmate.top/gallery/js/control_utils.js"></script>
+    <script src="https://www.teachmate.top/gallery/js/drawing_utils.js"></script>
+    <script src="https://www.teachmate.top/gallery/js/hands.js"></script>
+</head>
+<body>
+
+    <div id="loading" class="loading">
+        系统正在初始化...<br>
+        <span style="font-size:12px; color:#888;">正在加载本地核心模块</span>
+    </div>
+    
+    <video id="input-video"></video>
+    <canvas id="output-canvas"></canvas>
+    
+    <div class="overlay"></div>
+    <div class="scanlines"></div>
+    
+    <div class="ui-layer">
+        <div class="status-bar">
+            粒子数量: <span id="p-count">1800</span><br>
+            模式: Local Offline
+        </div>
+        <div class="instruction-box">
+            🔥 三指竖起 - 烈焰之手<br>
+            ⚡ V字手势 - 雷电召唤<br>
+            🌧️ 电话手势 - 数据雨伞<br>
+            ❤️ 双手比心 - 星河汇聚<br>
+            ✊ 单手握拳 - 黑洞塌缩
+        </div>
+        <div id="mode-text" class="mode-label">STAR FIELD</div>
+    </div>
+
+    <script>
+        const videoElement = document.getElementById('input-video');
+        const canvasElement = document.getElementById('output-canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const modeText = document.getElementById('mode-text');
+        
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        canvasElement.width = width;
+        canvasElement.height = height;
+
+        let currentMode = 'NEBULA'; 
+        let gestureCenter = { x: width/2, y: height/2 }; 
+        let secondaryTarget = { x: width/2, y: height/2 };
+        
+        const PARTICLE_COUNT = 1800; 
+        const particles = [];
+
+        class Particle {
+            constructor() {
+                this.initHome(); 
+                this.x = this.homeX;
+                this.y = this.homeY;
+                this.vx = 0; this.vy = 0;
+                this.size = Math.random() * 2 + 0.5;
+                this.baseColor = `rgba(180, 220, 255, ${Math.random() * 0.4 + 0.1})`; 
+                this.color = this.baseColor;
+                this.angle = Math.random() * Math.PI * 2; 
+                this.offset = Math.random() * 100;
+                this.life = 1;
+            }
+            initHome() { this.homeX = Math.random() * width; this.homeY = Math.random() * height; }
+            update() {
+                const cx = gestureCenter.x; const cy = gestureCenter.y; const t = Date.now() * 0.002;
+                let tx, ty; let ease = 0.05; let jit = 1; 
+
+                if (currentMode === 'NEBULA') {
+                    tx = this.homeX + Math.sin(t + this.offset) * 10; ty = this.homeY + Math.cos(t * 0.8 + this.offset) * 10;
+                    this.color = this.baseColor; ease = 0.03; 
+                } else if (currentMode === 'FIRE') {
+                    if (this.life <= 0 || Math.random() < 0.08) {
+                        this.x = cx + (Math.random()-0.5) * 50; this.y = cy + 20; this.life = 1;
+                        this.vx = (Math.random()-0.5)*3; this.vy = -3 - Math.random()*3;
+                    }
+                    this.vy -= 0.1; this.x += Math.sin(this.y * 0.1 + t) * 1; this.y += this.vy; this.x += this.vx; this.life -= 0.02;
+                    const r = 255; const g = Math.floor(this.life * 200); this.color = `rgba(${r},${g},0,${this.life})`; return; 
+                } else if (currentMode === 'RAIN') {
+                    this.vy = 15 + Math.random() * 10; this.y += this.vy;
+                    const dx = this.x - cx; const dy = this.y - cy;
+                    if (Math.sqrt(dx*dx+dy*dy) < 120 && this.y < cy) { this.vx = dx * 0.3; this.y = cy - Math.sqrt(120*120 - dx*dx); }
+                    this.x += this.vx; this.vx *= 0.9;
+                    if (this.y > height) { this.y = -10; this.x = Math.random() * width; }
+                    this.color = '#0f5'; return;
+                } else if (currentMode === 'LIGHTNING') {
+                    const sx = secondaryTarget.x; const sy = secondaryTarget.y; const p = Math.random();
+                    tx = cx + (sx - cx) * p + (Math.random()-0.5)*100; ty = cy + (sy - cy) * p + (Math.random()-0.5)*100;
+                    ease = 0.4; this.color = `rgba(180, 230, 255, ${Math.random()})`;
+                } else if (currentMode === 'HEART') {
+                    const s = 12; const hx = 16 * Math.pow(Math.sin(this.angle), 3);
+                    const hy = -(13 * Math.cos(this.angle) - 5 * Math.cos(2 * this.angle) - 2 * Math.cos(3 * this.angle) - Math.cos(4 * this.angle));
+                    tx = cx + hx * s; ty = cy + hy * s; this.color = '#f05'; jit = 10;
+                } else if (currentMode === 'HOLE') {
+                    const r = Math.random() * 40; tx = cx + Math.cos(this.angle) * r; ty = cy + Math.sin(this.angle) * r;
+                    ease = 0.15; this.color = '#fb0';
+                }
+
+                let dx = tx - this.x; let dy = ty - this.y;
+                this.vx += dx * ease * 0.1; this.vy += dy * ease * 0.1;
+                this.vx *= 0.9; this.vy *= 0.9;
+                this.vx += (Math.random() - 0.5) * jit * 0.1; this.vy += (Math.random() - 0.5) * jit * 0.1;
+                this.x += this.vx; this.y += this.vy;
+            }
+            draw() {
+                canvasCtx.fillStyle = this.color;
+                if (currentMode === 'RAIN') { canvasCtx.fillRect(this.x, this.y, 2, 20); } 
+                else { canvasCtx.beginPath(); canvasCtx.arc(this.x, this.y, this.size, 0, Math.PI * 2); canvasCtx.fill(); }
+            }
+        }
+        for(let i=0; i<PARTICLE_COUNT; i++) particles.push(new Particle());
+
+        // --- 2. 关键修改：配置 MediaPipe 使用本地文件 ---
+        const hands = new Hands({locateFile: (file) => {
+            // 这里告诉 JS 去 'js/' 文件夹里找 .wasm 和 .data 文件
+            return `js/${file}`;
+        }});
+
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 1280, height: 720
+        });
+        
+        camera.start().then(() => { document.getElementById('loading').style.display = 'none'; })
+        .catch(err => { document.getElementById('loading').innerHTML = "摄像头启动失败"; console.error(err); });
+
+        function dist(p1, p2) { return Math.hypot(p1.x - p2.x, p1.y - p2.y); }
+        function isExtended(lm, tip, pip, wrist=0) { return dist(lm[tip], lm[wrist]) > dist(lm[pip], lm[wrist]); }
+
+        function onResults(results) {
+            canvasCtx.clearRect(0, 0, width, height);
+            canvasCtx.save(); canvasCtx.filter = 'brightness(50%) contrast(120%) grayscale(30%)'; 
+            canvasCtx.drawImage(results.image, 0, 0, width, height); canvasCtx.restore();
+
+            let detected = 'NEBULA'; let label = ""; let color = "#fff";
+            const h = results.multiHandLandmarks;
+
+            if (h && h.length > 0) {
+                if (h.length === 2) {
+                    const h1 = h[0]; const h2 = h[1];
+                    gestureCenter.x = (h1[9].x + h2[9].x) / 2 * width; gestureCenter.y = (h1[9].y + h2[9].y) / 2 * height;
+                    if (dist(h1[4], h2[4]) < 0.1 && dist(h1[8], h2[8]) < 0.15) { detected = 'HEART'; label = "HEART LINK"; color="#f05"; }
+                }
+                if (detected === 'NEBULA') {
+                    const hand = h[0]; const cx = hand[9].x * width; const cy = hand[9].y * height;
+                    gestureCenter.x += (cx - gestureCenter.x) * 0.2; gestureCenter.y += (cy - gestureCenter.y) * 0.2;
+                    const i = isExtended(hand, 8, 6); const m = isExtended(hand, 12, 10);
+                    const r = isExtended(hand, 16, 14); const p = isExtended(hand, 20, 18); const t = isExtended(hand, 4, 3);
+                    if (i && m && r && !p) { detected = 'FIRE'; label = "FIRE"; color="#f50"; gestureCenter.y = hand[0].y * height; } 
+                    else if (i && m && !r && !p) { detected = 'LIGHTNING'; label = "LIGHTNING"; color="#8cf"; gestureCenter.x = hand[8].x * width; gestureCenter.y = hand[8].y * height; secondaryTarget.x = hand[12].x * width; secondaryTarget.y = hand[12].y * height; } 
+                    else if (t && p && !i && !m && !r) { detected = 'RAIN'; label = "MATRIX RAIN"; color="#0f5"; } 
+                    else if (!i && !m && !r && !p) { detected = 'HOLE'; label = "BLACK HOLE"; color="#fb0"; }
+                }
+            }
+            currentMode = detected;
+            if (currentMode === 'NEBULA') { modeText.style.opacity = '0'; } 
+            else { modeText.innerText = label; modeText.style.color = color; modeText.style.textShadow = `0 0 30px ${color}`; modeText.style.opacity = '1'; for (const lm of h) drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: 'rgba(255,255,255,0.2)', lineWidth: 1}); }
+
+            particles.forEach(p => { p.update(); p.draw(); });
+        }
+        window.addEventListener('resize', () => { width = window.innerWidth; height = window.innerHeight; canvasElement.width = width; canvasElement.height = height; particles.forEach(p => p.initHome()); });
+    </script>
+</body>
+</html>

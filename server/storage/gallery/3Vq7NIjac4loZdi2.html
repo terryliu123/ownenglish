@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：三角形的内切圆与外接圆</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 深色背景 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.6);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: crosshair;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            background-color: #2a2a2a;
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #333;
+            padding: 12px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* 自定义复选框样式 */
+        .toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #444;
+            padding: 5px 12px;
+            border-radius: 20px;
+        }
+
+        input[type="checkbox"] {
+            accent-color: #00A1E9;
+            transform: scale(1.2);
+            cursor: pointer;
+        }
+
+        label {
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+        }
+        
+        button {
+            background-color: #FFD700;
+            border: none;
+            color: #333;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        button:hover { background-color: #ffea00; }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+            max-width: 650px;
+            margin-bottom: 20px;
+        }
+
+        .legend-dot {
+            display: inline-block;
+            width: 10px; 
+            height: 10px; 
+            border-radius: 50%; 
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>三角形的内切圆与外接圆</h1>
+
+    <div class="controls">
+        <div class="toggle-group">
+            <input type="checkbox" id="showCircum" checked>
+            <label for="showCircum"><span class="legend-dot" style="background:#00A1E9;"></span>外接圆 (及半径)</label>
+        </div>
+        <div class="toggle-group">
+            <input type="checkbox" id="showIn" checked>
+            <label for="showIn"><span class="legend-dot" style="background:#66BB6A;"></span>内切圆</label>
+        </div>
+        <button onclick="resetShape()">重置形状</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="geoCanvas" width="800" height="650"></canvas>
+    </div>
+
+    <div class="info">
+        拖动顶点 <b>A, B, C</b> 改变三角形形状。<br>
+        观察：当三角形变为<span style="color:#FFD700">钝角</span>三角形时，蓝色外接圆的圆心跑到了哪里？
+    </div>
+
+<script>
+    const canvas = document.getElementById('geoCanvas');
+    const ctx = canvas.getContext('2d');
+    const checkCircum = document.getElementById('showCircum');
+    const checkIn = document.getElementById('showIn');
+
+    // 初始点
+    let points = {
+        A: { x: 400, y: 100 },
+        B: { x: 200, y: 450 },
+        C: { x: 600, y: 450 }
+    };
+
+    let draggingPoint = null;
+
+    // --- 数学工具函数 ---
+
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    // 计算外接圆参数 (Circumcircle)
+    function getCircumcircle(A, B, C) {
+        const D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+        if (Math.abs(D) < 0.001) return null; // 三点共线
+
+        const Ux = ((A.x**2 + A.y**2)*(B.y - C.y) + (B.x**2 + B.y**2)*(C.y - A.y) + (C.x**2 + C.y**2)*(A.y - B.y)) / D;
+        const Uy = ((A.x**2 + A.y**2)*(C.x - B.x) + (B.x**2 + B.y**2)*(A.x - C.x) + (C.x**2 + C.y**2)*(B.x - A.x)) / D;
+        
+        const center = { x: Ux, y: Uy };
+        const r = dist(center, A);
+        return { center, r };
+    }
+
+    // 计算内切圆参数 (Incircle)
+    function getIncircle(A, B, C) {
+        const a = dist(B, C);
+        const b = dist(A, C);
+        const c = dist(A, B);
+        const p = a + b + c;
+        const s = p / 2;
+        const area = Math.sqrt(s * (s - a) * (s - b) * (s - c));
+        const r = area / s;
+
+        const Ix = (a * A.x + b * B.x + c * C.x) / p;
+        const Iy = (a * A.y + b * B.y + c * C.y) / p;
+
+        return { center: { x: Ix, y: Iy }, r };
+    }
+
+    // --- 绘图函数 ---
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制外接圆 (蓝色)
+        if (checkCircum.checked) {
+            const circum = getCircumcircle(points.A, points.B, points.C);
+            if (circum) {
+                const { center, r } = circum;
+                
+                // 圆
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#00A1E9";
+                ctx.stroke();
+
+                // 辅助虚线 (半径)
+                ctx.beginPath();
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(center.x, center.y); ctx.lineTo(points.A.x, points.A.y);
+                ctx.moveTo(center.x, center.y); ctx.lineTo(points.B.x, points.B.y);
+                ctx.moveTo(center.x, center.y); ctx.lineTo(points.C.x, points.C.y);
+                ctx.stroke();
+                ctx.setLineDash([]); // Reset
+
+                // 圆心标记
+                ctx.fillStyle = "#00A1E9";
+                ctx.beginPath(); ctx.arc(center.x, center.y, 4, 0, Math.PI*2); ctx.fill();
+                ctx.font = "16px Arial";
+                ctx.fillText("O", center.x + 8, center.y - 8);
+            }
+        }
+
+        // 2. 绘制内切圆 (绿色)
+        if (checkIn.checked) {
+            const inCircle = getIncircle(points.A, points.B, points.C);
+            const { center, r } = inCircle;
+
+            // 圆
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, r, 0, Math.PI * 2);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#66BB6A";
+            ctx.stroke();
+            ctx.fillStyle = "rgba(102, 187, 106, 0.1)";
+            ctx.fill();
+
+            // 圆心标记
+            ctx.fillStyle = "#66BB6A";
+            ctx.beginPath(); ctx.arc(center.x, center.y, 4, 0, Math.PI*2); ctx.fill();
+            ctx.fillText("I", center.x + 8, center.y - 8);
+        }
+
+        // 3. 绘制三角形 (黄色，仿照截图风格)
+        ctx.beginPath();
+        ctx.moveTo(points.A.x, points.A.y);
+        ctx.lineTo(points.B.x, points.B.y);
+        ctx.lineTo(points.C.x, points.C.y);
+        ctx.closePath();
+        
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "#FFD700"; // 金黄色
+        ctx.stroke();
+
+        // 4. 绘制顶点
+        drawVertex(points.A, "A", 0, -15);
+        drawVertex(points.B, "B", -20, 10);
+        drawVertex(points.C, "C", 10, 10);
+    }
+
+    function drawVertex(p, label, offX, offY) {
+        // 外圈
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+        ctx.fillStyle = "#ddd";
+        ctx.fill();
+        // 选中感
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 20px serif";
+        ctx.fillText(label, p.x + offX, p.y + offY);
+    }
+
+    function resetShape() {
+        points = {
+            A: { x: 400, y: 100 },
+            B: { x: 200, y: 450 },
+            C: { x: 600, y: 450 }
+        };
+        draw();
+    }
+
+    // --- 交互逻辑 ---
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    }
+
+    canvas.addEventListener('mousedown', e => {
+        const pos = getMousePos(e);
+        for (let key in points) {
+            if (dist(pos, points[key]) < 20) {
+                draggingPoint = key;
+                break;
+            }
+        }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+        const pos = getMousePos(e);
+        
+        // 鼠标样式
+        let hover = false;
+        for (let key in points) {
+            if (dist(pos, points[key]) < 20) hover = true;
+        }
+        canvas.style.cursor = hover ? 'pointer' : 'default';
+
+        if (draggingPoint) {
+            // 边界限制
+            pos.x = Math.max(10, Math.min(canvas.width - 10, pos.x));
+            pos.y = Math.max(10, Math.min(canvas.height - 10, pos.y));
+            
+            points[draggingPoint] = pos;
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', () => draggingPoint = null);
+    
+    checkCircum.addEventListener('change', draw);
+    checkIn.addEventListener('change', draw);
+
+    // 启动
+    draw();
+
+</script>
+</body>
+</html>

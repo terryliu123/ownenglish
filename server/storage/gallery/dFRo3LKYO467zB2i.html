@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理学小实验：大脑“打架”挑战（修复版）</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f0f7ff;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: #333;
+            user-select: none; /* 防止选中文字影响体验 */
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h1 { color: var(--primary-color); margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 0.9em; margin-bottom: 20px; }
+
+        .game-area { display: none; flex-direction: column; align-items: center; }
+
+        /* 刺激词展示 */
+        #stimulus-word {
+            font-size: 80px;
+            font-weight: bold;
+            margin: 30px 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+            cursor: default;
+        }
+
+        /* 选项按钮区 */
+        .options-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        button {
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            font-weight: bold;
+            background-color: #e0e0e0;
+            color: #333;
+            outline: none;
+        }
+
+        button:hover { transform: translateY(-2px); filter: brightness(0.95); }
+        button:active { transform: scale(0.98); }
+
+        .btn-start {
+            background-color: var(--primary-color);
+            color: white;
+            width: 100%;
+            font-size: 20px;
+            margin-top: 20px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .result-area { display: none; }
+        .score-board { background: #ffeaa7; padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .theory-box {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-top: 20px;
+            border-left: 5px solid var(--primary-color);
+        }
+
+        /* 动画 */
+        .timer-danger { color: red; animation: pulse 0.5s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+        .correct-anim { animation: bounce 0.3s; }
+        .wrong-anim { animation: shake 0.3s; }
+        @keyframes bounce { 50% { transform: scale(1.2); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-10px); } 75% { transform: translateX(10px); } }
+
+    </style>
+</head>
+<body>
+
+    <div class="container" id="home-screen">
+        <h1>🧠 大脑“打架”挑战</h1>
+        <div class="subtitle">基于心理学经典的“斯特鲁普效应”</div>
+        
+        <div style="text-align: left; margin: 20px 0; padding: 0 20px;">
+            <p><strong>规则说明：</strong></p>
+            <p>屏幕上会出现一个汉字（比如“<span style="color:red">绿</span>”）。</p>
+            <p>❌ <strong>不要读字的意思！</strong></p>
+            <p>✅ <strong>请选字的颜色！</strong>（比如这个例子选“红”）</p>
+        </div>
+
+        <button class="btn-start" onclick="startGame()">开始挑战</button>
+    </div>
+
+    <div class="container game-area" id="game-screen">
+        <div class="status-bar">
+            <span id="score-display">得分: 0</span>
+            <span id="time-display">时间: 30s</span>
+        </div>
+
+        <div id="stimulus-word">准备</div>
+
+        <div class="options-grid" id="options-container">
+            <!-- 按钮由JS生成 -->
+        </div>
+    </div>
+
+    <div class="container result-area" id="result-screen">
+        <h1>挑战结束!</h1>
+        <div class="score-board">
+            <h2>最终得分: <span id="final-score" style="color: #d63031; font-size: 1.5em;">0</span></h2>
+            <p id="feedback-text">反应不错！</p>
+        </div>
+        <div class="theory-box">
+            <h3>🔬 斯特鲁普效应 (Stroop Effect)</h3>
+            <p>当字义（比如“绿”）和字体颜色（比如红色）冲突时，你的大脑需要抑制住读字的本能冲动，转而去识别颜色。</p>
+            <p>这反映了你的<strong>前额叶皮层</strong>正在努力工作，进行<strong>抑制控制</strong>。分数越高，说明你的专注力和抗干扰能力越强！</p>
+        </div>
+        <button class="btn-start" onclick="location.reload()">再试一次</button>
+    </div>
+
+    <script>
+        // 核心配置
+        const colors = [
+            { name: '红', hex: '#FF4757', id: 'red' },
+            { name: '绿', hex: '#2ED573', id: 'green' },
+            { name: '蓝', hex: '#1E90FF', id: 'blue' },
+            { name: '黄', hex: '#FFA502', id: 'yellow' },
+            { name: '紫', hex: '#9B59B6', id: 'purple' },
+            { name: '黑', hex: '#2F3542', id: 'black' }, 
+            { name: '橙', hex: '#E67E22', id: 'orange' } 
+        ];
+
+        let score = 0;
+        let timeLeft = 30;
+        let timerId = null;
+        let currentCorrectColorId = null; // 当前题目的正确答案ID
+
+        // DOM 元素
+        const homeScreen = document.getElementById('home-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const wordEl = document.getElementById('stimulus-word');
+        const optionsEl = document.getElementById('options-container');
+        const timeEl = document.getElementById('time-display');
+        const scoreEl = document.getElementById('score-display');
+
+        function startGame() {
+            homeScreen.style.display = 'none';
+            resultScreen.style.display = 'none';
+            gameScreen.style.display = 'flex';
+            
+            score = 0;
+            timeLeft = 30;
+            scoreEl.textContent = `得分: ${score}`;
+            timeEl.textContent = `时间: ${timeLeft}s`;
+            timeEl.classList.remove('timer-danger');
+
+            generateRound();
+            
+            timerId = setInterval(() => {
+                timeLeft--;
+                timeEl.textContent = `时间: ${timeLeft}s`;
+                if(timeLeft <= 5) timeEl.classList.add('timer-danger');
+                if (timeLeft <= 0) endGame();
+            }, 1000);
+        }
+
+        function generateRound() {
+            // 1. 随机选字 (Text)
+            const textObj = colors[Math.floor(Math.random() * colors.length)];
+
+            // 2. 随机选颜色 (Ink) - 确保大概率产生冲突
+            let colorObj;
+            if (Math.random() > 0.25) {
+                // 冲突模式：颜色 != 字义
+                const conflictColors = colors.filter(c => c.id !== textObj.id);
+                colorObj = conflictColors[Math.floor(Math.random() * conflictColors.length)];
+            } else {
+                // 一致模式：颜色 == 字义
+                colorObj = textObj;
+            }
+
+            currentCorrectColorId = colorObj.id; // 正确答案是颜色ID
+
+            // 3. 渲染刺激词
+            wordEl.textContent = textObj.name;
+            wordEl.style.color = colorObj.hex;
+            
+            wordEl.classList.remove('correct-anim', 'wrong-anim');
+            void wordEl.offsetWidth; 
+
+            // 4. 生成选项 (核心修复部分)
+            renderButtonsLogic();
+        }
+
+        // --- 核心修复：确保正确答案一定在选项中 ---
+        function renderButtonsLogic() {
+            optionsEl.innerHTML = '';
+            
+            // 1. 先找到正确的那个选项对象
+            const correctOption = colors.find(c => c.id === currentCorrectColorId);
+
+            // 2. 从剩余颜色中找出干扰项
+            // 过滤掉正确答案，剩下的全是干扰项
+            const otherOptions = colors.filter(c => c.id !== currentCorrectColorId);
+            
+            // 3. 随机打乱干扰项，并取前3个 (总共凑齐4个选项)
+            otherOptions.sort(() => 0.5 - Math.random());
+            const selectedDistractors = otherOptions.slice(0, 3);
+
+            // 4. 将正确答案和干扰项合并
+            let finalOptions = [correctOption, ...selectedDistractors];
+
+            // 5. 最后再次打乱这4个选项的顺序，防止正确答案总在第一个
+            finalOptions.sort(() => 0.5 - Math.random());
+
+            // 6. 渲染按钮
+            finalOptions.forEach(color => {
+                const btn = document.createElement('button');
+                btn.textContent = color.name + '色';
+                btn.onclick = () => checkAnswer(color.id);
+                optionsEl.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(selectedId) {
+            if (selectedId === currentCorrectColorId) {
+                score += 10;
+                wordEl.classList.add('correct-anim');
+            } else {
+                score = Math.max(0, score - 5);
+                wordEl.classList.add('wrong-anim');
+                document.body.style.backgroundColor = '#ffe0e0';
+                setTimeout(() => document.body.style.backgroundColor = '#f0f7ff', 200);
+            }
+            scoreEl.textContent = `得分: ${score}`;
+            generateRound();
+        }
+
+        function endGame() {
+            clearInterval(timerId);
+            gameScreen.style.display = 'none';
+            resultScreen.style.display = 'block';
+            document.getElementById('final-score').textContent = score;
+            
+            const feedback = document.getElementById('feedback-text');
+            if (score < 50) feedback.textContent = "还要加油哦，别被字义骗了！";
+            else if (score < 120) feedback.textContent = "反应不错，继续保持！";
+            else feedback.textContent = "神级反应！你的专注力超强！";
+        }
+    </script>
+</body>
+</html>

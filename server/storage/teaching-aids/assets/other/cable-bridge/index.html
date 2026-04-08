@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斜拉桥演示 (高对比版)</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background-color: #1e1e1e; /* 页面深色背景 */
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h2 { margin-bottom: 10px; color: #ffd700; }
+        
+        .container {
+            background: #2d2d2d;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            width: 850px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #263238; /* 画布深蓝背景 */
+            border: 2px solid #555;
+            border-radius: 4px;
+            cursor: crosshair;
+        }
+
+        .controls {
+            width: 100%;
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            background: #333;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 8px;
+            background: #555;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; }
+
+        .info {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #aaa;
+            text-align: center;
+            background: #444;
+            padding: 8px;
+            border-radius: 4px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>斜拉桥受力演示 (Cable-Stayed Bridge)</h2>
+
+    <div class="container">
+        <canvas id="bridgeCanvas" width="800" height="450"></canvas>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#546e7a"></div> 静止拉索</div>
+            <div class="legend-item"><div class="dot" style="background:#ffeb3b"></div> 受力拉索 (高亮)</div>
+            <div class="legend-item"><div class="dot" style="background:#ff5722"></div> 车辆载重</div>
+        </div>
+
+        <div class="controls">
+            <div>
+                <label>车辆载重 (Weight): <span id="loadVal" style="color:#ff5722; font-weight:bold;">20 吨</span></label>
+                <input type="range" id="weightSlider" min="10" max="100" value="20">
+            </div>
+            <div>
+                <label>车辆位置 (自动/手动)</label>
+                <input type="range" id="posSlider" min="0" max="800" value="0">
+            </div>
+        </div>
+
+        <div class="info">
+            <strong>修复说明：</strong> 已切换为夜间高对比模式。观察黄色线条的变化，体会“多点弹性支承”的原理。
+        </div>
+    </div>
+
+    <script>
+        // 等待页面加载完成后执行
+        window.addEventListener('load', function() {
+            const canvas = document.getElementById('bridgeCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // --- 关键坐标参数 ---
+            const DECK_Y = 300;          // 桥面高度
+            const TOWER_H = 200;         // 塔高 (从桥面算起)
+            const TOWER_TOP_Y = DECK_Y - TOWER_H; 
+            const TOWER_L_X = 250;       // 左塔X
+            const TOWER_R_X = 550;       // 右塔X
+            
+            // --- 拉索生成 (扇形) ---
+            // 我们只定义在桥面上的锚固点X坐标
+            // 桥面总长 0 - 800
+            const cableAnchors = [];
+            // 左侧拉索
+            for(let x=0; x<=200; x+=40) cableAnchors.push({x: x, tower: 'L'});
+            // 中间拉索
+            for(let x=290; x<=510; x+=40) {
+                if(x < 400) cableAnchors.push({x: x, tower: 'L'});
+                else cableAnchors.push({x: x, tower: 'R'});
+            }
+            // 右侧拉索
+            for(let x=600; x<=800; x+=40) cableAnchors.push({x: x, tower: 'R'});
+
+            // --- 状态 ---
+            let truck = { x: 0, weight: 20 };
+            let isAutoRun = true;
+
+            // --- 绘图循环 ---
+            function loop() {
+                update();
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            function update() {
+                if(isAutoRun) {
+                    truck.x += 2;
+                    if(truck.x > 850) truck.x = -50;
+                    document.getElementById('posSlider').value = truck.x;
+                }
+            }
+
+            function draw() {
+                // 1. 清空背景
+                ctx.fillStyle = "#263238"; // 深蓝灰背景
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 2. 绘制水面
+                ctx.fillStyle = "#37474f";
+                ctx.fillRect(0, DECK_Y + 20, canvas.width, canvas.height - (DECK_Y + 20));
+                // 水波纹装饰
+                ctx.strokeStyle = "rgba(255,255,255,0.1)";
+                ctx.beginPath();
+                for(let i=0; i<canvas.width; i+=40) {
+                    ctx.moveTo(i, DECK_Y + 30);
+                    ctx.lineTo(i+20, DECK_Y + 30);
+                }
+                ctx.stroke();
+
+                // 3. 绘制索塔 (Towers) - 亮灰色
+                ctx.fillStyle = "#cfd8dc";
+                const tWidth = 20;
+                // 左塔
+                ctx.fillRect(TOWER_L_X - tWidth/2, TOWER_TOP_Y, tWidth, DECK_Y + 50 - TOWER_TOP_Y);
+                // 右塔
+                ctx.fillRect(TOWER_R_X - tWidth/2, TOWER_TOP_Y, tWidth, DECK_Y + 50 - TOWER_TOP_Y);
+                
+                // 塔基
+                ctx.fillStyle = "#546e7a";
+                ctx.fillRect(TOWER_L_X - 20, DECK_Y + 20, 40, 60);
+                ctx.fillRect(TOWER_R_X - 20, DECK_Y + 20, 40, 60);
+
+                // 4. 绘制拉索 (Cables)
+                cableAnchors.forEach(anchor => {
+                    // 塔上的锚固点 (简单处理：都在塔顶附近，分散一点)
+                    const towerX = anchor.tower === 'L' ? TOWER_L_X : TOWER_R_X;
+                    // 简单的扇形分布: 越远的拉索挂得越高
+                    const dist = Math.abs(anchor.x - towerX);
+                    const offsetY = (dist / 300) * 50; 
+                    const towerY = TOWER_TOP_Y + 10 + offsetY;
+
+                    // 计算张力效果
+                    // 如果卡车靠近这个拉索的桥面锚点 (anchor.x)，拉索变亮
+                    const truckDist = Math.abs(truck.x - anchor.x);
+                    let tension = 0;
+                    const range = 80; // 影响范围
+                    if(truckDist < range) {
+                        tension = (1 - truckDist/range) * truck.weight;
+                    }
+
+                    // 颜色逻辑
+                    ctx.beginPath();
+                    ctx.moveTo(towerX, towerY);
+                    ctx.lineTo(anchor.x, DECK_Y);
+                    
+                    if (tension > 5) {
+                        // 受力状态：亮黄色/红色
+                        const intensity = Math.min(1, tension / 50);
+                        // r: 255, g: 235 (yellow) -> 变红
+                        ctx.strokeStyle = `rgb(255, ${235 - intensity*100}, ${59 - intensity*50})`;
+                        ctx.lineWidth = 2 + intensity * 3; // 变粗
+                        ctx.globalAlpha = 1.0;
+                    } else {
+                        // 静止状态：暗青色
+                        ctx.strokeStyle = "#546e7a";
+                        ctx.lineWidth = 1;
+                        ctx.globalAlpha = 0.5;
+                    }
+                    
+                    ctx.stroke();
+                    ctx.globalAlpha = 1.0; // 重置透明度
+                });
+
+                // 5. 绘制主梁 (Deck) - 亮白色
+                ctx.fillStyle = "#eceff1";
+                ctx.fillRect(0, DECK_Y, canvas.width, 8);
+                
+                // 6. 绘制卡车
+                drawTruck(truck.x, DECK_Y);
+            }
+
+            function drawTruck(x, y) {
+                if(x < -40 || x > 840) return; // 出画不绘制
+
+                ctx.save();
+                ctx.translate(x, y - 15);
+
+                // 车身
+                ctx.fillStyle = "#ff5722"; // 鲜橙色
+                ctx.fillRect(-20, -15, 40, 15);
+                ctx.fillStyle = "#bf360c";
+                ctx.fillRect(-20, -15, 15, 15); // 车头
+
+                // 轮子
+                ctx.fillStyle = "#fff";
+                ctx.beginPath(); 
+                ctx.arc(-12, 0, 5, 0, Math.PI*2); 
+                ctx.arc(12, 0, 5, 0, Math.PI*2); 
+                ctx.fill();
+
+                // 重力箭头
+                const arrowLen = 20 + truck.weight * 0.5;
+                ctx.strokeStyle = "#ff5722";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, 10);
+                ctx.lineTo(0, 10 + arrowLen);
+                ctx.stroke();
+                // 箭头头
+                ctx.beginPath();
+                ctx.moveTo(0, 10 + arrowLen);
+                ctx.lineTo(-5, 10 + arrowLen - 5);
+                ctx.lineTo(5, 10 + arrowLen - 5);
+                ctx.fillStyle = "#ff5722";
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // --- 交互绑定 ---
+            const posSlider = document.getElementById('posSlider');
+            const weightSlider = document.getElementById('weightSlider');
+            const loadVal = document.getElementById('loadVal');
+
+            posSlider.addEventListener('input', (e) => {
+                isAutoRun = false; // 只要手动拖，就停止自动
+                truck.x = parseInt(e.target.value);
+            });
+
+            // 松开鼠标后如果需要自动（可选），这里保持停止让用户仔细看
+            // posSlider.addEventListener('mouseup', () => isAutoRun = true);
+
+            weightSlider.addEventListener('input', (e) => {
+                truck.weight = parseInt(e.target.value);
+                loadVal.innerText = truck.weight + " 吨";
+            });
+
+            // 启动
+            loop();
+        });
+    </script>
+</body>
+</html>

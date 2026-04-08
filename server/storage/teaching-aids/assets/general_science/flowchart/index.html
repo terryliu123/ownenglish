@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+    <title>流程图 Pro - 精准连线版</title>
+    <style>
+        :root {
+            --primary: #2962FF;
+            --danger: #D50000;
+            --accent: #FF6D00;
+            --line-color: #546E7A;
+            --bg-color: #F5F7FA;
+            --panel-width: 100px;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg-color);
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: none; /* 禁止移动端默认滚动 */
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* === 左侧组件库 === */
+        #sidebar {
+            width: var(--panel-width);
+            background: white;
+            border-right: 1px solid #E0E0E0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 0;
+            gap: 15px;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+            z-index: 20;
+        }
+
+        .shape-item {
+            width: 60px;
+            height: 45px;
+            border: 1px solid #CFD8DC;
+            background: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 10px;
+            color: #546E7A;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+        .shape-item:active { transform: scale(0.9); border-color: var(--primary); }
+
+        /* 组件预览样式 */
+        .preview-start { border-radius: 25px; border-color: #66BB6A; color: #2E7D32; }
+        .preview-process { border-radius: 2px; border-color: #42A5F5; color: #1565C0; }
+        .preview-decision { transform: rotate(45deg); width: 38px; height: 38px; margin: 10px 0; border-color: #FFA726; color: #EF6C00; }
+        .preview-decision span { transform: rotate(-45deg); display: block; font-size: 9px; }
+
+        /* === 顶部工具栏 === */
+        #toolbar {
+            position: absolute;
+            top: 15px;
+            left: calc(var(--panel-width) + 20px);
+            right: 20px;
+            height: 45px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        .tool-group {
+            background: white;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            display: flex;
+            gap: 5px;
+            pointer-events: auto;
+        }
+
+        button {
+            border: none;
+            background: transparent;
+            padding: 0 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        button:hover { background: #F5F5F5; }
+        button.active { background: #E3F2FD; color: var(--primary); }
+        button.active-link { background: #FFF3E0; color: var(--accent); }
+        button.danger { color: var(--danger); }
+
+        /* === 画布区域 === */
+        #canvas-wrapper {
+            flex: 1;
+            position: relative;
+            background-image: 
+                linear-gradient(#E0E0E0 1px, transparent 1px),
+                linear-gradient(90deg, #E0E0E0 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: hidden;
+            cursor: grab; 
+        }
+        
+        #canvas-wrapper:active { cursor: grabbing; }
+        #canvas-wrapper.mode-link { cursor: crosshair; }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            overflow: visible; 
+        }
+
+        /* 形状样式 */
+        .shape-group { cursor: move; }
+        .shape-body {
+            fill: #fff;
+            stroke: var(--line-color);
+            stroke-width: 2;
+            transition: all 0.2s;
+        }
+        .shape-group.selected .shape-body {
+            stroke: var(--primary);
+            stroke-width: 3;
+            filter: drop-shadow(0 0 6px rgba(41, 98, 255, 0.4));
+        }
+
+        /* 形状文字 */
+        .foreign-obj { pointer-events: none; }
+        .shape-content {
+            width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            text-align: center; font-size: 13px; color: #333;
+            padding: 4px; box-sizing: border-box; word-break: break-word; line-height: 1.2;
+        }
+
+        /* 连线样式 */
+        .conn-group { cursor: pointer; }
+        
+        .conn-line-visible {
+            stroke: var(--line-color);
+            stroke-width: 2;
+            fill: none;
+            transition: stroke 0.2s;
+        }
+        
+        .conn-group:hover .conn-line-visible { stroke: var(--primary); }
+        .conn-group.selected .conn-line-visible { stroke: var(--danger); stroke-width: 3; }
+        
+        /* 透明热区线，方便选中 */
+        .conn-line-hit {
+            stroke: transparent;
+            stroke-width: 15;
+            fill: none;
+        }
+
+        /* 连线标签 */
+        .conn-label-rect {
+            fill: rgba(255,255,255,0.95);
+            stroke: #ddd;
+            stroke-width: 1;
+            rx: 4;
+        }
+        .conn-label-text {
+            font-size: 11px;
+            fill: #333;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+
+        /* 辅助元素 */
+        #ghost {
+            position: absolute; pointer-events: none; opacity: 0.6; z-index: 100;
+            display: none; border: 2px dashed #333; background: rgba(255,255,255,0.8);
+        }
+        #drag-line {
+            stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6,4; display: none; pointer-events: none;
+        }
+        #toast {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 8px 16px; border-radius: 20px;
+            font-size: 12px; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 50;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 左侧组件栏 -->
+    <div id="sidebar">
+        <div style="font-size:12px;color:#999;font-weight:bold;margin-bottom:10px;">组件库</div>
+        <div class="shape-item preview-start" data-type="terminator">起止</div>
+        <div class="shape-item preview-process" data-type="process">处理</div>
+        <div class="shape-item preview-decision" data-type="decision"><span>判断</span></div>
+        <div class="shape-item preview-process" data-type="data" style="transform: skewX(-10deg);"><span>数据</span></div>
+    </div>
+
+    <!-- 顶部工具栏 -->
+    <div id="toolbar">
+        <div class="tool-group">
+            <button id="btn-move" class="active" onclick="setMode('move')">🖐 移动</button>
+            <button id="btn-link" onclick="setMode('link')">🔗 连线</button>
+        </div>
+        <div class="tool-group">
+            <button onclick="editSelectedItem()">✎ 编辑文字</button>
+            <button class="danger" onclick="deleteSelected()">🗑 删除</button>
+            <button onclick="resetCanvas()">⛑ 归位</button>
+        </div>
+    </div>
+
+    <!-- 主画布 -->
+    <div id="canvas-wrapper">
+        <svg id="main-svg">
+            <defs>
+                <!-- 调整了 refX，防止箭头尖端插入到图形线条内部 -->
+                <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                    <path d="M0,0 L12,6 L0,12 L3,6 z" fill="#546E7A" />
+                </marker>
+                <marker id="arrow-selected" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+                    <path d="M0,0 L12,6 L0,12 L3,6 z" fill="#D50000" />
+                </marker>
+            </defs>
+
+            <g id="viewport">
+                <g id="layer-lines"></g>
+                <g id="layer-shapes"></g>
+                <line id="drag-line" x1="0" y1="0" x2="0" y2="0"></line>
+            </g>
+        </svg>
+    </div>
+
+    <!-- 拖拽幽灵元素和提示 -->
+    <div id="ghost"></div>
+    <div id="toast"></div>
+
+    <script>
+        // === 状态管理 ===
+        const app = {
+            mode: 'move', // 'move' | 'link'
+            shapes: [],
+            lines: [],
+            selection: { type: null, id: null }, 
+            nextId: 1,
+            viewport: { x: 0, y: 0 } 
+        };
+
+        const config = {
+            terminator: { w: 100, h: 50, text: "开始" },
+            process:    { w: 100, h: 60, text: "处理" },
+            decision:   { w: 100, h: 60, text: "条件?" }, // 菱形
+            data:       { w: 120, h: 60, text: "数据" }
+        };
+
+        const interact = {
+            draggingNew: false, newType: null,
+            movingShape: false, panningCanvas: false,
+            linking: false, linkStartId: null,
+            startPos: { x:0, y:0 }, dragOffset: { x:0, y:0 }, lastViewport: { x:0, y:0 }
+        };
+
+        const els = {
+            wrapper: document.getElementById('canvas-wrapper'),
+            viewport: document.getElementById('viewport'),
+            ghost: document.getElementById('ghost'),
+            dragLine: document.getElementById('drag-line'),
+            layers: { shapes: document.getElementById('layer-shapes'), lines: document.getElementById('layer-lines') }
+        };
+
+        // === 1. 核心交互事件 ===
+        
+        // 组件库拖拽
+        document.querySelectorAll('.shape-item').forEach(el => {
+            const start = (e) => {
+                e.preventDefault();
+                interact.draggingNew = true;
+                interact.newType = el.getAttribute('data-type');
+                const cfg = config[interact.newType];
+                els.ghost.style.width = cfg.w + 'px';
+                els.ghost.style.height = cfg.h + 'px';
+                // 拖拽时的预览样式优化
+                els.ghost.style.borderRadius = interact.newType === 'terminator' ? '25px' : '4px';
+                els.ghost.style.transform = interact.newType === 'decision' ? 'rotate(45deg) scale(0.8)' : '';
+                els.ghost.style.display = 'block';
+                updateGhostPos(e);
+            };
+            el.addEventListener('mousedown', start);
+            el.addEventListener('touchstart', start, {passive: false});
+        });
+
+        // 画布操作
+        const handleStart = (e) => {
+            if(e.target.closest('#sidebar') || e.target.closest('#toolbar')) return;
+            const pointer = getPointer(e);
+            
+            const shapeEl = e.target.closest('.shape-group');
+            if (shapeEl) {
+                e.preventDefault();
+                const id = parseInt(shapeEl.getAttribute('data-id'));
+                selectItem('shape', id);
+                
+                if (app.mode === 'move') {
+                    interact.movingShape = true;
+                    const shape = app.shapes.find(s => s.id === id);
+                    const world = screenToWorld(pointer.x, pointer.y);
+                    interact.dragOffset = { x: world.x - shape.x, y: world.y - shape.y };
+                } else {
+                    interact.linking = true;
+                    interact.linkStartId = id;
+                    // 连线起始点优化：从形状边缘开始，而不是中心
+                    const shape = app.shapes.find(s => s.id === id);
+                    const center = { x: shape.x + shape.w/2, y: shape.y + shape.h/2 };
+                    const world = screenToWorld(pointer.x, pointer.y);
+                    // 初始从中心画起，移动时会动态计算
+                    updateDragLine(center, world);
+                    els.dragLine.style.display = 'block';
+                }
+                return;
+            }
+
+            const lineEl = e.target.closest('.conn-group');
+            if (lineEl) {
+                e.preventDefault();
+                const id = parseInt(lineEl.getAttribute('data-id'));
+                selectItem('line', id);
+                return;
+            }
+
+            if (app.mode === 'move') {
+                interact.panningCanvas = true;
+                interact.startPos = pointer;
+                interact.lastViewport = { ...app.viewport };
+            }
+            selectItem(null, null);
+        };
+
+        const handleMove = (e) => {
+            const pointer = getPointer(e);
+            const world = screenToWorld(pointer.x, pointer.y);
+
+            if (interact.draggingNew) {
+                updateGhostPos(e);
+            }
+            else if (interact.movingShape) {
+                e.preventDefault();
+                const shape = app.shapes.find(s => s.id === app.selection.id);
+                if (shape) {
+                    shape.x = world.x - interact.dragOffset.x;
+                    shape.y = world.y - interact.dragOffset.y;
+                    render();
+                }
+            }
+            else if (interact.linking) {
+                e.preventDefault();
+                const s = app.shapes.find(s => s.id === interact.linkStartId);
+                const sCenter = { x: s.x + s.w/2, y: s.y + s.h/2 };
+                
+                // 动态计算连线起始点（从源形状边缘出发）
+                const startPt = getShapeIntersection(world, sCenter, s);
+                updateDragLine(startPt, world);
+            }
+            else if (interact.panningCanvas) {
+                e.preventDefault();
+                const dx = pointer.x - interact.startPos.x;
+                const dy = pointer.y - interact.startPos.y;
+                app.viewport.x = interact.lastViewport.x + dx;
+                app.viewport.y = interact.lastViewport.y + dy;
+                updateViewport();
+            }
+        };
+
+        const handleEnd = (e) => {
+            const pointer = getPointer(e);
+            
+            if (interact.draggingNew) {
+                interact.draggingNew = false;
+                els.ghost.style.display = 'none';
+                els.ghost.style.transform = ''; // reset
+                const rect = els.wrapper.getBoundingClientRect();
+                if (pointer.x > rect.left) {
+                    const world = screenToWorld(pointer.x, pointer.y);
+                    const cfg = config[interact.newType];
+                    addShape(interact.newType, world.x - cfg.w/2, world.y - cfg.h/2);
+                }
+            }
+            else if (interact.linking) {
+                interact.linking = false;
+                els.dragLine.style.display = 'none';
+                
+                const world = screenToWorld(pointer.x, pointer.y);
+                // 碰撞检测确定终点
+                let targetId = null;
+                // 稍微扩大一点判定范围，提升手感
+                const hitPadding = 10; 
+                for(let i=app.shapes.length-1; i>=0; i--) {
+                    const s = app.shapes[i];
+                    if(world.x >= s.x - hitPadding && world.x <= s.x + s.w + hitPadding && 
+                       world.y >= s.y - hitPadding && world.y <= s.y + s.h + hitPadding) {
+                        targetId = s.id;
+                        break;
+                    }
+                }
+
+                if (targetId && targetId !== interact.linkStartId) {
+                    addLine(interact.linkStartId, targetId);
+                }
+            }
+            
+            interact.movingShape = false;
+            interact.panningCanvas = false;
+        };
+
+        els.wrapper.addEventListener('mousedown', handleStart);
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+        
+        els.wrapper.addEventListener('touchstart', handleStart, {passive: false});
+        window.addEventListener('touchmove', handleMove, {passive: false});
+        window.addEventListener('touchend', handleEnd);
+
+        els.wrapper.addEventListener('dblclick', handleDoubleClick);
+        let lastTap = 0;
+        els.wrapper.addEventListener('touchend', (e) => {
+            const now = new Date().getTime();
+            if (now - lastTap < 300) handleDoubleClick(e);
+            lastTap = now;
+        });
+
+        function handleDoubleClick(e) {
+            const shapeEl = e.target.closest('.shape-group');
+            const lineEl = e.target.closest('.conn-group');
+            
+            if (shapeEl) editItem('shape', parseInt(shapeEl.getAttribute('data-id')));
+            else if (lineEl) editItem('line', parseInt(lineEl.getAttribute('data-id')));
+        }
+
+        // === 2. 逻辑方法 ===
+
+        function setMode(m) {
+            app.mode = m;
+            document.getElementById('btn-move').className = m === 'move' ? 'active' : '';
+            document.getElementById('btn-link').className = m === 'link' ? 'active-link' : '';
+            els.wrapper.className = m === 'link' ? 'mode-link' : '';
+            selectItem(null, null);
+            showToast(m === 'move' ? "移动模式：拖拽画布 / 双击编辑" : "连线模式：拖拽连接组件");
+        }
+
+        function addShape(type, x, y) {
+            const cfg = config[type];
+            app.shapes.push({ id: app.nextId++, type, x, y, w: cfg.w, h: cfg.h, text: cfg.text });
+            render();
+        }
+
+        function addLine(from, to) {
+            if(!app.lines.find(l => l.from === from && l.to === to)) {
+                app.lines.push({ id: app.nextId++, from, to, text: "" });
+                render();
+            }
+        }
+
+        function selectItem(type, id) {
+            app.selection = { type, id };
+            render();
+        }
+
+        function editSelectedItem() {
+            if(app.selection.id) editItem(app.selection.type, app.selection.id);
+            else showToast("请先选中一个组件或线条");
+        }
+
+        function editItem(type, id) {
+            if (type === 'shape') {
+                const s = app.shapes.find(x => x.id === id);
+                const txt = prompt("修改组件文字:", s.text);
+                if (txt !== null) { s.text = txt; render(); }
+            } else if (type === 'line') {
+                const l = app.lines.find(x => x.id === id);
+                const txt = prompt("添加连线说明 (如: 是/否):", l.text);
+                if (txt !== null) { l.text = txt; render(); }
+            }
+        }
+
+        function deleteSelected() {
+            const { type, id } = app.selection;
+            if (!id) return;
+            if (type === 'shape') {
+                app.shapes = app.shapes.filter(s => s.id !== id);
+                app.lines = app.lines.filter(l => l.from !== id && l.to !== id);
+            } else {
+                app.lines = app.lines.filter(l => l.id !== id);
+            }
+            selectItem(null, null);
+        }
+
+        function resetCanvas() {
+            app.viewport = { x: 0, y: 0 };
+            updateViewport();
+        }
+
+        // === 3. 渲染与计算 (关键升级) ===
+
+        function render() {
+            els.layers.shapes.innerHTML = '';
+            els.layers.lines.innerHTML = '';
+
+            // 1. 渲染线条 (使用新的交点计算逻辑)
+            app.lines.forEach(l => {
+                const s1 = app.shapes.find(s => s.id === l.from);
+                const s2 = app.shapes.find(s => s.id === l.to);
+                if(!s1 || !s2) return;
+
+                const c1 = { x: s1.x + s1.w/2, y: s1.y + s1.h/2 };
+                const c2 = { x: s2.x + s2.w/2, y: s2.y + s2.h/2 };
+
+                // 核心：计算连线与不同形状的精确交点
+                const p1 = getShapeIntersection(c2, c1, s1); 
+                const p2 = getShapeIntersection(c1, c2, s2); 
+
+                const isSel = (app.selection.type === 'line' && app.selection.id === l.id);
+                const g = createSvg('g', { class: `conn-group ${isSel?'selected':''}`, 'data-id': l.id });
+                
+                // 绘制线条
+                g.appendChild(createSvg('line', {
+                    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+                    class: 'conn-line-visible',
+                    'marker-end': isSel ? 'url(#arrow-selected)' : 'url(#arrow)'
+                }));
+                // 透明热区
+                g.appendChild(createSvg('line', {
+                    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, class: 'conn-line-hit'
+                }));
+
+                // 连线文字
+                if (l.text) {
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    const textLen = l.text.length * 12 + 10;
+                    g.appendChild(createSvg('rect', {
+                        x: midX - textLen/2, y: midY - 9, width: textLen, height: 18,
+                        class: 'conn-label-rect'
+                    }));
+                    const txt = createSvg('text', { x: midX, y: midY, class: 'conn-label-text' });
+                    txt.textContent = l.text;
+                    g.appendChild(txt);
+                }
+                els.layers.lines.appendChild(g);
+            });
+
+            // 2. 渲染形状
+            app.shapes.forEach(s => {
+                const isSel = (app.selection.type === 'shape' && app.selection.id === s.id);
+                const g = createSvg('g', {
+                    transform: `translate(${s.x},${s.y})`,
+                    class: `shape-group ${isSel?'selected':''}`,
+                    'data-id': s.id
+                });
+
+                let body;
+                if (s.type === 'process') body = createSvg('rect', {width: s.w, height: s.h, rx: 4});
+                else if (s.type === 'terminator') body = createSvg('rect', {width: s.w, height: s.h, rx: s.h/2});
+                else if (s.type === 'decision') body = createSvg('polygon', {points: `${s.w/2},0 ${s.w},${s.h/2} ${s.w/2},${s.h} 0,${s.h/2}`});
+                else if (s.type === 'data') { const sl=15; body = createSvg('polygon', {points: `${sl},0 ${s.w},0 ${s.w-sl},${s.h} 0,${s.h}`}); }
+
+                body.setAttribute('class', 'shape-body');
+                g.appendChild(body);
+
+                const fo = createSvg('foreignObject', {width: s.w, height: s.h, class: 'foreign-obj'});
+                const div = document.createElement('div');
+                div.className = 'shape-content';
+                div.textContent = s.text;
+                fo.appendChild(div);
+                g.appendChild(fo);
+
+                els.layers.shapes.appendChild(g);
+            });
+        }
+
+        // === 4. 数学工具 (边缘计算核心逻辑) ===
+
+        /**
+         * 计算从外部点 pExternal 到 shape 中心的连线，与 shape 边缘的交点
+         * @param {Object} pExternal - 外部点坐标 {x, y} (通常是另一端的中心)
+         * @param {Object} center - 当前形状中心坐标 {x, y}
+         * @param {Object} shape - 形状对象 {x, y, w, h, type}
+         */
+        function getShapeIntersection(pExternal, center, shape) {
+            const dx = pExternal.x - center.x;
+            const dy = pExternal.y - center.y;
+            
+            // 如果重合，返回中心
+            if (dx === 0 && dy === 0) return {x: center.x, y: center.y};
+
+            const w = shape.w / 2;
+            const h = shape.h / 2;
+
+            // 针对不同形状的几何计算
+            if (shape.type === 'decision') {
+                // 菱形方程：|x|/w + |y|/h = 1
+                // 设交点为 (k*dx, k*dy)，代入方程求解 k
+                const k = 1 / ( Math.abs(dx)/w + Math.abs(dy)/h );
+                return {
+                    x: center.x + dx * k,
+                    y: center.y + dy * k
+                };
+            } 
+            else if (shape.type === 'terminator') {
+                // 椭圆方程 (近似圆角矩形)：x^2/w^2 + y^2/h^2 = 1
+                const k = 1 / Math.sqrt( (dx*dx)/(w*w) + (dy*dy)/(h*h) );
+                return {
+                    x: center.x + dx * k,
+                    y: center.y + dy * k
+                };
+            }
+            else {
+                // 矩形 / 平行四边形 (简化为矩形处理)
+                // 矩形边界：max(|x|/w, |y|/h) = 1
+                // 找出哪个分量先撞墙
+                const k = 1 / Math.max( Math.abs(dx)/w, Math.abs(dy)/h );
+                return {
+                    x: center.x + dx * k,
+                    y: center.y + dy * k
+                };
+            }
+        }
+
+        // === 5. 基础工具 ===
+
+        function updateViewport() {
+            els.viewport.setAttribute('transform', `translate(${app.viewport.x}, ${app.viewport.y})`);
+            els.wrapper.style.backgroundPosition = `${app.viewport.x}px ${app.viewport.y}px`;
+        }
+
+        function getPointer(e) {
+            const evt = e.changedTouches ? e.changedTouches[0] : e;
+            return { x: evt.clientX, y: evt.clientY };
+        }
+
+        function screenToWorld(sx, sy) {
+            const rect = els.wrapper.getBoundingClientRect();
+            return { x: sx - rect.left - app.viewport.x, y: sy - rect.top - app.viewport.y };
+        }
+
+        function updateGhostPos(e) {
+            const p = getPointer(e);
+            // 修正：居中拖拽
+            const w = parseFloat(els.ghost.style.width);
+            const h = parseFloat(els.ghost.style.height);
+            els.ghost.style.left = (p.x - w/2) + 'px';
+            els.ghost.style.top = (p.y - h/2) + 'px';
+        }
+
+        function updateDragLine(start, end) {
+            els.dragLine.setAttribute('x1', start.x);
+            els.dragLine.setAttribute('y1', start.y);
+            els.dragLine.setAttribute('x2', end.x);
+            els.dragLine.setAttribute('y2', end.y);
+        }
+
+        function createSvg(tag, attrs) {
+            const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+            for (let k in attrs) el.setAttribute(k, attrs[k]);
+            return el;
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.style.opacity = 1;
+            setTimeout(() => t.style.opacity = 0, 2000);
+        }
+
+        // 初始化渲染
+        render();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio Pro + TTS (有声提词器)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        /* --- 继承上一版的现代设计变量 --- */
+        :root {
+            --bg-gradient: radial-gradient(circle at center, #1e1e24 0%, #000000 100%);
+            --glass-bg: rgba(20, 20, 23, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --accent-color: #3b82f6; 
+            --active-color: #10b981; /* 朗读模式开启色 */
+            --danger-color: #ef4444;
+            --highlight-color: #ff3b30;
+            
+            --text-main: #f3f4f6;
+            --text-muted: #6b7280;
+            
+            --radius-md: 12px;
+            --shadow-lg: 0 10px 30px -5px rgba(0, 0, 0, 0.6);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- 顶部控制栏 (加宽以容纳新功能) --- */
+        .glass-header {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 94%;
+            max-width: 1100px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            z-index: 100;
+            box-shadow: var(--shadow-lg);
+            transition: opacity 0.3s;
+        }
+        
+        /* 自动隐藏逻辑：鼠标移开变半透明 */
+        body:not(:hover) .glass-header { opacity: 0.2; }
+        .glass-header:hover { opacity: 1 !important; }
+
+        .control-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-right: 1px solid var(--glass-border);
+            padding-right: 15px;
+        }
+        .control-section:last-child { border: none; padding-right: 0; }
+
+        .label {
+            font-size: 9px;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 2px;
+            display: block;
+        }
+
+        /* --- 按钮样式 --- */
+        .btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: #ccc;
+            padding: 0 14px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+        
+        .btn-primary { background: var(--accent-color); border-color: transparent; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+
+        /* TTS 激活状态按钮 */
+        .btn-tts.active {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--active-color);
+            color: var(--active-color);
+        }
+
+        /* 下拉菜单美化 */
+        select.custom-select {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--glass-border);
+            color: #ddd;
+            height: 36px;
+            border-radius: 8px;
+            padding: 0 10px;
+            font-size: 12px;
+            max-width: 140px;
+            outline: none;
+            cursor: pointer;
+        }
+        select.custom-select option { background: #222; }
+
+        /* 滑块 */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100px;
+            background: transparent;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            height: 12px; width: 12px; border-radius: 50%; background: #fff;
+            margin-top: -4px; -webkit-appearance: none; cursor: pointer;
+        }
+
+        /* --- 舞台区域 (Stage) --- */
+        #stage {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            /* 顶部底部柔和遮罩 */
+            mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+        }
+
+        /* 极简发光准心 */
+        .focus-beam {
+            position: absolute;
+            top: 45%;
+            left: 0;
+            width: 100%;
+            height: 40px;
+            /* 左右两边红色光晕，中间空心 */
+            background: linear-gradient(90deg, rgba(255, 59, 48, 0.1) 0%, transparent 20%, transparent 80%, rgba(255, 59, 48, 0.1) 100%);
+            border-top: 1px dashed rgba(255, 59, 48, 0.2);
+            border-bottom: 1px dashed rgba(255, 59, 48, 0.2);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #content {
+            width: 80%;
+            max-width: 850px;
+            margin: 0 auto;
+            padding-top: 45vh;
+            padding-bottom: 50vh;
+            text-align: justify;
+            line-height: 1.8;
+        }
+
+        .token {
+            display: inline-block;
+            transition: color 0.2s ease;
+            white-space: pre-wrap;
+            color: rgba(255, 255, 255, 0.1); /* 未读：非常暗 */
+        }
+        
+        .token.current {
+            color: var(--highlight-color);
+            text-shadow: 0 0 15px rgba(255, 59, 48, 0.6); /* 霓虹光感 */
+        }
+        
+        .token.future { color: #d1d5db; } /* 稍亮 */
+
+        /* 镜像翻转 */
+        .mirror { transform: scaleX(-1); }
+
+        /* 底部状态 */
+        .status-pill {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #888;
+            font-family: monospace;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* 录音红点动画 */
+        .rec-dot {
+            width: 8px; height: 8px; background: var(--danger-color);
+            border-radius: 50%; display: inline-block; margin-right: 6px;
+        }
+        .recording .rec-dot { animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+    </style>
+</head>
+<body>
+
+    <div class="glass-header">
+        <!-- 1. 文件操作 -->
+        <div class="control-section">
+            <input type="file" id="fileInput" accept=".txt,.docx" style="display:none">
+            <button class="btn" onclick="document.getElementById('fileInput').click()">📂 导入</button>
+            <button class="btn" onclick="resetReader()">↺ 重置</button>
+        </div>
+
+        <!-- 2. 核心播放 -->
+        <div class="control-section">
+            <button id="btn-play" class="btn btn-primary" style="width: 80px; justify-content:center;" onclick="togglePlay()">▶ 开始</button>
+            <button class="btn" onclick="toggleMirror()" title="镜像模式">⇄</button>
+        </div>
+
+        <!-- 3. 朗读设置 (新增模块) -->
+        <div class="control-section">
+            <div>
+                <span class="label">智能朗读</span>
+                <button id="btn-tts" class="btn btn-tts" onclick="toggleTTSMode()">
+                    <span id="tts-icon">🔇</span> <span id="tts-text">关</span>
+                </button>
+            </div>
+            <div>
+                <span class="label">发音人</span>
+                <select id="voiceSelect" class="custom-select">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 4. 速度调节 -->
+        <div class="control-section">
+            <div>
+                <span class="label">语速 / 朗读倍速</span>
+                <input type="range" id="speedRange" min="1" max="100" value="30">
+            </div>
+            <div>
+                <span class="label">字号 <span id="font-val">60</span></span>
+                <input type="range" id="fontRange" min="30" max="100" value="60">
+            </div>
+        </div>
+
+        <!-- 5. 录音 -->
+        <div class="control-section" style="border:none">
+            <button id="btn-record" class="btn" onclick="toggleRecord()">
+                <span class="rec-dot"></span> 录音
+            </button>
+            <a id="dl-link" style="display:none"></a>
+        </div>
+    </div>
+
+    <div id="stage">
+        <div class="focus-beam"></div>
+        <div id="content">
+            <span class="token future">Welcome to Studio Pro.</span>
+            <span class="token future">\n</span>
+            <span class="token future">开启“智能朗读”后，系统将为您自动读稿。</span>
+            <span class="token future">\n</span>
+            <span class="token future">请导入文档开始体验...</span>
+        </div>
+    </div>
+
+    <div class="status-pill" id="status-bar">Ready</div>
+
+    <script>
+        // --- 核心状态管理 ---
+        const state = {
+            tokens: [],         // 存储 span 对象和它的字符位置信息
+            rawText: "",        // 纯文本内容
+            idx: 0,             // 当前读到的 token 索引
+            playing: false,
+            
+            // TTS 相关
+            ttsEnabled: false,
+            voices: [],
+            utterance: null,
+            
+            // 定时器相关 (用于手动模式)
+            wpm: 200,
+            lastTime: 0,
+            accTime: 0,
+            
+            // UI 相关
+            fontSize: 60,
+            recording: false
+        };
+
+        const UI = {
+            content: document.getElementById('content'),
+            stage: document.getElementById('stage'),
+            playBtn: document.getElementById('btn-play'),
+            voiceSelect: document.getElementById('voiceSelect'),
+            ttsBtn: document.getElementById('btn-tts'),
+            ttsIcon: document.getElementById('tts-icon'),
+            ttsText: document.getElementById('tts-text'),
+            speedRange: document.getElementById('speedRange'),
+            status: document.getElementById('status-bar')
+        };
+
+        // --- 1. 初始化与 TTS 准备 ---
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices(); // 尝试立即加载
+
+        function loadVoices() {
+            state.voices = window.speechSynthesis.getVoices();
+            UI.voiceSelect.innerHTML = '';
+            
+            // 优先显示中文 voices
+            const zhVoices = state.voices.filter(v => v.lang.includes('zh'));
+            const otherVoices = state.voices.filter(v => !v.lang.includes('zh'));
+            
+            [...zhVoices, ...otherVoices].forEach((v, index) => {
+                const opt = document.createElement('option');
+                opt.value = v.name;
+                opt.textContent = `${v.name} (${v.lang})`;
+                UI.voiceSelect.appendChild(opt);
+            });
+            
+            if(state.voices.length === 0) {
+                const opt = document.createElement('option');
+                opt.textContent = "未检测到语音包";
+                UI.voiceSelect.appendChild(opt);
+            }
+        }
+
+        // --- 2. 文档解析与映射构建 ---
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            
+            let text = "";
+            if(file.name.endsWith('.docx')) {
+                const buff = await file.arrayBuffer();
+                const res = await mammoth.extractRawText({arrayBuffer: buff});
+                text = res.value;
+            } else {
+                text = await file.text();
+            }
+            renderText(text);
+        });
+
+        function renderText(text) {
+            UI.content.innerHTML = '';
+            state.tokens = [];
+            state.idx = 0;
+            state.rawText = text; // 保存原始文本给 TTS 用
+
+            // 字符偏移量计数器 (用于同步 TTS 事件)
+            let charOffset = 0;
+
+            const paras = text.split(/\n/);
+            // 正则：拆分中文单字、英文单词、标点
+            const regex = /([\u4e00-\u9fa5]|[a-zA-Z0-9]+|[^\s\w])/g; 
+
+            paras.forEach(p => {
+                if(!p.trim()) { 
+                    createToken('\n', true, charOffset); 
+                    charOffset += 1; // 换行符算一个字符
+                    return; 
+                }
+                
+                // 为了精准匹配，我们需要重构字符串，确保 token 和 text 的对应
+                // 这里简化处理：TTS 读的 rawText 和我们拆分的 tokens 在逻辑上是一致的
+                
+                // 拆分当前段落
+                let match;
+                while ((match = regex.exec(p)) !== null) {
+                    // match.index 是相对段落的，我们需要绝对偏移量吗？
+                    // 其实 TTS 的 onboundary 给的是 charIndex (全文)
+                    
+                    // 这里我们不完全依赖 regex.exec 的 index，而是累加长度
+                    // 注意：这种拆分会丢失原句中的空格，可能导致 TTS index 对不上
+                    // 为了完美对齐，我们仅存储 token，偏移量在播放时动态计算或模糊匹配
+                    
+                    createToken(match[0], false, 0); // 偏移量稍后计算，或者不依赖偏移量
+                }
+                createToken('\n', true, 0);
+            });
+            
+            // 重新计算精准的全文档字符映射
+            // 这一步至关重要：我们需要知道每个 token 在全文 rawText 中的起始位置
+            // 但因为我们之前用正则拆分，可能丢失了空格。
+            // 策略调整：TTS 读的内容必须完全等于可视内容吗？
+            // 简单方案：TTS 读 rawText。我们在 rawText 里找 token。
+            
+            // 为了简化，我们让 TTS 读 tokens 拼起来的字符串，这样绝对一一对应。
+            state.cleanTextForTTS = state.tokens.map(t => t.text).join(""); 
+            
+            // 计算每个 token 在 cleanTextForTTS 中的起始位置
+            let currentPos = 0;
+            state.tokens.forEach(token => {
+                token.startPos = currentPos;
+                currentPos += token.text.length;
+                token.endPos = currentPos;
+            });
+
+            UI.status.innerText = `已加载 ${state.tokens.length} 个字词`;
+            resetReader();
+        }
+
+        function createToken(text, isBr, offset) {
+            if(isBr) {
+                UI.content.appendChild(document.createElement('br'));
+                // 换行符也存入 token，为了占位 text
+                state.tokens.push({ el: null, text: "\n", startPos: 0 });
+                return;
+            }
+            const span = document.createElement('span');
+            span.className = 'token future';
+            span.textContent = text;
+            span.style.fontSize = state.fontSize + 'px';
+            UI.content.appendChild(span);
+            
+            state.tokens.push({
+                el: span,
+                text: text,
+                startPos: 0 // 后续计算
+            });
+        }
+
+        // --- 3. 播放控制 (双引擎) ---
+
+        function toggleTTSMode() {
+            state.ttsEnabled = !state.ttsEnabled;
+            if(state.ttsEnabled) {
+                UI.ttsBtn.classList.add('active');
+                UI.ttsIcon.innerText = "🔊";
+                UI.ttsText.innerText = "开";
+                UI.status.innerText = "模式: 智能朗读 (跟随语音)";
+            } else {
+                UI.ttsBtn.classList.remove('active');
+                UI.ttsIcon.innerText = "🔇";
+                UI.ttsText.innerText = "关";
+                UI.status.innerText = "模式: 手动滚屏";
+                // 如果正在说话，立即停止
+                window.speechSynthesis.cancel();
+            }
+            // 切换模式重置播放
+            if(state.playing) togglePlay();
+        }
+
+        function togglePlay() {
+            if(!state.tokens.length) return;
+            
+            state.playing = !state.playing;
+            UI.playBtn.innerText = state.playing ? "⏸ 暂停" : "▶ 继续";
+            UI.playBtn.classList.toggle('btn-primary', !state.playing);
+
+            if(state.playing) {
+                if(state.ttsEnabled) {
+                    startTTS();
+                } else {
+                    state.lastTime = performance.now();
+                    requestAnimationFrame(manualLoop);
+                }
+            } else {
+                if(state.ttsEnabled) {
+                    window.speechSynthesis.pause(); // 或者 cancel
+                }
+            }
+        }
+
+        // 引擎 A: TTS 朗读驱动
+        function startTTS() {
+            // 如果暂停中，恢复
+            if(window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+                return;
+            }
+            
+            window.speechSynthesis.cancel(); // 停止之前的
+
+            // 从当前的 idx 开始截取文本
+            // 为了简单，我们每次 play 都构造一个新的 utterance 从当前文字开始读
+            // 找到当前 idx 对应的字符位置
+            const textToRead = state.cleanTextForTTS; 
+            // 实际上 TTS 不支持很好的 "从第N个字开始读" 除非截断字符串
+            // 所以我们截断字符串：
+            const startCharIndex = state.tokens[state.idx].startPos;
+            const subText = textToRead.substring(startCharIndex);
+            
+            const u = new SpeechSynthesisUtterance(subText);
+            
+            // 设置声音
+            const selectedVoiceName = UI.voiceSelect.value;
+            const voice = state.voices.find(v => v.name === selectedVoiceName);
+            if(voice) u.voice = voice;
+            
+            // 设置速度 (Range 1-100 -> Rate 0.5 - 2.0)
+            const speedVal = parseInt(UI.speedRange.value);
+            u.rate = 0.5 + (speedVal / 100) * 1.5; 
+
+            // 核心：边界事件监听
+            u.onboundary = (event) => {
+                // event.charIndex 是相对于 subText 的位置
+                // 我们需要转换回全文的位置
+                const realCharIndex = startCharIndex + event.charIndex;
+                
+                // 查找对应哪个 token (二分查找或简单遍历)
+                // 考虑到 performance，我们从 state.idx 开始往后找
+                for(let i = state.idx; i < state.tokens.length; i++) {
+                    const t = state.tokens[i];
+                    // 如果当前字符索引落在这个 token 的范围内
+                    if(realCharIndex >= t.startPos && realCharIndex < t.endPos) {
+                        state.idx = i;
+                        updateVisuals(i);
+                        break;
+                    }
+                }
+            };
+
+            u.onend = () => {
+                state.playing = false;
+                UI.playBtn.innerText = "↺ 完成";
+            };
+
+            state.utterance = u;
+            window.speechSynthesis.speak(u);
+        }
+
+        // 引擎 B: 手动/WPM 定时器驱动
+        function manualLoop(now) {
+            if(!state.playing || state.ttsEnabled) return;
+            
+            const dt = now - state.lastTime;
+            state.lastTime = now;
+            
+            // 简单的 WPM 映射
+            const speedVal = parseInt(UI.speedRange.value);
+            // 假设 50 = 200 WPM
+            const currentWPM = speedVal * 4 + 50; 
+            const msPerWord = 60000 / currentWPM;
+            
+            state.accTime += dt;
+            if(state.accTime >= msPerWord) {
+                state.accTime -= msPerWord;
+                if(state.idx < state.tokens.length - 1) {
+                    state.idx++;
+                    updateVisuals(state.idx);
+                } else {
+                    state.playing = false;
+                    UI.playBtn.innerText = "↺ 完成";
+                    return;
+                }
+            }
+            // 平滑滚动放在这里每帧调用，或者放在 updateVisuals 触发
+            requestAnimationFrame(manualLoop);
+        }
+
+        // --- 视觉更新 (通用) ---
+        function updateVisuals(index) {
+            if(!state.tokens[index]) return;
+            
+            // 样式更新 (将上一个变灰，当前变红)
+            // 优化：不要全量遍历，只处理 index 附近的
+            if(index > 0 && state.tokens[index-1].el) {
+                state.tokens[index-1].el.className = 'token'; // past
+            }
+            if(state.tokens[index].el) {
+                state.tokens[index].el.className = 'token current';
+            }
+            
+            // 平滑滚动
+            smoothScrollTo(index);
+        }
+
+        function smoothScrollTo(index) {
+            const token = state.tokens[index];
+            if(!token || !token.el) return;
+            
+            const elTop = token.el.offsetTop;
+            const targetScroll = elTop - (UI.stage.clientHeight * 0.45);
+            
+            // 如果是 TTS 模式，直接跳或者稍微缓动
+            // CSS 的 scroll-behavior: smooth 可能冲突，我们用 JS 简单设置
+            UI.stage.scrollTo({
+                top: targetScroll,
+                behavior: 'smooth' 
+            });
+        }
+
+        function resetReader() {
+            window.speechSynthesis.cancel();
+            state.playing = false;
+            state.idx = 0;
+            UI.playBtn.innerText = "▶ 开始";
+            state.tokens.forEach(t => { if(t.el) t.el.className = 'token future'; });
+            UI.stage.scrollTop = 0;
+        }
+
+        // --- 其他交互 ---
+        UI.fontRange.addEventListener('input', (e) => {
+            state.fontSize = e.target.value;
+            document.getElementById('font-val').innerText = state.fontSize;
+            state.tokens.forEach(t => { if(t.el) t.el.style.fontSize = state.fontSize + 'px'; });
+        });
+
+        function toggleMirror() { UI.content.classList.toggle('mirror'); }
+
+        // 录音逻辑 (复用)
+        let mediaRec, chunks;
+        async function toggleRecord() {
+            if(!state.recording) {
+                try {
+                    const s = await navigator.mediaDevices.getUserMedia({audio:true});
+                    mediaRec = new MediaRecorder(s);
+                    chunks = [];
+                    mediaRec.ondataavailable = e => chunks.push(e.data);
+                    mediaRec.onstop = () => {
+                        const b = new Blob(chunks, {type:'audio/webm'});
+                        const a = document.getElementById('dl-link');
+                        a.href = URL.createObjectURL(b);
+                        a.download = `Rec_${Date.now()}.webm`;
+                        a.click();
+                    };
+                    mediaRec.start();
+                    state.recording = true;
+                    document.getElementById('btn-record').classList.add('recording');
+                } catch(e) { alert("麦克风权限失败"); }
+            } else {
+                mediaRec.stop();
+                state.recording = false;
+                document.getElementById('btn-record').classList.remove('recording');
+            }
+        }
+
+        // 快捷键
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        });
+
+    </script>
+</body>
+</html>

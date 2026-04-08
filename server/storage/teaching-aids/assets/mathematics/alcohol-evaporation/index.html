@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探究蒸发的快慢 - 真实风扇版</title>
+    <style>
+        :root {
+            --bg-color: #aaddff;
+            --container-bg: #eef7ff;
+            --glass-border: #546e7a;
+            --liquid-color: #4fc3f7;
+            --fan-blade-color: #90a4ae; /* 扇叶颜色 */
+            --fan-blade-active: #546e7a; /* 转动时颜色 */
+            --heater-off: #78909c;
+            --heater-on: #ff5722;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        .main-stage {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #37474f;
+            background: #f5f5f5;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .experiment-area { flex: 1; display: flex; position: relative; }
+        .divider { width: 2px; background: #e0e0e0; height: 80%; align-self: center; }
+        
+        .group {
+            flex: 1;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            background: var(--container-bg);
+            padding-bottom: 40px;
+            cursor: default;
+        }
+
+        .group-label {
+            position: absolute;
+            top: 10px; left: 10px;
+            background: rgba(0,0,0,0.1);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #555;
+        }
+
+        /* --- 加热器样式 --- */
+        .heater {
+            position: absolute;
+            top: 0;
+            width: 140px; height: 50px;
+            background: #eceff1;
+            border: 2px solid #cfd8dc; border-top: none; border-radius: 0 0 10px 10px;
+            display: flex; justify-content: center; align-items: flex-end;
+            cursor: pointer; transition: all 0.3s; z-index: 10;
+        }
+        .heater:hover { box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .heater-coil {
+            width: 80%; height: 10px;
+            background: var(--heater-off);
+            border-radius: 5px; margin-bottom: 10px;
+            transition: background 0.5s;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .heater.active .heater-coil { background: var(--heater-on); box-shadow: 0 0 15px var(--heater-on); }
+        .heater-indicator {
+            position: absolute; right: 10px; bottom: 10px;
+            width: 8px; height: 8px; border-radius: 50%; background: #ccc;
+        }
+        .heater.active .heater-indicator { background: #ff0000; }
+
+        /* --- 真实风扇样式 --- */
+        .fan {
+            position: absolute;
+            left: 30px; bottom: 80px;
+            width: 120px; height: 140px;
+            display: flex; flex-direction: column; align-items: center;
+            cursor: pointer;
+        }
+        
+        /* 风扇笼子（外框） */
+        .fan-cage {
+            width: 110px; height: 110px;
+            border-radius: 50%;
+            background: #e0e0e0; /* 后盖颜色 */
+            border: 4px solid #cfd8dc;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        /* 扇叶层 (SVG) */
+        .fan-blades-svg {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 96px; height: 96px;
+            fill: var(--fan-blade-color);
+            transition: fill 0.3s;
+            z-index: 1; /* 在网罩下面 */
+        }
+
+        /* 防护网罩层 (SVG) */
+        .fan-guard-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 2; /* 在扇叶上面 */
+            pointer-events: none; /* 点击穿透 */
+        }
+        .fan-guard-lines {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 1.5;
+        }
+
+        /* 风扇底座 */
+        .fan-base {
+            width: 50px; height: 25px;
+            background: #eceff1;
+            border-radius: 4px; margin-top: -2px;
+            position: relative; z-index: 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .fan-neck {
+            width: 16px; height: 10px;
+            background: #cfd8dc; margin-top: -5px;
+            z-index: -1;
+        }
+        .fan-btn {
+            width: 8px; height: 8px;
+            background: #ccc; border-radius: 50%;
+            margin: 8px auto 0;
+        }
+
+        /* 激活状态动画 */
+        .fan.active .fan-blades-svg {
+            fill: var(--fan-blade-active);
+            animation: spin 0.15s linear infinite; /* 更快的转速模拟真实感 */
+        }
+        .fan.active .fan-btn { background: #4caf50; }
+
+        @keyframes spin {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+
+        /* --- 烧杯与液体 --- */
+        .beaker {
+            width: 120px; height: 140px;
+            border: 3px solid var(--glass-border); border-top: none; border-radius: 0 0 10px 10px;
+            position: relative; margin-left: 100px;
+            background: linear-gradient(to right, rgba(255,255,255,0.2), rgba(255,255,255,0.5));
+        }
+        .ticks { position: absolute; left: 0; top: 20px; width: 100%; height: 80px; }
+        .tick { position: absolute; left: 0; width: 10px; height: 2px; background: var(--glass-border); }
+        .tick.long { width: 20px; }
+        .tick-label { position: absolute; right: 5px; top: 20px; font-size: 12px; color: #555; }
+        .liquid {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 100px;
+            background: var(--liquid-color); border-radius: 0 0 5px 5px;
+            transition: height 0.1s linear; opacity: 0.8;
+        }
+        .liquid::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 10px;
+            background: rgba(255,255,255,0.3); border-radius: 50%; transform: translateY(-50%);
+        }
+        .liquid-name {
+            margin-top: 10px; font-size: 16px; font-weight: bold; color: white;
+            background: #7986cb; padding: 4px 20px; border-radius: 15px; margin-left: 100px;
+        }
+
+        /* 气泡 */
+        .vapor-particle {
+            position: absolute; background: rgba(255, 255, 255, 0.6); border-radius: 50%;
+            pointer-events: none; animation: rise 2s linear forwards;
+        }
+        @keyframes rise {
+            0% { transform: translateY(0) scale(1); opacity: 0.8; }
+            100% { transform: translateY(-100px) scale(1.5); opacity: 0; }
+        }
+
+        /* 控制栏 */
+        .control-panel {
+            height: 80px; background: white; display: flex; align-items: center; justify-content: center;
+            gap: 30px; border-top: 1px solid #eee; position: relative;
+        }
+        .btn { padding: 12px 40px; font-size: 18px; border: none; border-radius: 30px; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .btn-start { background: #42a5f5; color: white; }
+        .btn-start:hover { background: #2196f3; transform: translateY(-2px); }
+        .btn-reset { background: #eceff1; color: #546e7a; }
+        .btn-reset:hover { background: #cfd8dc; }
+        .tip {
+            position: absolute; bottom: 90px; width: 100%; text-align: center;
+            color: #f57c00; font-size: 14px; pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-stage">
+    <div class="header">探究蒸发的快慢</div>
+    
+    <div class="experiment-area">
+        <!-- 左侧实验组 -->
+        <div class="group" id="groupLeft">
+            <div class="group-label">实验组 A</div>
+            
+            <div class="heater" onclick="toggleDevice('heater', 'left')">
+                <div class="heater-coil"></div>
+                <div class="heater-indicator"></div>
+            </div>
+
+            <!-- 风扇 A -->
+            <div class="fan" onclick="toggleDevice('fan', 'left')">
+                <div class="fan-cage">
+                    <!-- 1. 扇叶 (三叶螺旋桨) -->
+                    <svg class="fan-blades-svg" viewBox="0 0 100 100">
+                        <!-- 中心轴 -->
+                        <circle cx="50" cy="50" r="12" fill="currentColor"/>
+                        <!-- 扇叶路径 -->
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(0, 50, 50)"/>
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(120, 50, 50)"/>
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(240, 50, 50)"/>
+                    </svg>
+
+                    <!-- 2. 防护网罩 (Grid Guard) -->
+                    <svg class="fan-guard-svg" viewBox="0 0 100 100">
+                        <!-- 环形线 -->
+                        <circle cx="50" cy="50" r="48" class="fan-guard-lines"/>
+                        <circle cx="50" cy="50" r="35" class="fan-guard-lines"/>
+                        <circle cx="50" cy="50" r="20" class="fan-guard-lines"/>
+                        <!-- 放射线 -->
+                        <line x1="50" y1="0" x2="50" y2="100" class="fan-guard-lines"/>
+                        <line x1="0" y1="50" x2="100" y2="50" class="fan-guard-lines"/>
+                        <line x1="15" y1="15" x2="85" y2="85" class="fan-guard-lines"/>
+                        <line x1="15" y1="85" x2="85" y2="15" class="fan-guard-lines"/>
+                    </svg>
+                </div>
+                <div class="fan-neck"></div>
+                <div class="fan-base">
+                    <div class="fan-btn"></div>
+                </div>
+            </div>
+
+            <div class="beaker">
+                <div class="ticks">
+                    <div class="tick long" style="top: 0;"></div>
+                    <div class="tick" style="top: 20px;"></div>
+                    <div class="tick" style="top: 40px;"></div>
+                    <div class="tick" style="top: 60px;"></div>
+                    <div class="tick-label">50mL</div>
+                </div>
+                <div class="liquid" id="liquidLeft"></div>
+            </div>
+            <div class="liquid-name">酒精</div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- 右侧实验组 -->
+        <div class="group" id="groupRight">
+            <div class="group-label">实验组 B</div>
+
+            <div class="heater" onclick="toggleDevice('heater', 'right')">
+                <div class="heater-coil"></div>
+                <div class="heater-indicator"></div>
+            </div>
+
+            <!-- 风扇 B -->
+            <div class="fan" onclick="toggleDevice('fan', 'right')">
+                <div class="fan-cage">
+                    <!-- 扇叶 -->
+                    <svg class="fan-blades-svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="12" fill="currentColor"/>
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(0, 50, 50)"/>
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(120, 50, 50)"/>
+                        <path d="M50,50 C50,50 70,20 85,30 C100,40 80,80 50,50 Z" transform="rotate(240, 50, 50)"/>
+                    </svg>
+                    <!-- 防护网 -->
+                    <svg class="fan-guard-svg" viewBox="0 0 100 100">
+                        <circle cx="50" cy="50" r="48" class="fan-guard-lines"/>
+                        <circle cx="50" cy="50" r="35" class="fan-guard-lines"/>
+                        <circle cx="50" cy="50" r="20" class="fan-guard-lines"/>
+                        <line x1="50" y1="0" x2="50" y2="100" class="fan-guard-lines"/>
+                        <line x1="0" y1="50" x2="100" y2="50" class="fan-guard-lines"/>
+                        <line x1="15" y1="15" x2="85" y2="85" class="fan-guard-lines"/>
+                        <line x1="15" y1="85" x2="85" y2="15" class="fan-guard-lines"/>
+                    </svg>
+                </div>
+                <div class="fan-neck"></div>
+                <div class="fan-base">
+                    <div class="fan-btn"></div>
+                </div>
+            </div>
+
+            <div class="beaker">
+                <div class="ticks">
+                    <div class="tick long" style="top: 0;"></div>
+                    <div class="tick" style="top: 20px;"></div>
+                    <div class="tick" style="top: 40px;"></div>
+                    <div class="tick" style="top: 60px;"></div>
+                    <div class="tick-label">50mL</div>
+                </div>
+                <div class="liquid" id="liquidRight"></div>
+            </div>
+            <div class="liquid-name">酒精</div>
+        </div>
+    </div>
+
+    <div class="tip" id="tips">提示：点击设备可改变实验条件，模拟控制变量法。</div>
+
+    <div class="control-panel">
+        <button class="btn btn-reset" onclick="resetExperiment()">重置</button>
+        <button class="btn btn-start" id="startBtn" onclick="startExperiment()">开始实验</button>
+    </div>
+</div>
+
+<script>
+    const state = {
+        left: { heater: false, fan: false, height: 100 },
+        right: { heater: false, fan: false, height: 100 },
+        isRunning: false,
+        animationId: null
+    };
+
+    const liquidLeft = document.getElementById('liquidLeft');
+    const liquidRight = document.getElementById('liquidRight');
+    const startBtn = document.getElementById('startBtn');
+    const tips = document.getElementById('tips');
+
+    window.onload = () => {
+        setTimeout(() => { tips.style.opacity = 1; }, 500);
+        setTimeout(() => { tips.style.opacity = 0; }, 4000);
+    };
+
+    function toggleDevice(type, side) {
+        if (state.isRunning) return;
+
+        state[side][type] = !state[side][type];
+        
+        const group = side === 'left' ? document.getElementById('groupLeft') : document.getElementById('groupRight');
+        const element = type === 'heater' ? group.querySelector('.heater') : group.querySelector('.fan');
+        
+        if (state[side][type]) {
+            element.classList.add('active');
+        } else {
+            element.classList.remove('active');
+        }
+    }
+
+    function createVapor(side, intensity) {
+        const group = side === 'left' ? document.getElementById('groupLeft') : document.getElementById('groupRight');
+        if (Math.random() > (0.9 - intensity * 0.1)) { 
+            const vapor = document.createElement('div');
+            vapor.className = 'vapor-particle';
+            const size = Math.random() * 6 + 4;
+            vapor.style.width = size + 'px';
+            vapor.style.height = size + 'px';
+            const leftPos = 130 + Math.random() * 60; 
+            vapor.style.left = leftPos + 'px';
+            vapor.style.bottom = '160px';
+            group.appendChild(vapor);
+            setTimeout(() => { vapor.remove(); }, 2000);
+        }
+    }
+
+    function calculateSpeed(conditions) {
+        let baseSpeed = 0.05; 
+        if (conditions.heater) baseSpeed += 0.15;
+        if (conditions.fan) baseSpeed += 0.1;    
+        return baseSpeed;
+    }
+
+    function loop() {
+        if (!state.isRunning) return;
+
+        const speedLeft = calculateSpeed(state.left);
+        const speedRight = calculateSpeed(state.right);
+
+        state.left.height -= speedLeft;
+        state.right.height -= speedRight;
+
+        if (state.left.height < 0) state.left.height = 0;
+        if (state.right.height < 0) state.right.height = 0;
+
+        liquidLeft.style.height = state.left.height + 'px';
+        liquidRight.style.height = state.right.height + 'px';
+
+        createVapor('left', speedLeft * 10);
+        createVapor('right', speedRight * 10);
+
+        if (state.left.height <= 0 && state.right.height <= 0) {
+            stopExperiment();
+            tips.innerText = "实验结束：酒精已全部蒸发。";
+            tips.style.opacity = 1;
+            return;
+        }
+        
+        state.animationId = requestAnimationFrame(loop);
+    }
+
+    function startExperiment() {
+        if (state.isRunning) return;
+        state.isRunning = true;
+        startBtn.innerText = "实验进行中...";
+        startBtn.style.background = "#ccc";
+        startBtn.disabled = true;
+        tips.style.opacity = 0;
+        loop();
+    }
+
+    function stopExperiment() {
+        state.isRunning = false;
+        cancelAnimationFrame(state.animationId);
+        startBtn.innerText = "实验结束";
+    }
+
+    function resetExperiment() {
+        state.isRunning = false;
+        cancelAnimationFrame(state.animationId);
+        
+        state.left.height = 100;
+        state.right.height = 100;
+        liquidLeft.style.height = '100px';
+        liquidRight.style.height = '100px';
+
+        startBtn.innerText = "开始实验";
+        startBtn.style.background = "#42a5f5";
+        startBtn.disabled = false;
+        
+        tips.innerText = "提示：点击设备可改变实验条件，模拟控制变量法。";
+        tips.style.opacity = 1;
+        setTimeout(() => { tips.style.opacity = 0; }, 3000);
+
+        document.querySelectorAll('.vapor-particle').forEach(el => el.remove());
+    }
+</script>
+
+</body>
+</html>

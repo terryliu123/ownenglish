@@ -133,6 +133,11 @@ def _answers_match(task_type: Optional[str], answer, correct_answer) -> Optional
             return None
         return normalized_answer == normalized_correct
 
+    if task_type == "single_choice":
+        normalized_answer = str(answer).strip().upper()
+        normalized_correct = str(correct_value).strip().upper()
+        return normalized_answer == normalized_correct
+
     if task_type == "fill_blank":
         return _normalize_fill_blank_answer(answer) == _normalize_fill_blank_answer(correct_value)
 

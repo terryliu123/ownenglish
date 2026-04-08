@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>凸透镜成像规律</title>
+    <style>
+        /* 全局重置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f4f6f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* 主容器 */
+        .container {
+            width: 100%;
+            max-width: 900px;
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 1. 头部标题 */
+        header {
+            padding: 20px 30px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .tag {
+            font-size: 0.85rem;
+            color: #666;
+            background-color: #f0f0f0;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+
+        /* 2. 中间演示区 */
+        .stage {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            background-color: #B5CFA5; /* 还原截图的绿色背景 */
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 播放按钮 */
+        .play-btn {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70px;
+            height: 70px;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+
+        .play-btn:hover {
+            background-color: rgba(0, 0, 0, 0.6);
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        .play-btn::after {
+            content: '';
+            display: block;
+            width: 0;
+            height: 0;
+            border-top: 12px solid transparent;
+            border-bottom: 12px solid transparent;
+            border-left: 20px solid #fff;
+            margin-left: 6px;
+        }
+
+        /* 3. 尾部说明 */
+        footer {
+            padding: 25px 30px;
+            background-color: #fff;
+        }
+
+        footer p {
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #444;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+
+        .book-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #888;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 头部 -->
+    <header>
+        <h1>凸透镜成像</h1>
+        <span class="tag">可交互式微课件</span>
+    </header>
+
+    <!-- 中间演示区 -->
+    <div class="stage" id="stage">
+        <canvas id="lensCanvas"></canvas>
+        <div class="play-btn" id="playBtn"></div>
+    </div>
+
+    <!-- 尾部说明 -->
+    <footer>
+        <p>
+            凸透镜是利用光的折射原理成像的，其所成像与像距和物距之间的关系有关。
+            素材展现了物体的物距处于不同焦距位置处时其对应的像的情况（当前展示：<strong>物距大于2倍焦距</strong>），
+            并且给出了光路图，可实时看到所成像的光路原理图。
+        </p>
+        <div class="book-info">
+            <strong>适配教科书：</strong><br>
+            鲁科版 / 北师大版 / 北师大版(2024) / 沪科版 / 沪粤版 / 苏教版 / 教科版(2024) / 人教版(2024) / 沪科版(2024) / 浙教版 / 沪粤版(2024) / 教科版 / 苏科版 / 苏科版(2024) / 人教版 / 沪教版
+        </div>
+    </footer>
+</div>
+
+<script>
+    const canvas = document.getElementById('lensCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = document.getElementById('stage');
+    const playBtn = document.getElementById('playBtn');
+
+    let width, height;
+    let animationProgress = 0;
+    let isAnimating = false;
+    let animationId;
+
+    // 初始化画布尺寸
+    function resizeCanvas() {
+        width = stage.clientWidth;
+        height = stage.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
+        drawScene(0);
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    // 启动动画
+    playBtn.addEventListener('click', () => {
+        if (isAnimating) return;
+        isAnimating = true;
+        animationProgress = 0;
+        playBtn.style.display = 'none';
+        animate();
+    });
+
+    function animate() {
+        animationProgress += 0.01; // 动画速度
+        if (animationProgress > 1.2) {
+            animationProgress = 1.2; // 保持结束状态
+            // 动画结束
+        } else {
+            animationId = requestAnimationFrame(animate);
+        }
+        drawScene(animationProgress);
+    }
+
+    // 核心绘图函数
+    function drawScene(progress) {
+        ctx.clearRect(0, 0, width, height);
+        const centerY = height / 2;
+        const centerX = width / 2;
+
+        // --- 参数定义 ---
+        // 定义焦距 f (像素单位)
+        const f = 120; 
+        // 物体位置 (在左侧 2F 之外)
+        const u = 300; // 物距
+        const objX = centerX - u;
+        // 计算像距 v (1/f = 1/u + 1/v => v = uf / (u-f))
+        const v = (u * f) / (u - f);
+        const imgX = centerX + v;
+        
+        // 树的高度
+        const treeH = 100;
+        // 计算像的高度 (放大率 M = v/u)
+        const magnification = v / u;
+        const imgH = treeH * magnification;
+
+        // --- 1. 绘制光轴 ---
+        ctx.beginPath();
+        ctx.setLineDash([8, 6]);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // --- 2. 绘制焦点点位 ---
+        // 左侧 2F, F
+        drawPoint(centerX - f * 2, centerY, '#FFA500', '2F₁'); 
+        drawPoint(centerX - f, centerY, '#FFA500', 'F₁');
+        // 右侧 F, 2F
+        drawPoint(centerX + f, centerY, '#FFA500', 'F₁'); // 这里为了还原图，也叫F1
+        drawPoint(centerX + f * 2, centerY, '#FFA500', '2F₁');
+
+        // --- 3. 绘制凸透镜 ---
+        drawLens(centerX, centerY, 240);
+
+        // --- 4. 绘制物体 (左侧树) ---
+        drawTree(objX, centerY, treeH, 1, false);
+
+        // --- 5. 绘制像 (右侧树) - 倒立缩小实像 ---
+        // 随动画进度慢慢显示
+        const imgOpacity = progress > 0.8 ? Math.min((progress - 0.8) * 5, 1) : 0.1;
+        drawTree(imgX, centerY, imgH, imgOpacity, true); 
+
+        // --- 6. 绘制光路动画 ---
+        if (progress > 0) {
+            drawLightRays(objX, centerY, treeH, centerX, imgX, imgH, f, progress);
+        }
+    }
+
+    // 绘制树木
+    function drawTree(x, y, h, opacity, inverted) {
+        ctx.save();
+        ctx.translate(x, y);
+        // 如果倒立，Y轴翻转
+        const scaleY = inverted ? -1 : 1;
+        ctx.scale(1, scaleY);
+        ctx.globalAlpha = opacity;
+
+        // 比例因子，用于归一化树的大小
+        const s = h / 100; 
+
+        // 树干
+        ctx.fillStyle = '#8D6E63';
+        ctx.fillRect(-8 * s, 0, 16 * s, -25 * s);
+
+        // 树叶 (三层三角形)
+        ctx.fillStyle = '#689F38'; // 还原截图的绿色
+        
+        const drawTriangle = (bottomY, w, t_h) => {
+            ctx.beginPath();
+            ctx.moveTo(0, bottomY - t_h);
+            ctx.lineTo(w / 2, bottomY);
+            ctx.lineTo(-w / 2, bottomY);
+            ctx.fill();
+        };
+
+        drawTriangle(-20 * s, 60 * s, 40 * s);
+        drawTriangle(-40 * s, 50 * s, 35 * s);
+        drawTriangle(-60 * s, 40 * s, 30 * s);
+
+        ctx.restore();
+    }
+
+    // 绘制透镜 (白色边框椭圆 + 半透明填充)
+    function drawLens(x, y, h) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        
+        ctx.beginPath();
+        // 绘制椭圆模拟透镜
+        ctx.ellipse(0, 0, 18, h/2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 光心点
+        ctx.beginPath();
+        ctx.fillStyle = '#FFA500';
+        ctx.arc(0, 0, 4, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.restore();
+    }
+
+    // 绘制焦点
+    function drawPoint(x, y, color, label) {
+        ctx.beginPath();
+        ctx.fillStyle = color;
+        ctx.arc(x, y, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (label) {
+            ctx.fillStyle = '#444';
+            ctx.font = 'italic 16px Times New Roman';
+            ctx.textAlign = 'center';
+            ctx.fillText(label, x, y - 15);
+        }
+    }
+
+    // 绘制光线逻辑
+    function drawLightRays(objX, centerY, objH, lensX, imgX, imgH, f, progress) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 4]);
+
+        const startX = objX;
+        const startY = centerY - objH; // 树顶
+        const endX = imgX;
+        const endY = centerY + imgH; // 像顶 (注意Y坐标向下为正，像倒立所以加)
+
+        // 1. 平行主轴光线 -> 折射过焦点
+        // 第一段：物体 -> 透镜
+        drawLineAnim(startX, startY, lensX, startY, progress, 0, 0.4);
+        // 第二段：透镜 -> 像点 (经过右焦点)
+        drawLineAnim(lensX, startY, endX, endY, progress, 0.4, 1.0);
+
+        // 2. 过光心光线 -> 传播方向不变
+        // 直接从物体顶点连到像顶点
+        drawLineAnim(startX, startY, endX, endY, progress, 0, 1.0);
+
+        ctx.restore();
+    }
+
+    // 动画线条辅助函数
+    function drawLineAnim(x1, y1, x2, y2, p, startP, endP) {
+        if (p < startP) return;
+        
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        
+        let currX, currY;
+        
+        if (p >= endP) {
+            currX = x2;
+            currY = y2;
+        } else {
+            // 归一化当前段进度
+            const percent = (p - startP) / (endP - startP);
+            currX = x1 + (x2 - x1) * percent;
+            currY = y1 + (y2 - y1) * percent;
+        }
+        
+        ctx.lineTo(currX, currY);
+        ctx.stroke();
+    }
+
+    // 首次渲染
+    resizeCanvas();
+
+</script>
+
+</body>
+</html>

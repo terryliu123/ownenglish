@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字教具：平行线被折线所截</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222; /* 深色背景 */
+            color: #eee;
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        .canvas-container {
+            position: relative;
+            margin: 20px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: default;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            background-color: #2a2a2a;
+            display: block;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            background: #333;
+            padding: 10px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        label, button {
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+        }
+        
+        button {
+            background-color: #009688;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #00796b; }
+
+        .info {
+            font-size: 14px;
+            color: #aaa;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .color-legend {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+    </style>
+</head>
+<body>
+
+    <h1>平行线被折线所截 (拐点模型)</h1>
+
+    <div class="controls">
+        <label>
+            <input type="checkbox" id="showAux" checked> 显示辅助线 (过拐点作平行线)
+        </label>
+        <label>
+            <input type="checkbox" id="showAngles" checked> 显示角度色块
+        </label>
+        <button onclick="resetPoints()">重置形状</button>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="mainCanvas" width="800" height="500"></canvas>
+    </div>
+
+    <div class="info">
+        拖动点 <b>A, B, C, D, E</b> 改变折线形状。<br>
+        观察相同颜色的角（内错角），体会角度是如何一层层传递的。
+    </div>
+
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const checkAux = document.getElementById('showAux');
+    const checkAngles = document.getElementById('showAngles');
+
+    // 颜色配置 (仿照截图)
+    const PALETTE = {
+        lines: '#fff',
+        parallelLines: '#76FF03', // 亮绿色
+        auxLines: '#aaa',
+        text: '#fff',
+        colors: [
+            '#2979FF', // 蓝 (A - C上)
+            '#FFD600', // 黄 (C下 - D上)
+            '#FF5252', // 红 (D下 - E上)
+            '#E040FB'  // 紫 (E下 - B)
+        ]
+    };
+
+    // 初始点位
+    let points = [];
+    
+    function initPoints() {
+        points = [
+            { x: 300, y: 100, label: 'A', type: 'fixed-y', limitY: 100 },
+            { x: 200, y: 200, label: 'C', type: 'free' },
+            { x: 500, y: 300, label: 'D', type: 'free' },
+            { x: 300, y: 400, label: 'E', type: 'free' },
+            { x: 250, y: 480, label: 'B', type: 'fixed-y', limitY: 480 } // 为了美观，让B在底部
+        ];
+        // 调整画布高度适配点B
+        if(canvas.height < 500) canvas.height = 500;
+        points[4].limitY = 450; 
+        points[0].limitY = 50;
+        points[0].y = 50;
+        points[4].y = 450;
+    }
+    initPoints();
+
+    let draggingPoint = null;
+
+    // 交互逻辑
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: evt.clientX - rect.left,
+            y: evt.clientY - rect.top
+        };
+    }
+
+    function dist(p1, p2) {
+        return Math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2);
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        const pos = getMousePos(e);
+        points.forEach(p => {
+            if (dist(pos, p) < 15) draggingPoint = p;
+        });
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        const pos = getMousePos(e);
+        
+        // 鼠标样式
+        let cursor = 'default';
+        points.forEach(p => { if(dist(pos, p) < 15) cursor = 'pointer'; });
+        canvas.style.cursor = cursor;
+
+        if (draggingPoint) {
+            // 移动限制
+            let newX = Math.max(20, Math.min(canvas.width - 20, pos.x));
+            let newY = Math.max(20, Math.min(canvas.height - 20, pos.y));
+
+            if (draggingPoint.type === 'fixed-y') {
+                draggingPoint.x = newX;
+            } else {
+                draggingPoint.x = newX;
+                draggingPoint.y = newY;
+            }
+            draw();
+        }
+    });
+
+    window.addEventListener('mouseup', () => { draggingPoint = null; });
+
+    // 绘图辅助函数：绘制扇形角
+    // center: 圆心, target: 指向的点, isTop: 是否是上方角(用于辅助线切割), color: 颜色
+    // isLeft: 指向左边的水平线还是右边的水平线
+    function drawAngle(center, target, color, isHorizontalLeft) {
+        const radius = 40;
+        const angleToTarget = Math.atan2(target.y - center.y, target.x - center.x);
+        const angleHorizontal = isHorizontalLeft ? Math.PI : 0;
+
+        ctx.beginPath();
+        ctx.moveTo(center.x, center.y);
+        // 绘制弧线，始终走劣弧
+        ctx.arc(center.x, center.y, radius, angleToTarget, angleHorizontal, isClockwise(angleToTarget, angleHorizontal));
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    // 判断画弧方向，确保画出锐角/钝角均可，但不画优弧（即画内角）
+    function isClockwise(start, end) {
+        // 简单的逻辑：比较角度差。在 -PI 到 PI 范围内处理
+        let diff = end - start;
+        while (diff <= -Math.PI) diff += 2*Math.PI;
+        while (diff > Math.PI) diff -= 2*Math.PI;
+        return diff < 0;
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制上下平行线 (绿色)
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = PALETTE.parallelLines;
+        
+        ctx.beginPath(); ctx.moveTo(0, points[0].y); ctx.lineTo(canvas.width, points[0].y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, points[4].y); ctx.lineTo(canvas.width, points[4].y); ctx.stroke();
+
+        // 2. 绘制辅助线 (白色虚线)
+        if (checkAux.checked) {
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = PALETTE.auxLines;
+            ctx.setLineDash([5, 5]);
+            for (let i = 1; i < points.length - 1; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, points[i].y);
+                ctx.lineTo(canvas.width, points[i].y);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+        }
+
+        // 3. 绘制角度色块 (核心逻辑)
+        if (checkAngles.checked) {
+            // 这里的逻辑是：每一段线段连接两个点，形成内错角对。
+            // 线段 A->C
+            // A处的角：水平线 与 AC 的夹角
+            // C处的角（上部分）：水平线 与 CA 的夹角
+            // 只有当C在A下方时，内错角才直观。我们假设正常的折线形态。
+            
+            // Pair 1: A 和 C上 (Blue)
+            // A点向右延伸还是向左？取决于C在A的哪一侧。内错角是Z字形。
+            // 如果C在A右侧，A的水平线向右，C的水平线向左。
+            // 简化判断：总是画内侧角。
+            
+            // 自动判断水平线方向：如果下一点X > 当前点X，则当前点水平线向右，下一点水平线向左。
+            
+            for (let i = 0; i < points.length - 1; i++) {
+                let p1 = points[i];
+                let p2 = points[i+1];
+                let color = PALETTE.colors[i % PALETTE.colors.length];
+                
+                let isP2RightOfP1 = p2.x > p1.x;
+                
+                // P1处的角 (如果是中间点，这是它的“下半部分”角，如果是起点，是唯一角)
+                // 如果是起点A(i=0)，它的水平线方向由C决定。如果C在右边，A水平线向右。
+                drawAngle(p1, p2, color, !isP2RightOfP1); 
+                
+                // P2处的角 (如果是中间点，这是它的“上半部分”角，如果是终点，是唯一角)
+                // 内错角原理，方向相反
+                drawAngle(p2, p1, color, isP2RightOfP1);
+            }
+        }
+
+        // 4. 绘制折线 (白色)
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = PALETTE.lines;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.stroke();
+
+        // 5. 绘制顶点和标签
+        points.forEach((p, index) => {
+            // 点
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 标签
+            ctx.fillStyle = '#fff';
+            ctx.font = "bold 18px Arial";
+            let textY = p.y - 15;
+            if (index === points.length -1) textY = p.y + 25; // B点文字在下
+            ctx.fillText(p.label, p.x - 5, textY);
+        });
+    }
+
+    checkAux.addEventListener('change', draw);
+    checkAngles.addEventListener('change', draw);
+
+    function resetPoints() {
+        initPoints();
+        draw();
+    }
+
+    draw();
+
+</script>
+</body>
+</html>

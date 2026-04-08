@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拱桥受力原理演示</title>
+    <style>
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #fcfdf5; /* 稍微暖一点的背景，配合古典石桥的感觉 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 { margin-bottom: 5px; color: #4e342e; }
+        .subtitle { font-size: 14px; color: #795548; margin-bottom: 20px; }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            width: 800px;
+            text-align: center;
+        }
+
+        canvas {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            /* 模拟天空背景 */
+            background: linear-gradient(to bottom, #e0f7fa 0%, #b2ebf2 100%);
+        }
+
+        .controls {
+            margin-top: 20px;
+            background: #fafafa;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        input[type=range] {
+            width: 300px;
+            height: 8px;
+            border-radius: 5px;
+            background: #bdbdbd;
+            outline: none;
+            accent-color: #d84315;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-top: 10px;
+            padding-top: 15px;
+            border-top: 1px dashed #ccc;
+        }
+
+        .dash-item {
+            background: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .dash-val { font-size: 18px; font-weight: bold; color: #d84315; }
+        .dash-label { font-size: 12px; color: #666; margin-top: 4px;}
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 5px; }
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        .explanation {
+            text-align: left;
+            background-color: #fff8e1;
+            border-left: 4px solid #ffc107;
+            padding: 10px 15px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #5d4037;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>拱桥 (Arch Bridge) 原理演示</h1>
+    <div class="subtitle">利用拱形结构将垂直压力转化为向外的推力</div>
+
+    <div class="container">
+        <canvas id="archCanvas" width="760" height="450"></canvas>
+
+        <div class="legend">
+            <div class="legend-item"><div class="dot" style="background:#d32f2f"></div>受力传递方向</div>
+            <div class="legend-item"><div class="dot" style="background:#1976d2"></div>桥台反作用力</div>
+        </div>
+
+        <div class="controls">
+            <div class="slider-group">
+                <span style="font-weight:bold;">桥面载重:</span>
+                <input type="range" id="loadSlider" min="0" max="100" value="0">
+                <span id="loadText" style="font-weight:bold; width:60px;">0 吨</span>
+            </div>
+
+            <div class="dashboard">
+                <div class="dash-item">
+                    <div class="dash-val" id="valVertical">0 kN</div>
+                    <div class="dash-label">垂直压力 (Vertical)</div>
+                </div>
+                <div class="dash-item" style="border: 2px solid #d84315; background-color: #fffbe6;">
+                    <div class="dash-val" id="valThrust">0 kN</div>
+                    <div class="dash-label">侧向推力 (Thrust) <br>★ 核心原理</div>
+                </div>
+                <div class="dash-item">
+                    <div class="dash-val" id="valComp">0 MPa</div>
+                    <div class="dash-label">拱圈挤压力 (Compression)</div>
+                </div>
+            </div>
+
+            <div class="explanation">
+                <strong>受力特点：</strong>
+                <ul style="margin: 5px 0 0 20px; padding:0;">
+                    <li>观察红色流线：重力没有让桥向下弯，而是顺着拱圈<strong>流向了两边</strong>。</li>
+                    <li>观察桥脚：产生了巨大的<strong>向外推力</strong>，所以拱桥需要非常坚固的桥基（桥台）来抵消这个推力，否则桥会“劈叉”倒塌。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('archCanvas');
+        const ctx = canvas.getContext('2d');
+        const slider = document.getElementById('loadSlider');
+        
+        // 物理/绘图参数
+        const cx = canvas.width / 2; // 中心X
+        const baseY = 350; // 拱脚高度
+        const archRadius = 200; // 半径
+        const archThick = 40; // 拱圈厚度
+        // 拱的角度范围 (PI到2PI是上半圆，我们取中间一段)
+        const startAngle = Math.PI + 0.4; 
+        const endAngle = 2 * Math.PI - 0.4;
+
+        // 计算拱顶高度 (用于放置车辆)
+        const topY = baseY + Math.sin(1.5 * Math.PI) * archRadius;
+
+        let load = 0;
+        let arrowOffset = 0; // 用于动画箭头流动
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function update() {
+            arrowOffset += 0.5; // 控制虚线/箭头流动速度
+            if (arrowOffset > 20) arrowOffset = 0;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawBackground();
+            drawArchStructure();
+            drawLoadAndForce();
+        }
+
+        function drawBackground() {
+            // 地面/桥台
+            ctx.fillStyle = '#5d4037'; // 土壤色
+            // 左岸
+            ctx.fillRect(0, baseY, cx - 150, canvas.height - baseY);
+            // 右岸
+            ctx.fillRect(cx + 150, baseY, canvas.width - (cx+150), canvas.height - baseY);
+            
+            // 水面
+            ctx.fillStyle = '#81d4fa';
+            ctx.fillRect(cx - 150, baseY + 20, 300, canvas.height - baseY);
+        }
+
+        function drawArchStructure() {
+            // 1. 绘制拱圈 (The Arch Ring)
+            // 随着压力增大，拱圈颜色微微变红，表示受压
+            const stressColor = `rgb(${150 + load}, ${150 - load}, 150)`; 
+            
+            ctx.beginPath();
+            ctx.arc(cx, baseY, archRadius, startAngle, endAngle); // 外弧
+            ctx.arc(cx, baseY, archRadius - archThick, endAngle, startAngle, true); // 内弧
+            ctx.closePath();
+            ctx.fillStyle = stressColor;
+            ctx.strokeStyle = '#4e342e';
+            ctx.lineWidth = 2;
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. 绘制拱上建筑 (桥面) - 简化为立柱和面板
+            const deckY = topY - 20; // 桥面高度
+            ctx.fillStyle = '#bcaaa4';
+            ctx.fillRect(cx - 220, deckY, 440, 20); // 桥面板
+
+            // 立柱 (Spandrel columns)
+            const colX = [cx - 120, cx - 60, cx + 60, cx + 120];
+            ctx.fillStyle = '#8d6e63';
+            colX.forEach(x => {
+                // 计算该x位置拱的上表面Y
+                // 简单几何近似，为了视觉效果直接画到大概位置
+                const heightAtX = Math.sqrt(Math.pow(archRadius, 2) - Math.pow(x - cx, 2));
+                const archTopY = baseY - heightAtX; 
+                
+                ctx.fillRect(x - 5, deckY + 20, 10, archTopY - (deckY + 20));
+            });
+            
+            // 3. 绘制石块纹理 (Voussoirs)
+            ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+            ctx.lineWidth = 1;
+            const steps = 12;
+            const span = endAngle - startAngle;
+            for(let i=0; i<=steps; i++) {
+                const ang = startAngle + (span/steps) * i;
+                const r1 = archRadius;
+                const r2 = archRadius - archThick;
+                ctx.beginPath();
+                ctx.moveTo(cx + Math.cos(ang)*r2, baseY + Math.sin(ang)*r2);
+                ctx.lineTo(cx + Math.cos(ang)*r1, baseY + Math.sin(ang)*r1);
+                ctx.stroke();
+            }
+        }
+
+        function drawLoadAndForce() {
+            if (load <= 0) return;
+
+            // 1. 绘制车 (Load)
+            const deckY = topY - 20;
+            drawTruck(cx, deckY);
+            
+            // 垂直重力箭头 G
+            drawArrow(cx, deckY + 20, cx, deckY + 20 + load + 20, '#d32f2f', 4, "G");
+
+            // 2. 绘制拱圈内的受力流线 (Force Flow)
+            // 从拱顶分流向两边
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(211, 47, 47, 0.6)'; // 红色半透明
+            ctx.lineWidth = 2 + (load / 20); // 线宽随压力变粗
+            ctx.setLineDash([10, 10]); // 虚线
+            ctx.lineDashOffset = -arrowOffset; // 动画效果
+
+            const midRadius = archRadius - archThick/2;
+            
+            // 左半边流线
+            ctx.arc(cx, baseY, midRadius, 1.5*Math.PI, startAngle, true);
+            ctx.stroke();
+            
+            // 右半边流线
+            ctx.beginPath();
+            ctx.arc(cx, baseY, midRadius, 1.5*Math.PI, endAngle, false);
+            ctx.stroke();
+            
+            ctx.setLineDash([]); // 重置虚线
+
+            // 3. 绘制桥脚的受力分解 (关键点!)
+            // 计算拱脚的位置
+            const leftFootX = cx + Math.cos(startAngle) * midRadius;
+            const leftFootY = baseY + Math.sin(startAngle) * midRadius;
+            const rightFootX = cx + Math.cos(endAngle) * midRadius;
+            const rightFootY = baseY + Math.sin(endAngle) * midRadius;
+
+            // 力的大小模拟
+            const forceMag = load * 0.8;
+            
+            // 绘制右侧受力
+            drawForceDecomposition(rightFootX, rightFootY, forceMag, 'right');
+            // 绘制左侧受力 (镜像)
+            drawForceDecomposition(leftFootX, leftFootY, forceMag, 'left');
+        }
+
+        function drawForceDecomposition(x, y, magnitude, side) {
+            const scale = 1.5;
+            const len = magnitude * scale + 10;
+            
+            // 1. 拱传递下来的压力 (斜向下的红箭头)
+            // 角度大约是切线方向
+            const angle = side === 'right' ? Math.PI/4 : 3*Math.PI/4; 
+            const endX = x + Math.cos(angle) * len;
+            const endY = y + Math.sin(angle) * len;
+            
+            drawArrow(x, y, endX, endY, '#d32f2f', 3);
+
+            // 2. 分解：垂直分力 (向下)
+            // ctx.strokeStyle = '#ef9a9a';
+            // ctx.setLineDash([2,2]);
+            // ctx.beginPath();
+            // ctx.moveTo(endX, endY);
+            // ctx.lineTo(endX, y); // 向上画回水平线
+            // ctx.stroke();
+
+            // 3. 分解：水平推力 (向外) - 核心展示点
+            // 从垂直投影点画回原点
+            // drawArrow(x, endY, endX, endY, '#ff5722', 4, "推力"); 
+            // 为了清晰，直接画在桥台上的反向受力
+            
+            // 4. 桥台反作用力 (蓝色) - 必须抵消推力
+            // 水平反作用力 (向内)
+            const reactLen = len * 0.7; // 水平分量
+            if (side === 'right') {
+                // 桥台给桥的水平力：向左
+                drawArrow(x + reactLen + 20, y, x, y, '#1976d2', 4, "反推力");
+                
+                // 标记推力 (红虚线向右)
+                drawDashedArrow(x, y + 5, x + reactLen, y + 5, '#d84315', "侧向推力");
+            } else {
+                // 桥台给桥的水平力：向右
+                drawArrow(x - reactLen - 20, y, x, y, '#1976d2', 4, "反推力");
+                
+                 // 标记推力 (红虚线向左)
+                 drawDashedArrow(x, y + 5, x - reactLen, y + 5, '#d84315', "侧向推力");
+            }
+        }
+
+        function drawArrow(x1, y1, x2, y2, color, width, label) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            // 箭头头部
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const headLen = 10;
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+
+            if (label) {
+                ctx.font = '14px Arial';
+                ctx.fillStyle = color;
+                ctx.fillText(label, x2 + 5, y2 + 15);
+            }
+        }
+
+        function drawDashedArrow(x1, y1, x2, y2, color, label) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 2]);
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+            
+            // 箭头头部 (实心)
+            ctx.setLineDash([]);
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const headLen = 8;
+            ctx.beginPath();
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+            
+            if (label) {
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, (x1+x2)/2, y1 + 20);
+            }
+            ctx.restore();
+        }
+
+        function drawTruck(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            // 车身
+            ctx.fillStyle = '#ef5350';
+            ctx.fillRect(-20, -30, 40, 20); 
+            ctx.fillStyle = '#333';
+            // 轮子
+            ctx.beginPath(); ctx.arc(-15, -10, 6, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(15, -10, 6, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        // 交互事件
+        slider.addEventListener('input', (e) => {
+            load = parseInt(e.target.value);
+            document.getElementById('loadText').innerText = load + " 吨";
+
+            // 更新仪表盘数值
+            // 简单模拟物理公式
+            const vForce = load * 10; // 垂直
+            const thrust = Math.round(vForce * 0.7); // 水平推力 (拱越扁推力越大，这里取固定比例演示)
+            const comp = (load * 0.5).toFixed(1); // 内部挤压力
+
+            document.getElementById('valVertical').innerText = vForce + " kN";
+            document.getElementById('valThrust').innerText = thrust + " kN";
+            document.getElementById('valComp').innerText = comp + " MPa";
+        });
+
+        // 启动动画
+        loop();
+
+    </script>
+</body>
+</html>

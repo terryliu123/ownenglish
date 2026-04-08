@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小学数学：长方形与正方形演示器</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --accent: #2196F3;
+            --square-color: #FF9800;
+            --bg-grid: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Comic Sans MS', 'Ma Shan Zheng', 'SimHei', sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #333;
+            text-shadow: 2px 2px 0px #fff;
+            margin-bottom: 20px;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        /* 演示区域 */
+        .canvas-area {
+            position: relative;
+            width: 500px;
+            height: 400px;
+            background-color: white;
+            border: 4px solid #333;
+            border-radius: 15px;
+            /* 绘制网格背景，每个格子代表 1cm */
+            background-image: 
+                linear-gradient(var(--bg-grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+            background-size: 40px 40px; /* 40px 代表 1个单位 */
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 图形样式 */
+        #shape {
+            background-color: rgba(33, 150, 243, 0.6);
+            border: 4px solid #1565C0;
+            box-sizing: border-box;
+            position: relative;
+            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            font-size: 1.2rem;
+        }
+
+        /* 正方形时的特殊样式 */
+        #shape.is-square {
+            background-color: rgba(255, 152, 0, 0.6);
+            border-color: #E65100;
+        }
+
+        /* 标注线 */
+        .label-width {
+            position: absolute;
+            top: -30px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            color: #333;
+            font-weight: bold;
+            text-shadow: none;
+        }
+        .label-height {
+            position: absolute;
+            left: -40px;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            color: #333;
+            font-weight: bold;
+            text-shadow: none;
+        }
+
+        /* 控制面板 */
+        .panel {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        label {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #555;
+        }
+
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            height: 10px;
+            border-radius: 5px;
+            background: #ddd;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* 数据展示区 */
+        .stats {
+            margin-top: 20px;
+        }
+        .stat-box {
+            background: #fff3e0;
+            border-left: 5px solid #ff9800;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .formula {
+            font-size: 0.9rem;
+            color: #777;
+            margin-top: 5px;
+        }
+        .result {
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .type-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            background: var(--accent);
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+        button#btn-square { background-color: var(--square-color); }
+
+    </style>
+</head>
+<body>
+
+    <h1>📐 长方形与正方形演示器</h1>
+
+    <div class="container">
+        <!-- 左侧演示区 -->
+        <div class="canvas-area">
+            <div id="shape">
+                <div class="label-width">长: <span id="disp-w">5</span> 厘米</div>
+                <div class="label-height">宽: <span id="disp-h">3</span> 厘米</div>
+                <span id="shape-name">长方形</span>
+            </div>
+            <!-- 右下角的网格说明 -->
+            <div style="position: absolute; bottom: 10px; right: 10px; font-size: 0.8rem; color: #999;">
+                1个格子 = 1平方厘米
+            </div>
+        </div>
+
+        <!-- 右侧控制区 -->
+        <div class="panel">
+            <div id="current-type" class="type-badge">当前形状：长方形</div>
+
+            <div class="control-group">
+                <label>📏 长 (Length): <span id="val-w" style="color:var(--accent)">5</span> cm</label>
+                <input type="range" id="input-w" min="1" max="10" value="5" step="1">
+            </div>
+
+            <div class="control-group">
+                <label>📏 宽 (Width): <span id="val-h" style="color:var(--accent)">3</span> cm</label>
+                <input type="range" id="input-h" min="1" max="8" value="3" step="1">
+            </div>
+
+            <button id="btn-square" onclick="makeSquare()">✨ 一键变正方形</button>
+
+            <div class="stats">
+                <div class="stat-box">
+                    <div>🏃 周长 (Perimeter)</div>
+                    <div class="formula" id="formula-p">公式：(长 + 宽) × 2</div>
+                    <div class="result"><span id="res-p">16</span> 厘米</div>
+                </div>
+                <div class="stat-box">
+                    <div>🔲 面积 (Area)</div>
+                    <div class="formula" id="formula-a">公式：长 × 宽</div>
+                    <div class="result"><span id="res-a">15</span> 平方厘米</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const shape = document.getElementById('shape');
+        const inputW = document.getElementById('input-w');
+        const inputH = document.getElementById('input-h');
+        
+        // 显示数值的元素
+        const valW = document.getElementById('val-w');
+        const valH = document.getElementById('val-h');
+        const dispW = document.getElementById('disp-w');
+        const dispH = document.getElementById('disp-h');
+        
+        // 结果元素
+        const typeBadge = document.getElementById('current-type');
+        const shapeName = document.getElementById('shape-name');
+        const formulaP = document.getElementById('formula-p');
+        const formulaA = document.getElementById('formula-a');
+        const resP = document.getElementById('res-p');
+        const resA = document.getElementById('res-a');
+
+        // 每个单位代表的像素值 (对应背景网格大小)
+        const UNIT_PX = 40; 
+
+        // 主更新函数
+        function update() {
+            let w = parseInt(inputW.value);
+            let h = parseInt(inputH.value);
+
+            // 1. 更新滑块旁边的数字
+            valW.innerText = w;
+            valH.innerText = h;
+            dispW.innerText = w;
+            dispH.innerText = h;
+
+            // 2. 更新图形尺寸
+            shape.style.width = (w * UNIT_PX) + 'px';
+            shape.style.height = (h * UNIT_PX) + 'px';
+
+            // 3. 计算周长和面积
+            let perimeter = (w + h) * 2;
+            let area = w * h;
+
+            resP.innerText = perimeter;
+            resA.innerText = area;
+
+            // 4. 更新公式显示
+            formulaP.innerText = `公式：(${w} + ${h}) × 2`;
+            formulaA.innerText = `公式：${w} × ${h}`;
+
+            // 5. 判断形状类型
+            if (w === h) {
+                // 正方形逻辑
+                shape.classList.add('is-square');
+                typeBadge.innerText = "当前形状：正方形";
+                typeBadge.style.background = "var(--square-color)";
+                shapeName.innerText = "正方形";
+                
+                // 正方形特殊公式提示
+                formulaP.innerText = `公式：边长 × 4 = ${w} × 4`;
+                formulaA.innerText = `公式：边长 × 边长 = ${w} × ${w}`;
+            } else {
+                // 长方形逻辑
+                shape.classList.remove('is-square');
+                typeBadge.innerText = "当前形状：长方形";
+                typeBadge.style.background = "var(--accent)";
+                shapeName.innerText = "长方形";
+            }
+        }
+
+        // 一键变正方形
+        function makeSquare() {
+            // 取当前长和宽的最大值，或者固定为长
+            let target = parseInt(inputW.value);
+            // 确保不超出滑块最大值
+            let maxVal = Math.min(parseInt(inputW.max), parseInt(inputH.max));
+            if (target > maxVal) target = maxVal;
+
+            inputH.value = target;
+            inputW.value = target;
+            update();
+        }
+
+        // 绑定事件
+        inputW.addEventListener('input', update);
+        inputH.addEventListener('input', update);
+
+        // 初始化
+        update();
+
+    </script>
+</body>
+</html>

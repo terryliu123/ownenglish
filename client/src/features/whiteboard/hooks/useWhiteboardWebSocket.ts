@@ -19,6 +19,7 @@ export function useWhiteboardWebSocket(classId: string | null) {
     if (!classId || !user) return
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    // Use Vite dev server proxy in development (port 5173)
     const host = window.location.host
     const wsUrl = `${protocol}//${host}/api/v1/live/ws?token=${localStorage.getItem('token')}&class_id=${classId}`
 

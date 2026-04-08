@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电流可视化探索</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        h1, h2, h3, h4 {
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 700;
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 8px rgba(96, 165, 250, 0.8);
+        }
+        
+        .glow-box {
+            box-shadow: 0 0 15px rgba(96, 165, 250, 0.5);
+        }
+        
+        .electron {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background-color: #60a5fa;
+            border-radius: 50%;
+            filter: drop-shadow(0 0 6px #3b82f6);
+            z-index: 10;
+        }
+        
+        .circuit-path {
+            stroke: #4b5563;
+            stroke-width: 3;
+            fill: none;
+        }
+        
+        .tab-active {
+            border-bottom: 3px solid #60a5fa;
+            color: #60a5fa;
+        }
+        
+        .conductor-3d {
+            width: 100%;
+            height: 400px;
+            background-color: rgba(30, 41, 59, 0.7);
+            border-radius: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .conductor-3d {
+                height: 300px;
+            }
+        }
+        
+        .step-card {
+            transition: all 0.3s ease;
+        }
+        
+        .step-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(96, 165, 250, 0.3);
+        }
+        
+        .current-flow {
+            stroke-dasharray: 10;
+            animation: dash 30s linear infinite;
+        }
+        
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 1000;
+            }
+        }
+        
+        .ac-current {
+            animation: ac-flow 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes ac-flow {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(20px);
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题区 -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold mb-4 glow-text">电流可视化探索</h1>
+            <p class="text-xl text-blue-200 max-w-3xl mx-auto">通过交互式动画理解电荷运动与电流形成的原理</p>
+        </header>
+        
+        <!-- 主内容区 -->
+        <main>
+            <!-- 导航标签 -->
+            <div class="flex justify-center mb-8 border-b border-gray-700">
+                <button class="tab-btn px-6 py-3 text-lg font-medium tab-active" data-tab="basic">基本原理</button>
+                <button class="tab-btn px-6 py-3 text-lg font-medium" data-tab="dc">直流电</button>
+                <button class="tab-btn px-6 py-3 text-lg font-medium" data-tab="ac">交流电</button>
+                <button class="tab-btn px-6 py-3 text-lg font-medium" data-tab="simulation">3D模拟</button>
+            </div>
+            
+            <!-- 标签内容区 -->
+            <div class="tab-content">
+                <!-- 基本原理标签 -->
+                <div id="basic" class="tab-pane active">
+                    <div class="grid md:grid-cols-2 gap-8 mb-12">
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">电荷与电场</h2>
+                            <p class="mb-4">物质由原子构成，原子包含带正电的质子和带负电的电子。当电子在导体中定向移动时，就形成了电流。</p>
+                            <p class="mb-6">电势差（电压）是驱动电子移动的动力源，就像水位差驱动水流一样。</p>
+                            
+                            <div class="relative h-64 bg-gray-900 rounded-lg overflow-hidden">
+                                <svg id="basic-circuit" class="w-full h-full">
+                                    <path class="circuit-path" d="M50,50 L250,50 L250,150 L50,150 Z" />
+                                    <circle id="battery-positive" cx="50" cy="50" r="15" fill="#ef4444" />
+                                    <circle id="battery-negative" cx="50" cy="150" r="15" fill="#3b82f6" />
+                                    <text x="50" y="45" text-anchor="middle" fill="white" font-size="12">+</text>
+                                    <text x="50" y="155" text-anchor="middle" fill="white" font-size="12">-</text>
+                                </svg>
+                                <div id="electron-container" class="absolute inset-0"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">闭合电路的必要性</h2>
+                            <p class="mb-4">电流只能在闭合回路中持续流动。如果电路断开，电荷无法形成循环，电流就会停止。</p>
+                            <p class="mb-6">开关的作用就是控制电路的通断，从而控制电器的运作。</p>
+                            
+                            <div class="relative h-64 bg-gray-900 rounded-lg overflow-hidden">
+                                <svg id="open-circuit" class="w-full h-full">
+                                    <path class="circuit-path" d="M50,50 L150,50 L150,100 M170,100 L250,100 L250,150 L50,150 Z" />
+                                    <rect x="150" y="50" width="20" height="50" fill="#64748b" />
+                                    <circle id="switch-knob" cx="160" cy="75" r="8" fill="#94a3b8" />
+                                    <circle id="battery-positive2" cx="50" cy="50" r="15" fill="#ef4444" />
+                                    <circle id="battery-negative2" cx="50" cy="150" r="15" fill="#3b82f6" />
+                                    <text x="50" y="45" text-anchor="middle" fill="white" font-size="12">+</text>
+                                    <text x="50" y="155" text-anchor="middle" fill="white" font-size="12">-</text>
+                                </svg>
+                                <div id="open-electron-container" class="absolute inset-0"></div>
+                            </div>
+                            <button id="toggle-switch" class="mt-4 px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">闭合开关</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="step-card bg-gray-800 rounded-xl p-6 glow-box">
+                            <div class="text-blue-400 text-3xl mb-4">1</div>
+                            <h3 class="text-xl font-bold mb-3">电势差</h3>
+                            <p>电源（如电池）两极之间存在电势差，正极电势高，负极电势低。</p>
+                        </div>
+                        
+                        <div class="step-card bg-gray-800 rounded-xl p-6 glow-box">
+                            <div class="text-blue-400 text-3xl mb-4">2</div>
+                            <h3 class="text-xl font-bold mb-3">电场形成</h3>
+                            <p>电势差在电路中建立电场，电场方向从正极指向负极。</p>
+                        </div>
+                        
+                        <div class="step-card bg-gray-800 rounded-xl p-6 glow-box">
+                            <div class="text-blue-400 text-3xl mb-4">3</div>
+                            <h3 class="text-xl font-bold mb-3">电子运动</h3>
+                            <p>自由电子受电场力作用，从低电势向高电势定向移动，形成电流。</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 直流电标签 -->
+                <div id="dc" class="tab-pane hidden">
+                    <div class="grid md:grid-cols-2 gap-8 mb-12">
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">直流电 (DC)</h2>
+                            <p class="mb-4">直流电是指方向和大小保持不变的电流。电池供电是典型的直流电。</p>
+                            <p class="mb-6">电子从负极(-)流向正极(+)，而传统电流方向则定义为从正极流向负极。</p>
+                            
+                            <div class="relative h-64 bg-gray-900 rounded-lg overflow-hidden">
+                                <svg id="dc-circuit" class="w-full h-full">
+                                    <path class="circuit-path current-flow" d="M50,100 L250,100" stroke="#60a5fa" />
+                                    <circle cx="50" cy="100" r="15" fill="#ef4444" />
+                                    <circle cx="250" cy="100" r="15" fill="#3b82f6" />
+                                    <text x="50" y="105" text-anchor="middle" fill="white" font-size="12">+</text>
+                                    <text x="250" y="105" text-anchor="middle" fill="white" font-size="12">-</text>
+                                    <text x="150" y="90" text-anchor="middle" fill="#60a5fa" font-size="14">电子流动方向</text>
+                                    <path d="M150,95 L140,85 M150,95 L160,85" stroke="#60a5fa" fill="none" />
+                                </svg>
+                                <div id="dc-electron-container" class="absolute inset-0"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">直流电特性</h2>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <i class="fas fa-bolt text-blue-400 mt-1 mr-3"></i>
+                                    <span>方向恒定不变</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-chart-line text-blue-400 mt-1 mr-3"></i>
+                                    <span>大小通常稳定（理想情况下）</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-battery-full text-blue-400 mt-1 mr-3"></i>
+                                    <span>适用于电池供电设备</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-microchip text-blue-400 mt-1 mr-3"></i>
+                                    <span>电子设备内部常用直流电</span>
+                                </li>
+                            </ul>
+                            
+                            <div class="mt-6 bg-gray-900 p-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span>电流强度</span>
+                                    <span id="dc-current-value">1.5A</span>
+                                </div>
+                                <input type="range" id="dc-current-slider" min="0.5" max="3" step="0.1" value="1.5" class="w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 交流电标签 -->
+                <div id="ac" class="tab-pane hidden">
+                    <div class="grid md:grid-cols-2 gap-8 mb-12">
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">交流电 (AC)</h2>
+                            <p class="mb-4">交流电是指方向和大小周期性变化的电流。家庭用电通常是50Hz或60Hz的交流电。</p>
+                            <p class="mb-6">电子在导线中来回振动，而不是单向流动，但能量却可以传输到远处。</p>
+                            
+                            <div class="relative h-64 bg-gray-900 rounded-lg overflow-hidden">
+                                <svg id="ac-circuit" class="w-full h-full">
+                                    <path class="circuit-path" d="M50,100 L250,100" />
+                                    <path id="ac-wave" d="M50,100 Q125,50 200,100 T350,100" stroke="#60a5fa" stroke-width="2" fill="none" />
+                                    <circle id="ac-electron" cx="50" cy="100" r="8" fill="#60a5fa" class="ac-current" />
+                                    <text x="150" y="80" text-anchor="middle" fill="#60a5fa" font-size="14">电子振动方向</text>
+                                    <path d="M150,85 L140,75 M150,85 L160,75" stroke="#60a5fa" fill="none" />
+                                </svg>
+                            </div>
+                            
+                            <div class="mt-4 bg-gray-900 p-4 rounded-lg">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span>频率 (Hz)</span>
+                                    <span id="ac-freq-value">50</span>
+                                </div>
+                                <input type="range" id="ac-freq-slider" min="10" max="100" step="1" value="50" class="w-full">
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">交流电特性</h2>
+                            <ul class="space-y-3">
+                                <li class="flex items-start">
+                                    <i class="fas fa-exchange-alt text-blue-400 mt-1 mr-3"></i>
+                                    <span>方向周期性变化</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-wave-square text-blue-400 mt-1 mr-3"></i>
+                                    <span>大小按正弦规律变化</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-home text-blue-400 mt-1 mr-3"></i>
+                                    <span>家庭和工业用电主要形式</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <i class="fas fa-transformer text-blue-400 mt-1 mr-3"></i>
+                                    <span>便于变压和远距离传输</span>
+                                </li>
+                            </ul>
+                            
+                            <div class="mt-6">
+                                <h3 class="text-lg font-semibold mb-3">交流电波形</h3>
+                                <canvas id="ac-waveform" class="w-full h-32 bg-gray-900 rounded"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 3D模拟标签 -->
+                <div id="simulation" class="tab-pane hidden">
+                    <div class="grid md:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                            <h2 class="text-2xl font-bold mb-4">导体内部电子运动</h2>
+                            <p class="mb-4">在金属导体中，大量自由电子在晶格间随机运动（热运动）。当施加电场时，电子获得定向移动分量。</p>
+                            <p>3D模型展示了导体内部电子的运动情况。</p>
+                            
+                            <div class="mt-6">
+                                <div class="flex space-x-4 mb-4">
+                                    <button id="show-random" class="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">随机运动</button>
+                                    <button id="show-current" class="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition">电流形成</button>
+                                </div>
+                                
+                                <div class="bg-gray-900 p-4 rounded-lg">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <span>电场强度</span>
+                                        <span id="field-strength-value">中等</span>
+                                    </div>
+                                    <input type="range" id="field-strength-slider" min="0" max="2" step="1" value="1" class="w-full">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="conductor-3d glow-box" id="conductor-3d-container">
+                            <!-- Three.js 3D模型将在这里渲染 -->
+                            <div class="flex items-center justify-center h-full">
+                                <p class="text-gray-400">加载3D模型中...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-800 rounded-xl p-6 glow-box">
+                        <h2 class="text-2xl font-bold mb-4">电流密度与漂移速度</h2>
+                        <p class="mb-4">虽然单个电子的漂移速度很慢（约0.1mm/s），但由于电子密度极高，整体电流可以很大。</p>
+                        
+                        <div class="grid md:grid-cols-3 gap-6 mt-6">
+                            <div class="bg-gray-900 p-4 rounded-lg">
+                                <div class="text-blue-400 text-xl mb-2">电子密度</div>
+                                <div class="text-3xl font-bold">~10²⁹/m³</div>
+                                <div class="text-sm text-gray-400 mt-1">铜导体中自由电子数</div>
+                            </div>
+                            
+                            <div class="bg-gray-900 p-4 rounded-lg">
+                                <div class="text-blue-400 text-xl mb-2">漂移速度</div>
+                                <div class="text-3xl font-bold">0.1mm/s</div>
+                                <div class="text-sm text-gray-400 mt-1">典型电流下的速度</div>
+                            </div>
+                            
+                            <div class="bg-gray-900 p-4 rounded-lg">
+                                <div class="text-blue-400 text-xl mb-2">电流速度</div>
+                                <div class="text-3xl font-bold">光速</div>
+                                <div class="text-sm text-gray-400 mt-1">电场传播速度</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 页脚 -->
+        <footer class="mt-16 text-center text-gray-500 text-sm">
+            <p>© 2023 电流可视化教学工具 | 设计用于物理教育</p>
+        </footer>
+    </div>
+
+    <!-- 引入必要的JS库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 标签切换功能
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const tabId = this.getAttribute('data-tab');
+                    
+                    // 更新活动标签样式
+                    tabBtns.forEach(b => b.classList.remove('tab-active'));
+                    this.classList.add('tab-active');
+                    
+                    // 显示对应内容
+                    tabPanes.forEach(pane => {
+                        pane.classList.add('hidden');
+                        pane.classList.remove('active');
+                    });
+                    
+                    const activePane = document.getElementById(tabId);
+                    activePane.classList.remove('hidden');
+                    activePane.classList.add('active');
+                    
+                    // 如果切换到3D标签，初始化3D场景
+                    if (tabId === 'simulation') {
+                        init3DScene();
+                    }
+                });
+            });
+            
+            // 基本电路电子动画
+            function createElectronAnimation(containerId, pathId, count = 10, speed = 5) {
+                const container = document.getElementById(containerId);
+                const path = document.querySelector(`#${pathId} .circuit-path`);
+                const pathLength = path.getTotalLength();
+                
+                // 清除现有电子
+                container.innerHTML = '';
+                
+                // 创建多个电子
+                for (let i = 0; i < count; i++) {
+                    const electron = document.createElement('div');
+                    electron.className = 'electron';
+                    container.appendChild(electron);
+                    
+                    // 随机起始位置
+                    const offset = (i / count) * pathLength;
+                    
+                    GSAP.to(electron, {
+                        motionPath: {
+                            path: path,
+                            align: path,
+                        },
+                        ease: "none",
+                        duration: speed,
+                        repeat: -1,
+                        startAt: { motionPath: { offset: offset / pathLength } }
+                    });
+                }
+            }
+            
+            // 初始化基本电路动画
+            createElectronAnimation('electron-container', 'basic-circuit');
+            
+            // 开关控制
+            const toggleSwitch = document.getElementById('toggle-switch');
+            let switchClosed = false;
+            
+            toggleSwitch.addEventListener('click', function() {
+                switchClosed = !switchClosed;
+                
+                if (switchClosed) {
+                    this.textContent = '断开开关';
+                    document.querySelector('#open-circuit .circuit-path').setAttribute('d', 'M50,50 L250,50 L250,150 L50,150 Z');
+                    createElectronAnimation('open-electron-container', 'open-circuit');
+                    
+                    // 移动开关旋钮
+                    GSAP.to('#switch-knob', {
+                        cy: 125,
+                        duration: 0.3
+                    });
+                } else {
+                    this.textContent = '闭合开关';
+                    document.querySelector('#open-circuit .circuit-path').setAttribute('d', 'M50,50 L150,50 L150,100 M170,100 L250,100 L250,150 L50,150 Z');
+                    document.getElementById('open-electron-container').innerHTML = '';
+                    
+                    // 移动开关旋钮
+                    GSAP.to('#switch-knob', {
+                        cy: 75,
+                        duration: 0.3
+                    });
+                }
+            });
+            
+            // 直流电控制
+            const dcCurrentSlider = document.getElementById('dc-current-slider');
+            const dcCurrentValue = document.getElementById('dc-current-value');
+            
+            dcCurrentSlider.addEventListener('input', function() {
+                const value = parseFloat(this.value);
+                dcCurrentValue.textContent = `${value.toFixed(1)}A`;
+                
+                // 更新电子速度
+                const speed = 10 - (value * 2);
+                createElectronAnimation('dc-electron-container', 'dc-circuit', 15, speed);
+            });
+            
+            // 初始化直流电动画
+            createElectronAnimation('dc-electron-container', 'dc-circuit', 15, 7);
+            
+            // 交流电控制
+            const acFreqSlider = document.getElementById('ac-freq-slider');
+            const acFreqValue = document.getElementById('ac-freq-value');
+            
+            acFreqSlider.addEventListener('input', function() {
+                const freq = parseInt(this.value);
+                acFreqValue.textContent = freq;
+                
+                // 更新电子动画速度
+                GSAP.killTweensOf('.ac-current');
+                GSAP.to('.ac-current', {
+                    x: 200,
+                    duration: 1 / (freq / 50),
+                    repeat: -1,
+                    yoyo: true,
+                    ease: "sine.inOut"
+                });
+                
+                // 更新波形
+                drawACWaveform(freq);
+            });
+            
+            // 绘制交流电波形
+            function drawACWaveform(freq) {
+                const canvas = document.getElementById('ac-waveform');
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width = canvas.offsetWidth;
+                const height = canvas.height = canvas.offsetHeight;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.strokeStyle = '#60a5fa';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                
+                const amplitude = height / 3;
+                const centerY = height / 2;
+                const cycles = 2;
+                const points = 100;
+                
+                for (let i = 0; i <= points; i++) {
+                    const x = (i / points) * width;
+                    const radians = (i / points) * Math.PI * 2 * cycles;
+                    const y = centerY - Math.sin(radians * (freq / 50)) * amplitude;
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+            }
+            
+            // 初始化交流电动画和波形
+            GSAP.to('.ac-current', {
+                x: 200,
+                duration: 1,
+                repeat: -1,
+                yoyo: true,
+                ease: "sine.inOut"
+            });
+            
+            drawACWaveform(50);
+            
+            // 3D场景初始化
+            function init3DScene() {
+                const container = document.getElementById('conductor-3d-container');
+                if (container.querySelector('canvas')) return; // 避免重复初始化
+                
+                // 创建场景
+                const scene = new THREE.Scene();
+                scene.background = new THREE.Color(0x1e293b);
+                
+                // 创建相机
+                const camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
+                camera.position.z = 30;
+                camera.position.y = 15;
+                camera.lookAt(0, 0, 0);
+                
+                // 创建渲染器
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(container.offsetWidth, container.offsetHeight);
+                container.innerHTML = '';
+                container.appendChild(renderer.domElement);
+                
+                // 添加光源
+                const ambientLight = new THREE.AmbientLight(0x404040);
+                scene.add(ambientLight);
+                
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(1, 1, 1);
+                scene.add(directionalLight);
+                
+                // 创建导体晶格
+                const latticeGeometry = new THREE.BoxGeometry(20, 20, 20);
+                const latticeMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0x4b5563,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                const lattice = new THREE.Mesh(latticeGeometry, latticeMaterial);
+                scene.add(lattice);
+                
+                // 创建电子
+                const electrons = [];
+                const electronGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+                const electronMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0x60a5fa,
+                    emissive: 0x3b82f6,
+                    emissiveIntensity: 0.5
+                });
+                
+                // 创建随机运动的电子
+                for (let i = 0; i < 50; i++) {
+                    const electron = new THREE.Mesh(electronGeometry, electronMaterial);
+                    
+                    // 随机位置
+                    electron.position.x = (Math.random() - 0.5) * 15;
+                    electron.position.y = (Math.random() - 0.5) * 15;
+                    electron.position.z = (Math.random() - 0.5) * 15;
+                    
+                    // 随机速度
+                    electron.userData = {
+                        velocity: new THREE.Vector3(
+                            (Math.random() - 0.5) * 0.2,
+                            (Math.random() - 0.5) * 0.2,
+                            (Math.random() - 0.5) * 0.2
+                        )
+                    };
+                    
+                    scene.add(electron);
+                    electrons.push(electron);
+                }
+                
+                // 动画循环
+                function animate() {
+                    requestAnimationFrame(animate);
+                    
+                    // 更新电子位置
+                    electrons.forEach(electron => {
+                        // 随机运动
+                        electron.position.add(electron.userData.velocity);
+                        
+                        // 边界检查
+                        if (electron.position.x > 10 || electron.position.x < -10) {
+                            electron.userData.velocity.x *= -1;
+                        }
+                        if (electron.position.y > 10 || electron.position.y < -10) {
+                            electron.userData.velocity.y *= -1;
+                        }
+                        if (electron.position.z > 10 || electron.position.z < -10) {
+                            electron.userData.velocity.z *= -1;
+                        }
+                        
+                        // 如果有电场，添加定向分量
+                        if (window.currentFieldStrength > 0) {
+                            electron.position.x += 0.05 * window.currentFieldStrength;
+                            
+                            // 如果超出边界，从另一侧出现
+                            if (electron.position.x > 10) {
+                                electron.position.x = -10;
+                            }
+                        }
+                    });
+                    
+                    renderer.render(scene, camera);
+                }
+                
+                animate();
+                
+                // 窗口大小调整
+                window.addEventListener('resize', function() {
+                    camera.aspect = container.offsetWidth / container.offsetHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(container.offsetWidth, container.offsetHeight);
+                });
+                
+                // 初始电场强度
+                window.currentFieldStrength = 0;
+                
+                // 控制按钮
+                document.getElementById('show-random').addEventListener('click', function() {
+                    window.currentFieldStrength = 0;
+                });
+                
+                document.getElementById('show-current').addEventListener('click', function() {
+                    window.currentFieldStrength = 1;
+                });
+                
+                // 电场强度滑块
+                const fieldStrengthSlider = document.getElementById('field-strength-slider');
+                const fieldStrengthValue = document.getElementById('field-strength-value');
+                
+                fieldStrengthSlider.addEventListener('input', function() {
+                    const value = parseInt(this.value);
+                    window.currentFieldStrength = value;
+                    
+                    const labels = ['无', '中等', '强'];
+                    fieldStrengthValue.textContent = labels[value];
+                });
+            }
+        });
+    </script>
+</body>
+</html>

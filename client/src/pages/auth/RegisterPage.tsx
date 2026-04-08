@@ -82,21 +82,21 @@ export default function RegisterPage() {
 
   const inputStyle = {
     width: '100%',
-    padding: '12px 16px',
-    borderRadius: '12px',
+    padding: '8px 12px',
+    borderRadius: '10px',
     border: '1px solid rgba(24, 36, 58, 0.1)',
     background: 'rgba(255, 255, 255, 0.8)',
-    fontSize: '0.9375rem',
+    fontSize: '0.875rem',
     outline: 'none',
     transition: 'border-color 200ms, box-shadow 200ms',
   } as React.CSSProperties
 
   const labelStyle = {
     display: 'block',
-    fontSize: '0.8125rem',
+    fontSize: '0.75rem',
     fontWeight: 500,
     color: 'var(--muted)',
-    marginBottom: '6px',
+    marginBottom: '4px',
   }
 
   const inputFocus = (e: React.FocusEvent<HTMLInputElement>) => {
@@ -110,32 +110,32 @@ export default function RegisterPage() {
   }
 
   return (
-    <div style={{ minHeight: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-      <div className="surface-card" style={{ width: '100%', maxWidth: '400px', padding: '40px 32px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '28px' }}>
-          <img src="/logo.png" alt="胖鼠互动课堂系统" style={{ width: 64, height: 64, borderRadius: 16, margin: '0 auto 16px', display: 'block' }} />
-          <h1 style={{ fontSize: '1.375rem', fontWeight: 700, marginBottom: '4px', color: 'var(--ink)', fontFamily: 'Noto Sans SC, sans-serif', letterSpacing: '-0.01em' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px', overflow: 'auto' }}>
+      <div className="surface-card" style={{ width: '100%', maxWidth: '380px', padding: '24px 20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <img src="/logo.png" alt="胖鼠互动课堂系统" style={{ width: 48, height: 48, borderRadius: 12, margin: '0 auto 10px', display: 'block' }} />
+          <h1 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '2px', color: 'var(--ink)', fontFamily: 'Noto Sans SC, sans-serif', letterSpacing: '-0.01em' }}>
             胖鼠互动课堂系统
           </h1>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--muted)' }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
             {t('auth.registerSubtitle')}
           </p>
         </div>
 
         {error && (
-          <div style={{ background: 'rgba(220, 68, 68, 0.08)', border: '1px solid rgba(220, 68, 68, 0.2)', color: 'var(--danger)', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.875rem' }}>
+          <div style={{ background: 'rgba(220, 68, 68, 0.08)', border: '1px solid rgba(220, 68, 68, 0.2)', color: 'var(--danger)', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px', fontSize: '0.8125rem' }}>
             {error}
           </div>
         )}
 
         {success && (
-          <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)', color: '#15803d', padding: '12px 16px', borderRadius: '12px', marginBottom: '20px', fontSize: '0.875rem' }}>
+          <div style={{ background: 'rgba(34, 197, 94, 0.08)', border: '1px solid rgba(34, 197, 94, 0.2)', color: '#15803d', padding: '8px 12px', borderRadius: '10px', marginBottom: '12px', fontSize: '0.8125rem' }}>
             {success}
           </div>
         )}
 
         {step === 'form' ? (
-          <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={(e) => { e.preventDefault(); handleSendCode(); }} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div>
               <label style={labelStyle}>{t('form.name')}</label>
               <input
@@ -162,6 +162,7 @@ export default function RegisterPage() {
                 onFocus={inputFocus}
                 onBlur={inputBlur}
               />
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '4px' }}>推荐使用 QQ 邮箱，便于接收验证码</p>
             </div>
 
             <div>
@@ -212,14 +213,14 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label style={{ ...labelStyle, marginBottom: '10px' }}>{t('form.roleLabel')}</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <label style={{ ...labelStyle, marginBottom: '6px' }}>{t('form.roleLabel')}</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, role: 'teacher' })}
                   style={{
-                    padding: '12px',
-                    borderRadius: '12px',
+                    padding: '8px',
+                    borderRadius: '10px',
                     border: `1px solid ${formData.role === 'teacher' ? 'var(--navy)' : 'rgba(24, 36, 58, 0.1)'}`,
                     background: formData.role === 'teacher' ? 'var(--navy)' : 'rgba(255, 255, 255, 0.8)',
                     color: formData.role === 'teacher' ? '#fff' : 'var(--muted)',
@@ -234,8 +235,8 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => setFormData({ ...formData, role: 'student' })}
                   style={{
-                    padding: '12px',
-                    borderRadius: '12px',
+                    padding: '8px',
+                    borderRadius: '10px',
                     border: `1px solid ${formData.role === 'student' ? 'var(--navy)' : 'rgba(24, 36, 58, 0.1)'}`,
                     background: formData.role === 'student' ? 'var(--navy)' : 'rgba(255, 255, 255, 0.8)',
                     color: formData.role === 'student' ? '#fff' : 'var(--muted)',
@@ -253,18 +254,18 @@ export default function RegisterPage() {
               type="submit"
               disabled={loading}
               className="solid-button wide-button"
-              style={{ marginTop: '8px' }}
+              style={{ marginTop: '4px' }}
             >
               {loading ? t('form.registering') : t('auth.sendVerifyCode')}
             </button>
           </form>
         ) : (
-          <form onSubmit={handleVerifyAndRegister} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div className="text-center mb-2">
-              <p style={{ fontSize: '0.875rem', color: 'var(--muted)', marginBottom: '8px' }}>
+          <form onSubmit={handleVerifyAndRegister} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="text-center mb-1">
+              <p style={{ fontSize: '0.8125rem', color: 'var(--muted)', marginBottom: '4px' }}>
                 {t('auth.verifyCodeSent')}
               </p>
-              <p style={{ fontSize: '0.8125rem', color: 'var(--muted)' }}>{formData.email}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{formData.email}</p>
             </div>
 
             <div>
@@ -273,7 +274,7 @@ export default function RegisterPage() {
                 type="text"
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                style={{ ...inputStyle, textAlign: 'center', fontSize: '1.5rem', letterSpacing: '8px', fontFamily: 'monospace' }}
+                style={{ ...inputStyle, textAlign: 'center', fontSize: '1.25rem', letterSpacing: '6px', fontFamily: 'monospace' }}
                 placeholder={t('auth.verifyCodePlaceholder')}
                 maxLength={6}
                 required
@@ -291,7 +292,7 @@ export default function RegisterPage() {
               {loading ? t('form.registering') : t('auth.register')}
             </button>
 
-            <div style={{ textAlign: 'center', fontSize: '0.8125rem' }}>
+            <div style={{ textAlign: 'center', fontSize: '0.75rem' }}>
               {countdown > 0 ? (
                 <span style={{ color: 'var(--muted)' }}>
                   {t('auth.resendCountdown', { count: String(countdown) })}
@@ -300,7 +301,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={handleResendCode}
-                  style={{ background: 'none', border: 'none', color: 'var(--navy)', cursor: 'pointer', fontSize: '0.8125rem', textDecoration: 'underline' }}
+                  style={{ background: 'none', border: 'none', color: 'var(--navy)', cursor: 'pointer', fontSize: '0.75rem', textDecoration: 'underline' }}
                 >
                   {t('auth.resendCode')}
                 </button>
@@ -310,14 +311,14 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={() => { setStep('form'); setCode(''); setSuccess(''); setError(''); }}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.8125rem' }}
+              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '0.75rem' }}
             >
               ← {t('common.back')}
             </button>
           </form>
         )}
 
-        <p style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.875rem', color: 'var(--muted)' }}>
+        <p style={{ marginTop: '16px', textAlign: 'center', fontSize: '0.8125rem', color: 'var(--muted)' }}>
           {t('auth.haveAccount')}{' '}
           <a href="/login" style={{ color: 'var(--navy)', fontWeight: 600 }}>
             {t('auth.loginNow')}

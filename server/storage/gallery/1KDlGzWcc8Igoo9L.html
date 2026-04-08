@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斜抛中的能量转化交互演示</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Microsoft YaHei', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f2f5;
+        }
+
+        .container {
+            position: relative;
+            width: 900px;
+            height: 550px;
+            background: linear-gradient(to bottom, #b0e0e6 0%, #b0e0e6 70%, #4caf50 70%, #4caf50 100%);
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 画布区域 */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 能量图表区域 */
+        .chart-container {
+            position: absolute;
+            top: 50px;
+            right: 50px;
+            width: 180px;
+            height: 220px;
+            background-color: rgba(255, 255, 255, 0.8);
+            border-radius: 10px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .chart-title {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .bars-wrapper {
+            display: flex;
+            justify-content: space-around;
+            align-items: flex-end;
+            height: 160px; /* 柱状图活动高度 */
+            border-bottom: 2px solid #666;
+            position: relative;
+        }
+        
+        /* Y轴箭头 */
+        .bars-wrapper::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -2px;
+            border-left: 2px solid #666;
+            height: 175px;
+        }
+        .bars-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: -6px;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-bottom: 8px solid #666;
+        }
+
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 30%;
+            height: 100%;
+            justify-content: flex-end;
+        }
+
+        .bar {
+            width: 100%;
+            transition: height 0.1s linear;
+            border-radius: 3px 3px 0 0;
+        }
+
+        .bar-label {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #555;
+            text-align: center;
+        }
+
+        /* 颜色定义 */
+        .bg-kinetic { background-color: #2196f3; } /* 动能 - 蓝 */
+        .bg-potential { background-color: #4caf50; } /* 势能 - 绿 */
+        .bg-total { background-color: #ff9800; } /* 机械能 - 橙 */
+
+        /* 控制面板 */
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 30px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type=range] {
+            cursor: pointer;
+        }
+
+        button {
+            padding: 8px 20px;
+            background-color: #e91e63;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #c2185b;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 游戏画面 -->
+    <canvas id="simCanvas" width="900" height="550"></canvas>
+
+    <!-- 能量图表 -->
+    <div class="chart-container">
+        <div class="chart-title">能量转化柱状图</div>
+        <div class="bars-wrapper">
+            <div class="bar-group">
+                <div class="bar bg-kinetic" id="barEk" style="height: 0%;"></div>
+                <div class="bar-label">动能</div>
+            </div>
+            <div class="bar-group">
+                <div class="bar bg-potential" id="barEp" style="height: 0%;"></div>
+                <div class="bar-label">重力势能</div>
+            </div>
+            <div class="bar-group">
+                <div class="bar bg-total" id="barEtotal" style="height: 0%;"></div>
+                <div class="bar-label">机械能</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 控制条 -->
+    <div class="controls">
+        <div class="control-group">
+            <label for="angle">角度:</label>
+            <input type="range" id="angle" min="10" max="85" value="45">
+            <span id="angleVal">45°</span>
+        </div>
+        <div class="control-group">
+            <label for="speed">力度:</label>
+            <input type="range" id="speed" min="30" max="90" value="60">
+        </div>
+        <button id="btnLaunch">发射</button>
+        <button id="btnReset" style="background-color:#555;">重置</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // UI 元素
+    const angleInput = document.getElementById('angle');
+    const speedInput = document.getElementById('speed');
+    const angleVal = document.getElementById('angleVal');
+    const btnLaunch = document.getElementById('btnLaunch');
+    const btnReset = document.getElementById('btnReset');
+    
+    const barEk = document.getElementById('barEk');
+    const barEp = document.getElementById('barEp');
+    const barEtotal = document.getElementById('barEtotal');
+
+    // 物理参数
+    const g = 0.2; // 重力加速度 (为了动画效果调整过的数值)
+    const groundY = 385; // 地面高度 (Y坐标)
+    const startX = 100; // 发射点X
+    const startY = groundY; // 发射点Y
+
+    // 状态变量
+    let isFlying = false;
+    let ball = { x: startX, y: startY, vx: 0, vy: 0, r: 10 };
+    let trail = []; // 轨迹数组
+    let animationId;
+    
+    // 初始总能量 (用于归一化柱状图高度)
+    let initialTotalEnergy = 0;
+
+    // 初始化
+    function init() {
+        drawScene();
+        updateEnergyBars(0, 0, 0); // 初始状态能量为0
+    }
+
+    // 监听滑块变化
+    angleInput.addEventListener('input', () => {
+        angleVal.textContent = angleInput.value + '°';
+        if (!isFlying) drawScene();
+    });
+
+    speedInput.addEventListener('input', () => {
+        if (!isFlying) drawScene();
+    });
+
+    // 监听按钮
+    btnLaunch.addEventListener('click', launch);
+    btnReset.addEventListener('click', reset);
+
+    function reset() {
+        cancelAnimationFrame(animationId);
+        isFlying = false;
+        ball.x = startX;
+        ball.y = startY;
+        trail = [];
+        btnLaunch.disabled = false;
+        drawScene();
+        updateEnergyBars(0, 0, 0);
+    }
+
+    function launch() {
+        if (isFlying) return;
+        
+        const angle = parseInt(angleInput.value) * Math.PI / 180;
+        const speed = parseInt(speedInput.value) * 0.3; // 速度系数
+
+        ball.x = startX;
+        ball.y = startY;
+        ball.vx = speed * Math.cos(angle);
+        ball.vy = -speed * Math.sin(angle); // Canvas Y轴向下，所以向上运动是负值
+        
+        isFlying = true;
+        btnLaunch.disabled = true;
+        trail = [];
+        trail.push({x: ball.x, y: ball.y});
+
+        // 计算初始总能量 (E = 1/2 * m * v^2)，设 m=1
+        // 初始势能为0 (以地面为0势能面)
+        const vSq = ball.vx * ball.vx + ball.vy * ball.vy;
+        initialTotalEnergy = 0.5 * vSq;
+
+        loop();
+    }
+
+    function loop() {
+        if (!isFlying) return;
+
+        // 更新物理
+        ball.vy += g;
+        ball.x += ball.vx;
+        ball.y += ball.vy;
+
+        // 记录轨迹 (每隔几帧记录一次，或者每次都记录)
+        trail.push({x: ball.x, y: ball.y});
+
+        // 能量计算
+        // 1. 动能 Ek = 1/2 * v^2
+        const vSq = ball.vx * ball.vx + ball.vy * ball.vy;
+        const Ek = 0.5 * vSq;
+
+        // 2. 势能 Ep = mgh (h = groundY - ball.y)
+        // 注意：我们需要按比例换算，确保 Ep + Ek = Total
+        // 在物理模拟中，Ep = g * h。
+        // 因为我们用了模拟的g和像素高度，直接计算即可。
+        const height = groundY - ball.y;
+        const Ep = g * height; 
+
+        // 更新柱状图
+        // 为了防止微小的浮点数误差导致总能量看起来在变，我们用初始总能量作为基准
+        updateEnergyBars(Ek, Ep, initialTotalEnergy);
+
+        // 碰撞检测
+        if (ball.y >= groundY) {
+            ball.y = groundY;
+            isFlying = false;
+            btnLaunch.disabled = false;
+            // 落地瞬间
+            updateEnergyBars(initialTotalEnergy, 0, initialTotalEnergy);
+            drawScene();
+            return; // 停止动画
+        }
+
+        drawScene();
+        animationId = requestAnimationFrame(loop);
+    }
+
+    function updateEnergyBars(Ek, Ep, Etotal) {
+        // 计算百分比
+        // 注意：Etotal 可能微小波动，显示时最好固定最大高度
+        if (Etotal <= 0) {
+            barEk.style.height = '0%';
+            barEp.style.height = '0%';
+            barEtotal.style.height = '0%';
+            return;
+        }
+
+        // 机械能守恒修正（消除计算误差，让视觉效果更完美）
+        // 实际上总能量 Etotal 应该保持不变（除了落地后损耗）
+        const displayTotal = initialTotalEnergy > 0 ? initialTotalEnergy : Etotal;
+        
+        const pctEk = Math.min(100, (Ek / displayTotal) * 100);
+        const pctEp = Math.min(100, (Ep / displayTotal) * 100);
+        
+        barEk.style.height = pctEk + '%';
+        barEp.style.height = pctEp + '%';
+        barEtotal.style.height = '100%'; // 机械能守恒，始终满格（相对于初始能量）
+    }
+
+    function drawScene() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制大炮
+        drawCannon();
+
+        // 2. 绘制轨迹
+        if (trail.length > 0) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#2196f3';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]); // 虚线
+            ctx.moveTo(trail[0].x, trail[0].y);
+            for (let i = 1; i < trail.length; i++) {
+                ctx.lineTo(trail[i].x, trail[i].y);
+            }
+            ctx.stroke();
+            ctx.setLineDash([]); // 重置实线
+        }
+
+        // 3. 绘制炮弹
+        // 只有在飞行中或者未发射状态下在炮口处才绘制
+        let drawBallX = ball.x;
+        let drawBallY = ball.y;
+
+        if (!isFlying) {
+            // 如果没飞，炮弹在炮筒底部
+            // 这里简单处理，让它看起来像是在准备发射的位置
+            const angle = parseInt(angleInput.value) * Math.PI / 180;
+            // 稍微调整初始位置让其看起来在炮口
+            // 实际物理计算从 startX, startY 开始，视觉上可以稍微偏移一点配合大炮图形
+        }
+
+        ctx.beginPath();
+        ctx.arc(drawBallX, drawBallY, ball.r, 0, Math.PI * 2);
+        ctx.fillStyle = '#03a9f4'; // 亮蓝色
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // 绘制地面参考线 (虚线)
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.setLineDash([10, 5]);
+        ctx.moveTo(0, groundY);
+        ctx.lineTo(canvas.width, groundY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    function drawCannon() {
+        const angle = parseInt(angleInput.value) * Math.PI / 180;
+        
+        ctx.save();
+        ctx.translate(startX, startY); // 移动原点到发射点
+        
+        // 绘制底座 (半圆)
+        ctx.beginPath();
+        ctx.arc(0, 10, 25, Math.PI, 0); 
+        ctx.fillStyle = '#d81b60';
+        ctx.fill();
+        ctx.strokeStyle = '#880e4f';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 旋转炮管
+        ctx.rotate(-angle); // 逆时针旋转
+
+        // 炮管
+        ctx.fillStyle = '#ad1457';
+        // 炮管矩形
+        ctx.fillRect(0, -15, 60, 30);
+        // 炮口装饰
+        ctx.fillStyle = '#880e4f';
+        ctx.fillRect(55, -18, 10, 36);
+
+        ctx.restore();
+    }
+
+    // 启动初始画面
+    init();
+
+</script>
+
+</body>
+</html>

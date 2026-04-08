@@ -10,6 +10,9 @@ interface ClassSelectorProps {
   onRefresh: () => void
   t: (key: string) => string
   onSwitchToWhiteboard?: () => void
+  // Danmu props
+  danmuEnabled?: boolean
+  onToggleDanmu?: () => void
 }
 
 export const ClassSelector: React.FC<ClassSelectorProps> = ({
@@ -22,6 +25,8 @@ export const ClassSelector: React.FC<ClassSelectorProps> = ({
   onRefresh,
   t,
   onSwitchToWhiteboard,
+  danmuEnabled,
+  onToggleDanmu,
 }) => {
   const getCurrentClassName = () => {
     const cls = classes.find((c) => c.id === currentClassId)
@@ -154,6 +159,18 @@ export const ClassSelector: React.FC<ClassSelectorProps> = ({
               >
                 <span>🎨</span>
                 <span>白板模式</span>
+              </button>
+            )}
+
+            {/* Danmu / Atmosphere */}
+            {onToggleDanmu && (
+              <button
+                onClick={onToggleDanmu}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors hover:bg-white/20"
+                style={{ background: danmuEnabled ? 'rgba(236,72,153,0.4)' : 'rgba(255,255,255,0.15)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
+              >
+                <span>🎆</span>
+                <span>氛围{danmuEnabled ? '●' : '○'}</span>
               </button>
             )}
           </div>

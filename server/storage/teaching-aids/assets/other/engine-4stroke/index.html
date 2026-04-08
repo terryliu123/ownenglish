@@ -1,0 +1,246 @@
+<meta charset="UTF-8">
+<svg width="600" height="500" viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- 定义金属渐变 -->
+    <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#999;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#fff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#999;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- 燃烧渐变 -->
+    <radialGradient id="fire" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#ffeb3b;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#ff9800;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f44336;stop-opacity:1" />
+    </radialGradient>
+
+    <!-- 遮罩，用于限制气体显示范围 -->
+    <clipPath id="cylinderClip">
+      <rect x="120" y="100" width="160" height="200" />
+    </clipPath>
+  </defs>
+
+  <style>
+    /* 定义动画周期：总时长 8秒 (每冲程 2秒) */
+    :root {
+      --cycle-duration: 8s;
+    }
+
+    /* 1. 曲轴旋转 (2圈 = 720度) */
+    .crankshaft {
+      transform-origin: 200px 400px;
+      animation: rotateCrank var(--cycle-duration) linear infinite;
+    }
+    @keyframes rotateCrank {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(720deg); }
+    }
+
+    /* 2. 活塞运动 (上下往复) */
+    .piston-group {
+      animation: movePiston var(--cycle-duration) linear infinite;
+    }
+    @keyframes movePiston {
+      0% { transform: translateY(0px); }      /* 上止点 - 吸气开始 */
+      25% { transform: translateY(100px); }   /* 下止点 - 吸气结束 */
+      50% { transform: translateY(0px); }     /* 上止点 - 压缩结束/点火 */
+      75% { transform: translateY(100px); }   /* 下止点 - 做功结束 */
+      100% { transform: translateY(0px); }    /* 上止点 - 排气结束 */
+    }
+
+    /* 3. 连杆摆动 (配合曲轴和活塞) */
+    .rod {
+      transform-box: fill-box;
+      transform-origin: 50% 0%; /* 围绕活塞销旋转 */
+      animation: swingRod var(--cycle-duration) linear infinite;
+    }
+    /* 简单的摆动模拟 */
+    @keyframes swingRod {
+      0% { transform: rotate(0deg); }
+      12.5% { transform: rotate(-15deg); }
+      25% { transform: rotate(0deg); }
+      37.5% { transform: rotate(15deg); }
+      50% { transform: rotate(0deg); }
+      62.5% { transform: rotate(-15deg); }
+      75% { transform: rotate(0deg); }
+      87.5% { transform: rotate(15deg); }
+      100% { transform: rotate(0deg); }
+    }
+
+    /* 4. 进气门 (0-25% 打开) */
+    .valve-intake {
+      animation: valveIntakeAnim var(--cycle-duration) linear infinite;
+    }
+    @keyframes valveIntakeAnim {
+      0% { transform: translateY(0); }
+      5% { transform: translateY(15px); } /* 打开 */
+      20% { transform: translateY(15px); }
+      25% { transform: translateY(0); }   /* 关闭 */
+      100% { transform: translateY(0); }
+    }
+
+    /* 5. 排气门 (75-100% 打开) */
+    .valve-exhaust {
+      animation: valveExhaustAnim var(--cycle-duration) linear infinite;
+    }
+    @keyframes valveExhaustAnim {
+      0% { transform: translateY(0); }
+      75% { transform: translateY(0); }
+      80% { transform: translateY(15px); } /* 打开 */
+      95% { transform: translateY(15px); }
+      100% { transform: translateY(0); }   /* 关闭 */
+    }
+
+    /* 6. 气体颜色变化 */
+    .gas {
+      clip-path: url(#cylinderClip);
+      animation: gasColor var(--cycle-duration) steps(1) infinite,
+                 gasFill var(--cycle-duration) linear infinite;
+      transform-origin: center top;
+    }
+    @keyframes gasColor {
+      0% { fill: #e3f2fd; opacity: 0.5; } /* 吸气：淡蓝 */
+      25% { fill: #2196f3; opacity: 0.7; } /* 压缩：深蓝 */
+      50% { fill: url(#fire); opacity: 1; } /* 做功：火红 */
+      75% { fill: #757575; opacity: 0.6; } /* 排气：灰 */
+    }
+    @keyframes gasFill {
+      0% { height: 0px; y: 130px; }
+      25% { height: 170px; y: 130px;}
+      50% { height: 30px; y: 130px;} /* 压缩极致 */
+      52% { height: 30px; y: 130px;} /* 爆炸瞬间维持一下 */
+      75% { height: 170px; y: 130px;}
+      100% { height: 0px; y: 130px;}
+    }
+
+    /* 7. 火花塞点火 (50% 时闪烁) */
+    .spark {
+      opacity: 0;
+      animation: sparkAnim var(--cycle-duration) linear infinite;
+    }
+    @keyframes sparkAnim {
+      0%, 49% { opacity: 0; }
+      50%, 52% { opacity: 1; fill: #ffff00; stroke: #ff0000; }
+      53%, 100% { opacity: 0; }
+    }
+
+    /* 8. 文字提示 */
+    .text-label {
+      font-family: sans-serif;
+      font-size: 24px;
+      font-weight: bold;
+      fill: #333;
+      text-anchor: middle;
+    }
+    .text-cycle {
+      animation: textCycle var(--cycle-duration) steps(1) infinite;
+    }
+    @keyframes textCycle {
+      0% { content: "吸气冲程"; fill: #2196f3; }
+      25% { content: "压缩冲程"; fill: #1565c0; }
+      50% { content: "做功冲程"; fill: #d32f2f; }
+      75% { content: "排气冲程"; fill: #616161; }
+    }
+    /* SVG不支持 content 属性修改文本，使用显隐控制 */
+    .label-1, .label-2, .label-3, .label-4 { opacity: 0; animation-duration: var(--cycle-duration); animation-iteration-count: infinite; animation-timing-function: steps(1); }
+    .label-1 { animation-name: show1; }
+    .label-2 { animation-name: show2; }
+    .label-3 { animation-name: show3; }
+    .label-4 { animation-name: show4; }
+
+    @keyframes show1 { 0% {opacity:1} 25% {opacity:0} }
+    @keyframes show2 { 25% {opacity:1} 50% {opacity:0} }
+    @keyframes show3 { 50% {opacity:1} 75% {opacity:0} }
+    @keyframes show4 { 75% {opacity:1} 100% {opacity:0} }
+
+  </style>
+
+  <!-- 背景 -->
+  <rect width="100%" height="100%" fill="#f5f5f5" />
+
+  <!-- 标题文字 -->
+  <text x="200" y="50" class="text-label">四冲程汽油机原理</text>
+  
+  <!-- 动态状态文字 -->
+  <g transform="translate(200, 80)">
+    <text class="text-label label-1" fill="#2196f3">1. 吸气冲程</text>
+    <text class="text-label label-2" fill="#1565c0">2. 压缩冲程</text>
+    <text class="text-label label-3" fill="#d32f2f">3. 做功冲程</text>
+    <text class="text-label label-4" fill="#616161">4. 排气冲程</text>
+  </g>
+
+  <!-- 发动机主体结构 -->
+  <g transform="translate(0, 50)">
+    
+    <!-- 气缸内气体 -->
+    <rect x="120" y="130" width="160" height="0" class="gas" />
+
+    <!-- 气缸壁 -->
+    <path d="M110,100 L110,320 M290,100 L290,320" stroke="#555" stroke-width="10" fill="none" />
+    <path d="M80,100 L320,100 L320,130 L80,130 Z" fill="url(#metal)" stroke="#555" stroke-width="2" /> <!-- 缸盖 -->
+
+    <!-- 进气道 -->
+    <path d="M20,150 Q80,150 110,120 L130,120 L130,130 L110,130 Q90,170 20,170" fill="#ddd" stroke="#555" stroke-width="2"/>
+    <text x="50" y="165" font-size="12" fill="#2196f3">进气</text>
+    
+    <!-- 排气道 -->
+    <path d="M380,150 Q320,150 290,120 L270,120 L270,130 L290,130 Q310,170 380,170" fill="#ddd" stroke="#555" stroke-width="2"/>
+    <text x="330" y="165" font-size="12" fill="#616161">排气</text>
+
+    <!-- 气门 -->
+    <g class="valve-intake">
+      <rect x="135" y="110" width="10" height="60" fill="#777" />
+      <path d="M125,170 L155,170 L140,150 Z" fill="#777" /> <!-- 气门头 -->
+    </g>
+    <g class="valve-exhaust">
+      <rect x="255" y="110" width="10" height="60" fill="#777" />
+      <path d="M245,170 L275,170 L260,150 Z" fill="#777" /> <!-- 气门头 -->
+    </g>
+
+    <!-- 火花塞 -->
+    <g transform="translate(200, 100)">
+      <rect x="-5" y="-20" width="10" height="50" fill="#fff" stroke="#333" />
+      <rect x="-2" y="30" width="4" height="10" fill="#333" />
+      <!-- 电火花 -->
+      <path d="M-10,45 L10,55 M10,45 L-10,55 M0,40 L0,60" stroke="gold" stroke-width="3" class="spark" />
+    </g>
+
+    <!-- 运动组件 -->
+    <g>
+      <!-- 曲轴转动部分 -->
+      <g class="crankshaft">
+        <circle cx="200" cy="400" r="40" fill="none" stroke="#ccc" stroke-width="5" stroke-dasharray="5,5" /> <!-- 轨迹 -->
+        <circle cx="200" cy="400" r="10" fill="#333" /> <!-- 中心点 -->
+        <!-- 曲柄臂 -->
+        <rect x="190" y="350" width="20" height="50" fill="#555" rx="5" />
+      </g>
+
+      <!-- 活塞组 (跟随动画) -->
+      <g class="piston-group">
+        <!-- 活塞本体 -->
+        <g transform="translate(0, 130)"> <!-- 初始位置 -->
+          <rect x="122" y="0" width="156" height="80" rx="5" fill="url(#metal)" stroke="#333" stroke-width="2" />
+          <!-- 活塞环线 -->
+          <line x1="122" y1="20" x2="278" y2="20" stroke="#777" />
+          <line x1="122" y1="35" x2="278" y2="35" stroke="#777" />
+          
+          <!-- 活塞销 -->
+          <circle cx="200" cy="40" r="8" fill="#333" />
+
+          <!-- 连杆 (相对于活塞运动) -->
+          <g transform="translate(200, 40)"> 
+             <g class="rod">
+                <!-- 连杆本体 -->
+                <rect x="-10" y="0" width="20" height="180" fill="#bbb" stroke="#555" rx="5" />
+                <circle cx="0" cy="180" r="15" fill="#777" /> <!-- 连杆大头 -->
+             </g>
+          </g>
+        </g>
+      </g>
+    </g>
+
+    <!-- 底部曲轴箱遮挡 -->
+    <path d="M50,320 L350,320 L350,450 Q200,480 50,450 Z" fill="none" stroke="#555" stroke-width="5" />
+  </g>
+</svg>

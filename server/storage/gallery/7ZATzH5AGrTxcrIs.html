@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>数字迷宫 - 10关贺岁版</title>
+    <style>
+        :root {
+            --primary-red: #C62828;
+            --bg-yellow: #fff9e6;
+            --gold: #FFD700;
+            --cell-size: 70px;
+        }
+
+        body {
+            font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+            background-color: var(--bg-yellow);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: #333;
+            touch-action: manipulation;
+            min-height: 100vh;
+            overflow: hidden; /* 防止烟花引起滚动 */
+        }
+
+        .header {
+            background: var(--primary-red);
+            color: white;
+            width: 100%;
+            padding: 15px 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .level-nav {
+            margin: 10px 0;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            width: 95%;
+            padding: 10px 5px;
+            justify-content: flex-start;
+            position: relative;
+            z-index: 10;
+        }
+
+        .nav-btn {
+            padding: 6px 12px;
+            border-radius: 15px;
+            border: 1px solid var(--primary-red);
+            background: white;
+            color: var(--primary-red);
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .nav-btn.active {
+            background: var(--primary-red);
+            color: white;
+        }
+
+        .game-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            max-width: 400px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .status-info {
+            font-size: 0.9rem;
+            color: var(--primary-red);
+            font-weight: bold;
+            background: rgba(198, 40, 40, 0.1);
+            padding: 8px 20px;
+            border-radius: 20px;
+            min-width: 280px;
+            text-align: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, var(--cell-size));
+            grid-template-rows: repeat(4, var(--cell-size));
+            gap: 6px;
+            background: #e0d5b0;
+            padding: 10px;
+            border: 4px solid var(--primary-red);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .cell {
+            width: var(--cell-size);
+            height: var(--cell-size);
+            background: white;
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.6rem;
+            font-weight: bold;
+            color: #333;
+            border: 2px solid transparent;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+
+        .cell.fixed { color: var(--primary-red); background: #fff0f0; }
+        .cell.selected { border-color: #2196F3; background: #e3f2fd; }
+        .cell.last-pos { border-color: #4CAF50; box-shadow: 0 0 10px rgba(76, 175, 80, 0.5); }
+        .cell.error { background: #ffebee; animation: shake 0.3s; }
+
+        .num-pad {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            background: white;
+            padding: 12px;
+            border-radius: 15px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.05);
+            width: 95%;
+        }
+
+        .num-btn {
+            width: 38px;
+            height: 38px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 50%;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .num-btn.hidden { visibility: hidden; pointer-events: none; }
+        .num-btn.next-hint { 
+            background: var(--primary-red); color: white; border-color: var(--primary-red); 
+            transform: scale(1.15); box-shadow: 0 0 8px rgba(198,40,40,0.4); 
+        }
+
+        /* 成功弹窗蒙层 */
+        #win-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); /* 黑色背景 */
+            z-index: 150; /* 低于烟花，高于游戏 */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+        }
+
+        /* 烟花 Canvas 在最顶层 */
+        #fireworks {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; /* 关键：点击可穿透烟花层 */
+            z-index: 200; /* 最高层 */
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+
+        @media (max-width: 400px) {
+            :root { --cell-size: 60px; }
+            .num-pad { grid-template-columns: repeat(6, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="fireworks"></canvas>
+
+<div class="header">
+    <h1 style="margin:0; font-size: 1.2rem;">🧧 数字迷宫挑战 (10关) 🧧</h1>
+</div>
+
+<div class="level-nav" id="level-nav"></div>
+
+<div class="game-box">
+    <div class="status-info" id="status-info">请按 1-16 顺序填满</div>
+    <div class="grid" id="grid"></div>
+    <div style="font-size: 0.75rem; color: #888; text-align: center; margin-top:5px;">玩法：点空格子 -> 点下方红色数字</div>
+    <div class="num-pad" id="num-pad"></div>
+    <div style="display:flex; gap:10px; margin-bottom: 20px;">
+        <button onclick="undoStep()" style="padding: 10px 20px; border-radius: 20px; border: 1px solid #999; background: white; font-weight: bold;">撤销</button>
+        <button onclick="resetCurrentLevel()" style="padding: 10px 20px; border-radius: 20px; border: 1px solid #C62828; background: white; color: #C62828; font-weight: bold;">重置</button>
+    </div>
+</div>
+
+<div id="win-modal">
+    <div style="font-size: 5rem; margin-bottom: 10px;">🧧</div>
+    <h1 style="color:var(--gold); font-size: 2.5rem; margin: 0;">挑战成功！</h1>
+    <p id="win-text" style="font-size: 1.2rem; margin: 15px 0;">步步高升，大吉大利！</p>
+    <button style="background:var(--gold); border:none; padding:15px 50px; border-radius:12px; font-weight:bold; cursor:pointer; font-size:1.2rem; box-shadow: 0 4px 15px rgba(255,215,0,0.3);" onclick="nextLevel()">进入下一关</button>
+</div>
+
+<script>
+    // 关卡数据 (10关)
+    const LEVELS = [
+        [[4, 0, 0, 1], [0, 6, 0, 0], [0, 0, 16, 0], [0, 12, 0, 0]],
+        [[1, 0, 0, 16], [0, 13, 0, 0], [0, 0, 0, 10], [0, 5, 0, 0]],
+        [[1, 0, 0, 10], [0, 0, 16, 0], [0, 14, 0, 0], [0, 0, 6, 0]],
+        [[0, 1, 6, 0], [0, 0, 0, 0], [0, 13, 0, 9], [0, 16, 0, 0]],
+        [[1, 0, 0, 0], [4, 0, 10, 0], [0, 0, 0, 0], [0, 0, 16, 0]],
+        [[1, 0, 5, 0], [0, 0, 0, 0], [0, 10, 0, 16], [0, 0, 0, 0]],
+        [[0, 0, 1, 16], [4, 9, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 
+        [[13, 0, 1, 0], [0, 0, 16, 0], [0, 8, 0, 0], [0, 0, 0, 0]], 
+        [[0, 16, 0, 0], [0, 0, 0, 1], [11, 0, 5, 0], [0, 0, 0, 0]], 
+        [[6, 0, 0, 0], [0, 0, 0, 0], [0, 11, 0, 1], [0, 0, 0, 16]]
+    ];
+
+    let currentLvl = 0;
+    let board = [];
+    let selectedPos = { r: -1, c: -1 };
+    let currentStep = 1; 
+    let stepHistory = [];
+
+    // --- 音效模块 ---
+    function playWinSound() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const notes = [523.25, 659.25, 783.99, 1046.50]; 
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.12);
+                gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.12);
+                gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + i * 0.12 + 0.05);
+                gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.12 + 0.4);
+                osc.start(ctx.currentTime + i * 0.12);
+                osc.stop(ctx.currentTime + i * 0.12 + 0.4);
+            });
+        } catch(e) {}
+    }
+
+    // --- 烟花模块 ---
+    const canvas = document.getElementById('fireworks');
+    const g = canvas.getContext('2d');
+    let particles = [];
+    let animeId = null;
+
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize); resize();
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x; this.y = y; this.color = color;
+            this.vx = (Math.random() - 0.5) * 12;
+            this.vy = (Math.random() - 0.5) * 12;
+            this.alpha = 1;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy; this.vy += 0.15; // 重力
+            this.alpha -= 0.015;
+        }
+        draw() {
+            g.globalAlpha = this.alpha;
+            g.fillStyle = this.color;
+            g.beginPath(); g.arc(this.x, this.y, 3, 0, Math.PI*2); g.fill();
+        }
+    }
+
+    function boom() {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height * 0.6;
+        const colors = ['#FFD700', '#FF4500', '#FF1493', '#FFFFFF', '#00FF00'];
+        const color = colors[Math.floor(Math.random()*colors.length)];
+        for(let i=0; i<50; i++) particles.push(new Particle(x, y, color));
+    }
+
+    function loop() {
+        g.clearRect(0,0,canvas.width, canvas.height);
+        particles = particles.filter(p => p.alpha > 0);
+        particles.forEach(p => { p.update(); p.draw(); });
+        if(Math.random() < 0.1) boom();
+        animeId = requestAnimationFrame(loop);
+    }
+
+    // --- 逻辑模块 ---
+    function init() {
+        const nav = document.getElementById('level-nav');
+        LEVELS.forEach((_, i) => {
+            const btn = document.createElement('button');
+            btn.className = `nav-btn ${i===0?'active':''}`;
+            btn.innerText = `关卡 ${i+1}`;
+            btn.onclick = () => loadLevel(i);
+            nav.appendChild(btn);
+        });
+        loadLevel(0);
+    }
+
+    function loadLevel(idx) {
+        currentLvl = idx;
+        board = LEVELS[idx].map(row => [...row]);
+        stepHistory = [];
+        selectedPos = {r:-1, c:-1};
+        cancelAnimationFrame(animeId);
+        g.clearRect(0,0,canvas.width, canvas.height);
+        document.getElementById('win-modal').style.display = 'none';
+        recalc();
+        document.querySelectorAll('.nav-btn').forEach((b,i)=> b.classList.toggle('active', i===idx));
+        render();
+    }
+
+    function recalc() {
+        currentStep = 1;
+        while(find(currentStep)) currentStep++;
+    }
+
+    function find(n) {
+        for(let r=0; r<4; r++) for(let c=0; c<4; c++) if(board[r][c]===n) return {r,c};
+        return null;
+    }
+
+    function render() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
+        const last = find(currentStep-1);
+        for(let r=0; r<4; r++) {
+            for(let c=0; c<4; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                const val = board[r][c];
+                if(LEVELS[currentLvl][r][c] !== 0) cell.classList.add('fixed');
+                if(selectedPos.r===r && selectedPos.c===c) cell.classList.add('selected');
+                if(last && last.r===r && last.c===c) cell.classList.add('last-pos');
+                if(val!==0) cell.innerText = val;
+                cell.onclick = () => {
+                    if(board[r][c] === currentStep) fill(currentStep, r, c);
+                    else if(board[r][c] === 0) { selectedPos = {r,c}; render(); }
+                };
+                grid.appendChild(cell);
+            }
+        }
+        const pad = document.getElementById('num-pad');
+        pad.innerHTML = '';
+        const used = new Set();
+        board.flat().forEach(v => {if(v>0) used.add(v)});
+        for(let i=1; i<=16; i++) {
+            const btn = document.createElement('div');
+            btn.className = `num-btn ${used.has(i)?'hidden':(i===currentStep?'next-hint':'')}`;
+            btn.innerText = i;
+            btn.onclick = () => { if(selectedPos.r!==-1) fill(i, selectedPos.r, selectedPos.c); };
+            pad.appendChild(btn);
+        }
+    }
+
+    function fill(num, r, c) {
+        if(num !== currentStep) return;
+        if(currentStep > 1) {
+            const last = find(currentStep-1);
+            if(Math.abs(last.r-r)>1 || Math.abs(last.c-c)>1) {
+                const cells = document.querySelectorAll('.cell');
+                cells[r*4+c].classList.add('error');
+                setTimeout(()=>cells[r*4+c].classList.remove('error'), 300);
+                return;
+            }
+        }
+        if(LEVELS[currentLvl][r][c]!==0 && LEVELS[currentLvl][r][c]!==num) return;
+
+        board[r][c] = num;
+        stepHistory.push({r,c});
+        currentStep++;
+        selectedPos = {r:-1, c:-1};
+        render();
+
+        if(currentStep > 16) {
+            playWinSound();
+            loop();
+            document.getElementById('win-modal').style.display = 'flex';
+        }
+    }
+
+    function undoStep() {
+        if(!stepHistory.length) return;
+        const last = stepHistory.pop();
+        if(LEVELS[currentLvl][last.r][last.c]===0) board[last.r][last.c] = 0;
+        recalc(); render();
+    }
+
+    function resetCurrentLevel() { loadLevel(currentLvl); }
+    function nextLevel() { 
+        if(currentLvl < LEVELS.length-1) loadLevel(currentLvl+1);
+        else loadLevel(0);
+    }
+
+    init();
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 from enum import Enum
@@ -32,8 +32,7 @@ class UserResponse(BaseModel):
     is_guest: bool = False
     membership: Optional[dict] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GuestJoinRequest(BaseModel):
@@ -84,8 +83,7 @@ class TeacherInfo(BaseModel):
     id: str
     name: str
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ClassResponse(BaseModel):
@@ -100,8 +98,7 @@ class ClassResponse(BaseModel):
     teacher: Optional[TeacherInfo] = None
     student_count: int = 0
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Study Pack schemas
@@ -144,8 +141,7 @@ class PracticeModuleResponse(BaseModel):
     order: int
     estimated_minutes: Optional[int]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StudyPackResponse(BaseModel):
@@ -169,8 +165,7 @@ class StudyPackResponse(BaseModel):
     completion_rate: float = 0
     latest_submissions: list["SubmissionResponse"] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Submission schemas
@@ -191,8 +186,7 @@ class SubmissionResponse(BaseModel):
     submitted_at: datetime
     result: Optional[dict] = None
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 StudyPackResponse.update_forward_refs()
@@ -222,8 +216,7 @@ class LiveTaskResponse(BaseModel):
     status: str
     correct_answer: Optional[dict]
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LiveSubmissionCreate(BaseModel):
@@ -240,5 +233,4 @@ class LiveSubmissionResponse(BaseModel):
     response_time_ms: Optional[int]
     submitted_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

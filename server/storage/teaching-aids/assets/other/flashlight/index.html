@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手电筒工作原理与构造</title>
+    <style>
+        :root {
+            --bg-color: #b2dfdb;
+            --flashlight-body: #fdd835;
+            --flashlight-stroke: #fbc02d;
+            --wire-color: #e53935;
+            --battery-body: #e65100;
+            --battery-end: #37474f;
+            --text-color: #455a64;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        .container {
+            position: relative;
+            width: 90%;
+            max-width: 900px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #00695c;
+        }
+
+        .instruction {
+            text-align: center;
+            font-size: 14px;
+            color: #004d40;
+            margin-bottom: 20px;
+        }
+
+        /* SVG 样式 */
+        svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            overflow: visible;
+        }
+
+        /* 开关交互 */
+        .switch-group {
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+        .switch-btn {
+            fill: #455a64;
+            transition: transform 0.3s ease;
+        }
+        /* 开关打开状态 */
+        .is-on .switch-btn {
+            transform: translateX(-15px); /* 向左滑动接通 */
+        }
+        .is-on .switch-contact {
+            transform: rotate(0deg); /* 闭合接触点 */
+        }
+
+        /* 灯泡发光效果 */
+        .bulb-glass {
+            fill: #cfd8dc;
+            fill-opacity: 0.5;
+            transition: fill 0.3s;
+        }
+        .bulb-light-beam {
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .is-on .bulb-glass {
+            fill: #fff9c4;
+            filter: drop-shadow(0 0 10px #fff176);
+        }
+        .is-on .bulb-filament {
+            stroke: #ffeb3b;
+            stroke-width: 2;
+        }
+        .is-on .bulb-light-beam {
+            opacity: 0.6;
+        }
+
+        /* 电流流动动画 */
+        .current-flow {
+            fill: none;
+            stroke: #ffeb3b;
+            stroke-width: 3;
+            stroke-dasharray: 5, 5;
+            opacity: 0;
+            stroke-linecap: round;
+            pointer-events: none;
+        }
+        .is-on .current-flow {
+            opacity: 1;
+            animation: flow 1s linear infinite;
+        }
+        @keyframes flow {
+            to { stroke-dashoffset: -10; }
+        }
+
+        /* 交互热点 */
+        .hotspot {
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .hotspot-circle {
+            fill: white;
+            stroke: #80cbc4;
+            stroke-width: 2;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+        }
+        .hotspot-line {
+            stroke: #b0bec5;
+            stroke-width: 1;
+            pointer-events: none;
+        }
+        .hotspot:hover .hotspot-circle {
+            fill: #ffeb3b;
+            transform: scale(1.2);
+            transform-origin: center;
+        }
+        .hotspot.active .hotspot-circle {
+            fill: #ffca28;
+            stroke: #ff6f00;
+        }
+
+        /* 信息面板 */
+        .info-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            transition: all 0.3s;
+        }
+        .info-title {
+            font-weight: bold;
+            font-size: 18px;
+            color: #e65100;
+            margin-right: 10px;
+        }
+        .info-desc {
+            color: #546e7a;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container" id="mainContainer">
+    <h2>手电筒的工作原理和构造</h2>
+    <div class="instruction">点击上方黑色开关控制灯泡亮灭 | 点击白色圆点查看部件说明</div>
+
+    <svg viewBox="0 0 800 350" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <!-- 光束渐变 -->
+            <radialGradient id="lightGradient" cx="0%" cy="50%" r="100%">
+                <stop offset="0%" style="stop-color:white;stop-opacity:0.8" />
+                <stop offset="100%" style="stop-color:white;stop-opacity:0" />
+            </radialGradient>
+            <!-- 电池渐变 -->
+            <linearGradient id="batteryGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#ff7043" />
+                <stop offset="100%" style="stop-color:#e64a19" />
+            </linearGradient>
+        </defs>
+
+        <!-- 1. 光束 (最底层) -->
+        <path class="bulb-light-beam" d="M160,175 L20,50 L20,300 Z" fill="url(#lightGradient)" />
+
+        <!-- 2. 外壳 (后半部分) -->
+        <path d="M200,110 L700,110 Q730,110 730,140 L730,210 Q730,240 700,240 L200,240" fill="#fff59d" stroke="#fbc02d" stroke-width="4" />
+        
+        <!-- 3. 内部组件 -->
+        
+        <!-- 弹簧 (负极) -->
+        <path d="M700,150 L710,155 L700,160 L710,165 L700,170 L710,175 L700,180 L710,185 L700,190" fill="none" stroke="#90a4ae" stroke-width="2" />
+
+        <!-- 电池组 -->
+        <g transform="translate(350, 135)">
+            <!-- 电池 1 (左) -->
+            <rect x="0" y="0" width="140" height="80" fill="url(#batteryGradient)" stroke="none" />
+            <rect x="110" y="0" width="30" height="80" fill="#263238" /> <!-- 负极区 -->
+            <path d="M0,20 L-5,20 L-5,60 L0,60 Z" fill="#cfd8dc" /> <!-- 正极凸起 -->
+            <text x="20" y="50" fill="white" font-size="30" font-weight="bold">+</text>
+            <text x="115" y="45" fill="white" font-size="40" font-weight="bold">-</text>
+
+            <!-- 电池 2 (右) -->
+            <rect x="150" y="0" width="140" height="80" fill="url(#batteryGradient)" stroke="none" />
+            <rect x="260" y="0" width="30" height="80" fill="#263238" />
+            <path d="M150,20 L145,20 L145,60 L150,60 Z" fill="#cfd8dc" />
+            <text x="170" y="50" fill="white" font-size="30" font-weight="bold">+</text>
+            <text x="265" y="45" fill="white" font-size="40" font-weight="bold">-</text>
+        </g>
+
+        <!-- 导线 (红色) -->
+        <polyline points="280,155 280,125 420,125" fill="none" stroke="#e53935" stroke-width="3" />
+        <polyline points="470,125 680,125 680,150" fill="none" stroke="#e53935" stroke-width="3" />
+
+        <!-- 开关结构 -->
+        <g class="switch-group" onclick="toggleSwitch()">
+            <!-- 底座 -->
+            <rect x="410" y="100" width="80" height="10" fill="#546e7a" />
+            <!-- 滑块按钮 -->
+            <path class="switch-btn" d="M460,100 L490,100 Q495,90 485,90 L465,90 Q455,90 460,100" />
+            <!-- 内部接触片 (视觉模拟) -->
+            <rect class="switch-metal" x="430" y="122" width="50" height="4" fill="#bdbdbd" opacity="0.5" />
+        </g>
+
+        <!-- 灯头部分 -->
+        <!-- 反光罩 -->
+        <path d="M280,140 L160,80 Q150,80 150,100 L150,250 Q150,270 160,270 L280,210" fill="#eceff1" stroke="#cfd8dc" stroke-width="2" />
+        
+        <!-- 灯泡底座 -->
+        <rect x="260" y="155" width="25" height="40" fill="#b0bec5" rx="2" />
+        <path d="M260,165 L285,165 M260,175 L285,175 M260,185 L285,185" stroke="#78909c" stroke-width="1" />
+
+        <!-- 灯泡玻璃 -->
+        <circle cx="250" cy="175" r="25" class="bulb-glass" stroke="#b0bec5" stroke-width="1" />
+        <!-- 灯丝 -->
+        <path class="bulb-filament" d="M250,175 L255,165 L245,165 L250,175" fill="none" stroke="#78909c" stroke-width="1" />
+
+        <!-- 外壳 (前盖和轮廓) -->
+        <path d="M200,110 L140,70 Q130,60 130,80 L130,270 Q130,290 140,280 L200,240" fill="#fff59d" stroke="#fbc02d" stroke-width="4" opacity="0.4" />
+        <path d="M200,110 L140,70 Q130,60 130,80 L130,270 Q130,290 140,280 L200,240 M200,110 L700,110 Q730,110 730,140 L730,210 Q730,240 700,240 L200,240" fill="none" stroke="#fbc02d" stroke-width="4" />
+
+        <!-- 电流流动路径 (默认隐藏，开启时显示) -->
+        <!-- 这里的路径是一条闭合回路：电池+ -> 灯泡 -> 电池- -->
+        <path class="current-flow" d="M350,155 L285,155 M272,195 L272,220 L700,220 L700,180 M690,155 L690,125 L460,125 M420,125 L285,125 L285,155" />
+
+        <!-- 交互热点 (Hotspots) -->
+        
+        <!-- 热点 1: 开关 -->
+        <g class="hotspot" onclick="showInfo('switch', this)">
+            <line x1="450" y1="90" x2="450" y2="50" class="hotspot-line" />
+            <circle cx="450" cy="50" r="8" class="hotspot-circle" />
+        </g>
+
+        <!-- 热点 2: 灯泡 -->
+        <g class="hotspot" onclick="showInfo('bulb', this)">
+            <line x1="250" y1="150" x2="250" y2="50" class="hotspot-line" />
+            <circle cx="250" cy="50" r="8" class="hotspot-circle" />
+        </g>
+
+        <!-- 热点 3: 电池 -->
+        <g class="hotspot" onclick="showInfo('battery', this)">
+            <line x1="420" y1="215" x2="420" y2="280" class="hotspot-line" />
+            <circle cx="420" cy="280" r="8" class="hotspot-circle" />
+        </g>
+
+        <!-- 热点 4: 弹簧/导电 -->
+        <g class="hotspot" onclick="showInfo('spring', this)">
+            <line x1="710" y1="175" x2="710" y2="280" class="hotspot-line" />
+            <circle cx="710" cy="280" r="8" class="hotspot-circle" />
+        </g>
+
+        <!-- 热点 5: 反光罩 -->
+        <g class="hotspot" onclick="showInfo('reflector', this)">
+            <line x1="200" y1="240" x2="200" y2="280" class="hotspot-line" />
+            <circle cx="200" cy="280" r="8" class="hotspot-circle" />
+        </g>
+
+    </svg>
+
+    <div class="info-panel" id="infoPanel">
+        <div>
+            <span class="info-title" id="infoTitle">手电筒构造</span>
+            <span class="info-desc" id="infoDesc">点击上方的白色圆点查看各部件详细介绍。</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isOn = false;
+    const container = document.getElementById('mainContainer');
+    const infoTitle = document.getElementById('infoTitle');
+    const infoDesc = document.getElementById('infoDesc');
+
+    // 构造信息数据
+    const partsInfo = {
+        'switch': {
+            title: '开关',
+            desc: '控制电路通断的关键部件。按下开关，两片金属片接触，电路闭合，电流流通；松开则断开。'
+        },
+        'bulb': {
+            title: '小灯泡',
+            desc: '用电器。电流流过灯丝产生热量并发出光亮，将电能转化为光能和热能。'
+        },
+        'battery': {
+            title: '电池',
+            desc: '电源。为手电筒提供电能。电流从正极(+)流出，经过灯泡，流回负极(-)。'
+        },
+        'spring': {
+            title: '金属弹簧',
+            desc: '导电并固定电池。它连接电池负极与外壳（或导线），确保电路连接紧密，防止电池晃动。'
+        },
+        'reflector': {
+            title: '反光罩',
+            desc: '位于灯泡周围的凹面镜。它可以将灯泡发出的光线汇聚成一束强光射向前方。'
+        }
+    };
+
+    // 切换开关状态
+    function toggleSwitch() {
+        isOn = !isOn;
+        if (isOn) {
+            container.classList.add('is-on');
+        } else {
+            container.classList.remove('is-on');
+        }
+    }
+
+    // 显示部件信息
+    function showInfo(partKey, element) {
+        // 移除其他热点的激活状态
+        document.querySelectorAll('.hotspot').forEach(el => el.classList.remove('active'));
+        
+        // 激活当前热点
+        element.classList.add('active');
+
+        // 更新文字
+        if (partsInfo[partKey]) {
+            infoTitle.textContent = partsInfo[partKey].title;
+            infoDesc.textContent = partsInfo[partKey].desc;
+            
+            // 添加淡入动画效果
+            const panel = document.getElementById('infoPanel');
+            panel.style.opacity = 0;
+            setTimeout(() => panel.style.opacity = 1, 50);
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>角的度量 - 数字化演示教具</title>
+    <style>
+        :root {
+            --bg-color: #f0f7ff;
+            --panel-bg: #ffffff;
+            --primary: #4a90e2;
+            --accent: #ff6b6b;
+            --text: #333;
+            --inner-scale: #d35400; /* 内圈刻度颜色 */
+            --outer-scale: #2980b9; /* 外圈刻度颜色 */
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        h1 {
+            color: var(--text);
+            margin-bottom: 10px;
+            text-shadow: 1px 1px 0px white;
+        }
+
+        .container {
+            display: flex;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* 画布区域 */
+        .canvas-wrapper {
+            position: relative;
+        }
+
+        canvas {
+            border: 1px solid #eee;
+            border-radius: 10px;
+            background: #fff;
+            cursor: crosshair;
+        }
+
+        /* 提示标签 */
+        .annotation {
+            position: absolute;
+            background: rgba(255, 255, 0, 0.9);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            color: #333;
+            pointer-events: none;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+            display: none; /* 默认隐藏 */
+        }
+
+        /* 控制面板 */
+        .controls {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .readout-box {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 5px solid var(--primary);
+            text-align: center;
+        }
+
+        .degree-display {
+            font-size: 3rem;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: monospace;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: bold;
+            color: #555;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type=range] {
+            width: 100%;
+            height: 10px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: var(--primary);
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(0,0,0,0.3);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active { transform: scale(0.96); }
+
+        .btn-random { background-color: var(--accent); color: white; }
+        .btn-show { background-color: var(--primary); color: white; }
+        .btn-step { background-color: #27ae60; color: white; grid-column: span 2; }
+
+        /* 教学步骤说明 */
+        .steps-info {
+            font-size: 14px;
+            color: #666;
+            background: #fff8e1;
+            padding: 10px;
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+        .highlight { color: #d35400; font-weight: bold; }
+        .correct-method { color: #27ae60; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <h1>📐 小学数学：角的度量演示器</h1>
+
+    <div class="container">
+        <div class="canvas-wrapper">
+            <canvas id="mainCanvas" width="600" height="400"></canvas>
+            <div id="tip-center" class="annotation" style="top: 280px; left: 285px;">中心点重合顶点</div>
+            <div id="tip-line" class="annotation" style="top: 280px; left: 450px;">0刻度线重合一边</div>
+        </div>
+
+        <div class="controls">
+            <div class="readout-box">
+                <div>当前度数</div>
+                <div class="degree-display" id="degreeVal">45°</div>
+                <div style="font-size: 12px; color: #999;">(读内圈刻度)</div>
+            </div>
+
+            <div class="slider-group">
+                <label>
+                    <span>调整角度大小</span>
+                    <span id="sliderVal">45°</span>
+                </label>
+                <input type="range" id="angleSlider" min="0" max="180" value="45">
+            </div>
+
+            <div class="steps-info">
+                <strong>量角三步曲：</strong><br>
+                1. <span class="correct-method">点重合</span>：量角器中心 与 角的顶点 重合。<br>
+                2. <span class="correct-method">线重合</span>：0刻度线 与 角的一条边 重合。<br>
+                3. <span class="correct-method">读数</span>：看另一条边所指的刻度（0在内读内，0在外读外）。
+            </div>
+
+            <div class="btn-group">
+                <button class="btn-random" onclick="randomAngle()">🎲 随机出题</button>
+                <button class="btn-show" onclick="toggleAnswer()">👁️ 显示/隐藏答案</button>
+                <button class="btn-step" onclick="toggleGuide()">💡 显示关键点提示</button>
+            </div>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('angleSlider');
+    const degreeDisplay = document.getElementById('degreeVal');
+    const sliderVal = document.getElementById('sliderVal');
+    const tipCenter = document.getElementById('tip-center');
+    const tipLine = document.getElementById('tip-line');
+
+    // 配置参数
+    const CX = 300; // 中心X
+    const CY = 300; // 中心Y (基准线高度)
+    const R = 220;  // 量角器半径
+    let currentAngle = 45;
+    let showAnswer = true;
+    let showGuide = false;
+
+    // 颜色配置
+    const COLORS = {
+        bgProtractor: 'rgba(255, 255, 255, 0.85)',
+        lineProtractor: '#666',
+        innerScale: '#d35400', // 内圈 橙色
+        outerScale: '#2980b9', // 外圈 蓝色
+        angleLine: '#e74c3c',  // 角的边 红色
+        vertex: '#2c3e50'
+    };
+
+    // 初始化
+    function init() {
+        draw();
+        
+        // 绑定事件
+        slider.addEventListener('input', (e) => {
+            currentAngle = parseInt(e.target.value);
+            showAnswer = true; // 拖动时自动显示答案
+            updateUI();
+            draw();
+        });
+    }
+
+    // 更新界面数值
+    function updateUI() {
+        if (showAnswer) {
+            degreeDisplay.innerText = currentAngle + "°";
+            sliderVal.innerText = currentAngle + "°";
+        } else {
+            degreeDisplay.innerText = "?";
+            sliderVal.innerText = "?";
+        }
+        
+        // 提示信息的显示状态
+        tipCenter.style.display = showGuide ? 'block' : 'none';
+        tipLine.style.display = showGuide ? 'block' : 'none';
+    }
+
+    // 核心绘制函数
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 绘制角 (在量角器下面)
+        drawAngle(currentAngle);
+
+        // 2. 绘制量角器 (半透明覆盖)
+        drawProtractor();
+        
+        // 3. 绘制读数指示线 (辅助教学)
+        drawIndicator(currentAngle);
+    }
+
+    // 绘制量角器
+    function drawProtractor() {
+        ctx.save();
+        ctx.translate(CX, CY);
+
+        // 半圆背景
+        ctx.beginPath();
+        ctx.arc(0, 0, R, Math.PI, 0);
+        ctx.fillStyle = COLORS.bgProtractor;
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#ccc';
+        ctx.stroke();
+
+        // 底部直线
+        ctx.beginPath();
+        ctx.moveTo(-R, 0);
+        ctx.lineTo(R, 0);
+        ctx.strokeStyle = COLORS.lineProtractor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 中心点十字
+        ctx.beginPath();
+        ctx.moveTo(0, -10); ctx.lineTo(0, 10);
+        ctx.moveTo(-10, 0); ctx.lineTo(10, 0);
+        ctx.strokeStyle = COLORS.vertex;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 绘制刻度
+        for (let i = 0; i <= 180; i++) {
+            const rad = (Math.PI / 180) * (180 - i); // Canvas 0度在右边，顺时针，我们需要逆时针从左边开始
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+
+            // 刻度线长度逻辑
+            let len = 5;
+            if (i % 5 === 0) len = 10;
+            if (i % 10 === 0) len = 15;
+
+            // 外圈刻度线
+            let rOutStart = R - 2;
+            let rOutEnd = R - 2 - len;
+            
+            ctx.beginPath();
+            ctx.moveTo(rOutStart * cos, -rOutStart * sin); // Y轴向上为负
+            ctx.lineTo(rOutEnd * cos, -rOutEnd * sin);
+            ctx.strokeStyle = COLORS.outerScale;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // 内圈刻度线 (半径小一点)
+            let rInStart = R - 45;
+            let rInEnd = R - 45 + len;
+
+            ctx.beginPath();
+            ctx.moveTo(rInStart * cos, -rInStart * sin);
+            ctx.lineTo(rInEnd * cos, -rInEnd * sin);
+            ctx.strokeStyle = COLORS.innerScale;
+            ctx.stroke();
+
+            // 绘制数字 (每10度)
+            if (i % 10 === 0) {
+                ctx.font = "12px Arial";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+
+                // 外圈数字 (从左到右 0 - 180) -> 实际上通常外圈是顺时针，内圈逆时针
+                // 这里我们设定：右边起0为内圈，左边起0为外圈 (这是最常见的学生量角器布局)
+                // 角度i是从左边(180位置)开始算的
+                
+                // 外圈数值 (左边是0)
+                let rTextOut = R - 25;
+                ctx.fillStyle = COLORS.outerScale;
+                ctx.fillText(180 - i, rTextOut * cos, -rTextOut * sin);
+
+                // 内圈数值 (右边是0)
+                let rTextIn = R - 60;
+                ctx.fillStyle = COLORS.innerScale;
+                ctx.fillText(i, rTextIn * cos, -rTextIn * sin);
+            }
+        }
+
+        ctx.restore();
+    }
+
+    // 绘制被测量的角
+    function drawAngle(deg) {
+        ctx.save();
+        ctx.translate(CX, CY);
+
+        const lineLen = R + 40; // 边长一点，超出量角器，方便读数
+
+        // 1. 顶点
+        ctx.beginPath();
+        ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.vertex;
+        ctx.fill();
+
+        // 2. 初始边 (0刻度线 - 右边)
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(lineLen, 0);
+        ctx.strokeStyle = COLORS.angleLine;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // 3. 终边 (旋转边)
+        const rad = (Math.PI / 180) * deg;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        // 注意Canvas坐标系Y向下，所以Y要取负值
+        ctx.lineTo(lineLen * Math.cos(-rad), lineLen * Math.sin(-rad)); 
+        ctx.stroke();
+
+        // 4. 角度弧线
+        if (deg > 0) {
+            ctx.beginPath();
+            ctx.arc(0, 0, 50, 0, -rad, true); // 逆时针
+            ctx.strokeStyle = COLORS.angleLine;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // 角度填充
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.1)';
+            ctx.lineTo(0,0);
+            ctx.fill();
+        }
+
+        ctx.restore();
+    }
+
+    // 绘制高亮读数指示
+    function drawIndicator(deg) {
+        if (!showAnswer) return;
+
+        ctx.save();
+        ctx.translate(CX, CY);
+        const rad = (Math.PI / 180) * deg;
+        
+        // 在边缘绘制一个小放大镜效果或箭头
+        const rPos = R - 60; // 指向内圈读数位置
+        const x = rPos * Math.cos(-rad);
+        const y = rPos * Math.sin(-rad);
+
+        // 绘制一个圈圈住读数
+        ctx.beginPath();
+        ctx.arc(x, y, 15, 0, Math.PI*2);
+        ctx.strokeStyle = '#e74c3c';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 2]);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    // 随机出题
+    function randomAngle() {
+        // 生成 10 - 170 之间的随机角，最好是5的倍数方便读
+        const rand = Math.floor(Math.random() * 32 + 2) * 5; 
+        currentAngle = rand;
+        slider.value = rand;
+        showAnswer = false; // 隐藏答案
+        updateUI();
+        draw();
+    }
+
+    // 切换答案显示
+    function toggleAnswer() {
+        showAnswer = !showAnswer;
+        updateUI();
+        draw();
+    }
+
+    // 切换教学辅助线
+    function toggleGuide() {
+        showGuide = !showGuide;
+        updateUI();
+    }
+
+    // 启动
+    init();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,327 @@
+<!--
+设计思路:
+1. 整体布局采用响应式设计，使用Flexbox进行垂直和水平居中
+2. 主要分为三个区域：显示区域、控制按钮区域、设置区域
+3. 显示区域采用超大字体数字显示倒计时，视觉冲击力强
+4. 控制按钮使用底部固定布局，采用醒目的颜色区分功能
+5. 设置区域默认隐藏，通过动画展开/收起
+6. 时间设置支持分钟和秒钟的独立调整
+7. 使用Web Audio API实现声音提醒功能
+8. 颜色方案：主色调为稳定的蓝色系，避免闪烁效果
+9. 添加过渡动画提升用户体验
+10. 使用Font Awesome图标增强按钮识别度
+-->
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>课堂计时器</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #1e40af; /* 稳定的蓝色背景 */
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .timer-display {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 7rem; /* 原来的2倍 */
+            font-weight: 700;
+            text-shadow: 0 0 15px rgba(255, 255, 255, 0.7);
+            letter-spacing: 5px;
+            line-height: 1;
+        }
+        
+        @media (min-width: 768px) {
+            .timer-display {
+                font-size: 10rem; /* 原来的2倍 */
+            }
+        }
+        
+        .control-btn {
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        
+        .control-btn:active {
+            transform: translateY(1px);
+        }
+        
+        .setting-panel {
+            transition: all 0.5s ease;
+            max-height: 0;
+            overflow: hidden;
+        }
+        
+        .setting-panel.expanded {
+            max-height: 500px;
+        }
+        
+        .time-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            font-size: 1.5rem;
+            width: 80px;
+        }
+        
+        .time-input:focus {
+            outline: none;
+            border-color: #4299e1;
+            background: rgba(255, 255, 255, 0.15);
+        }
+        
+        .pulse {
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .blink {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8 max-w-2xl w-full"> <!-- 增加容器宽度 -->
+        <div class="bg-blue-900 bg-opacity-80 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden">
+            <!-- 显示区域 -->
+            <div class="p-8 text-center">
+                <h1 class="text-3xl md:text-4xl font-bold mb-8 flex items-center justify-center">
+                    <i class="fas fa-clock mr-4 text-blue-300"></i>
+                    课堂计时器
+                </h1>
+                <div class="timer-display mb-10" id="displayElement">05:00</div>
+                
+                <!-- 进度条 -->
+                <div class="w-full bg-blue-700 rounded-full h-6 mb-10"> <!-- 增加进度条高度 -->
+                    <div class="bg-blue-400 h-6 rounded-full transition-all duration-1000 ease-linear" 
+                         id="progressElement" style="width: 100%"></div>
+                </div>
+            </div>
+            
+            <!-- 设置面板 -->
+            <div class="setting-panel bg-blue-800 bg-opacity-50" id="settingsPanel">
+                <div class="p-8 border-t border-blue-700">
+                    <h2 class="text-2xl font-semibold mb-6 flex items-center justify-center">
+                        <i class="fas fa-cog mr-3"></i> 时间设置
+                    </h2>
+                    <div class="flex justify-center items-center space-x-6 mb-8">
+                        <div class="text-center">
+                            <label class="block text-lg mb-3">分钟</label>
+                            <input type="number" min="0" max="99" value="05" 
+                                   class="time-input py-4 text-2xl" id="minutesInputField">
+                        </div>
+                        <div class="text-4xl">:</div>
+                        <div class="text-center">
+                            <label class="block text-lg mb-3">秒钟</label>
+                            <input type="number" min="0" max="59" value="0" 
+                                   class="time-input py-4 text-2xl" id="secondsInputField">
+                        </div>
+                    </div>
+                    <div class="flex justify-center">
+                        <button id="applySettingsBtn" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-full font-medium flex items-center text-xl">
+                            <i class="fas fa-check mr-3"></i> 应用设置
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 控制按钮 -->
+            <div class="grid grid-cols-4 gap-3 p-5 bg-blue-900 bg-opacity-60">
+                <button id="startButton" 
+                        class="control-btn bg-green-500 hover:bg-green-600 text-white py-5 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fas fa-play text-2xl mb-2"></i>
+                    <span class="text-sm">开始</span>
+                </button>
+                <button id="pauseButton" 
+                        class="control-btn bg-yellow-500 hover:bg-yellow-600 text-white py-5 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fas fa-pause text-2xl mb-2"></i>
+                    <span class="text-sm">暂停</span>
+                </button>
+                <button id="resetButton" 
+                        class="control-btn bg-red-500 hover:bg-red-600 text-white py-5 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fas fa-redo text-2xl mb-2"></i>
+                    <span class="text-sm">重置</span>
+                </button>
+                <button id="settingsButton" 
+                        class="control-btn bg-blue-500 hover:bg-blue-600 text-white py-5 rounded-2xl flex flex-col items-center justify-center">
+                    <i class="fas fa-cog text-2xl mb-2"></i>
+                    <span class="text-sm">设置</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 使用立即执行函数表达式(IIFE)避免全局变量冲突
+        (function() {
+            // 计时器状态管理
+            const timerState = {
+                totalSeconds: 5 * 60, // 默认25分钟
+                remainingSeconds: 5 * 60,
+                intervalId: null,
+                isRunning: false
+            };
+            
+            // DOM元素引用
+            const domElements = {
+                display: document.getElementById('displayElement'),
+                progress: document.getElementById('progressElement'),
+                startBtn: document.getElementById('startButton'),
+                pauseBtn: document.getElementById('pauseButton'),
+                resetBtn: document.getElementById('resetButton'),
+                settingsBtn: document.getElementById('settingsButton'),
+                settingsPanel: document.getElementById('settingsPanel'),
+                minutesInput: document.getElementById('minutesInputField'),
+                secondsInput: document.getElementById('secondsInputField'),
+                applySettingsBtn: document.getElementById('applySettingsBtn')
+            };
+            
+            // 格式化时间显示
+            function formatDisplayTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            // 更新显示
+            function updateTimerDisplay() {
+                domElements.display.textContent = formatDisplayTime(timerState.remainingSeconds);
+                const progressPercent = (timerState.remainingSeconds / timerState.totalSeconds) * 100;
+                domElements.progress.style.width = `${progressPercent}%`;
+                
+                // 当剩余时间少于1分钟时，显示闪烁效果
+                if (timerState.remainingSeconds < 60 && timerState.remainingSeconds > 0) {
+                    domElements.display.classList.add('blink');
+                } else {
+                    domElements.display.classList.remove('blink');
+                }
+            }
+            
+            // 播放提示音
+            function playCompletionSound() {
+                try {
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.type = 'sine';
+                    oscillator.frequency.value = 880;
+                    gainNode.gain.value = 0.3;
+                    
+                    oscillator.start();
+                    
+                    // 播放三短声
+                    setTimeout(() => {
+                        oscillator.stop();
+                        setTimeout(() => {
+                            oscillator.start();
+                            setTimeout(() => oscillator.stop(), 200);
+                        }, 300);
+                    }, 200);
+                } catch (error) {
+                    console.log("无法播放声音:", error);
+                }
+            }
+            
+            // 计时器核心逻辑
+            function startTimerFunction() {
+                if (timerState.isRunning) return;
+                
+                timerState.isRunning = true;
+                domElements.display.classList.remove('pulse');
+                
+                timerState.intervalId = setInterval(() => {
+                    timerState.remainingSeconds--;
+                    updateTimerDisplay();
+                    
+                    if (timerState.remainingSeconds <= 0) {
+                        clearInterval(timerState.intervalId);
+                        timerState.isRunning = false;
+                        domElements.display.classList.add('pulse');
+                        playCompletionSound();
+                    }
+                }, 1000);
+            }
+            
+            function pauseTimerFunction() {
+                if (!timerState.isRunning) return;
+                
+                clearInterval(timerState.intervalId);
+                timerState.isRunning = false;
+            }
+            
+            function resetTimerFunction() {
+                pauseTimerFunction();
+                timerState.remainingSeconds = timerState.totalSeconds;
+                updateTimerDisplay();
+                domElements.display.classList.remove('pulse', 'blink');
+            }
+            
+            // 设置面板控制
+            function toggleSettingsPanel() {
+                domElements.settingsPanel.classList.toggle('expanded');
+            }
+            
+            // 应用时间设置
+            function applyTimeSettingsFunction() {
+                const minutes = parseInt(domElements.minutesInput.value) || 0;
+                const seconds = parseInt(domElements.secondsInput.value) || 0;
+                
+                // 限制输入范围
+                const clampedMinutes = Math.min(Math.max(minutes, 0), 99);
+                const clampedSeconds = Math.min(Math.max(seconds, 0), 59);
+                
+                domElements.minutesInput.value = clampedMinutes;
+                domElements.secondsInput.value = clampedSeconds;
+                
+                timerState.totalSeconds = clampedMinutes * 60 + clampedSeconds;
+                resetTimerFunction();
+                toggleSettingsPanel();
+            }
+            
+            // 事件监听器绑定
+            domElements.startBtn.addEventListener('click', startTimerFunction);
+            domElements.pauseBtn.addEventListener('click', pauseTimerFunction);
+            domElements.resetBtn.addEventListener('click', resetTimerFunction);
+            domElements.settingsBtn.addEventListener('click', toggleSettingsPanel);
+            domElements.applySettingsBtn.addEventListener('click', applyTimeSettingsFunction);
+            
+            // 初始化显示
+            updateTimerDisplay();
+        })();
+    </script>
+</body>
+</html>

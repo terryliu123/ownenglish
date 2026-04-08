@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>落花生课文学习</title>
+    <link href="https://cdn.staticfile.org/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.staticfile.org/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f8f4e9;
+            color: #333;
+        }
+        .title-font {
+            font-family: 'Noto Serif SC', serif;
+        }
+        .character-card {
+            transition: all 0.3s ease;
+            background-color: #fff9e6;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .character-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+        .highlight {
+            background-color: #fff3b0;
+            padding: 0 2px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .character-img-container {
+            width: 120px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5f5f5;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .character-img {
+            font-size: 60px;
+            color: #333;
+        }
+        .answer-feedback {
+            display: none;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .correct {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        /* 修改按钮文字颜色为黑色 */
+        .btn-primary {
+            color: black !important;
+        }
+        @media (max-width: 768px) {
+            .character-img-container {
+                width: 80px;
+                height: 80px;
+            }
+            .character-img {
+                font-size: 40px;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 标题区 -->
+        <div class="text-center mb-10">
+            <h1 class="title-font text-4xl md:text-5xl font-bold text-brown-800 mb-4">落花生</h1>
+            <p class="text-lg text-gray-600">小学五年级语文课文自主学习</p>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 课文内容区 -->
+            <div class="lg:w-2/3 bg-white rounded-xl shadow-md p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="title-font text-2xl font-bold text-brown-800">课文阅读</h2>
+                    <button id="playAudio" class="btn-primary bg-brown-600 hover:bg-brown-700 rounded-full p-3 transition">
+                        <i class="fas fa-volume-up text-xl"></i>
+                    </button>
+                </div>
+                
+                <div class="text-content" id="articleText">
+                    <p class="mb-4">我们家的后园有半<span class="highlight character" data-char="亩">亩</span>空地。母亲说："让它荒着怪可惜的，你们那么爱吃花生，就开辟出来种花生吧。"我们姐弟几个都很高兴，买种，翻地，<span class="highlight character" data-char="播">播</span>种，<span class="highlight character" data-char="浇">浇</span>水，没过几个月，居然收获了。</p>
+                    <p class="mb-4">母亲说："今晚我们过一个收获节，请你们父亲也来尝尝我们的新花生，好不好？"我们都说好。母亲把花生做成了好几样食品，还吩咐就在后园的茅亭里过这个节。</p>
+                    <p class="mb-4">那晚上天色不大好，可是父亲也来了，实在很难得。</p>
+                    <p class="mb-4">父亲说："你们爱吃花生吗？"</p>
+                    <p class="mb-4">我们争着答应："爱！"</p>
+                    <p class="mb-4">"谁能把花生的好处说出来？"</p>
+                    <p class="mb-4">姐姐说："花生的味儿美。"</p>
+                    <p class="mb-4">哥哥说："花生可以榨油。"</p>
+                    <p class="mb-4">我说："花生的价钱便宜，谁都可以买来吃，都喜欢吃。这就是它的好处。"</p>
+                    <p class="mb-4">父亲说："花生的好处很多，有一样最可贵：它的果实埋在地里，不像桃子、石榴、苹果那样，把鲜红嫩绿的果实高高地挂在枝头上，使人一见就生爱<span class="highlight character" data-char="慕">慕</span>之心。你们看它矮矮地长在地上，等到成熟了，也不能立刻分辨出来它有没有果实，必须挖起来才知道。"</p>
+                    <p class="mb-4">我们都说是，母亲也点点头。</p>
+                    <p class="mb-4">父亲接下去说："所以你们要像花生，它虽然不好看，可是很有用。"</p>
+                    <p class="mb-4">我说："那么，人要做有用的人，不要做只讲体面，而对别人没有好处的人。"</p>
+                    <p class="mb-4">父亲说："对。这是我对你们的希望。"</p>
+                    <p class="mb-4">我们谈到夜深才散。花生做的食品都吃完了，父亲的话却深深地印在我的心上。</p>
+                </div>
+            </div>
+
+            <!-- 生字学习区 -->
+            <div class="lg:w-1/3">
+                <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+                    <h2 class="title-font text-2xl font-bold text-brown-800 mb-6">生字学习</h2>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- 播 -->
+                        <div class="character-card p-4 cursor-pointer" data-char="播">
+                            <div class="flex flex-col items-center">
+                                <div class="character-img-container">
+                                    <div class="character-img">播</div>
+                                </div>
+                                <h3 class="text-xl font-bold text-brown-800">播</h3>
+                                <p class="text-gray-600">bō</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 浇 -->
+                        <div class="character-card p-4 cursor-pointer" data-char="浇">
+                            <div class="flex flex-col items-center">
+                                <div class="character-img-container">
+                                    <div class="character-img">浇</div>
+                                </div>
+                                <h3 class="text-xl font-bold text-brown-800">浇</h3>
+                                <p class="text-gray-600">jiāo</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 慕 -->
+                        <div class="character-card p-4 cursor-pointer" data-char="慕">
+                            <div class="flex flex-col items-center">
+                                <div class="character-img-container">
+                                    <div class="character-img">慕</div>
+                                </div>
+                                <h3 class="text-xl font-bold text-brown-800">慕</h3>
+                                <p class="text-gray-600">mù</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 亩 -->
+                        <div class="character-card p-4 cursor-pointer" data-char="亩">
+                            <div class="flex flex-col items-center">
+                                <div class="character-img-container">
+                                    <div class="character-img">亩</div>
+                                </div>
+                                <h3 class="text-xl font-bold text-brown-800">亩</h3>
+                                <p class="text-gray-600">mǔ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 互动练习区 -->
+                <div class="bg-white rounded-xl shadow-md p-6">
+                    <h2 class="title-font text-2xl font-bold text-brown-800 mb-6">互动练习</h2>
+                    
+                    <div id="exerciseContainer">
+                        <!-- 练习内容将通过JS动态生成 -->
+                        <p class="text-gray-500 text-center">请点击上方生字开始练习</p>
+                    </div>
+                    
+                    <button id="checkAnswers" class="btn-primary bg-brown-600 hover:bg-brown-700 mt-6 w-full py-3 rounded-lg font-medium transition">
+                        检查答案
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 生字详情模态框 -->
+    <div id="characterModal" class="fixed inset-0 z-50 flex items-center justify-center hidden bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 relative">
+            <button id="closeModal" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+            
+            <div id="modalContent" class="mt-4">
+                <!-- 内容将通过JS动态填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 生字数据
+            const characters = {
+                '播': {
+                    pinyin: 'bō',
+                    meaning: '撒种，传播',
+                    words: ['播种', '广播', '传播'],
+                    strokeOrder: '播的笔顺：横、竖钩、提、撇、点、撇、横、竖、撇、捺',
+                    example: '农民伯伯在田里播种。',
+                    exercises: [
+                        {
+                            type: 'choice',
+                            question: '"播"字的正确读音是：',
+                            options: ['bō', 'pō', 'bǒ'],
+                            answer: 'bō'
+                        },
+                        {
+                            type: 'fill',
+                            question: '填空：农民伯伯在田里____种。',
+                            answer: '播'
+                        }
+                    ]
+                },
+                '浇': {
+                    pinyin: 'jiāo',
+                    meaning: '灌溉，淋洒',
+                    words: ['浇水', '浇花', '浇灌'],
+                    strokeOrder: '浇的笔顺：点、点、提、横、斜钩、撇、横、撇、竖弯钩',
+                    example: '我每天给阳台上的花浇水。',
+                    exercises: [
+                        {
+                            type: 'choice',
+                            question: '"浇"字的正确读音是：',
+                            options: ['jiāo', 'jiǎo', 'jiào'],
+                            answer: 'jiāo'
+                        },
+                        {
+                            type: 'fill',
+                            question: '填空：我每天给花____水。',
+                            answer: '浇'
+                        }
+                    ]
+                },
+                '慕': {
+                    pinyin: 'mù',
+                    meaning: '向往，敬仰',
+                    words: ['羡慕', '爱慕', '慕名'],
+                    strokeOrder: '慕的笔顺：横、竖、竖、竖、横折、横、横、横、撇、捺、点、点',
+                    example: '小明很羡慕同学的新书包。',
+                    exercises: [
+                        {
+                            type: 'choice',
+                            question: '"慕"字的正确读音是：',
+                            options: ['mù', 'mò', 'mǔ'],
+                            answer: 'mù'
+                        },
+                        {
+                            type: 'fill',
+                            question: '填空：小明很____同学的新书包。',
+                            answer: '羡慕'
+                        }
+                    ]
+                },
+                '亩': {
+                    pinyin: 'mǔ',
+                    meaning: '土地面积单位，一亩约等于666.67平方米',
+                    words: ['亩产', '亩数', '一亩地'],
+                    strokeOrder: '亩的笔顺：点、横、竖、横折、横、竖、横',
+                    example: '这块田有三亩大。',
+                    exercises: [
+                        {
+                            type: 'choice',
+                            question: '"亩"字的正确读音是：',
+                            options: ['mǔ', 'mù', 'mǒu'],
+                            answer: 'mǔ'
+                        },
+                        {
+                            type: 'fill',
+                            question: '填空：这块田有三____大。',
+                            answer: '亩'
+                        }
+                    ]
+                }
+            };
+
+            // 当前选中的生字
+            let currentCharacter = null;
+            
+            // 朗读功能实现
+            const playAudioBtn = document.getElementById('playAudio');
+            let isSpeaking = false;
+            let speechSynthesis = window.speechSynthesis;
+            
+            playAudioBtn.addEventListener('click', function() {
+                if (isSpeaking) {
+                    speechSynthesis.cancel();
+                    isSpeaking = false;
+                    playAudioBtn.innerHTML = '<i class="fas fa-volume-up text-xl"></i>';
+                    return;
+                }
+                
+                const articleText = document.getElementById('articleText').textContent;
+                
+                if ('speechSynthesis' in window) {
+                    // 创建新的语音合成实例
+                    const utterance = new SpeechSynthesisUtterance();
+                    utterance.text = articleText;
+                    utterance.lang = 'zh-CN';
+                    utterance.rate = 0.9; // 稍微放慢语速
+                    
+                    // 语音开始时的回调
+                    utterance.onstart = function() {
+                        isSpeaking = true;
+                        playAudioBtn.innerHTML = '<i class="fas fa-stop text-xl"></i>';
+                    };
+                    
+                    // 语音结束时的回调
+                    utterance.onend = function() {
+                        isSpeaking = false;
+                        playAudioBtn.innerHTML = '<i class="fas fa-volume-up text-xl"></i>';
+                    };
+                    
+                    // 语音错误时的回调
+                    utterance.onerror = function(event) {
+                        console.error('语音合成错误:', event);
+                        isSpeaking = false;
+                        playAudioBtn.innerHTML = '<i class="fas fa-volume-up text-xl"></i>';
+                        
+                        // 显示错误提示
+                        const errorMsg = document.createElement('div');
+                        errorMsg.className = 'bg-red-100 text-red-800 p-2 rounded mt-2 text-sm';
+                        errorMsg.textContent = '朗读功能出错，请尝试使用其他浏览器';
+                        playAudioBtn.parentNode.appendChild(errorMsg);
+                        setTimeout(() => errorMsg.remove(), 3000);
+                    };
+                    
+                    // 开始朗读
+                    speechSynthesis.speak(utterance);
+                } else {
+                    // 浏览器不支持语音合成API
+                    const unsupportedMsg = document.createElement('div');
+                    unsupportedMsg.className = 'bg-yellow-100 text-yellow-800 p-2 rounded mt-2 text-sm';
+                    unsupportedMsg.textContent = '您的浏览器不支持文本朗读功能，请使用Chrome或Edge浏览器';
+                    playAudioBtn.parentNode.appendChild(unsupportedMsg);
+                    setTimeout(() => unsupportedMsg.remove(), 3000);
+                }
+            });
+
+            // 点击生字或生字卡片打开模态框并加载对应练习
+            const characterElements = document.querySelectorAll('.character, .character-card');
+            characterElements.forEach(el => {
+                el.addEventListener('click', function() {
+                    const char = this.getAttribute('data-char') || this.closest('[data-char]').getAttribute('data-char');
+                    currentCharacter = char;
+                    
+                    // 显示生字详情
+                    showCharacterModal(char);
+                    
+                    // 加载对应练习
+                    loadExercises(char);
+                });
+            });
+
+            // 显示生字详情模态框
+            function showCharacterModal(char) {
+                const modal = document.getElementById('characterModal');
+                const modalContent = document.getElementById('modalContent');
+                const charData = characters[char];
+                
+                // 构建模态框内容
+                let content = `
+                    <div class="text-center">
+                        <div class="text-6xl mb-4">${char}</div>
+                        <p class="text-xl text-gray-600 mb-6">拼音：${charData.pinyin}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-bold text-gray-700 mb-2">释义：</h4>
+                        <p>${charData.meaning}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h4 class="font-bold text-gray-700 mb-2">组词：</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${charData.words.map(word => `<span class="bg-gray-100 px-3 py-1 rounded-full">${word}</span>`).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                        <h4 class="font-bold text-gray-700 mb-2">笔顺：</h4>
+                        <p>${charData.strokeOrder}</p>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-bold text-gray-700 mb-2">例句：</h4>
+                        <p>${charData.example}</p>
+                    </div>
+                `;
+                
+                modalContent.innerHTML = content;
+                modal.classList.remove('hidden');
+            }
+
+            // 加载对应生字的练习题
+            function loadExercises(char) {
+                const exerciseContainer = document.getElementById('exerciseContainer');
+                const charData = characters[char];
+                
+                if (!charData || !charData.exercises) {
+                    exerciseContainer.innerHTML = '<p class="text-gray-500 text-center">暂无练习题</p>';
+                    return;
+                }
+                
+                let exercisesHTML = '';
+                
+                charData.exercises.forEach((exercise, index) => {
+                    if (exercise.type === 'choice') {
+                        exercisesHTML += `
+                            <div class="mb-6">
+                                <h3 class="font-bold text-brown-700 mb-3">${index + 1}. ${exercise.question}</h3>
+                                <div class="space-y-2">
+                                    ${exercise.options.map(option => `
+                                        <label class="flex items-center space-x-3 cursor-pointer">
+                                            <input type="radio" name="q${index}" class="form-radio text-brown-600" value="${option}">
+                                            <span>${option}</span>
+                                        </label>
+                                    `).join('')}
+                                </div>
+                                <div id="q${index}-feedback" class="answer-feedback"></div>
+                            </div>
+                        `;
+                    } else if (exercise.type === 'fill') {
+                        exercisesHTML += `
+                            <div class="mb-6">
+                                <h3 class="font-bold text-brown-700 mb-3">${index + 1}. ${exercise.question}</h3>
+                                <input type="text" id="q${index}-answer" class="border rounded px-3 py-2 w-full" placeholder="请输入答案">
+                                <div id="q${index}-feedback" class="answer-feedback"></div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                exerciseContainer.innerHTML = exercisesHTML;
+            }
+
+            // 关闭模态框
+            document.getElementById('closeModal').addEventListener('click', function() {
+                document.getElementById('characterModal').classList.add('hidden');
+            });
+
+            // 检查练习答案
+            document.getElementById('checkAnswers').addEventListener('click', function() {
+                if (!currentCharacter) {
+                    alert('请先选择一个生字');
+                    return;
+                }
+                
+                const charData = characters[currentCharacter];
+                if (!charData || !charData.exercises) return;
+                
+                charData.exercises.forEach((exercise, index) => {
+                    const feedbackEl = document.getElementById(`q${index}-feedback`);
+                    
+                    if (exercise.type === 'choice') {
+                        const selectedOption = document.querySelector(`input[name="q${index}"]:checked`);
+                        
+                        if (selectedOption && selectedOption.value === exercise.answer) {
+                            feedbackEl.textContent = '回答正确！';
+                            feedbackEl.className = 'answer-feedback correct';
+                        } else {
+                            feedbackEl.textContent = `回答错误，正确答案是"${exercise.answer}"`;
+                            feedbackEl.className = 'answer-feedback incorrect';
+                        }
+                        feedbackEl.style.display = 'block';
+                        
+                    } else if (exercise.type === 'fill') {
+                        const answer = document.getElementById(`q${index}-answer`).value.trim();
+                        
+                        if (answer === exercise.answer) {
+                            feedbackEl.textContent = '回答正确！';
+                            feedbackEl.className = 'answer-feedback correct';
+                        } else {
+                            feedbackEl.textContent = `回答错误，正确答案是"${exercise.answer}"`;
+                            feedbackEl.className = 'answer-feedback incorrect';
+                        }
+                        feedbackEl.style.display = 'block';
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字范围韦恩图生成器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f7f6;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        .input-group {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .range-input {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+
+        .result-info {
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 8px;
+            background: #e9ecef;
+            font-weight: bold;
+        }
+
+        #venn-container {
+            margin-top: 20px;
+            background: white;
+        }
+
+        circle {
+            transition: all 0.5s ease;
+            mix-blend-mode: multiply;
+        }
+
+        text {
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .label-a { fill: #ff4757; }
+        .label-b { fill: #1e90ff; }
+        
+        button {
+            background-color: #2ed573;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background-color: #26af61;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>数字范围韦恩图生成器</h2>
+        
+        <div class="input-group">
+            <div class="range-input">
+                <label>范围 A</label>
+                <div>
+                    [ <input type="number" id="aStart" value="1"> , 
+                    <input type="number" id="aEnd" value="10"> ]
+                </div>
+            </div>
+            <div class="range-input">
+                <label>范围 B</label>
+                <div>
+                    [ <input type="number" id="bStart" value="5"> , 
+                    <input type="number" id="bEnd" value="15"> ]
+                </div>
+            </div>
+        </div>
+
+        <button onclick="generateVenn()">生成关系图</button>
+
+        <div class="result-info" id="statusText">
+            请输入范围并点击生成
+        </div>
+
+        <svg id="venn-container" width="500" height="300" viewBox="0 0 500 300">
+            <!-- 两个圆 -->
+            <circle id="circleA" cx="200" cy="150" r="80" fill="rgba(255, 71, 87, 0.6)" />
+            <circle id="circleB" cx="300" cy="150" r="80" fill="rgba(30, 144, 255, 0.6)" />
+            
+            <!-- 标签 -->
+            <text id="textA" x="150" y="150" text-anchor="middle">A</text>
+            <text id="textB" x="350" y="150" text-anchor="middle">B</text>
+        </svg>
+    </div>
+
+    <script>
+        function generateVenn() {
+            const aStart = parseFloat(document.getElementById('aStart').value);
+            const aEnd = parseFloat(document.getElementById('aEnd').value);
+            const bStart = parseFloat(document.getElementById('bStart').value);
+            const bEnd = parseFloat(document.getElementById('bEnd').value);
+
+            if (aStart > aEnd || bStart > bEnd) {
+                alert("错误：起始值不能大于结束值！");
+                return;
+            }
+
+            const statusText = document.getElementById('statusText');
+            const cA = document.getElementById('circleA');
+            const cB = document.getElementById('circleB');
+            const tA = document.getElementById('textA');
+            const tB = document.getElementById('textB');
+
+            // 逻辑判断
+            let relationship = "";
+            let intersectionStart = Math.max(aStart, bStart);
+            let intersectionEnd = Math.min(aEnd, bEnd);
+
+            // 初始参数
+            let aConfig = { cx: 250, r: 80, opacity: 0.6 };
+            let bConfig = { cx: 250, r: 80, opacity: 0.6 };
+
+            if (aStart === bStart && aEnd === bEnd) {
+                relationship = "集合 A 等于 集合 B";
+                aConfig.cx = 250;
+                bConfig.cx = 250;
+            } 
+            else if (aStart >= bStart && aEnd <= bEnd) {
+                relationship = "集合 A 是 集合 B 的子集 (A ⊆ B)";
+                aConfig.cx = 250; aConfig.r = 50;
+                bConfig.cx = 250; bConfig.r = 90;
+            } 
+            else if (bStart >= aStart && bEnd <= aEnd) {
+                relationship = "集合 B 是 集合 A 的子集 (B ⊆ A)";
+                aConfig.cx = 250; aConfig.r = 90;
+                bConfig.cx = 250; bConfig.r = 50;
+            } 
+            else if (intersectionStart <= intersectionEnd) {
+                relationship = "两个集合部分重叠";
+                aConfig.cx = 200;
+                bConfig.cx = 300;
+            } 
+            else {
+                relationship = "两个集合完全相离 (无交集)";
+                aConfig.cx = 150;
+                bConfig.cx = 350;
+            }
+
+            // 更新文本
+            statusText.innerHTML = `关系：${relationship}<br>交集：${intersectionStart <= intersectionEnd ? `[${intersectionStart}, ${intersectionEnd}]` : "空集"}`;
+
+            // 应用动画更新 SVG
+            cA.setAttribute('cx', aConfig.cx);
+            cA.setAttribute('r', aConfig.r);
+            cB.setAttribute('cx', bConfig.cx);
+            cB.setAttribute('r', bConfig.r);
+
+            tA.setAttribute('x', aConfig.cx - (aConfig.cx === bConfig.cx ? 0 : 20));
+            tB.setAttribute('x', bConfig.cx + (aConfig.cx === bConfig.cx ? 0 : 20));
+            
+            tA.textContent = `A [${aStart}, ${aEnd}]`;
+            tB.textContent = `B [${bStart}, ${bEnd}]`;
+        }
+
+        // 初始化加载一次
+        window.onload = generateVenn;
+    </script>
+</body>
+</html>

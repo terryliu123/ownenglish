@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全能封面工坊 (修复版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;700;900&family=ZCOOL+KuaiLe&family=ZCOOL+XiaoWei&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Noto Sans SC', sans-serif; 
+            background-color: #f1f5f9; 
+            overscroll-behavior: none;
+            user-select: none;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* 选中框 & 手柄 */
+        .selected-box { outline: 2px dashed #3b82f6; z-index: 50; cursor: grab; }
+        .selected-box:active { cursor: grabbing; }
+        .resize-handle {
+            width: 14px; height: 14px;
+            background: #3b82f6; border: 2px solid white; border-radius: 50%;
+            position: absolute; bottom: -7px; right: -7px;
+            cursor: nwse-resize; pointer-events: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        /* 动画 */
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
+        
+        /* 棋盘格背景 */
+        .checkered-bg {
+            background-image: 
+                linear-gradient(45deg, #cbd5e1 25%, transparent 25%), 
+                linear-gradient(-45deg, #cbd5e1 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #cbd5e1 75%), 
+                linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+
+        /* 九宫格辅助线 */
+        .grid-line-h {
+            position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 2px rgba(0,0,0,0.3); pointer-events: none; z-index: 20;
+        }
+        .grid-line-v {
+            position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.8);
+            box-shadow: 0 0 2px rgba(0,0,0,0.3); pointer-events: none; z-index: 20;
+        }
+        /* 暗色遮罩层 */
+        .crop-overlay-mask {
+            position: absolute; inset: 0; 
+            box-shadow: 0 0 0 9999px rgba(0,0,0,0.5); 
+            z-index: 10; pointer-events: none;
+        }
+
+        .modal-mask {
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="h-screen flex overflow-hidden text-slate-800">
+
+    <div id="app" class="w-full h-full flex flex-col md:flex-row">
+        
+        <!-- 左侧：功能面板 -->
+        <div class="w-full md:w-[400px] bg-white border-r border-slate-200 flex flex-col h-full z-20 shadow-xl shrink-0">
+            <!-- Header -->
+            <div class="p-5 border-b border-slate-100 flex items-center justify-between z-10 bg-white">
+                <div class="flex items-center gap-2 text-blue-600">
+                    <i data-lucide="layout-grid" size="24"></i>
+                    <h1 class="font-black text-xl tracking-tight text-slate-800">封面工坊 Pro</h1>
+                </div>
+                <button @click="download" :disabled="!bgImage" class="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all disabled:opacity-50 shadow-lg active:scale-95">
+                    <i data-lucide="download" size="16"></i> 导出
+                </button>
+            </div>
+
+            <!-- 滚动内容区 -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-8 no-scrollbar bg-slate-50">
+                <!-- 1. 模板选择 -->
+                <section>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">🔥 爆款模板</h3>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div v-for="tpl in templates" :key="tpl.name" @click="applyTemplate(tpl)"
+                            class="relative aspect-[4/3] bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-blue-500 hover:shadow-md transition-all overflow-hidden group">
+                            <div class="absolute inset-0 flex flex-col items-center justify-center p-2 gap-1 pointer-events-none">
+                                <div :class="['w-3/4 h-2 rounded-sm', tpl.colorClass]"></div>
+                                <div class="w-1/2 h-1.5 bg-slate-200 rounded-sm"></div>
+                            </div>
+                            <div class="absolute bottom-0 left-0 right-0 bg-slate-900/5 text-center py-1">
+                                <span class="text-[10px] font-bold text-slate-600">{{ tpl.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. 图片设置 -->
+                <section class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm ring-1 ring-slate-100">
+                    <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center justify-between">
+                        <span class="flex items-center gap-2"><i data-lucide="image" size="16" class="text-blue-500"></i> 底图设置</span>
+                    </h3>
+                    
+                    <div class="flex gap-3 mb-4">
+                        <div class="relative flex-1 group">
+                             <input type="file" accept="image/*" @change="handleImageUpload" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                             <button class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold border border-slate-200 transition-colors flex justify-center items-center gap-2">
+                                <i data-lucide="image-plus" size="14"></i> {{ bgImage ? '更换图片' : '上传图片' }}
+                             </button>
+                        </div>
+                        <select v-model="currentRatio" class="flex-1 bg-slate-100 text-xs font-bold text-slate-600 rounded-lg border-transparent px-2 outline-none cursor-pointer">
+                            <option :value="{w:1200, h:1600}">3:4 (小红书)</option>
+                            <option :value="{w:1920, h:1080}">16:9 (横屏)</option>
+                            <option :value="{w:1200, h:1200}">1:1 (方图)</option>
+                        </select>
+                    </div>
+
+                    <div v-if="bgImage" class="mb-4">
+                        <button @click="openCropModal" class="w-full py-3 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors border border-blue-200 shadow-sm">
+                            <i data-lucide="crop" size="16"></i> 调整画面 / 裁剪
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-slate-500 w-8 font-bold">暗角</span>
+                        <input type="range" v-model="maskOpacity" min="0" max="0.8" step="0.05" class="flex-1 accent-slate-600 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </section>
+
+                <!-- 3. 添加内容 -->
+                <section>
+                    <div class="grid grid-cols-2 gap-3 mb-4">
+                        <button @click="addLayer('text')" class="flex items-center justify-center gap-2 bg-white border border-slate-200 py-3 rounded-xl hover:border-blue-400 hover:shadow-sm transition-all text-slate-700 font-bold text-xs group">
+                            <div class="w-6 h-6 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="type" size="14"></i></div>
+                            添加文字
+                        </button>
+                        <button @click="showStickerPanel = !showStickerPanel" :class="['flex items-center justify-center gap-2 border py-3 rounded-xl transition-all font-bold text-xs group', showStickerPanel ? 'bg-orange-50 border-orange-400 text-orange-700' : 'bg-white border-slate-200 text-slate-700 hover:border-orange-400']">
+                            <div class="w-6 h-6 rounded-full bg-orange-50 text-orange-500 flex items-center justify-center group-hover:scale-110 transition-transform"><i data-lucide="sticker" size="14"></i></div>
+                            添加贴纸
+                        </button>
+                    </div>
+
+                    <!-- 贴纸面板 -->
+                    <transition name="fade">
+                        <div v-if="showStickerPanel" class="bg-white p-4 rounded-xl border border-orange-200 shadow-sm mb-4">
+                            <div class="flex gap-4 border-b border-slate-100 pb-2 mb-3 overflow-x-auto no-scrollbar">
+                                <button v-for="(group, key) in stickerGroups" :key="key" @click="currentStickerTab = key"
+                                    :class="['text-xs font-bold pb-1 whitespace-nowrap transition-colors', currentStickerTab === key ? 'text-orange-500 border-b-2 border-orange-500' : 'text-slate-400 hover:text-orange-400']">
+                                    {{ group.name }}
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-6 gap-2">
+                                <button v-for="emoji in stickerGroups[currentStickerTab].items" :key="emoji" 
+                                    @click="addLayer('sticker', emoji)"
+                                    class="aspect-square flex items-center justify-center text-xl hover:bg-orange-50 rounded-lg transition-transform hover:scale-110 cursor-pointer">
+                                    {{ emoji }}
+                                </button>
+                            </div>
+                        </div>
+                    </transition>
+
+                    <!-- 图层列表 -->
+                    <div class="space-y-2">
+                        <div v-for="(layer, index) in layers" :key="layer.id"
+                             @click="selectLayer(index)"
+                             :class="['flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all', 
+                                activeLayerIndex === index ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : 'bg-white border-slate-200 hover:border-blue-200']">
+                             <div class="text-slate-400 text-xs font-mono w-4">{{ index + 1 }}</div>
+                             <div class="flex-1 truncate text-sm font-medium text-slate-700">{{ layer.content }}</div>
+                             <button @click.stop="removeLayer(index)" class="text-slate-300 hover:text-red-500 px-2"><i data-lucide="trash-2" size="14"></i></button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- 右侧：交互画布 -->
+        <div class="flex-1 bg-slate-200 relative overflow-hidden flex items-center justify-center p-4 md:p-10"
+             @mousedown="handleStageMouseDown">
+             
+            <!-- 棋盘格背景层 (单独一层，避免被遮挡) -->
+            <div class="absolute inset-0 checkered-bg pointer-events-none opacity-50"></div>
+            
+            <div v-if="!bgImage" class="absolute pointer-events-none flex flex-col items-center text-slate-400 z-10">
+                <i data-lucide="image-plus" size="48" class="mb-2 opacity-50"></i>
+                <p class="font-medium mt-2">请在左侧上传底图</p>
+            </div>
+
+            <!-- 画布核心 -->
+            <div v-if="bgImage"
+                 ref="canvasRef"
+                 class="relative shadow-2xl bg-white group overflow-hidden transition-shadow select-none z-10"
+                 :style="{
+                     aspectRatio: `${currentRatio.w}/${currentRatio.h}`,
+                     height: 'min(85vh, 100%)',
+                     maxWidth: '100%'
+                 }">
+                
+                <!-- 1. 背景层 -->
+                <div class="absolute w-full h-full bg-slate-100 overflow-hidden">
+                     <img :src="bgImage" 
+                          class="absolute origin-center pointer-events-none will-change-transform"
+                          :style="computedImgStyle">
+                </div>
+                
+                <!-- 2. 遮罩 -->
+                <div class="absolute inset-0 bg-black pointer-events-none transition-opacity" :style="{ opacity: maskOpacity }"></div>
+
+                <!-- 3. 图层 -->
+                <div v-for="(layer, index) in layers" :key="layer.id"
+                     class="absolute origin-center flex items-center justify-center leading-tight whitespace-pre-wrap text-center select-none"
+                     @mousedown.stop="startLayerDrag($event, index)"
+                     :class="[ activeLayerIndex === index ? 'selected-box' : '' ]"
+                     :style="{
+                         left: layer.x + '%',
+                         top: layer.y + '%',
+                         transform: `translate(-50%, -50%) rotate(${layer.rotation}deg)`,
+                         fontSize: layer.size + 'px',
+                         color: layer.color || 'inherit',
+                         fontFamily: layer.type === 'text' ? getFontName(layer.fontFamily) : 'inherit',
+                         fontWeight: layer.type === 'text' && layer.isBold ? '900' : '400',
+                         backgroundColor: layer.bgColor,
+                         padding: layer.type === 'text' && layer.bgColor !== 'transparent' ? '0.2em 0.4em' : '0',
+                         borderRadius: layer.type === 'text' ? '6px' : '0',
+                         textShadow: (layer.type === 'text' && layer.bgColor === 'transparent') ? '0 2px 4px rgba(0,0,0,0.3)' : 'none',
+                         minWidth: '20px'
+                     }">
+                     {{ layer.content }}
+                     <div v-if="activeLayerIndex === index" class="resize-handle" @mousedown.stop="startLayerResize($event, index)"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 全局事件层 -->
+        <div v-if="interaction.mode" class="fixed inset-0 z-40 cursor-default" 
+             @mousemove="handleGlobalMouseMove" 
+             @mouseup="handleGlobalMouseUp"></div>
+
+        <!-- ✂️ 裁剪模态框 (修复版) ✂️ -->
+        <transition name="fade">
+            <div v-if="showCropModal" class="fixed inset-0 z-[100] modal-mask flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+                    
+                    <!-- 标题栏 -->
+                    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <h3 class="font-bold text-lg text-slate-800">调整画面</h3>
+                        <button @click="cancelCrop" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" size="24"></i></button>
+                    </div>
+
+                    <!-- 裁剪操作区 (深色背景) -->
+                    <div class="flex-1 bg-slate-800 relative overflow-hidden flex items-center justify-center p-8 select-none"
+                         @mousedown="startCropPan"
+                         @mousemove="handleCropPan"
+                         @mouseup="endCropPan"
+                         @mouseleave="endCropPan">
+                        
+                        <!-- 容器：模拟当前比例 (关键：使用 transform scale 来适配模态框) -->
+                        <div class="relative shadow-2xl bg-white" 
+                             ref="modalPreviewRef"
+                             :style="{
+                                 width: modalBaseDims.w + 'px',
+                                 height: modalBaseDims.h + 'px',
+                                 transform: `scale(${modalScale})`,
+                                 transformOrigin: 'center center'
+                             }">
+                             
+                             <!-- 1. 图片预览 (使用绝对定位 + 同样的 computedTempImgStyle) -->
+                             <div class="absolute inset-0 overflow-hidden bg-slate-200">
+                                <!-- 这里我们渲染一个和主画布一模一样的结构 -->
+                                <img :src="bgImage" 
+                                     class="absolute origin-center will-change-transform cursor-move"
+                                     draggable="false"
+                                     :style="computedTempImgStyle">
+                             </div>
+                             
+                             <!-- 2. 九宫格辅助线 (绝对定位，浮在最上) -->
+                             <div class="absolute inset-0 z-20 pointer-events-none">
+                                 <div class="grid-line-h" style="top: 33.33%"></div>
+                                 <div class="grid-line-h" style="top: 66.66%"></div>
+                                 <div class="grid-line-v" style="left: 33.33%"></div>
+                                 <div class="grid-line-v" style="left: 66.66%"></div>
+                                 <!-- 外部边框 -->
+                                 <div class="absolute inset-0 border border-white/50"></div>
+                             </div>
+                        </div>
+                    </div>
+
+                    <!-- 底部控制栏 -->
+                    <div class="px-8 py-6 bg-white border-t border-slate-100">
+                        <div class="flex items-center gap-4 mb-6">
+                            <i data-lucide="minus-circle" size="20" class="text-slate-400"></i>
+                            <input type="range" v-model.number="tempImgState.userScale" min="0.5" max="3" step="0.01" 
+                                   class="flex-1 accent-red-500 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                            <i data-lucide="plus-circle" size="20" class="text-slate-400"></i>
+                            <span class="text-xs font-mono text-slate-500 w-10 text-right">{{ tempImgState.userScale.toFixed(1) }}x</span>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <button @click="cancelCrop" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors">
+                                取消
+                            </button>
+                            <button @click="confirmCrop" class="flex-1 py-3 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg shadow-red-200 transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="check" size="18"></i> 确认裁剪
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </transition>
+
+        <canvas ref="exportCanvas" class="hidden"></canvas>
+    </div>
+
+    <script>
+        const { createApp, ref, reactive, computed, onMounted, watch, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                // --- 状态 ---
+                const bgImage = ref(null);
+                const bgImgObj = ref(null);
+                const currentRatio = ref({ w: 1200, h: 1600 });
+                const maskOpacity = ref(0.2);
+                const canvasRef = ref(null);
+                const exportCanvas = ref(null);
+                const modalPreviewRef = ref(null);
+                
+                // 弹窗控制
+                const showStickerPanel = ref(false);
+                const showCropModal = ref(false);
+
+                const layers = ref([]);
+                const activeLayerIndex = ref(-1);
+
+                // --- 图片状态 ---
+                // 真实应用到画布的状态
+                const imgState = reactive({ userScale: 1, panX: 0, panY: 0 });
+                // 裁剪模态框中的临时状态
+                const tempImgState = reactive({ userScale: 1, panX: 0, panY: 0 });
+                // 基础适配状态 (Base Fit) - 核心：这是基于主画布 DOM 尺寸计算的
+                const baseState = reactive({ w: 0, h: 0, left: 0, top: 0 });
+
+                // 模态框适配
+                const modalBaseDims = reactive({ w: 300, h: 400 }); // 模态框内预览框的物理尺寸(未缩放前)
+                const modalScale = ref(1); // 缩放因子，让大尺寸预览框适应模态框屏幕
+
+                // 交互
+                const interaction = reactive({ mode: null, startX: 0, startY: 0, initialValX: 0, initialValY: 0, initialSize: 0 });
+                // 裁剪拖拽
+                const cropDrag = reactive({ isDragging: false, startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+                // 贴纸库
+                const currentStickerTab = ref('marks');
+                const stickerGroups = {
+                    marks: { name: '重点', items: ['✅', '❌', '⭕️', '‼️', '❓', '📌', '📍', '🔍'] },
+                    decor: { name: '装饰', items: ['✨', '🔥', '💡', '🌟', '💥', '🍀', '🌸', '🌈'] },
+                    arrow: { name: '指向', items: ['⬆️', '⬇️', '⬅️', '➡️', '↗️', '↘️', '👉', '👇'] },
+                    num: { name: '数字', items: ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '❶', '❷', '❸'] }
+                };
+
+                // 模板
+                const templates = [
+                    {
+                        name: "大字报", colorClass: "bg-yellow-400",
+                        apply: () => {
+                            maskOpacity.value = 0.4;
+                            layers.value = [
+                                { id: 1, type: 'text', content: "零基础\n学会Python", x: 50, y: 40, size: 60, rotation: 0, color: "#ffffff", bgColor: "transparent", fontFamily: "font-sans", isBold: true },
+                                { id: 2, type: 'text', content: "收藏这一篇就够了", x: 50, y: 58, size: 28, rotation: 0, color: "#000000", bgColor: "#facc15", fontFamily: "font-sans", isBold: true }
+                            ];
+                        }
+                    },
+                    {
+                        name: "清单体", colorClass: "bg-green-500",
+                        apply: () => {
+                            maskOpacity.value = 0.2;
+                            layers.value = [
+                                { id: 1, type: 'text', content: "英语口语\n万能句型", x: 50, y: 20, size: 48, rotation: 0, color: "#ffffff", bgColor: "transparent", fontFamily: "font-art", isBold: true },
+                                { id: 2, type: 'text', content: "1. I'm gonna...", x: 50, y: 45, size: 28, rotation: 0, color: "#ffffff", bgColor: "#22c55e", fontFamily: "font-sans", isBold: true },
+                                { id: 3, type: 'text', content: "2. You gotta...", x: 50, y: 55, size: 28, rotation: 0, color: "#ffffff", bgColor: "#22c55e", fontFamily: "font-sans", isBold: true },
+                            ];
+                        }
+                    },
+                    {
+                        name: "知识卡片", colorClass: "bg-white",
+                        apply: () => {
+                            maskOpacity.value = 0.6;
+                            layers.value = [
+                                { id: 1, type: 'text', content: "今日单词", x: 50, y: 30, size: 30, rotation: 0, color: "#cbd5e1", bgColor: "transparent", fontFamily: "font-serif", isBold: false },
+                                { id: 2, type: 'text', content: "Serendipity", x: 50, y: 45, size: 50, rotation: 0, color: "#fef08a", bgColor: "transparent", fontFamily: "font-serif", isBold: false },
+                                { id: 3, type: 'text', content: "不期而遇的美好", x: 50, y: 60, size: 24, rotation: 0, color: "#ffffff", bgColor: "transparent", fontFamily: "font-sans", isBold: false }
+                            ];
+                        }
+                    },
+                    {
+                        name: "可爱手账", colorClass: "bg-pink-400",
+                        apply: () => {
+                            maskOpacity.value = 0.1;
+                            layers.value = [
+                                { id: 1, type: 'text', content: "周末去哪玩?", x: 50, y: 45, size: 55, rotation: -5, color: "#db2777", bgColor: "#fce7f3", fontFamily: "font-cute", isBold: false },
+                                { id: 2, type: 'sticker', content: "✨", x: 80, y: 30, size: 60, rotation: 15, bgColor: "transparent" },
+                                { id: 3, type: 'sticker', content: "🌸", x: 20, y: 60, size: 50, rotation: -10, bgColor: "transparent" }
+                            ];
+                        }
+                    }
+                ];
+
+                // --- 计算逻辑 ---
+                const calculateBaseFit = () => {
+                    if (!bgImgObj.value || !canvasRef.value) return;
+                    const rect = canvasRef.value.getBoundingClientRect();
+                    const cw = rect.width; const ch = rect.height;
+                    const iw = bgImgObj.value.width; const ih = bgImgObj.value.height;
+                    
+                    // 计算基于主画布的 Base Fit
+                    const scale = Math.max(cw / iw, ch / ih); // Cover
+                    baseState.w = iw * scale;
+                    baseState.h = ih * scale;
+                    baseState.left = (cw - baseState.w) / 2;
+                    baseState.top = (ch - baseState.h) / 2;
+
+                    // 同步设置模态框的基础尺寸（镜像主画布的尺寸）
+                    modalBaseDims.w = cw;
+                    modalBaseDims.h = ch;
+                };
+                watch(currentRatio, () => setTimeout(calculateBaseFit, 100));
+
+                // 样式计算工厂函数
+                const getImgStyle = (state) => ({
+                    width: baseState.w + 'px', height: baseState.h + 'px',
+                    left: baseState.left + 'px', top: baseState.top + 'px',
+                    transform: `translate(${state.panX}px, ${state.panY}px) scale(${state.userScale})`
+                });
+
+                const computedImgStyle = computed(() => getImgStyle(imgState));
+                const computedTempImgStyle = computed(() => getImgStyle(tempImgState));
+
+                // --- 裁剪模态框逻辑 ---
+
+                const openCropModal = () => {
+                    // 1. 同步数据
+                    Object.assign(tempImgState, imgState);
+                    showCropModal.value = true;
+                    
+                    // 2. 计算模态框适配缩放 (让主画布的尺寸适配模态框屏幕)
+                    // 假设模态框最大显示区域是 500x500 (CSS估算)
+                    // 我们在 nextTick 后获取主画布的尺寸，然后计算 scale
+                    nextTick(() => {
+                         if (!canvasRef.value) return;
+                         const cw = canvasRef.value.getBoundingClientRect().width;
+                         const ch = canvasRef.value.getBoundingClientRect().height;
+                         // 设置虚拟容器尺寸 = 主画布尺寸
+                         modalBaseDims.w = cw;
+                         modalBaseDims.h = ch;
+
+                         // 计算缩放：假设模态框可用高度约 400px，宽度 500px
+                         const maxW = window.innerWidth * 0.8; 
+                         const maxH = window.innerHeight * 0.5;
+                         const scaleW = maxW / cw;
+                         const scaleH = maxH / ch;
+                         modalScale.value = Math.min(scaleW, scaleH, 1); // 缩放到合适大小，最大为1
+                    });
+                };
+
+                const cancelCrop = () => { showCropModal.value = false; };
+                const confirmCrop = () => { Object.assign(imgState, tempImgState); showCropModal.value = false; };
+
+                // 裁剪拖拽 (只更新 tempImgState)
+                const startCropPan = (e) => {
+                    cropDrag.isDragging = true;
+                    cropDrag.startX = e.clientX;
+                    cropDrag.startY = e.clientY;
+                    cropDrag.initialX = tempImgState.panX;
+                    cropDrag.initialY = tempImgState.panY;
+                };
+                const handleCropPan = (e) => {
+                    if (!cropDrag.isDragging) return;
+                    // 注意：因为模态框被缩放了(modalScale)，鼠标移动 1px 对应的实际像素需要除以 scale
+                    const dx = (e.clientX - cropDrag.startX) / modalScale.value;
+                    const dy = (e.clientY - cropDrag.startY) / modalScale.value;
+                    tempImgState.panX = cropDrag.initialX + dx;
+                    tempImgState.panY = cropDrag.initialY + dy;
+                };
+                const endCropPan = () => { cropDrag.isDragging = false; };
+
+                // --- 基础功能 ---
+                const handleImageUpload = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            bgImage.value = evt.target.result;
+                            const img = new Image();
+                            img.src = evt.target.result;
+                            img.onload = () => {
+                                bgImgObj.value = img;
+                                calculateBaseFit();
+                                // 重置状态并打开裁剪
+                                imgState.userScale = 1; imgState.panX = 0; imgState.panY = 0;
+                                openCropModal();
+                            };
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+
+                // 图层操作
+                const handleStageMouseDown = () => { if(bgImage.value) activeLayerIndex.value = -1; };
+                const addLayer = (type, content) => {
+                    layers.value.push({
+                        id: Date.now(), type, content: content || (type === 'text' ? "双击编辑" : "✨"),
+                        x: 50, y: 50, size: type === 'text' ? 40 : 80, rotation: 0,
+                        color: type === 'text' ? "#ffffff" : null, bgColor: "transparent",
+                        fontFamily: "font-sans", isBold: true
+                    });
+                    activeLayerIndex.value = layers.value.length - 1;
+                };
+                const removeLayer = (idx) => { layers.value.splice(idx, 1); activeLayerIndex.value = -1; };
+                const selectLayer = (idx) => { activeLayerIndex.value = idx; };
+                const applyTemplate = (tpl) => { tpl.apply(); activeLayerIndex.value = 0; };
+                const getFontName = (key) => ({ 'font-sans':'Noto Sans SC', 'font-art':'Ma Shan Zheng', 'font-cute':'ZCOOL KuaiLe', 'font-serif':'ZCOOL XiaoWei' }[key] || 'sans-serif');
+
+                // 图层拖拽
+                const startLayerDrag = (e, index) => {
+                    activeLayerIndex.value = index;
+                    interaction.mode = 'layer_drag';
+                    interaction.startX = e.clientX;
+                    interaction.startY = e.clientY;
+                    interaction.initialValX = layers.value[index].x;
+                    interaction.initialValY = layers.value[index].y;
+                };
+                const startLayerResize = (e, index) => {
+                    activeLayerIndex.value = index;
+                    interaction.mode = 'layer_resize';
+                    interaction.startX = e.clientX;
+                    interaction.initialSize = layers.value[index].size;
+                };
+                const handleGlobalMouseMove = (e) => {
+                    if (!interaction.mode) return;
+                    const dx = e.clientX - interaction.startX;
+                    const dy = e.clientY - interaction.startY;
+                    if (interaction.mode === 'layer_drag') {
+                        const rect = canvasRef.value.getBoundingClientRect();
+                        layers.value[activeLayerIndex.value].x = interaction.initialValX + (dx/rect.width)*100;
+                        layers.value[activeLayerIndex.value].y = interaction.initialValY + (dy/rect.height)*100;
+                    } else if (interaction.mode === 'layer_resize') {
+                        layers.value[activeLayerIndex.value].size = Math.max(12, interaction.initialSize + dx*0.5);
+                    }
+                };
+                const handleGlobalMouseUp = () => { interaction.mode = null; };
+
+                // --- 导出逻辑 ---
+                const download = () => {
+                    if (!bgImage.value) return;
+                    const canvas = exportCanvas.value;
+                    const ctx = canvas.getContext('2d');
+                    const w = currentRatio.value.w;
+                    const h = currentRatio.value.h;
+                    canvas.width = w; canvas.height = h;
+
+                    ctx.beginPath(); ctx.rect(0,0,w,h); ctx.clip();
+
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.src = bgImage.value;
+                    img.onload = () => {
+                        ctx.save();
+                        ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+                        
+                        const domRect = canvasRef.value.getBoundingClientRect();
+                        const exportScaleFactor = w / domRect.width;
+
+                        const iw = img.width; const ih = img.height;
+                        const baseScale = Math.max(w/iw, h/ih);
+                        const bw = iw * baseScale; const bh = ih * baseScale;
+                        const bLeft = (w - bw) / 2; const bTop = (h - bh) / 2;
+
+                        ctx.translate(bLeft, bTop);
+                        ctx.translate(bw/2, bh/2);
+                        ctx.translate(imgState.panX * exportScaleFactor, imgState.panY * exportScaleFactor);
+                        ctx.scale(imgState.userScale, imgState.userScale);
+                        ctx.translate(-bw/2, -bh/2);
+                        ctx.drawImage(img, 0, 0, bw, bh);
+                        ctx.restore();
+
+                        if(maskOpacity.value > 0) {
+                            ctx.fillStyle = `rgba(0,0,0,${maskOpacity.value})`;
+                            ctx.fillRect(0,0,w,h);
+                        }
+
+                        layers.value.forEach(layer => {
+                            const size = layer.size * exportScaleFactor;
+                            const x = w * (layer.x/100); const y = h * (layer.y/100);
+                            ctx.save();
+                            ctx.translate(x, y);
+                            ctx.rotate(layer.rotation * Math.PI / 180);
+                            const fontName = getFontName(layer.fontFamily);
+                            ctx.font = `${layer.isBold?'900':'400'} ${size}px "${fontName}", sans-serif`;
+                            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                            if (layer.type === 'text') {
+                                const lines = layer.content.split('\n');
+                                const lh = size * 1.2;
+                                const totalH = (lines.length - 1) * lh;
+                                lines.forEach((line, i) => {
+                                    const ly = -(totalH/2) + i*lh;
+                                    if(layer.bgColor !== 'transparent'){
+                                        const m = ctx.measureText(line);
+                                        const p = size * 0.2;
+                                        ctx.fillStyle = layer.bgColor;
+                                        ctx.beginPath(); ctx.roundRect(-m.width/2 - p, ly - size*0.6, m.width + p*2, size*1.2, 6*exportScaleFactor); ctx.fill();
+                                    }
+                                    ctx.fillStyle = layer.color;
+                                    ctx.fillText(line, 0, ly);
+                                });
+                            } else {
+                                ctx.fillText(layer.content, 0, 0);
+                            }
+                            ctx.restore();
+                        });
+
+                        const link = document.createElement('a');
+                        link.download = `cover_${Date.now()}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    };
+                };
+
+                onMounted(() => lucide.createIcons());
+
+                return {
+                    bgImage, currentRatio, maskOpacity, layers, activeLayerIndex, templates,
+                    showStickerPanel, stickerGroups, currentStickerTab, 
+                    showCropModal, openCropModal, cancelCrop, confirmCrop,
+                    tempImgState, startCropPan, handleCropPan, endCropPan,
+                    imgState, interaction, computedImgStyle, computedTempImgStyle,
+                    handleImageUpload, applyTemplate, addLayer, removeLayer, selectLayer, getFontName,
+                    handleStageMouseDown, startLayerDrag, startLayerResize, handleGlobalMouseMove, handleGlobalMouseUp,
+                    canvasRef, exportCanvas, download, modalBaseDims, modalScale, modalPreviewRef
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

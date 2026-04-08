@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>环保小卫士 - 触屏版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        body {
+            font-family: 'ZCOOL KuaiLe', cursive, sans-serif;
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: hidden; /* 禁止页面滚动 */
+            touch-action: none; /* 关键：禁止浏览器默认手势 */
+        }
+
+        /* 垃圾卡片样式 */
+        .trash-item {
+            cursor: grab;
+            touch-action: none;
+            position: relative; /* 用于位移定位 */
+            z-index: 50;
+            /* 初始不设置transition，拖拽时更跟手，释放时加上transition实现回弹 */
+        }
+        .trash-item.dragging {
+            opacity: 0.8;
+            cursor: grabbing;
+            transform: scale(1.1);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            transition: none; /* 拖拽时移除过渡，防止延迟 */
+            z-index: 100;
+        }
+        .trash-item.returning {
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* 垃圾桶交互反馈 */
+        .bin {
+            transition: transform 0.2s, filter 0.2s;
+        }
+        .bin.hovered {
+            transform: scale(1.1) translateY(-10px);
+            filter: brightness(1.1);
+            z-index: 10;
+        }
+
+        /* 动画定义 */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-10px) rotate(-5deg); }
+            40% { transform: translateX(10px) rotate(5deg); }
+            60% { transform: translateX(-10px); }
+            80% { transform: translateX(10px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0) rotate(180deg); opacity: 0; }
+            60% { transform: scale(1.1); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .animate-pop {
+            animation: pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        /* 漂浮分数 */
+        .float-score {
+            position: fixed;
+            pointer-events: none;
+            font-weight: 900;
+            font-size: 2rem;
+            color: #10b981;
+            z-index: 200;
+            text-shadow: 2px 2px 0 #fff;
+            animation: floatUp 1s ease-out forwards;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-80px) scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between py-4 select-none">
+
+    <!-- 顶部栏 -->
+    <div class="w-full px-4 flex justify-between items-center z-10">
+        <div>
+            <h1 class="text-2xl md:text-4xl text-gray-800 drop-shadow-md">♻️ 垃圾分类</h1>
+        </div>
+        <div class="bg-white px-4 py-2 rounded-full shadow-lg border border-gray-200 flex items-center">
+            <span class="text-gray-500 text-sm mr-2">得分</span>
+            <span id="score" class="text-2xl text-blue-600 font-bold min-w-[40px] text-center">0</span>
+        </div>
+    </div>
+
+    <!-- 游戏主舞台 (垃圾生成区) -->
+    <div class="flex-1 flex flex-col items-center justify-center relative w-full">
+        <!-- 提示语 -->
+        <div id="feedback" class="absolute top-10 text-lg text-gray-400 font-bold transition-opacity duration-300 opacity-0 pointer-events-none">
+            拖动垃圾到对应桶内
+        </div>
+
+        <!-- 垃圾容器 -->
+        <div id="trash-container" class="relative w-full h-full flex items-center justify-center">
+            <!-- 垃圾元素会生成在这里 -->
+        </div>
+    </div>
+
+    <!-- 底部垃圾桶区域 -->
+    <div class="w-full px-2 pb-6 grid grid-cols-4 gap-2 md:gap-6 z-10">
+        
+        <!-- 蓝色：可回收 -->
+        <div class="bin relative flex flex-col items-center" data-type="recyclable">
+            <div class="w-full aspect-[3/5] md:aspect-[3/4] bg-blue-500 rounded-t-lg rounded-b-xl shadow-lg border-b-4 border-blue-700 flex flex-col items-center justify-center p-1 relative">
+                <i class="fas fa-recycle text-white/90 text-2xl md:text-5xl mb-1 pointer-events-none"></i>
+                <span class="text-white font-bold text-xs md:text-lg pointer-events-none">可回收</span>
+            </div>
+            <!-- 盖子 -->
+            <div class="absolute -top-2 w-[90%] h-3 bg-blue-600 rounded-sm shadow pointer-events-none"></div>
+        </div>
+
+        <!-- 红色：有害 -->
+        <div class="bin relative flex flex-col items-center" data-type="hazardous">
+            <div class="w-full aspect-[3/5] md:aspect-[3/4] bg-red-500 rounded-t-lg rounded-b-xl shadow-lg border-b-4 border-red-700 flex flex-col items-center justify-center p-1 relative">
+                <i class="fas fa-skull-crossbones text-white/90 text-2xl md:text-5xl mb-1 pointer-events-none"></i>
+                <span class="text-white font-bold text-xs md:text-lg pointer-events-none">有害</span>
+            </div>
+            <div class="absolute -top-2 w-[90%] h-3 bg-red-600 rounded-sm shadow pointer-events-none"></div>
+        </div>
+
+        <!-- 绿色：厨余 -->
+        <div class="bin relative flex flex-col items-center" data-type="food">
+            <div class="w-full aspect-[3/5] md:aspect-[3/4] bg-green-500 rounded-t-lg rounded-b-xl shadow-lg border-b-4 border-green-700 flex flex-col items-center justify-center p-1 relative">
+                <i class="fas fa-fish text-white/90 text-2xl md:text-5xl mb-1 pointer-events-none"></i>
+                <span class="text-white font-bold text-xs md:text-lg pointer-events-none">厨余</span>
+            </div>
+            <div class="absolute -top-2 w-[90%] h-3 bg-green-600 rounded-sm shadow pointer-events-none"></div>
+        </div>
+
+        <!-- 灰色：其他 -->
+        <div class="bin relative flex flex-col items-center" data-type="residual">
+            <div class="w-full aspect-[3/5] md:aspect-[3/4] bg-gray-600 rounded-t-lg rounded-b-xl shadow-lg border-b-4 border-gray-800 flex flex-col items-center justify-center p-1 relative">
+                <i class="fas fa-trash-alt text-white/90 text-2xl md:text-5xl mb-1 pointer-events-none"></i>
+                <span class="text-white font-bold text-xs md:text-lg pointer-events-none">其他</span>
+            </div>
+            <div class="absolute -top-2 w-[90%] h-3 bg-gray-700 rounded-sm shadow pointer-events-none"></div>
+        </div>
+    </div>
+
+    <!-- 结算弹窗 -->
+    <div id="game-over-modal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center backdrop-blur-md">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl text-center w-80 animate-pop">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-2xl font-bold text-gray-800 mb-2">挑战完成!</h2>
+            <p class="text-gray-500 text-sm mb-4">最终得分</p>
+            <div class="text-6xl font-black text-blue-600 mb-6 font-mono" id="final-score">0</div>
+            <button onclick="restartGame()" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
+                再来一局
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // === 1. 游戏数据 ===
+        const TRASH_DATA = [
+            { name: '矿泉水瓶', icon: '🥤', type: 'recyclable', color: 'text-blue-500' },
+            { name: '旧报纸', icon: '📰', type: 'recyclable', color: 'text-blue-500' },
+            { name: '快递箱', icon: '📦', type: 'recyclable', color: 'text-blue-500' },
+            { name: '废电池', icon: '🔋', type: 'hazardous', color: 'text-red-500' },
+            { name: '过期药', icon: '💊', type: 'hazardous', color: 'text-red-500' },
+            { name: '温度计', icon: '🌡️', type: 'hazardous', color: 'text-red-500' },
+            { name: '西瓜皮', icon: '🍉', type: 'food', color: 'text-green-500' },
+            { name: '鱼骨头', icon: '🐟', type: 'food', color: 'text-green-500' },
+            { name: '剩饭菜', icon: '🍚', type: 'food', color: 'text-green-500' },
+            { name: '脏纸巾', icon: '🧻', type: 'residual', color: 'text-gray-500' },
+            { name: '烟头', icon: '🚬', type: 'residual', color: 'text-gray-500' },
+            { name: '破瓷片', icon: '🏺', type: 'residual', color: 'text-gray-500' }
+        ];
+
+        let score = 0;
+        let gameQueue = [];
+        let currentData = null;
+        
+        // DOM 元素
+        const container = document.getElementById('trash-container');
+        const feedback = document.getElementById('feedback');
+        const bins = document.querySelectorAll('.bin');
+        const scoreEl = document.getElementById('score');
+
+        // === 2. 核心触屏拖拽逻辑 (Touch Logic) ===
+        let dragItem = null;
+        let active = false;
+        let initialX, initialY, currentX, currentY;
+        let xOffset = 0, yOffset = 0;
+
+        function initGame() {
+            score = 0;
+            scoreEl.innerText = '0';
+            gameQueue = [...TRASH_DATA].sort(() => Math.random() - 0.5); // 打乱顺序
+            spawnTrash();
+        }
+
+        function spawnTrash() {
+            container.innerHTML = '';
+            feedback.style.opacity = '0';
+
+            if (gameQueue.length === 0) {
+                showGameOver();
+                return;
+            }
+
+            currentData = gameQueue.pop();
+            
+            // 创建垃圾元素
+            const el = document.createElement('div');
+            el.className = 'trash-item w-32 h-32 bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center border-4 border-white animate-pop';
+            el.innerHTML = `
+                <div class="text-6xl mb-2 pointer-events-none select-none">${currentData.icon}</div>
+                <div class="font-bold text-gray-600 pointer-events-none select-none text-lg">${currentData.name}</div>
+            `;
+
+            // 绑定触摸和鼠标事件（兼容 PC 和 手机）
+            el.addEventListener('touchstart', dragStart, { passive: false });
+            el.addEventListener('touchend', dragEnd, { passive: false });
+            el.addEventListener('touchmove', drag, { passive: false });
+
+            el.addEventListener('mousedown', dragStart);
+            el.addEventListener('mouseup', dragEnd);
+            el.addEventListener('mousemove', drag);
+
+            container.appendChild(el);
+            dragItem = el;
+            
+            // 重置偏移量
+            xOffset = 0;
+            yOffset = 0;
+            setTranslate(0, 0, el);
+        }
+
+        function dragStart(e) {
+            if (e.type === "touchstart") {
+                initialX = e.touches[0].clientX - xOffset;
+                initialY = e.touches[0].clientY - yOffset;
+            } else {
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
+            }
+
+            if (e.target === dragItem) {
+                active = true;
+                dragItem.classList.add('dragging');
+                dragItem.classList.remove('returning'); // 移除回弹动画
+                
+                // 震动反馈 (Android only)
+                if (navigator.vibrate) navigator.vibrate(20);
+                
+                feedback.innerText = "拖动到下方垃圾桶";
+                feedback.style.opacity = '1';
+            }
+        }
+
+        function drag(e) {
+            if (active) {
+                e.preventDefault(); // 阻止屏幕滚动
+
+                if (e.type === "touchmove") {
+                    currentX = e.touches[0].clientX - initialX;
+                    currentY = e.touches[0].clientY - initialY;
+                } else {
+                    currentX = e.clientX - initialX;
+                    currentY = e.clientY - initialY;
+                }
+
+                xOffset = currentX;
+                yOffset = currentY;
+
+                setTranslate(currentX, currentY, dragItem);
+
+                // 检测碰撞高亮垃圾桶
+                checkCollisionHighlight(e);
+            }
+        }
+
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+        }
+
+        function dragEnd(e) {
+            if (!active) return;
+            
+            initialX = currentX;
+            initialY = currentY;
+            active = false;
+            dragItem.classList.remove('dragging');
+
+            // 获取手指释放位置下的元素
+            let clientX, clientY;
+            if (e.type === "touchend") {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // 隐藏垃圾卡片一下，以便通过坐标检测下方的垃圾桶
+            dragItem.style.visibility = 'hidden';
+            let elemBelow = document.elementFromPoint(clientX, clientY);
+            dragItem.style.visibility = 'visible';
+
+            // 查找最近的垃圾桶父元素
+            let bin = elemBelow ? elemBelow.closest('.bin') : null;
+
+            if (bin) {
+                const type = bin.getAttribute('data-type');
+                checkAnswer(type, bin);
+            } else {
+                // 没有放到垃圾桶，回弹
+                returnToCenter();
+            }
+            
+            // 清除所有高亮
+            bins.forEach(b => b.classList.remove('hovered'));
+        }
+
+        // 检测并高亮下方的垃圾桶
+        function checkCollisionHighlight(e) {
+            let clientX, clientY;
+            if (e.type === "touchmove") {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            dragItem.style.visibility = 'hidden';
+            let elemBelow = document.elementFromPoint(clientX, clientY);
+            dragItem.style.visibility = 'visible';
+
+            bins.forEach(b => b.classList.remove('hovered'));
+            
+            let bin = elemBelow ? elemBelow.closest('.bin') : null;
+            if (bin) {
+                bin.classList.add('hovered');
+            }
+        }
+
+        // === 3. 游戏逻辑判断 ===
+        function checkAnswer(binType, binElement) {
+            if (binType === currentData.type) {
+                // 正确
+                if (navigator.vibrate) navigator.vibrate([50, 30, 50]); // 双震反馈
+                score += 10;
+                updateScore(10);
+                showFloatScore(binElement, "+10");
+                
+                // 成功动画：卡片缩小飞入垃圾桶
+                const rect = binElement.getBoundingClientRect();
+                const itemRect = dragItem.getBoundingClientRect();
+                
+                // 计算从当前位置飞入垃圾桶中心的偏移
+                const deltaX = (rect.left + rect.width/2) - (itemRect.left + itemRect.width/2);
+                const deltaY = (rect.top + rect.height/2) - (itemRect.top + itemRect.height/2);
+                
+                dragItem.style.transition = 'all 0.3s ease-in';
+                dragItem.style.transform = `translate3d(${xOffset + deltaX}px, ${yOffset + deltaY}px, 0) scale(0.1)`;
+                dragItem.style.opacity = '0';
+
+                feedback.innerText = "太棒了！👏";
+                feedback.className = "absolute top-10 text-2xl text-green-500 font-bold animate-bounce";
+                
+                setTimeout(() => {
+                    feedback.className = "absolute top-10 text-lg text-gray-400 font-bold transition-opacity duration-300 opacity-0";
+                    spawnTrash();
+                }, 400);
+
+            } else {
+                // 错误
+                if (navigator.vibrate) navigator.vibrate(200); // 长震反馈
+                score = Math.max(0, score - 5);
+                updateScore(-5);
+                
+                feedback.innerText = "分错了哦 😭";
+                feedback.className = "absolute top-10 text-2xl text-red-500 font-bold";
+                
+                dragItem.classList.add('animate-shake');
+                
+                setTimeout(() => {
+                    dragItem.classList.remove('animate-shake');
+                    returnToCenter();
+                    feedback.className = "absolute top-10 text-lg text-gray-400 font-bold transition-opacity duration-300 opacity-0";
+                }, 500);
+            }
+        }
+
+        function returnToCenter() {
+            dragItem.classList.add('returning');
+            xOffset = 0;
+            yOffset = 0;
+            setTranslate(0, 0, dragItem);
+        }
+
+        // === 4. UI 辅助 ===
+        function updateScore(delta) {
+            scoreEl.innerText = score;
+            // 分数跳动动画
+            scoreEl.classList.remove('scale-125');
+            void scoreEl.offsetWidth; // trigger reflow
+            scoreEl.classList.add('transition', 'transform', 'scale-125', 'text-green-600');
+            setTimeout(() => scoreEl.classList.remove('scale-125', 'text-green-600'), 200);
+        }
+
+        function showFloatScore(targetEl, text) {
+            const el = document.createElement('div');
+            el.className = 'float-score';
+            el.innerText = text;
+            const rect = targetEl.getBoundingClientRect();
+            el.style.left = (rect.left + rect.width / 2 - 20) + 'px';
+            el.style.top = rect.top + 'px';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        function showGameOver() {
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            document.getElementById('game-over-modal').classList.add('hidden');
+            initGame();
+        }
+
+        // 启动
+        initGame();
+
+        // 阻止iOS橡皮筋效果
+        document.body.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+
+    </script>
+</body>
+</html>

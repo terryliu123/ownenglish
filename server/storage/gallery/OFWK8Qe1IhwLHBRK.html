@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电流的热效应 - 交互实验</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f0f2f5;
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background: linear-gradient(to bottom, #3e4a54, #2c353c);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .controls-panel {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background-color: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            color: white;
+            backdrop-filter: blur(5px);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        input[type=range] {
+            width: 150px;
+            cursor: pointer;
+        }
+
+        .value-display {
+            font-family: monospace;
+            font-size: 18px;
+            color: #4fc3f7;
+            min-width: 50px;
+        }
+
+        button {
+            padding: 8px 24px;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        #btn-start {
+            background-color: #4caf50;
+            color: white;
+        }
+        #btn-start:hover { background-color: #43a047; }
+
+        #btn-reset {
+            background-color: #ff5252;
+            color: white;
+        }
+        #btn-reset:hover { background-color: #e53935; }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+        }
+        
+        /* 提示文字 */
+        .info-text {
+            position: absolute;
+            top: 100px;
+            width: 100%;
+            text-align: center;
+            color: #fff;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="legend">串联电路: I1 = I2</div>
+        <!-- 模拟文字说明 -->
+        <canvas id="simCanvas" width="800" height="500"></canvas>
+        
+        <div class="controls-panel">
+            <div class="control-group">
+                <label>左侧电阻 R1:</label>
+                <span class="value-display">5Ω</span>
+            </div>
+            <div class="control-group">
+                <label for="r2-slider">右侧电阻 R2:</label>
+                <input type="range" id="r2-slider" min="5" max="15" step="1" value="5">
+                <span id="r2-val" class="value-display">5Ω</span>
+            </div>
+            <button id="btn-start">开始实验</button>
+            <button id="btn-reset">重置</button>
+        </div>
+    </div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // 状态变量
+    let isRunning = false;
+    let time = 0;
+    const r1 = 5;
+    let r2 = 5;
+    
+    // 模拟参数
+    const maxLiquidHeight = 180; // 液体最大上升高度
+    let h1 = 0; // 左侧液面高度增量
+    let h2 = 0; // 右侧液面高度增量
+    const heatRate = 0.05; // 加热速率系数
+
+    // 动画循环ID
+    let animationFrameId;
+    let electronOffset = 0; // 电子流动动画偏移量
+
+    // DOM 元素
+    const slider = document.getElementById('r2-slider');
+    const r2Val = document.getElementById('r2-val');
+    const btnStart = document.getElementById('btn-start');
+    const btnReset = document.getElementById('btn-reset');
+
+    // 监听滑块
+    slider.addEventListener('input', (e) => {
+        r2 = parseInt(e.target.value);
+        r2Val.textContent = r2 + "Ω";
+        if (!isRunning) {
+            drawScene();
+        }
+    });
+
+    // 监听开始按钮
+    btnStart.addEventListener('click', () => {
+        if (isRunning) return;
+        isRunning = true;
+        animate();
+    });
+
+    // 监听重置按钮
+    btnReset.addEventListener('click', () => {
+        isRunning = false;
+        cancelAnimationFrame(animationFrameId);
+        time = 0;
+        h1 = 0;
+        h2 = 0;
+        drawScene();
+    });
+
+    // 核心物理计算与动画循环
+    function animate() {
+        if (!isRunning) return;
+
+        // 模拟热量产生 Q = I^2 * R * t
+        // 因为串联 I 相同，所以 Q 正比于 R
+        // 我们直接让高度增加量与 R 成正比
+        
+        if (h1 < maxLiquidHeight && h2 < maxLiquidHeight) {
+            h1 += r1 * heatRate;
+            h2 += r2 * heatRate;
+            time += 1;
+        }
+
+        // 电子流动动画
+        electronOffset -= 2;
+        if (electronOffset < -20) electronOffset = 0;
+
+        drawScene();
+        animationFrameId = requestAnimationFrame(animate);
+    }
+
+    // 绘图主函数
+    function drawScene() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 坐标参考
+        const boxY = 250;
+        const boxWidth = 120;
+        const boxHeight = 140;
+        const box1X = 200;
+        const box2X = 600;
+        
+        // 1. 绘制两个透明容器 (空气盒)
+        drawContainer(box1X, boxY, "Q1", "5Ω");
+        drawContainer(box2X, boxY, "Q2", r2 + "Ω");
+
+        // 2. 绘制U型管及液体 (核心视觉)
+        // 中间位置
+        const pipeCenterX = 400;
+        const pipeYBase = 420; // U型管底部
+        
+        // 绘制连接管和U型管背景
+        drawPipes(box1X, boxY, box2X, pipeCenterX);
+
+        // 绘制液体
+        drawLiquid(pipeCenterX, h1, h2);
+
+        // 绘制标尺 (中间背景)
+        drawRuler(pipeCenterX);
+
+        // 3. 绘制电路连线 (红色)
+        drawWires(box1X, boxY, box2X);
+        
+        // 4. 绘制电阻丝
+        // 根据时间改变颜色模拟发热 (灰 -> 红)
+        const heatColor1 = getHeatColor(h1);
+        const heatColor2 = getHeatColor(h2);
+        drawResistor(box1X, boxY, heatColor1);
+        drawResistor(box2X, boxY, heatColor2);
+
+        // 5. 绘制电流流向 (如果正在运行)
+        if (isRunning) {
+            drawCurrentFlow(box1X, boxY, box2X);
+        }
+    }
+
+    function getHeatColor(height) {
+        // 根据液面高度(代表温度)计算电阻丝颜色
+        const percent = Math.min(height / 100, 1);
+        const r = Math.floor(100 + 155 * percent);
+        const g = Math.floor(100 - 100 * percent);
+        const b = Math.floor(100 - 100 * percent);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    function drawContainer(x, y, labelQ, labelR) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // 容器壁
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 2;
+        ctx.fillStyle = "rgba(255,255,255,0.05)";
+        
+        ctx.beginPath();
+        ctx.rect(-60, -70, 120, 140);
+        ctx.fill();
+        ctx.stroke();
+
+        // 标签
+        ctx.fillStyle = "#fff";
+        ctx.font = "20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(labelQ, 0, 100); // Q1 Q2
+        
+        ctx.fillStyle = "#ccc";
+        ctx.font = "16px Arial";
+        ctx.fillText(labelR, 0, 50); // 电阻值
+
+        ctx.restore();
+    }
+
+    function drawResistor(x, y, color) {
+        ctx.save();
+        ctx.translate(x, y);
+        
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        
+        // 绘制弹簧状电阻
+        ctx.beginPath();
+        ctx.moveTo(-40, -50); // 接线柱连接点
+        ctx.lineTo(-40, -20);
+        
+        // 螺旋部分
+        for(let i=0; i<10; i++) {
+            const cx = -40 + (i * 80/10) + 4;
+            const cy = (i % 2 === 0) ? 20 : -20;
+            ctx.lineTo(cx, cy); // 简化为折线模拟螺旋
+        }
+        
+        ctx.lineTo(40, -20);
+        ctx.lineTo(40, -50); // 接线柱连接点
+        ctx.stroke();
+        
+        // 接线柱
+        ctx.fillStyle = "#d4af37"; // 金色
+        ctx.fillRect(-45, -60, 10, 15);
+        ctx.fillRect(35, -60, 10, 15);
+
+        ctx.restore();
+    }
+
+    function drawPipes(x1, y, x2, centerX) {
+        ctx.save();
+        
+        // 管道样式
+        ctx.strokeStyle = "rgba(200,200,200,0.5)";
+        ctx.lineWidth = 12;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        // 这是一个简化的视觉连接，模拟图中的导管连接到中间的U型管
+        // 左管路 (连接 Box1 到 中间左管)
+        ctx.beginPath();
+        ctx.moveTo(x1, y - 70); // Box1 顶部
+        ctx.bezierCurveTo(x1, y - 120, centerX - 30, y - 120, centerX - 30, y - 50);
+        ctx.stroke();
+
+        // 右管路
+        ctx.beginPath();
+        ctx.moveTo(x2, y - 70); // Box2 顶部
+        ctx.bezierCurveTo(x2, y - 120, centerX + 30, y - 120, centerX + 30, y - 50);
+        ctx.stroke();
+
+        // 绘制中间的两个垂直玻璃管背景 (U型管的两臂)
+        ctx.fillStyle = "rgba(255,255,255,0.1)";
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 2;
+
+        // 左管
+        drawGlassTube(centerX - 30, 100, 300);
+        // 右管
+        drawGlassTube(centerX + 30, 100, 300);
+        
+        // U型底部连接 (视觉上)
+        ctx.beginPath();
+        ctx.arc(centerX, 400, 30, 0, Math.PI, false); // 底部弯管
+        ctx.lineWidth = 14;
+        ctx.strokeStyle = "rgba(200,200,200,0.2)"; 
+        ctx.stroke();
+
+        ctx.restore();
+    }
+    
+    function drawGlassTube(x, topY, bottomY) {
+        ctx.beginPath();
+        ctx.moveTo(x - 8, topY);
+        ctx.lineTo(x - 8, bottomY);
+        ctx.arc(x, bottomY, 8, Math.PI, 0, true); // 底部封口
+        ctx.lineTo(x + 8, topY);
+        ctx.stroke();
+        ctx.fill();
+    }
+
+    function drawLiquid(centerX, h1, h2) {
+        ctx.save();
+        
+        const liquidColor = "#03a9f4"; // 亮蓝色
+        const baseLevel = 350; // 初始液面Y坐标
+        
+        // 左管液体
+        const level1 = baseLevel - h1;
+        ctx.fillStyle = liquidColor;
+        ctx.fillRect(centerX - 30 - 6, level1, 12, 400 - level1); // 稍微简化底部连接
+        
+        // 右管液体
+        const level2 = baseLevel - h2;
+        ctx.fillStyle = liquidColor;
+        ctx.fillRect(centerX + 30 - 6, level2, 12, 400 - level2);
+
+        // 绘制液面高光 (增加立体感)
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillRect(centerX - 30 - 4, level1, 4, 400 - level1);
+        ctx.fillRect(centerX + 30 - 4, level2, 4, 400 - level2);
+
+        ctx.restore();
+    }
+
+    function drawRuler(centerX) {
+        ctx.save();
+        ctx.translate(centerX, 150);
+        
+        // 标尺背景
+        ctx.fillStyle = "rgba(255,255,200,0.8)";
+        ctx.fillRect(-15, 0, 30, 250);
+        
+        // 刻度线
+        ctx.fillStyle = "#333";
+        for(let i=0; i<25; i++) {
+            let y = i * 10;
+            let w = (i % 5 === 0) ? 10 : 5;
+            ctx.fillRect(-w/2, y, w, 1);
+            
+            // 颜色条装饰 (模拟图中的黄蓝条纹)
+            if (i % 2 === 0) {
+                ctx.fillStyle = "rgba(0,0,0,0.1)";
+                ctx.fillRect(-15, y, 30, 10);
+                ctx.fillStyle = "#333";
+            }
+        }
+        
+        ctx.restore();
+    }
+
+    function drawWires(x1, y, x2) {
+        ctx.save();
+        
+        ctx.strokeStyle = "#c62828"; // 深红色导线
+        ctx.lineWidth = 6;
+        
+        // 左边入线
+        ctx.beginPath();
+        ctx.moveTo(50, y - 55); 
+        ctx.quadraticCurveTo(100, y-55, x1-45, y-60); // 连到左接线柱
+        ctx.stroke();
+        
+        // 中间连接线 (串联)
+        ctx.beginPath();
+        ctx.moveTo(x1 + 35, y - 60); // 左出
+        ctx.bezierCurveTo(x1+100, y-80, x2-100, y-80, x2-45, y-60); // 右入
+        ctx.stroke();
+
+        // 右边出线
+        ctx.beginPath();
+        ctx.moveTo(x2 + 35, y - 60);
+        ctx.quadraticCurveTo(700, y-55, 750, y-55);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawCurrentFlow(x1, y, x2) {
+        ctx.save();
+        
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 15]); // 虚线模拟电子
+        ctx.lineDashOffset = electronOffset;
+
+        // 重复导线路径
+        // 左入
+        ctx.beginPath();
+        ctx.moveTo(50, y - 55); 
+        ctx.quadraticCurveTo(100, y-55, x1-45, y-60);
+        ctx.stroke();
+        
+        // 内部 (不画，假设电子在电阻丝里)
+
+        // 中间
+        ctx.beginPath();
+        ctx.moveTo(x1 + 35, y - 60);
+        ctx.bezierCurveTo(x1+100, y-80, x2-100, y-80, x2-45, y-60);
+        ctx.stroke();
+
+        // 右出
+        ctx.beginPath();
+        ctx.moveTo(x2 + 35, y - 60);
+        ctx.quadraticCurveTo(700, y-55, 750, y-55);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    // 初始绘制
+    drawScene();
+
+</script>
+</body>
+</html>

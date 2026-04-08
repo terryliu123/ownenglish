@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双向摩斯密码终端</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --accent-color: #00ff41;
+            --text-color: #e0e0e0;
+            --border-color: #333;
+            --light-off: #2a2a2a;
+            --light-on: #00ff41;
+            --light-shadow: rgba(0, 255, 65, 0.6);
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            background-color: var(--panel-color);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            width: 90%;
+            max-width: 550px;
+            border: 1px solid var(--border-color);
+            margin: 20px 0;
+        }
+
+        h1 {
+            text-align: center;
+            margin: 0 0 20px 0;
+            letter-spacing: 2px;
+            color: var(--accent-color);
+            font-size: 24px;
+            text-transform: uppercase;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        /* 信号灯 */
+        .signal-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 25px;
+        }
+
+        .signal-light {
+            width: 60px;
+            height: 60px;
+            background-color: var(--light-off);
+            border-radius: 50%;
+            border: 3px solid #000;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            transition: all 0.05s;
+        }
+
+        .signal-light.active {
+            background-color: var(--light-on);
+            box-shadow: 0 0 25px var(--light-shadow), inset 0 0 10px #fff;
+            transform: scale(1.05);
+        }
+
+        /* 输入区域 */
+        .io-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #0a0a0a;
+            border: 1px solid var(--border-color);
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: none;
+            box-sizing: border-box;
+            transition: border 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 5px rgba(0, 255, 65, 0.2);
+        }
+
+        #morseInput {
+            color: #ffcc00; /* 摩斯码显示为黄色 */
+            letter-spacing: 1px;
+        }
+
+        /* 交换图标 */
+        .exchange-icon {
+            text-align: center;
+            color: #555;
+            font-size: 14px;
+        }
+
+        /* 控制按钮 */
+        .controls {
+            margin-top: 25px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: #2a2a2a;
+            color: white;
+            border: 1px solid #444;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: all 0.2s;
+            flex: 1;
+        }
+
+        button:hover {
+            background: #333;
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        button.primary {
+            background: rgba(0, 255, 65, 0.1);
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        button.primary:hover {
+            background: var(--accent-color);
+            color: black;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        /* 速度控制 */
+        .speed-control {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #161616;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #888;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            margin: 0 15px;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        /* 折叠区域 */
+        .accordion {
+            margin-top: 10px;
+        }
+
+        .accordion-btn {
+            width: 100%;
+            text-align: center;
+            background: transparent;
+            border: none;
+            color: #666;
+            font-size: 12px;
+            padding: 10px;
+            cursor: pointer;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .accordion-btn:hover {
+            color: var(--accent-color);
+            background: transparent;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, opacity 0.4s ease-out;
+            opacity: 0;
+            background: #161616;
+            border-radius: 0 0 6px 6px;
+        }
+
+        .accordion-content.open {
+            max-height: 400px; /* 近似值，足够容纳即可 */
+            opacity: 1;
+            overflow-y: auto;
+        }
+
+        .cheat-sheet {
+            padding: 15px;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+            gap: 8px;
+            text-align: center;
+        }
+
+        .cheat-item {
+            font-size: 12px;
+            color: #888;
+            background: #222;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .cheat-item b {
+            display: block;
+            color: var(--accent-color);
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Morse Transceiver</h1>
+
+    <div class="signal-container">
+        <div class="signal-light" id="signalLight"></div>
+    </div>
+
+    <div class="io-group">
+        <div class="input-wrapper">
+            <label>明文 (TEXT)</label>
+            <textarea id="textInput" placeholder="输入文字，支持中英文..."></textarea>
+        </div>
+        
+        <div class="exchange-icon">⇅ 双向自动翻译 ⇅</div>
+        
+        <div class="input-wrapper">
+            <label>摩斯电码 (MORSE CODE)</label>
+            <textarea id="morseInput" placeholder="输入 . - 空格 / (例如 ... --- ...)"></textarea>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="btn-group" style="grid-column: 1 / -1;">
+            <button id="playBtn" class="primary">▶ 播放电报</button>
+            <button id="stopBtn" disabled>⏹ 停止</button>
+            <button id="clearBtn">🗑 清空</button>
+        </div>
+
+        <div class="speed-control">
+            <span>慢</span>
+            <input type="range" id="speedRange" min="60" max="240" value="120">
+            <span>快 <span id="wpmDisplay">15 WPM</span></span>
+        </div>
+    </div>
+
+    <div class="accordion">
+        <button class="accordion-btn" id="toggleSheet">▼ 展开摩斯密码对照表</button>
+        <div class="accordion-content" id="sheetContent">
+            <div class="cheat-sheet" id="cheatGrid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 1. 数据字典 ---
+    const MORSE_CODE = {
+        'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+        'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+        'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+        'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+        'Y': '-.--', 'Z': '--..',
+        '1': '.----', '2': '..---', '3': '...--', '4': '....-', '5': '.....',
+        '6': '-....', '7': '--...', '8': '---..', '9': '----.', '0': '-----',
+        '.': '.-.-.-', ',': '--..--', '?': '..--..', "'": '.----.', '!': '-.-.--',
+        '/': '-..-.', '(': '-.--.', ')': '-.--.-', '&': '.-...', ':': '---...',
+        ';': '-.-.-.', '=': '-...-', '+': '.-.-.', '-': '-....-', '_': '..--.-',
+        '"': '.-..-.', '$': '...-..-', '@': '.--.-.'
+    };
+
+    // 生成反向字典 (Morse -> Text)
+    const REVERSE_MORSE = Object.fromEntries(
+        Object.entries(MORSE_CODE).map(([k, v]) => [v, k])
+    );
+
+    // --- 2. DOM 元素 ---
+    const textInput = document.getElementById('textInput');
+    const morseInput = document.getElementById('morseInput');
+    const signalLight = document.getElementById('signalLight');
+    const playBtn = document.getElementById('playBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const speedRange = document.getElementById('speedRange');
+    const wpmDisplay = document.getElementById('wpmDisplay');
+    const toggleSheet = document.getElementById('toggleSheet');
+    const sheetContent = document.getElementById('sheetContent');
+
+    // --- 3. 翻译逻辑 ---
+    let isUpdating = false; // 防止循环触发
+
+    // 文字 -> 摩斯
+    textInput.addEventListener('input', (e) => {
+        if (isUpdating) return;
+        isUpdating = true;
+        
+        const text = e.target.value.toUpperCase();
+        // 处理中文：暂时忽略或原样保留，这里简单处理为忽略
+        const morse = text.split('').map(char => {
+            if (char === ' ') return '/'; // 单词间空格
+            if (char === '\n') return '\n';
+            return MORSE_CODE[char] || ''; // 未知字符忽略或显示空
+        }).join(' ').replace(/\s+/g, ' ').trim(); // 规范化空格
+
+        morseInput.value = morse;
+        isUpdating = false;
+    });
+
+    // 摩斯 -> 文字
+    morseInput.addEventListener('input', (e) => {
+        if (isUpdating) return;
+        isUpdating = true;
+
+        // 允许输入：. - / 空格 换行
+        let val = e.target.value;
+        // 过滤非法字符
+        if (/[^.\- \/\n]/.test(val)) {
+            val = val.replace(/[^.\- \/\n]/g, '');
+            e.target.value = val; // 移除非法字符
+        }
+
+        // 解析逻辑：
+        // 1. 按换行分割行
+        // 2. 按 / 分割单词
+        // 3. 按空格分割字母
+        const text = val.split('\n').map(line => {
+            return line.split('/').map(word => {
+                return word.trim().split(/\s+/).map(code => {
+                    return REVERSE_MORSE[code] || '';
+                }).join('');
+            }).join(' ');
+        }).join('\n');
+
+        textInput.value = text;
+        isUpdating = false;
+    });
+
+    // 清空按钮
+    clearBtn.addEventListener('click', () => {
+        textInput.value = '';
+        morseInput.value = '';
+    });
+
+    // --- 4. 播放逻辑 (视听同步) ---
+    let audioCtx = null;
+    let isPlaying = false;
+    let abortCtrl = null;
+
+    // 播放音效
+    function playTone(duration) {
+        return new Promise(resolve => {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = 600;
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.5, now + 0.005);
+            gain.gain.linearRampToValueAtTime(0, now + duration/1000);
+
+            osc.start(now);
+            osc.stop(now + duration/1000 + 0.05);
+
+            signalLight.classList.add('active');
+            setTimeout(() => {
+                signalLight.classList.remove('active');
+                resolve();
+            }, duration);
+        });
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    async function playSequence() {
+        if (isPlaying) return;
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        isPlaying = true;
+        playBtn.disabled = true;
+        stopBtn.disabled = false;
+        textInput.disabled = true;
+        morseInput.disabled = true;
+
+        abortCtrl = new AbortController();
+        const signal = abortCtrl.signal;
+
+        // 计算单位时间 (WPM 计算)
+        // WPM = 2.4 * (Dots per minute) / 50 (Standard word PARIS is 50 units)
+        // Unit (ms) = 1200 / WPM
+        const wpm = parseInt(speedRange.value) / 8; // 粗略换算显示值
+        const unit = 1200 / wpm; 
+
+        const code = morseInput.value;
+
+        try {
+            for (let char of code) {
+                if (signal.aborted) break;
+
+                if (char === '.') {
+                    await playTone(unit);
+                    await sleep(unit);
+                } else if (char === '-') {
+                    await playTone(unit * 3);
+                    await sleep(unit);
+                } else if (char === ' ') {
+                    await sleep(unit * 3); // 字符间隔
+                } else if (char === '/' || char === '\n') {
+                    await sleep(unit * 7); // 单词间隔
+                }
+            }
+        } catch (err) {
+            // Ignore abort errors
+        } finally {
+            stopPlayingState();
+        }
+    }
+
+    function stopPlayingState() {
+        if (abortCtrl) abortCtrl.abort();
+        isPlaying = false;
+        playBtn.disabled = false;
+        stopBtn.disabled = true;
+        textInput.disabled = false;
+        morseInput.disabled = false;
+        signalLight.classList.remove('active');
+    }
+
+    playBtn.addEventListener('click', playSequence);
+    stopBtn.addEventListener('click', stopPlayingState);
+
+    // 速度显示更新
+    speedRange.addEventListener('input', (e) => {
+        const wpm = Math.round(e.target.value / 8);
+        wpmDisplay.textContent = `${wpm} WPM`;
+    });
+
+    // --- 5. 折叠面板逻辑 ---
+    toggleSheet.addEventListener('click', () => {
+        if (sheetContent.classList.contains('open')) {
+            sheetContent.classList.remove('open');
+            toggleSheet.textContent = "▼ 展开摩斯密码对照表";
+        } else {
+            sheetContent.classList.add('open');
+            toggleSheet.textContent = "▲ 收起对照表";
+        }
+    });
+
+    // 初始化填充对照表
+    const grid = document.getElementById('cheatGrid');
+    Object.keys(MORSE_CODE).forEach(k => {
+        const item = document.createElement('div');
+        item.className = 'cheat-item';
+        item.innerHTML = `<b>${k}</b>${MORSE_CODE[k]}`;
+        grid.appendChild(item);
+    });
+
+</script>
+</body>
+</html>

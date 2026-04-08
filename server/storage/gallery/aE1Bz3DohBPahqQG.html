@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滑动与滚动 - 修复版</title>
+    <style>
+        :root {
+            --bg-color: #e8e0d5;
+            --ui-bg: rgba(255, 255, 255, 0.95);
+            --primary: #5c6bc0;
+            --accent: #ffeb3b;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            background-color: #eee4da;
+            border-radius: 16px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        /* 标题区 */
+        .header {
+            position: absolute;
+            top: 25px;
+            left: 30px;
+            pointer-events: none;
+        }
+        .header h2 { margin: 0; color: #333; font-size: 26px; letter-spacing: 1px; }
+        .header p { margin: 6px 0 0; color: #795548; font-size: 14px; opacity: 0.8; }
+
+        /* 画布 */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 控制面板 */
+        .controls {
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 120px;
+            background: var(--ui-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* 物体选择按钮 */
+        .obj-selector {
+            display: flex;
+            gap: 10px;
+            background: #f0f0f0;
+            padding: 5px;
+            border-radius: 10px;
+        }
+        .obj-btn {
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .obj-btn:hover { background: #fff; }
+        .obj-btn.active { 
+            background: #fff; 
+            border-color: var(--primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .icon-cube { width: 20px; height: 20px; background: #d87a48; border-radius: 2px; position: relative; }
+        .icon-cube::after { content:''; position:absolute; width:4px; height:4px; background:var(--accent); border-radius:50%; top:50%; left:50%; transform:translate(-50%, -50%); }
+        
+        .icon-ball { width: 20px; height: 20px; background: #d87a48; border-radius: 50%; position: relative; }
+        .icon-ball::after { content:''; position:absolute; width:4px; height:4px; background:var(--accent); border-radius:50%; top:4px; left:50%; transform:translateX(-50%); }
+
+        /* 按钮 */
+        .action-btns {
+            display: flex;
+            gap: 15px;
+        }
+        .circle-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: none;
+            background: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #555;
+            transition: all 0.2s;
+        }
+        .circle-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(0,0,0,0.15); color: var(--primary); }
+        .circle-btn:active { transform: scale(0.95); }
+        .circle-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
+        /* 开关 */
+        .toggle-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        .toggle-label { font-size: 12px; color: #666; font-weight: bold; }
+        
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        input:checked + .slider { background-color: var(--primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* 覆盖层播放按钮 */
+        .overlay-play {
+            position: absolute;
+            top: 50%;
+            left: 42%;
+            transform: translate(-50%, -50%);
+            width: 90px;
+            height: 90px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 0 0 8px rgba(255,255,255,0.3);
+            z-index: 20;
+        }
+        .overlay-play:hover { transform: translate(-50%, -50%) scale(1.1); background: #fff; }
+        .overlay-play svg { width: 40px; height: 40px; fill: var(--primary); margin-left: 6px; }
+        
+        /* 隐藏状态 */
+        .hidden { 
+            opacity: 0; 
+            pointer-events: none; 
+            transform: translate(-50%, -50%) scale(0.8); 
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>滑动与滚动</h2>
+        <p>观察物体在斜面上的不同运动形式</p>
+    </div>
+
+    <canvas id="simCanvas" width="800" height="500"></canvas>
+
+    <!-- 屏幕中央播放按钮，增加点击事件 -->
+    <div class="overlay-play" id="overlayPlay" onclick="playSimulation()">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+
+    <div class="controls">
+        <div class="obj-selector">
+            <div class="obj-btn active" id="btnCube" onclick="setObject('cube')" title="立方体 (滑动)">
+                <div class="icon-cube"></div>
+            </div>
+            <div class="obj-btn" id="btnBall" onclick="setObject('ball')" title="小球 (滚动)">
+                <div class="icon-ball"></div>
+            </div>
+        </div>
+
+        <div class="action-btns">
+            <button class="circle-btn" onclick="playSimulation()" title="播放">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <button class="circle-btn" onclick="resetSimulation()" title="重置">
+                <svg viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+            </button>
+        </div>
+
+        <div class="toggle-wrapper">
+            <span class="toggle-label">显示轨迹</span>
+            <label class="switch">
+                <input type="checkbox" id="traceToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const overlayPlay = document.getElementById('overlayPlay');
+
+    const CONFIG = {
+        startX: 100,
+        startY: 150,
+        angle: 25 * (Math.PI / 180),
+        length: 550,
+        objSize: 40,
+        traceColorCube: '#2196f3',
+        traceColorBall: '#e91e63',
+        woodColor: '#d87a48',
+        woodBorder: '#bf6a3e'
+    };
+
+    let state = {
+        objType: 'cube',
+        progress: 0,
+        isPlaying: false,
+        showTrace: false,
+        tracePoints: []
+    };
+
+    let animationFrameId = null;
+
+    // 坐标变换函数
+    function getGlobalCoord(centerX, centerY, rampAngle, selfRotationAngle, localX, localY) {
+        const cosR = Math.cos(selfRotationAngle);
+        const sinR = Math.sin(selfRotationAngle);
+        const rotX = localX * cosR - localY * sinR;
+        const rotY = localX * sinR + localY * cosR;
+
+        const cosA = Math.cos(rampAngle);
+        const sinA = Math.sin(rampAngle);
+        
+        const finalX = rotX * cosA - rotY * sinA;
+        const finalY = rotX * sinA + rotY * cosA;
+
+        return {
+            x: centerX + finalX,
+            y: centerY + finalY
+        };
+    }
+
+    function init() {
+        draw();
+        // 确保大按钮能被点击
+        overlayPlay.addEventListener('click', playSimulation);
+    }
+
+    function setObject(type) {
+        state.objType = type;
+        document.getElementById('btnCube').className = type === 'cube' ? 'obj-btn active' : 'obj-btn';
+        document.getElementById('btnBall').className = type === 'ball' ? 'obj-btn active' : 'obj-btn';
+        resetSimulation();
+    }
+
+    function playSimulation() {
+        if (state.isPlaying) return;
+        
+        // 如果已经播放结束，点击播放则重置并重新开始
+        if (state.progress >= 1) {
+            resetSimulation();
+            // 稍作延迟确保重置完成
+            setTimeout(() => {
+                state.isPlaying = true;
+                overlayPlay.classList.add('hidden');
+                loop();
+            }, 10);
+            return;
+        }
+
+        state.isPlaying = true;
+        overlayPlay.classList.add('hidden');
+        loop();
+    }
+
+    function resetSimulation() {
+        state.isPlaying = false;
+        state.progress = 0;
+        state.tracePoints = [];
+        cancelAnimationFrame(animationFrameId);
+        overlayPlay.classList.remove('hidden');
+        draw();
+    }
+
+    function loop() {
+        if (!state.isPlaying) return;
+
+        const speed = 0.003 + (state.progress * 0.015);
+        state.progress += speed;
+
+        if (state.progress >= 1) {
+            state.progress = 1;
+            state.isPlaying = false;
+            // 播放结束后不自动显示大按钮，保持画面静止，直到用户点击重置或播放
+        }
+
+        draw();
+
+        if (state.progress < 1) {
+            animationFrameId = requestAnimationFrame(loop);
+        }
+    }
+
+    document.getElementById('traceToggle').addEventListener('change', (e) => {
+        state.showTrace = e.target.checked;
+        if (!state.isPlaying) draw();
+    });
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 轨迹
+        if (state.showTrace && state.tracePoints.length > 1) {
+            ctx.save();
+            ctx.strokeStyle = state.objType === 'cube' ? CONFIG.traceColorCube : CONFIG.traceColorBall;
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(state.tracePoints[0].x, state.tracePoints[0].y);
+            for (let i = 1; i < state.tracePoints.length; i++) {
+                ctx.lineTo(state.tracePoints[i].x, state.tracePoints[i].y);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 2. 斜坡
+        ctx.save();
+        ctx.translate(CONFIG.startX, CONFIG.startY);
+        ctx.rotate(CONFIG.angle);
+
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(CONFIG.length, 0);
+        ctx.strokeStyle = '#8d6e63';
+        ctx.lineWidth = 4; 
+        ctx.stroke();
+
+        ctx.fillStyle = '#a1887f';
+        ctx.beginPath();
+        ctx.moveTo(0, 2);
+        ctx.lineTo(CONFIG.length, 2);
+        ctx.lineTo(CONFIG.length, 300);
+        ctx.lineTo(0, 300);
+        ctx.fill();
+
+        ctx.fillStyle = '#6d4c41';
+        ctx.fillRect(CONFIG.length, -50, 15, 52);
+        ctx.restore();
+
+        // 3. 物体
+        const distance = state.progress * (CONFIG.length - CONFIG.objSize);
+        const cosA = Math.cos(CONFIG.angle);
+        const sinA = Math.sin(CONFIG.angle);
+
+        const slopeX = distance;
+        const slopeY = -CONFIG.objSize - 2; 
+
+        const centerX = CONFIG.startX + slopeX * cosA - slopeY * sinA;
+        const centerY = CONFIG.startY + slopeX * sinA + slopeY * cosA;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(CONFIG.angle); 
+
+        if (state.objType === 'cube') {
+            ctx.fillStyle = CONFIG.woodColor;
+            ctx.strokeStyle = CONFIG.woodBorder;
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.roundRect(-CONFIG.objSize, -CONFIG.objSize, CONFIG.objSize*2, CONFIG.objSize*2, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+            ctx.beginPath();
+            ctx.moveTo(-CONFIG.objSize+10, -CONFIG.objSize+10);
+            ctx.lineTo(CONFIG.objSize-10, CONFIG.objSize-10);
+            ctx.stroke();
+
+            drawYellowDot(0, 0);
+
+            if (state.isPlaying) {
+                state.tracePoints.push({x: centerX, y: centerY});
+            }
+
+        } else {
+            const rollAngle = distance / CONFIG.objSize;
+            ctx.rotate(rollAngle); 
+
+            ctx.beginPath();
+            ctx.arc(0, 0, CONFIG.objSize, 0, Math.PI * 2);
+            ctx.fillStyle = CONFIG.woodColor;
+            ctx.fill();
+            
+            let grad = ctx.createRadialGradient(-15, -15, 5, 0, 0, CONFIG.objSize);
+            grad.addColorStop(0, 'rgba(255,255,255,0.3)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.strokeStyle = CONFIG.woodBorder;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(-CONFIG.objSize, 0); ctx.lineTo(CONFIG.objSize, 0);
+            ctx.moveTo(0, -CONFIG.objSize); ctx.lineTo(0, CONFIG.objSize);
+            ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            const dotOffset = -CONFIG.objSize + 8;
+            drawYellowDot(0, dotOffset);
+
+            if (state.isPlaying) {
+                const globalDot = getGlobalCoord(centerX, centerY, CONFIG.angle, rollAngle, 0, dotOffset);
+                state.tracePoints.push(globalDot);
+            }
+        }
+        
+        ctx.restore();
+
+        // 4. 地面
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(0, CONFIG.startY + CONFIG.length * Math.sin(CONFIG.angle) + 50);
+        ctx.lineTo(800, CONFIG.startY + CONFIG.length * Math.sin(CONFIG.angle) + 50);
+        ctx.strokeStyle = '#d7ccc8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawYellowDot(x, y) {
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffeb3b';
+        ctx.fill();
+        ctx.strokeStyle = '#f57f17';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(x - 2, y - 2, 2, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fill();
+    }
+
+    init();
+
+</script>
+</body>
+</html>

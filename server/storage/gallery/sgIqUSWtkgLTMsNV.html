@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>八大行星排序 - 优化布局版</title>
+    <style>
+        :root {
+            --bg-color: #000005;
+            --toggle-active: #0099ff;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: white;
+            font-family: "Microsoft YaHei", sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 星空背景 */
+        .stars {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
+        }
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            opacity: 0.8;
+            animation: twinkle var(--duration) infinite ease-in-out;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* 标题 */
+        .header {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #ccc;
+        }
+
+        /* 行星舞台 */
+        .stage-container {
+            position: relative;
+            width: 95%; /* 稍微加宽舞台 */
+            max-width: 1200px; /* 允许更大的最大宽度 */
+            height: 350px;
+            /* 辅助线，调试用 */
+            /* border: 1px dashed rgba(255,255,255,0.1); */
+        }
+
+        .planet-wrapper {
+            position: absolute;
+            top: 50%;
+            /* 关键修改：使用 -50% -50% 居中定位，确保 left 值是星球的绝对中心 */
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: left 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); /* 增加一点弹性效果 */
+            width: 140px; /* 增加容器宽度以容纳土星光环 */
+            pointer-events: none; /* 防止遮挡点击 */
+        }
+
+        /* 星球通用样式 */
+        .planet {
+            border-radius: 50%;
+            box-shadow: inset -10px -10px 20px rgba(0,0,0,0.7), 0 0 15px rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .planet-name {
+            margin-top: 20px;
+            font-size: 14px;
+            color: #ddd;
+            text-shadow: 0 0 5px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+
+        /* --- 各个星球的 CSS 绘图 --- */
+        
+        .mercury .planet { background: radial-gradient(circle at 30% 30%, #a1a1a1, #4a4a4a); }
+        .venus .planet { background: radial-gradient(circle at 30% 30%, #e6ac5c, #d35400); }
+        
+        .earth .planet {
+            background: radial-gradient(circle at 30% 30%, #4facfe, #00f2fe);
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20,50 Q40,30 60,50 T90,50" fill="none" stroke="%232ecc71" stroke-width="8" opacity="0.6"/></svg>'), radial-gradient(circle at 30% 30%, #2980b9, #1a252f);
+            background-size: cover;
+        }
+
+        .mars .planet { background: radial-gradient(circle at 30% 30%, #e74c3c, #c0392b); }
+
+        /* 木星 */
+        .jupiter .planet {
+            background: repeating-linear-gradient(
+                -15deg,
+                #dfae7e,
+                #dfae7e 10px,
+                #c79464 10px,
+                #c79464 20px,
+                #e6cea8 20px,
+                #e6cea8 25px
+            );
+            box-shadow: inset -10px -10px 30px rgba(0,0,0,0.6);
+        }
+
+        /* 土星 */
+        .saturn .planet {
+            background: radial-gradient(circle at 30% 30%, #f4e4a8, #d4ac6e);
+            z-index: 2;
+        }
+        /* 土星环 - 调整位置使其更自然 */
+        .saturn .ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 180%; /* 环更宽 */
+            height: 50%;
+            border: 10px solid rgba(190, 170, 130, 0.7);
+            border-top: 10px solid rgba(190, 170, 130, 0.35);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            z-index: 1;
+            box-shadow: 0 0 10px rgba(190,170,130,0.2);
+        }
+
+        .uranus .planet { background: radial-gradient(circle at 30% 30%, #a2d9ff, #5dade2); }
+        .neptune .planet { background: radial-gradient(circle at 30% 30%, #3498db, #252475); }
+
+
+        /* 控制条 */
+        .controls {
+            position: absolute;
+            bottom: 40px;
+            display: flex;
+            background: white;
+            border-radius: 25px;
+            padding: 4px;
+            box-shadow: 0 0 15px rgba(255,255,255,0.2);
+            z-index: 10;
+        }
+
+        .toggle-btn {
+            padding: 8px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .toggle-btn.active {
+            background-color: var(--toggle-active);
+            color: white;
+            font-weight: bold;
+        }
+
+        .description {
+            position: absolute;
+            bottom: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="stars" id="starField"></div>
+    <div class="header">八大行星排序</div>
+
+    <div class="stage-container" id="stage">
+        <!-- JS生成星球 -->
+    </div>
+
+    <div class="controls">
+        <div class="toggle-btn" id="btnDistance" onclick="sortPlanets('distance')">距离太阳由近及远</div>
+        <div class="toggle-btn active" id="btnDiameter" onclick="sortPlanets('diameter')">星球直径由小到大</div>
+    </div>
+    
+    <div class="description">
+        适配教科书：教科版 / 远东版
+    </div>
+
+    <script>
+        // 定义星球数据
+        // weight: 用于布局计算的权重，数值越大，该星球周围预留的空间越大
+        const planets = [
+            { id: 'mercury', name: '水星', class: 'mercury', visualSize: 20, weight: 0.8, distanceOrder: 0, diameterOrder: 0 },
+            { id: 'venus',   name: '金星', class: 'venus',   visualSize: 38, weight: 1.0, distanceOrder: 1, diameterOrder: 2 },
+            { id: 'earth',   name: '地球', class: 'earth',   visualSize: 40, weight: 1.0, distanceOrder: 2, diameterOrder: 3 },
+            { id: 'mars',    name: '火星', class: 'mars',    visualSize: 28, weight: 0.9, distanceOrder: 3, diameterOrder: 1 },
+            
+            // 中等星球，稍微拉大间距
+            { id: 'neptune', name: '海王星', class: 'neptune', visualSize: 60, weight: 1.4, distanceOrder: 7, diameterOrder: 4 },
+            { id: 'uranus',  name: '天王星', class: 'uranus',  visualSize: 65, weight: 1.4, distanceOrder: 6, diameterOrder: 5 },
+            
+            // 巨大星球，给予最大权重，防止拥挤
+            { id: 'saturn',  name: '土星', class: 'saturn',  visualSize: 90, weight: 2.4, distanceOrder: 5, diameterOrder: 6, hasRing: true },
+            { id: 'jupiter', name: '木星', class: 'jupiter', visualSize: 110, weight: 2.2, distanceOrder: 4, diameterOrder: 7 },
+        ];
+
+        const stage = document.getElementById('stage');
+        let currentSortMode = 'diameter'; 
+
+        function initPlanets() {
+            planets.forEach(p => {
+                const wrapper = document.createElement('div');
+                wrapper.className = `planet-wrapper ${p.class}`;
+                wrapper.id = `p-${p.id}`;
+                
+                const ball = document.createElement('div');
+                ball.className = 'planet';
+                ball.style.width = p.visualSize + 'px';
+                ball.style.height = p.visualSize + 'px';
+                
+                wrapper.appendChild(ball);
+
+                if (p.hasRing) {
+                    const ring = document.createElement('div');
+                    ring.className = 'ring';
+                    wrapper.appendChild(ring);
+                }
+
+                const label = document.createElement('div');
+                label.className = 'planet-name';
+                label.innerText = p.name;
+                wrapper.appendChild(label);
+
+                stage.appendChild(wrapper);
+            });
+            sortPlanets(currentSortMode);
+        }
+
+        function sortPlanets(mode) {
+            currentSortMode = mode;
+
+            // 按钮样式更新
+            document.getElementById('btnDistance').className = mode === 'distance' ? 'toggle-btn active' : 'toggle-btn';
+            document.getElementById('btnDiameter').className = mode === 'diameter' ? 'toggle-btn active' : 'toggle-btn';
+
+            // 1. 对数据进行排序
+            const sortedData = [...planets].sort((a, b) => {
+                return mode === 'distance' ? (a.distanceOrder - b.distanceOrder) : (a.diameterOrder - b.diameterOrder);
+            });
+
+            // 2. 计算布局总权重 (Total Weight)
+            // 我们不使用固定的 index * 12%，而是根据星球大小动态分配空间
+            const totalWeight = sortedData.reduce((sum, p) => sum + p.weight, 0);
+            
+            // 3. 开始分配位置
+            // 可用空间范围：从 5% 到 95% (预留两边边距)
+            const startPos = 5;
+            const availableRange = 90; 
+            
+            let currentAccumulator = 0;
+
+            sortedData.forEach((p) => {
+                const el = document.getElementById(`p-${p.id}`);
+                
+                // 计算当前星球占据的份额
+                // 它的中心位置应该在：之前的累计权重 + (自己权重的一半)
+                const centerWeight = currentAccumulator + (p.weight / 2);
+                
+                // 映射到百分比
+                // 公式：起始点 + (当前中心权重 / 总权重) * 可用范围
+                const leftPercent = startPos + (centerWeight / totalWeight) * availableRange;
+                
+                el.style.left = leftPercent + '%';
+                
+                // 累加权重
+                currentAccumulator += p.weight;
+            });
+        }
+
+        // 背景动画
+        function createStars() {
+            const starContainer = document.getElementById('starField');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                const size = Math.random() * 2 + 1;
+                star.style.width = size + 'px';
+                star.style.height = size + 'px';
+                star.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
+                starContainer.appendChild(star);
+            }
+        }
+
+        createStars();
+        initPlanets();
+
+    </script>
+</body>
+</html>

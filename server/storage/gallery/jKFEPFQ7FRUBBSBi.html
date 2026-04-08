@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拉瓦锡实验 - 测定空气中氧气含量</title>
+    <style>
+        /* 全局布局 */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+            background-color: #8d8383; /* 参考图背景色 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        /* 1. 头部标题 */
+        header {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 15px 0;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        h1 { margin: 0; font-size: 1.5rem; letter-spacing: 2px; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+        .tag { font-size: 0.8rem; background: rgba(255,255,255,0.2); padding: 3px 8px; border-radius: 4px; margin-left: 10px; }
+
+        /* 2. 中间实验区 */
+        .stage-container {
+            position: relative;
+            margin: 30px 0;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #9e9494; /* 画布背景 */
+        }
+
+        canvas {
+            display: block;
+            cursor: default;
+        }
+
+        /* 控制按钮悬浮层 */
+        .controls-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none; /* 让鼠标穿透到Canvas，但按钮除外 */
+        }
+
+        .play-btn {
+            pointer-events: auto;
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 4px solid #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(4px);
+        }
+        .play-btn:hover { transform: scale(1.1); background: rgba(0,0,0,0.7); }
+        .play-icon {
+            width: 0; height: 0;
+            border-top: 15px solid transparent;
+            border-bottom: 15px solid transparent;
+            border-left: 25px solid #fff;
+            margin-left: 5px;
+        }
+        /* 实验中隐藏按钮 */
+        .playing .play-btn { opacity: 0; pointer-events: none; }
+
+        /* 3. 底部说明 */
+        footer {
+            max-width: 800px;
+            background: #fff;
+            color: #333;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            line-height: 1.6;
+            margin-bottom: 30px;
+        }
+        .highlight { color: #c0392b; font-weight: bold; }
+        .book-info {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+            font-size: 0.85rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>拉瓦锡实验<span class="tag">化学史</span></h1>
+    </header>
+
+    <div class="stage-container" id="stage">
+        <canvas id="simCanvas" width="800" height="450"></canvas>
+        <div class="controls-layer" id="controlsLayer">
+            <div class="play-btn" onclick="startExperiment()">
+                <div class="play-icon"></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>
+            <strong>动画模拟拉瓦锡测定空气中氧气体积：</strong>
+            把少量汞放在密闭的曲颈甑里连续加热12天。
+            汞与氧气反应生成<span class="highlight" style="color:#d32f2f">红色粉末（氧化汞）</span>，消耗了密闭容器中的氧气，导致压强减小。
+            大气压将水银槽中的水银压入钟罩，<span class="highlight">液面上升约 1/5</span>，从而证明了空气中氧气约占 1/5 的体积。
+        </p>
+        <div class="book-info">
+            适配教科书：沪教版(2024) / 沪教版(上海) / 鲁教版 / 鲁教版(2024) / 人教版 / 人教版(2024) / 浙教版
+        </div>
+    </footer>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const stage = document.getElementById('stage');
+
+    // --- 绘图参数 ---
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerX = width / 2;
+    
+    // 颜色定义
+    const COLORS = {
+        furnace: '#c27ba0', // 炉子淡红/紫
+        furnaceDark: '#8e44ad',
+        mercury: '#e0e0e0', // 水银银白
+        mercuryDark: '#bdbdbd',
+        glass: 'rgba(255, 255, 255, 0.3)',
+        glassBorder: 'rgba(255, 255, 255, 0.6)',
+        table: '#8d6e63',
+        fire: ['#ffeb3b', '#ff9800', '#f44336']
+    };
+
+    // --- 状态变量 ---
+    let isPlaying = false;
+    let progress = 0; // 0 到 1
+    let particles = []; // 红色粉末粒子
+    let fireFrame = 0;
+
+    // --- 绘图函数 ---
+
+    // 1. 绘制桌子
+    function drawTable() {
+        ctx.fillStyle = COLORS.table;
+        // 桌面
+        ctx.fillRect(450, 300, 300, 15);
+        // 桌腿
+        ctx.fillRect(480, 315, 15, 60);
+        ctx.fillRect(700, 315, 15, 60);
+        // 透视感
+        ctx.fillStyle = 'rgba(0,0,0,0.2)';
+        ctx.fillRect(450, 315, 300, 5);
+    }
+
+    // 2. 绘制火炉
+    function drawFurnace() {
+        const fx = 150, fy = 200, w = 160, h = 220;
+        
+        // 炉体
+        ctx.fillStyle = '#c06c84'; // 砖红偏粉
+        ctx.strokeStyle = '#6c5b7b';
+        ctx.lineWidth = 2;
+        
+        // 圆柱体模拟
+        ctx.beginPath();
+        ctx.ellipse(fx + w/2, fy, w/2, 15, 0, Math.PI, 0); // 顶后沿
+        ctx.lineTo(fx + w, fy + h);
+        ctx.ellipse(fx + w/2, fy + h, w/2, 15, 0, 0, Math.PI); // 底
+        ctx.lineTo(fx, fy);
+        ctx.fill();
+        ctx.stroke();
+        
+        // 炉顶面
+        ctx.beginPath();
+        ctx.ellipse(fx + w/2, fy, w/2, 15, 0, 0, Math.PI*2);
+        ctx.fillStyle = '#d88c9a';
+        ctx.fill();
+        ctx.stroke();
+
+        // 炉门/通气口
+        ctx.fillStyle = '#6c5b7b';
+        ctx.fillRect(fx + 40, fy + 60, 80, 50); // 上门
+        ctx.fillRect(fx + 40, fy + 150, 80, 30); // 下门
+        
+        // 炉栅栏
+        ctx.beginPath();
+        ctx.moveTo(fx + 20, fy); ctx.lineTo(fx + 140, fy);
+        ctx.moveTo(fx + w/2, fy - 15); ctx.lineTo(fx + w/2, fy + 15);
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.stroke();
+    }
+
+    // 3. 绘制火焰 (动画)
+    function drawFire() {
+        if (!isPlaying) return;
+        const fx = 230, fy = 250; // 火焰中心位置 (炉子内部)
+        
+        fireFrame++;
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter'; // 发光效果
+        
+        for(let i=0; i<3; i++) {
+            const size = 20 + Math.sin(fireFrame * 0.2 + i) * 5;
+            const offset = Math.cos(fireFrame * 0.3 + i) * 5;
+            
+            ctx.fillStyle = COLORS.fire[i];
+            ctx.beginPath();
+            ctx.arc(fx + offset, fy - i*10, size, 0, Math.PI*2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // 4. 绘制水银槽和钟罩
+    function drawApparatus() {
+        const tankX = 600, tankY = 280; // 水银槽中心
+        
+        // --- 水银槽 (Trough) ---
+        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+        ctx.strokeStyle = COLORS.glassBorder;
+        ctx.lineWidth = 2;
+        
+        // 槽后壁
+        ctx.beginPath();
+        ctx.ellipse(tankX, tankY - 40, 100, 20, 0, Math.PI, 0); 
+        ctx.lineTo(tankX + 100, tankY + 10);
+        ctx.ellipse(tankX, tankY + 10, 100, 20, 0, 0, Math.PI);
+        ctx.lineTo(tankX - 100, tankY - 40);
+        ctx.fill();
+        
+        // 槽内水银 (底部)
+        ctx.fillStyle = COLORS.mercury;
+        ctx.beginPath();
+        ctx.ellipse(tankX, tankY, 95, 18, 0, 0, Math.PI*2);
+        ctx.fill();
+
+        // --- 钟罩 (Bell Jar) ---
+        const jarX = 600, jarY = 180, jarW = 60, jarH = 120;
+        
+        // 钟罩内液面上升逻辑
+        // 初始高度 10px, 最终上升到 1/5 处 (约30px)
+        const liquidRise = 10 + (progress * 30); 
+        const liquidY = tankY - liquidRise;
+
+        // 钟罩内的水银柱
+        ctx.fillStyle = COLORS.mercuryDark; // 稍微深一点表示在内部
+        ctx.beginPath();
+        // 液面
+        ctx.ellipse(jarX, liquidY, jarW - 2, 8, 0, 0, Math.PI*2);
+        ctx.fill();
+        // 柱体
+        ctx.beginPath();
+        ctx.rect(jarX - jarW + 2, liquidY, (jarW - 2)*2, (tankY - liquidY));
+        ctx.fill();
+
+        // 钟罩玻璃本体
+        ctx.fillStyle = COLORS.glass;
+        ctx.strokeStyle = COLORS.glassBorder;
+        
+        ctx.beginPath();
+        // 顶部圆顶
+        ctx.arc(jarX, jarY, jarW, Math.PI, 0);
+        // 两侧壁
+        ctx.lineTo(jarX + jarW, tankY + 5); // 伸入水银槽一点
+        // 底部开口弧线 (透视)
+        ctx.ellipse(jarX, tankY + 5, jarW, 10, 0, 0, Math.PI);
+        ctx.lineTo(jarX - jarW, jarY);
+        
+        ctx.fill();
+        ctx.stroke();
+
+        // 钟罩顶部的提手
+        ctx.beginPath();
+        ctx.arc(jarX, jarY - 60, 8, 0, Math.PI*2);
+        ctx.fillStyle = COLORS.glass;
+        ctx.stroke();
+        ctx.fill();
+
+        // --- 水银槽前壁 (遮挡效果) ---
+        ctx.fillStyle = 'rgba(200,200,200,0.3)';
+        ctx.beginPath();
+        ctx.ellipse(tankX, tankY - 40, 100, 20, 0, 0, Math.PI);
+        ctx.lineTo(tankX + 100, tankY + 10);
+        ctx.ellipse(tankX, tankY + 10, 100, 20, 0, 0, Math.PI);
+        ctx.lineTo(tankX - 100, tankY - 40);
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // 5. 绘制曲颈甑 (Retort)
+    function drawRetort() {
+        const bulbX = 230, bulbY = 180, r = 40; // 甑体球部
+        
+        // --- 甑内水银 ---
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(bulbX, bulbY, r - 2, 0, Math.PI * 2); // 限制在球内
+        ctx.clip();
+        
+        ctx.fillStyle = COLORS.mercury;
+        ctx.fillRect(bulbX - r, bulbY + 10, r*2, r); // 水银液面
+        ctx.fillStyle = '#bdc3c7'; // 液面反光
+        ctx.beginPath();
+        ctx.ellipse(bulbX, bulbY + 10, r-2, 10, 0, 0, Math.PI*2);
+        ctx.fill();
+        
+        // 红色粉末 (HgO) 生成动画
+        if (isPlaying && progress > 0.1) {
+            // 随着进度增加粒子数量
+            if (Math.random() < 0.2 && particles.length < 50) {
+                particles.push({
+                    x: bulbX - 20 + Math.random()*40,
+                    y: bulbY + 10 + Math.random()*5,
+                    r: 1 + Math.random() * 2
+                });
+            }
+            
+            ctx.fillStyle = '#d32f2f'; // 红色
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                ctx.fill();
+            });
+        }
+        ctx.restore();
+
+        // --- 玻璃外壳 ---
+        ctx.strokeStyle = COLORS.glassBorder;
+        ctx.lineWidth = 2;
+        ctx.fillStyle = COLORS.glass;
+        
+        ctx.beginPath();
+        // 球部
+        ctx.arc(bulbX, bulbY, r, Math.PI * 0.2, Math.PI * 1.8, true); // 留个口接颈
+        
+        // 颈部 (长弯管)
+        // 贝塞尔曲线模拟：从球部上方伸出，弯曲向下，进入钟罩
+        const startX = bulbX + r * Math.cos(Math.PI * 1.8);
+        const startY = bulbY + r * Math.sin(Math.PI * 1.8);
+        
+        // 上沿
+        ctx.bezierCurveTo(bulbX + 100, bulbY - 100, 
+                          550, 150, 
+                          600, 250); // 终点在钟罩内水银面下
+        
+        // 管口 (在水银槽内)
+        ctx.lineTo(580, 250);
+        
+        // 下沿回连
+        ctx.bezierCurveTo(530, 160, 
+                          bulbX + 90, bulbY - 70, 
+                          bulbX + r * Math.cos(Math.PI * 0.2), bulbY + r * Math.sin(Math.PI * 0.2));
+        
+        ctx.stroke();
+        ctx.fill();
+    }
+
+    // --- 主循环 ---
+    function loop() {
+        // 清空画布
+        ctx.clearRect(0, 0, width, height);
+        
+        // 1. 背景物体
+        drawTable();
+        drawFurnace();
+        
+        // 2. 动态逻辑
+        if (isPlaying) {
+            drawFire(); // 画火
+            if (progress < 1) {
+                progress += 0.002; // 反应速度
+            }
+        }
+        
+        // 3. 核心仪器 (按遮挡关系排序)
+        drawApparatus(); // 钟罩和水银槽
+        drawRetort();    // 曲颈甑 (覆盖在炉子上)
+
+        requestAnimationFrame(loop);
+    }
+
+    // --- 交互控制 ---
+    function startExperiment() {
+        if (isPlaying) return;
+        isPlaying = true;
+        stage.classList.add('playing');
+    }
+
+    // 初始化绘制一帧
+    loop();
+
+</script>
+</body>
+</html>

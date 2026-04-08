@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多力杠杆平衡演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            user-select: none; /* 防止拖拽时选中文本 */
+        }
+
+        h1 { color: #333; margin-bottom: 10px; }
+
+        .game-container {
+            position: relative;
+            background: white;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border-radius: 12px;
+            padding: 20px;
+            width: 800px;
+            text-align: center;
+        }
+
+        canvas {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fafafa;
+            cursor: grab;
+        }
+        canvas:active { cursor: grabbing; }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding: 10px 20px;
+            background: #e3f2fd;
+            border-radius: 8px;
+            color: #0d47a1;
+            font-weight: bold;
+        }
+
+        .info-panel .right { color: #d32f2f; }
+        .info-panel .status { color: #333; }
+
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            padding: 8px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #0056b3; }
+        button.reset { background-color: #6c757d; }
+        button.reset:hover { background-color: #545b62; }
+
+        .instruction {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>多力杠杆平衡演示</h1>
+
+    <div class="game-container">
+        <div class="info-panel">
+            <div id="leftTorque">左侧力矩: 0</div>
+            <div id="status" class="status">平衡</div>
+            <div id="rightTorque" class="right">右侧力矩: 0</div>
+        </div>
+
+        <canvas id="simCanvas" width="760" height="450"></canvas>
+
+        <div class="controls">
+            <button class="reset" onclick="resetSim()">清空所有</button>
+        </div>
+        <p class="instruction">提示：从底部拖拽新的砝码挂到杠杆上，拖出画布区域即可删除。</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // 配置参数
+        const PIVOT_X = width / 2;
+        const PIVOT_Y = 200;
+        const BEAM_LENGTH = 600;
+        const MARK_Spacing = 30; // 每个刻度的像素间距
+        const MAX_MARKS = 10; // 单侧最大刻度数
+        
+        // 状态变量
+        let weights = []; // 存放在杠杆上的砝码
+        let isDragging = false;
+        let draggedWeight = null;
+        let currentAngle = 0; // 当前倾斜角度 (弧度)
+        let targetAngle = 0;  // 目标角度
+        
+        // 砝码库（底部供拖拽的区域）
+        const WAREHOUSE_Y = 380;
+        const WEIGHT_MASS = 10; // 每个砝码的标准质量
+        
+        // 初始化
+        function init() {
+            // 添加几个初始砝码
+            weights.push({id: 1, pos: -4, mass: 10, x: 0, y: 0, isNew: false});
+            weights.push({id: 2, pos: 4, mass: 10, x: 0, y: 0, isNew: false});
+            loop();
+        }
+
+        // 核心物理计算
+        function updatePhysics() {
+            let leftMoment = 0;
+            let rightMoment = 0;
+
+            weights.forEach(w => {
+                if (w.isNew) return; // 正在拖拽的新砝码不计入力矩
+                const dist = Math.abs(w.pos);
+                if (w.pos < 0) leftMoment += w.mass * dist;
+                if (w.pos > 0) rightMoment += w.mass * dist;
+            });
+
+            // 更新UI数值
+            document.getElementById('leftTorque').innerText = `左侧力矩: ${leftMoment}`;
+            document.getElementById('rightTorque').innerText = `右侧力矩: ${rightMoment}`;
+
+            // 决定目标角度
+            const diff = leftMoment - rightMoment;
+            const threshold = 0.1;
+
+            if (Math.abs(diff) < threshold) {
+                targetAngle = 0;
+                document.getElementById('status').innerText = "平衡 ✔";
+                document.getElementById('status').style.color = "green";
+            } else if (diff > 0) {
+                targetAngle = -20 * (Math.PI / 180); // 左倾
+                document.getElementById('status').innerText = "左边重 ◀";
+                document.getElementById('status').style.color = "#333";
+            } else {
+                targetAngle = 20 * (Math.PI / 180); // 右倾
+                document.getElementById('status').innerText = "右边重 ▶";
+                document.getElementById('status').style.color = "#333";
+            }
+
+            // 动画平滑过渡
+            currentAngle += (targetAngle - currentAngle) * 0.1;
+        }
+
+        // 绘图循环
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. 绘制支架
+            ctx.beginPath();
+            ctx.moveTo(PIVOT_X, PIVOT_Y);
+            ctx.lineTo(PIVOT_X - 20, PIVOT_Y + 100);
+            ctx.lineTo(PIVOT_X + 20, PIVOT_Y + 100);
+            ctx.fillStyle = '#78909c';
+            ctx.fill();
+
+            // 保存上下文以旋转杠杆
+            ctx.save();
+            ctx.translate(PIVOT_X, PIVOT_Y);
+            ctx.rotate(currentAngle);
+
+            // 2. 绘制杠杆主体
+            ctx.fillStyle = '#8d6e63';
+            ctx.fillRect(-BEAM_LENGTH / 2, -10, BEAM_LENGTH, 20);
+            
+            // 3. 绘制刻度
+            ctx.fillStyle = 'white';
+            ctx.font = '12px Arial';
+            ctx.textAlign = 'center';
+            
+            for (let i = -MAX_MARKS; i <= MAX_MARKS; i++) {
+                if (i === 0) continue;
+                let x = i * MARK_Spacing;
+                // 刻度线
+                ctx.beginPath();
+                ctx.moveTo(x, -10);
+                ctx.lineTo(x, 0);
+                ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+                ctx.stroke();
+                // 数字 (每隔2个标一下，防止拥挤)
+                if (i % 2 === 0) {
+                    ctx.fillText(Math.abs(i), x, 5);
+                }
+            }
+            
+            // 4. 绘制挂在杠杆上的砝码
+            // 为了防止砝码看起来是“歪”的（重力始终向下），我们需要反向旋转砝码
+            weights.forEach(w => {
+                if (w.isDragging) return; // 拖拽中的单独画
+
+                let wx = w.pos * MARK_Spacing;
+                let wy = 10; // 挂钩点
+
+                ctx.save();
+                ctx.translate(wx, wy);
+                ctx.rotate(-currentAngle); // 反向旋转，保持垂直向下
+
+                drawWeightShape(ctx, 0, 0, w.mass);
+
+                ctx.restore();
+            });
+
+            ctx.restore(); // 恢复到旋转之前的状态
+
+            // 5. 绘制拖拽中的砝码 (跟随鼠标)
+            if (draggedWeight) {
+                drawWeightShape(ctx, draggedWeight.x, draggedWeight.y, draggedWeight.mass, true);
+            }
+
+            // 6. 绘制底部“砝码库”
+            drawWarehouse();
+        }
+
+        // 绘制单个砝码的函数
+        function drawWeightShape(context, x, y, mass, isShadow = false) {
+            const size = 30;
+            context.fillStyle = isShadow ? 'rgba(33, 150, 243, 0.8)' : '#1976d2';
+            context.strokeStyle = '#0d47a1';
+            
+            // 挂钩线
+            context.beginPath();
+            context.moveTo(x, y);
+            context.lineTo(x, y + 20);
+            context.stroke();
+
+            // 砝码本体
+            context.fillRect(x - size/2, y + 20, size, size);
+            context.strokeRect(x - size/2, y + 20, size, size);
+
+            // 文字
+            context.fillStyle = 'white';
+            context.font = '12px Arial';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(mass, x, y + 20 + size/2);
+        }
+
+        function drawWarehouse() {
+            ctx.fillStyle = '#e0e0e0';
+            ctx.fillRect(200, WAREHOUSE_Y - 20, 360, 80);
+            ctx.fillStyle = '#666';
+            ctx.font = '14px Arial';
+            ctx.fillText("砝码库 (拖拽使用)", width/2, WAREHOUSE_Y + 50);
+            
+            // 画一个示例砝码
+            drawWeightShape(ctx, width/2, WAREHOUSE_Y, 10);
+        }
+
+        function loop() {
+            updatePhysics();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        // --- 交互逻辑 ---
+
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: evt.clientX - rect.left,
+                y: evt.clientY - rect.top
+            };
+        }
+
+        // 坐标转换：屏幕坐标 -> 杠杆上的刻度位置 (考虑旋转)
+        function getBeamPos(mx, my) {
+            // 简单的近似：因为只在刻度附近吸附
+            // 更精确的方法是将鼠标坐标逆旋转回水平状态
+            // x' = (x - cx) * cos(-a) - (y - cy) * sin(-a)
+            
+            let dx = mx - PIVOT_X;
+            let dy = my - PIVOT_Y;
+            
+            // 逆旋转
+            let rotatedX = dx * Math.cos(-currentAngle) - dy * Math.sin(-currentAngle);
+            
+            // 转换为刻度索引
+            let index = Math.round(rotatedX / MARK_Spacing);
+            
+            // 限制范围
+            if (index < -MAX_MARKS) index = -MAX_MARKS;
+            if (index > MAX_MARKS) index = MAX_MARKS;
+            
+            return index;
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const m = getMousePos(e);
+            
+            // 1. 检查是否点击了仓库中的砝码
+            if (m.y > WAREHOUSE_Y - 20 && m.x > 200 && m.x < 560) {
+                // 生成新砝码
+                let newW = {
+                    id: Date.now(),
+                    mass: 10,
+                    pos: 0,
+                    x: m.x,
+                    y: m.y,
+                    isDragging: true,
+                    isNew: true
+                };
+                weights.push(newW);
+                draggedWeight = newW;
+                isDragging = true;
+                return;
+            }
+
+            // 2. 检查是否点击了杠杆上的砝码
+            // 这比较难，因为砝码跟着杠杆转。我们反向遍历，找到最近的一个。
+            for (let i = weights.length - 1; i >= 0; i--) {
+                let w = weights[i];
+                
+                // 计算该砝码当前的屏幕坐标
+                let wx_local = w.pos * MARK_Spacing;
+                let wy_local = 35; // 大概的中心点 (挂钩20 + 半高15)
+                
+                // 旋转变换
+                let screenX = PIVOT_X + wx_local * Math.cos(currentAngle) - wy_local * Math.sin(currentAngle);
+                let screenY = PIVOT_Y + wx_local * Math.sin(currentAngle) + wy_local * Math.cos(currentAngle);
+                
+                // 简单的距离检测
+                let dist = Math.sqrt((m.x - screenX)**2 + (m.y - screenY)**2);
+                
+                if (dist < 30) {
+                    w.isDragging = true;
+                    w.isNew = false; // 如果是旧砝码被拖动
+                    draggedWeight = w;
+                    isDragging = true;
+                    // 从数组移除，稍后add回去（避免重绘时的层级问题）或者就在原位改
+                    // 这里不移除，只是标记状态
+                    break;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDragging || !draggedWeight) return;
+            const m = getMousePos(e);
+            draggedWeight.x = m.x;
+            draggedWeight.y = m.y;
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDragging || !draggedWeight) return;
+
+            const m = getMousePos(e);
+            
+            // 判断是否扔出了有效区域 (删除砝码)
+            if (m.y > height - 50 || m.y < 50 || m.x < 50 || m.x > width - 50) {
+                // 删除
+                weights = weights.filter(w => w !== draggedWeight);
+            } else {
+                // 吸附到最近的刻度
+                let posIndex = getBeamPos(m.x, m.y);
+                
+                // 不能放在支点(0)上
+                if (posIndex === 0) {
+                     if (m.x < PIVOT_X) posIndex = -1;
+                     else posIndex = 1;
+                }
+
+                draggedWeight.pos = posIndex;
+                draggedWeight.isNew = false;
+            }
+
+            draggedWeight.isDragging = false;
+            draggedWeight = null;
+            isDragging = false;
+        });
+
+        function resetSim() {
+            weights = [];
+            currentAngle = 0;
+            targetAngle = 0;
+        }
+
+        // 启动
+        init();
+
+    </script>
+</body>
+</html>

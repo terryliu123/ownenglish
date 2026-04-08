@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定滑轮交互演示</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .canvas-area {
+            position: relative;
+            margin-bottom: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+
+        /* 控制区域样式 */
+        .controls {
+            width: 100%;
+            padding: 15px;
+            background-color: #e3f2fd;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type=range] {
+            width: 80%;
+            height: 8px;
+            border-radius: 5px;
+            background: #bdc3c7;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* 数据面板 */
+        .data-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .data-card {
+            background: #fff;
+            padding: 10px;
+            border-left: 5px solid #2196f3;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        .data-card.force {
+            border-left-color: #e91e63;
+        }
+
+        .data-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .data-label {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .highlight {
+            color: #d32f2f;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>定滑轮原理演示</h1>
+
+    <div class="container">
+        <div class="canvas-area">
+            <svg id="pulleySvg" width="500" height="400" viewBox="0 0 500 400">
+                <defs>
+                    <!-- 定义箭头 -->
+                    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                        <path d="M0,0 L0,10 L10,5 z" fill="#e91e63" />
+                    </marker>
+                    <marker id="arrowBlue" markerWidth="10" markerHeight="10" refX="5" refY="5" orient="auto">
+                        <path d="M0,0 L0,10 L10,5 z" fill="#2196f3" />
+                    </marker>
+                    <!-- 渐变 -->
+                    <radialGradient id="wheelGrad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+                        <stop offset="0%" style="stop-color:#eceff1;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#b0bec5;stop-opacity:1" />
+                    </radialGradient>
+                </defs>
+
+                <!-- 支架 -->
+                <rect x="200" y="0" width="100" height="20" fill="#546e7a"/>
+                <line x1="250" y1="20" x2="250" y2="60" stroke="#333" stroke-width="4"/>
+
+                <!-- 绳子 (动态路径) -->
+                <!-- 路径逻辑：从重物 -> 绕过滑轮 -> 到手 -->
+                <path id="rope" d="M 210,300 L 210,60 A 40,40 0 0,1 290,60 L 290,300" 
+                      fill="none" stroke="#795548" stroke-width="4"/>
+
+                <!-- 定滑轮主体 (固定位置) -->
+                <circle cx="250" cy="60" r="40" fill="url(#wheelGrad)" stroke="#546e7a" stroke-width="2"/>
+                <circle cx="250" cy="60" r="5" fill="#333"/>
+                <circle cx="250" cy="60" r="35" fill="none" stroke="#cfd8dc" stroke-width="1" stroke-dasharray="5,5"/>
+
+                <!-- 重物组 (动态) -->
+                <g id="loadGroup" transform="translate(210, 300)">
+                    <!-- 物体 -->
+                    <rect x="-25" y="0" width="50" height="50" fill="#2196f3" stroke="#1565c0" stroke-width="2" rx="4"/>
+                    <text x="0" y="30" text-anchor="middle" fill="white" font-weight="bold">G</text>
+                    <!-- 挂钩 -->
+                    <path d="M 0,0 L 0,-10" stroke="#795548" stroke-width="4"/>
+                    <!-- 辅助线：高度h -->
+                    <line x1="-60" y1="50" x2="-30" y2="50" stroke="#999" stroke-dasharray="4"/>
+                    <text x="-80" y="55" fill="#2196f3" font-size="14">h</text>
+                </g>
+
+                <!-- 拉力端 (动态) -->
+                <g id="handGroup" transform="translate(290, 100)">
+                    <!-- 拉环/手 -->
+                    <circle r="8" fill="#e91e63"/>
+                    <!-- 拉力箭头 F -->
+                    <line x1="0" y1="0" x2="0" y2="50" stroke="#e91e63" stroke-width="3" marker-end="url(#arrowRed)"/>
+                    <text x="15" y="30" fill="#e91e63" font-weight="bold" font-size="18">F</text>
+                </g>
+
+                <!-- 静态基准线 -->
+                <line x1="100" y1="350" x2="400" y2="350" stroke="#ccc" stroke-width="2"/>
+                <text x="410" y="355" fill="#999" font-size="12">地面</text>
+
+            </svg>
+        </div>
+
+        <div class="controls">
+            <label for="controlSlider" style="font-weight: bold; color: #333;">
+                拖动滑块拉绳子：
+            </label>
+            <input type="range" id="controlSlider" min="0" max="200" value="0">
+            <div style="display: flex; justify-content: space-between; width: 80%; margin-top: 5px; color: #666; font-size: 12px;">
+                <span>放松</span>
+                <span>拉紧</span>
+            </div>
+        </div>
+
+        <div class="data-panel">
+            <div class="data-card">
+                <div class="data-label">重物上升距离 (h)</div>
+                <div class="data-value" id="val-h">0 cm</div>
+            </div>
+            <div class="data-card force">
+                <div class="data-label">绳子下拉距离 (s)</div>
+                <div class="data-value" id="val-s">0 cm</div>
+                <div style="font-size: 12px; color: #666; margin-top:5px;">始终满足: <span class="highlight">s = h</span></div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; background: #fff3e0; padding: 10px; border-radius: 5px; width: 100%; box-sizing: border-box;">
+            <strong>核心结论：</strong>
+            <ul style="margin: 5px 0 0 20px; font-size: 14px; color: #e65100;">
+                <li>定滑轮可以改变力的方向（向下用力，物体向上走）。</li>
+                <li>定滑轮不省力，也不省距离 ($F = G$)。</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const slider = document.getElementById('controlSlider');
+        const rope = document.getElementById('rope');
+        const loadGroup = document.getElementById('loadGroup');
+        const handGroup = document.getElementById('handGroup');
+        const valH = document.getElementById('val-h');
+        const valS = document.getElementById('val-s');
+
+        // 配置参数
+        const pulleyX = 250;
+        const pulleyY = 60;
+        const radius = 40;
+        const groundY = 350; // 地面位置
+        const initialLoadY = 300; // 重物初始Y坐标 (对应slider=0)
+        const initialHandY = 60 + radius + 20; // 手初始Y坐标 (绳子刚绕过来)
+
+        // 更新函数
+        function updateSimulation() {
+            // 1. 获取输入值 (0 到 200)
+            const inputVal = parseInt(slider.value);
+
+            // 2. 计算位置
+            // 重物上升：输入值越大，Y坐标越小（向上）
+            const currentLoadY = initialLoadY - inputVal;
+            
+            // 手下拉：定滑轮 s = h，所以手向下移动的距离 = 重物向上移动的距离
+            // 手的起始位置比较高，随着拉动向下走
+            // 为了视觉效果，我们设定手的起始点在滑轮右侧下方一点
+            const startHandY = 100; 
+            const currentHandY = startHandY + inputVal;
+
+            // 3. 更新 SVG 元素
+            
+            // 移动重物
+            loadGroup.setAttribute('transform', `translate(${pulleyX - radius}, ${currentLoadY})`);
+
+            // 移动手/拉力箭头
+            handGroup.setAttribute('transform', `translate(${pulleyX + radius}, ${currentHandY})`);
+
+            // 重新绘制绳子路径
+            // 路径：Move到重物顶部 -> Line到滑轮左切点 -> Arc画半圆 -> Line到手的位置
+            const pathD = `
+                M ${pulleyX - radius}, ${currentLoadY} 
+                L ${pulleyX - radius}, ${pulleyY} 
+                A ${radius},${radius} 0 0,1 ${pulleyX + radius},${pulleyY} 
+                L ${pulleyX + radius}, ${currentHandY}
+            `;
+            rope.setAttribute('d', pathD);
+
+            // 4. 更新数据面板
+            valH.textContent = inputVal + " cm";
+            valS.textContent = inputVal + " cm";
+        }
+
+        // 绑定事件
+        slider.addEventListener('input', updateSimulation);
+
+        // 初始化
+        updateSimulation();
+    </script>
+</body>
+</html>

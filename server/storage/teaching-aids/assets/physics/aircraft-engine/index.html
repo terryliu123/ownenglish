@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>航空发动机机械原理演示 (稳定版)</title>
+    <style>
+        /* --- 1. 基础样式 --- */
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: #eef2f5; /* 护眼灰 */
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* --- 2. 加载提示 --- */
+        #loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #333;
+            background: rgba(255,255,255,0.9);
+            padding: 20px 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            z-index: 999;
+            pointer-events: none;
+            transition: opacity 0.5s;
+        }
+
+        /* --- 3. UI 面板 --- */
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            border-left: 5px solid #2b6cb0;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 10px 0;
+            color: #1a202c;
+            display: flex;
+            align-items: center;
+        }
+
+        .status-light {
+            width: 8px;
+            height: 8px;
+            background: #48bb78;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 5px #48bb78;
+        }
+
+        p {
+            font-size: 13px;
+            color: #4a5568;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        /* 按钮样式 */
+        .btn-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        button {
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            background: #fff;
+            color: #2d3748;
+            cursor: pointer;
+            font-size: 13px;
+            text-align: left;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: #f7fafc;
+            border-color: #cbd5e0;
+            transform: translateX(2px);
+        }
+
+        button.active {
+            background: #2b6cb0;
+            color: white;
+            border-color: #2b6cb0;
+        }
+
+        .hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 12px;
+            color: #718096;
+            background: rgba(255,255,255,0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+    </style>
+    
+    <!-- 错误捕获 -->
+    <script>
+        window.onerror = function(msg, url, line) {
+            alert("程序运行出错: " + msg + "\n请检查网络连接或刷新页面。");
+            document.getElementById('loader').innerText = "加载失败 (请刷新重试)";
+        };
+    </script>
+
+    <!-- 引入 Three.js (使用更稳定的 esm.sh 源) -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://esm.sh/three@0.160.0",
+                "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <div id="loader">正在组装发动机模型...</div>
+
+    <div id="ui-panel">
+        <h1><div class="status-light"></div> 涡扇发动机核心</h1>
+        <p id="desc-text">双轴涡扇发动机结构演示。<br>你可以清晰地看到内轴（N1）和外轴（N2）的机械连接关系。</p>
+        
+        <div class="btn-container">
+            <button onclick="setStage(0)" class="active">🛠️ 全机概览</button>
+            <button onclick="setStage(1)">1️⃣ 进气 (风扇)</button>
+            <button onclick="setStage(2)">2️⃣ 压缩 (压气机)</button>
+            <button onclick="setStage(3)">3️⃣ 燃烧 (燃烧室)</button>
+            <button onclick="setStage(4)">4️⃣ 排气 (涡轮做功)</button>
+        </div>
+    </div>
+
+    <div class="hint">左键旋转 · 右键平移 · 滚轮缩放</div>
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 全局变量 ---
+        let scene, camera, renderer, controls;
+        let engineGroup, n1Shaft, n2Shaft;
+        let components = {}; // 存储部件引用
+
+        // --- 材质库 (使用标准材质，不依赖环境贴图，确保稳定) ---
+        const mat = {
+            // 轴
+            shaft: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.3, metalness: 0.8 }),
+            shaftOuter: new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.3, metalness: 0.6 }),
+            // 叶片
+            fanBlade: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.2, metalness: 0.5 }),
+            silverBlade: new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.7 }),
+            heatBlade: new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.5, metalness: 0.6 }),
+            // 外壳
+            casing: new THREE.MeshPhongMaterial({ 
+                color: 0xffffff, 
+                opacity: 0.15, 
+                transparent: true, 
+                side: THREE.DoubleSide,
+                shininess: 100
+            }),
+            // 高亮色
+            blue: new THREE.MeshStandardMaterial({ color: 0x0088ff, emissive: 0x003388, metalness: 0.5 }),
+            red: new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0x881100, metalness: 0.5 }),
+            fire: new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xff4400, metalness: 0 })
+        };
+
+        init();
+        animate();
+
+        function init() {
+            try {
+                const container = document.getElementById('canvas-container');
+
+                // 1. 场景
+                scene = new THREE.Scene();
+                scene.background = new THREE.Color(0xeef2f5);
+                // 添加雾效，增加空间感
+                scene.fog = new THREE.Fog(0xeef2f5, 20, 60);
+
+                // 2. 相机
+                camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                camera.position.set(10, 6, 10); // 更好的观察角度
+
+                // 3. 渲染器
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.shadowMap.enabled = true; // 开启阴影
+                container.appendChild(renderer.domElement);
+
+                // 4. 灯光系统 (保证看清模型)
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                scene.add(ambientLight);
+
+                const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+                dirLight.position.set(5, 10, 5);
+                dirLight.castShadow = true;
+                dirLight.shadow.mapSize.width = 1024;
+                dirLight.shadow.mapSize.height = 1024;
+                scene.add(dirLight);
+                
+                // 底部补光，防止底部全黑
+                const bottomLight = new THREE.DirectionalLight(0xaaccff, 0.5);
+                bottomLight.position.set(0, -5, 0);
+                scene.add(bottomLight);
+
+                // 5. 控制器
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.minDistance = 5;
+                controls.maxDistance = 30;
+
+                // 6. 构建模型
+                buildEngine();
+
+                // 7. 移除加载提示
+                document.getElementById('loader').style.opacity = 0;
+                setTimeout(() => document.getElementById('loader').remove(), 500);
+
+                // 8. 监听窗口
+                window.addEventListener('resize', onWindowResize);
+
+            } catch (e) {
+                console.error(e);
+                alert("初始化失败，请检查控制台错误信息。");
+            }
+        }
+
+        function buildEngine() {
+            engineGroup = new THREE.Group();
+            scene.add(engineGroup);
+
+            // 为了方便对齐，我们沿 X 轴构建
+            // 机头在 X+, 喷口在 X-
+
+            // === 1. N1 轴 (内轴) ===
+            n1Shaft = new THREE.Group();
+            engineGroup.add(n1Shaft);
+            
+            // 实心长轴 (黑色)
+            const n1Geo = new THREE.CylinderGeometry(0.2, 0.2, 10, 16);
+            n1Geo.rotateZ(Math.PI / 2);
+            const n1Mesh = new THREE.Mesh(n1Geo, mat.shaft);
+            n1Mesh.position.x = -1; // 稍微向后偏，连接风扇和LPT
+            n1Shaft.add(n1Mesh);
+
+            // === 2. N2 轴 (外轴) ===
+            n2Shaft = new THREE.Group();
+            engineGroup.add(n2Shaft);
+
+            // 空心套轴 (灰色，比N1粗)
+            const n2Geo = new THREE.CylinderGeometry(0.5, 0.5, 5, 16);
+            n2Geo.rotateZ(Math.PI / 2);
+            const n2Mesh = new THREE.Mesh(n2Geo, mat.shaftOuter);
+            n2Mesh.position.x = -1.5; // 位于中间段
+            n2Shaft.add(n2Mesh);
+
+            // === 3. 风扇 (Fan) - 连接 N1 ===
+            components.fanGroup = new THREE.Group();
+            
+            // 轮毂
+            const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.5, 24).rotateZ(Math.PI/2), mat.shaft);
+            components.fanGroup.add(fanHub);
+            
+            // 叶片 (24片)
+            const bladeGeo = new THREE.BoxGeometry(0.1, 3.5, 0.6);
+            for(let i=0; i<24; i++) {
+                const blade = new THREE.Mesh(bladeGeo, mat.fanBlade);
+                const angle = (i / 24) * Math.PI * 2;
+                blade.position.y = Math.cos(angle) * 1.8;
+                blade.position.z = Math.sin(angle) * 1.8;
+                blade.rotation.x = angle;
+                blade.rotation.y = 0.4; // 攻角
+                components.fanGroup.add(blade);
+            }
+            
+            // 鼻锥 (Spinner)
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.5, 32).rotateZ(-Math.PI/2), mat.fanBlade);
+            cone.position.x = 0.8;
+            components.fanGroup.add(cone);
+
+            components.fanGroup.position.x = 3.5;
+            n1Shaft.add(components.fanGroup); // 物理连接到N1
+
+            // === 4. 低压压气机 (Booster) - 连接 N1 ===
+            // 位于风扇后
+            const booster = createStage(1.3, 0.5, 16, mat.silverBlade);
+            booster.position.x = 2.0;
+            n1Shaft.add(booster);
+            components.booster = booster;
+
+            // === 5. 高压压气机 (HPC) - 连接 N2 ===
+            components.hpc = new THREE.Group();
+            for(let i=0; i<5; i++) {
+                const r = 1.2 - (i*0.1);
+                const stage = createStage(r, 0.8, 20, mat.silverBlade); // 内径0.8，套在N2上
+                stage.position.x = 0.5 - (i*0.5);
+                components.hpc.add(stage);
+            }
+            n2Shaft.add(components.hpc);
+
+            // === 6. 燃烧室 (Combustor) - 静止 ===
+            components.combustor = new THREE.Group();
+            const combGeo = new THREE.CylinderGeometry(1.3, 1.3, 1.5, 32, 1, true);
+            combGeo.rotateZ(Math.PI/2);
+            const combMesh = new THREE.Mesh(combGeo, mat.shaftOuter); // 默认深色
+            components.combustor.add(combMesh);
+            components.combustor.position.x = -2.5;
+            engineGroup.add(components.combustor);
+
+            // === 7. 高压涡轮 (HPT) - 连接 N2 ===
+            components.hpt = createStage(1.2, 0.8, 24, mat.heatBlade);
+            components.hpt.position.x = -3.5;
+            n2Shaft.add(components.hpt);
+
+            // === 8. 低压涡轮 (LPT) - 连接 N1 ===
+            components.lpt = new THREE.Group();
+            for(let i=0; i<3; i++) {
+                const r = 1.3 + (i*0.1);
+                const stage = createStage(r, 0.3, 24, mat.heatBlade); // 内径0.3，连在N1细轴上
+                stage.position.x = -4.5 - (i*0.6);
+                components.lpt.add(stage);
+            }
+            n1Shaft.add(components.lpt);
+
+            // === 9. 静止机匣 (Casing) ===
+            
+            // 外涵道机匣 (Nacelle)
+            const nacellePts = [];
+            // 手动构建 Lathe 轮廓
+            for ( let i = 0; i <= 10; i ++ ) {
+                const u = i / 10;
+                const x = 3.8 + Math.sin(u * Math.PI) * 0.2; // 微微的弧度
+                const y = (u - 0.5) * 7; // 长度
+                nacellePts.push( new THREE.Vector2( x, y ) );
+            }
+            const nacelleGeo = new THREE.LatheGeometry(nacellePts, 32);
+            const nacelle = new THREE.Mesh(nacelleGeo, mat.casing);
+            nacelle.rotation.z = -Math.PI/2; // 旋转对齐X轴
+            nacelle.position.x = 0.5; 
+            engineGroup.add(nacelle);
+            components.nacelle = nacelle;
+
+            // 尾喷口 (Cone)
+            const tailCone = new THREE.Mesh(new THREE.ConeGeometry(0.5, 2, 32).rotateZ(Math.PI/2), mat.heatBlade);
+            tailCone.position.x = -7;
+            engineGroup.add(tailCone);
+            components.tailCone = tailCone;
+        }
+
+        // 辅助函数：创建一级叶片
+        function createStage(outerRadius, innerRadius, count, material) {
+            const group = new THREE.Group();
+            
+            // 盘心
+            const hub = new THREE.Mesh(
+                new THREE.CylinderGeometry(innerRadius, innerRadius, 0.15, 16).rotateZ(Math.PI/2), 
+                mat.shaft
+            );
+            group.add(hub);
+
+            // 叶片
+            const h = outerRadius - innerRadius;
+            const geo = new THREE.BoxGeometry(0.05, h, outerRadius * 0.25);
+            for(let i=0; i<count; i++) {
+                const mesh = new THREE.Mesh(geo, material);
+                const angle = (i/count) * Math.PI * 2;
+                const dist = innerRadius + h/2;
+                
+                mesh.position.y = Math.cos(angle) * dist;
+                mesh.position.z = Math.sin(angle) * dist;
+                mesh.rotation.x = angle;
+                mesh.rotation.z = 0.5;
+                group.add(mesh);
+            }
+            return group;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if(n1Shaft && n2Shaft) {
+                // N1 转得慢
+                n1Shaft.rotation.x -= 0.1;
+                // N2 转得快
+                n2Shaft.rotation.x -= 0.25;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // === 交互逻辑 ===
+        window.setStage = function(idx) {
+            // 更新按钮UI
+            const btns = document.querySelectorAll('button');
+            btns.forEach((b, i) => b.className = i === idx ? 'active' : '');
+
+            // 重置所有材质
+            resetMats();
+
+            const desc = document.getElementById('desc-text');
+
+            switch(idx) {
+                case 0: 
+                    desc.innerText = "双轴结构：黑色细轴(N1)贯穿整体，驱动风扇；灰色粗轴(N2)套在外面，驱动核心机。互不干扰。";
+                    break;
+                case 1: 
+                    desc.innerText = "【进气】N1轴驱动大风扇旋转。注意看：风扇和最末端的低压涡轮是连在一起转的。";
+                    highlight(components.fanGroup, mat.blue);
+                    highlight(components.nacelle, mat.blue);
+                    break;
+                case 2: 
+                    desc.innerText = "【压缩】空气被多级叶片层层压缩。银色叶片是压气机，前段连N1，后段连N2。";
+                    highlight(components.booster, mat.blue);
+                    highlight(components.hpc, mat.red);
+                    break;
+                case 3: 
+                    desc.innerText = "【燃烧】中间的环形燃烧室。燃油在此点火，产生能量。这是发动机的心脏。";
+                    components.combustor.children[0].material = mat.fire;
+                    break;
+                case 4: 
+                    desc.innerText = "【排气/做功】高温气体推动涡轮。先推动高压涡轮(带N2转)，再推动低压涡轮(带N1转)。";
+                    highlight(components.hpt, mat.red);
+                    highlight(components.lpt, mat.red);
+                    highlight(components.tailCone, mat.red);
+                    break;
+            }
+        };
+
+        function resetMats() {
+            // 暴力重置：遍历所有对象恢复默认材质逻辑太复杂，这里简化处理
+            // 我们只重置关键的高亮部分
+            applyMat(components.fanGroup, mat.fanBlade);
+            components.nacelle.material = mat.casing;
+            applyMat(components.booster, mat.silverBlade);
+            applyMat(components.hpc, mat.silverBlade);
+            components.combustor.children[0].material = mat.shaftOuter;
+            applyMat(components.hpt, mat.heatBlade);
+            applyMat(components.lpt, mat.heatBlade);
+            components.tailCone.material = mat.heatBlade;
+        }
+
+        function highlight(obj, material) {
+            if(!obj) return;
+            if(obj.isMesh) {
+                obj.material = material;
+            } else {
+                obj.traverse(child => {
+                    if(child.isMesh) child.material = material;
+                });
+            }
+        }
+
+        function applyMat(group, material) {
+            if(!group) return;
+            group.traverse(child => {
+                if(child.isMesh) child.material = material;
+            });
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>长方体滚动实验 - 支持双向滚动</title>
+    <style>
+        :root {
+            --box-color: #f3d4b1;
+            --line-color: #ff4d4d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f2f5;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .info { margin-bottom: 15px; color: #444; text-align: center; line-height: 1.6; }
+        .dim-info { font-weight: bold; color: #2c3e50; margin-bottom: 10px; }
+
+        /* 场景容器 */
+        .scene {
+            width: 1000px;
+            height: 400px;
+            perspective: 1500px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+        }
+
+        /* 地面（纸张） */
+        .paper {
+            position: absolute;
+            width: 3000px; /* 足够长以容纳多次滚动 */
+            height: 320px;
+            background: #fafafa;
+            border-bottom: 2px solid #eee;
+            transform: rotateX(60deg) translateY(120px);
+            transform-origin: bottom;
+            display: flex;
+            align-items: center;
+            padding-left: 50px;
+            z-index: 1;
+            transition: transform 0.5s;
+        }
+
+        /* 印记样式 */
+        .imprint {
+            border: 3px solid var(--line-color);
+            background: rgba(255, 77, 77, 0.1);
+            box-sizing: border-box;
+            flex-shrink: 0;
+            animation: stamp 0.4s ease-out forwards;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: var(--line-color);
+        }
+
+        @keyframes stamp {
+            0% { opacity: 0; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* 移动轨道 */
+        .object-track {
+            position: absolute;
+            left: 50px;
+            top: 180px;
+            transform-style: preserve-3d;
+            transform: rotateX(-30deg);
+            z-index: 10;
+            transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+        }
+
+        /* 长方体 */
+        .cuboid {
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.6s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+            transform-origin: bottom right; 
+        }
+
+        .face {
+            position: absolute;
+            background: var(--box-color);
+            border: 1px solid #c9a57b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+            color: rgba(0,0,0,0.4);
+            backface-visibility: visible;
+        }
+
+        /* 控制区域 */
+        .controls {
+            margin-top: 25px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding-right: 20px;
+            border-right: 1px solid #ddd;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 6px;
+            background: #4a90e2;
+            color: white;
+            transition: 0.2s;
+        }
+        button:hover { background: #357abd; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .reset-btn { background: #e67e22; }
+        .active-mode { background: #27ae60 !important; font-weight: bold; }
+
+        .label-tag {
+            font-size: 12px;
+            background: rgba(255,255,255,0.5);
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>长方体多向滚动演示</h1>
+    <div class="dim-info">长方体尺寸：长(L) 120px × 宽(W) 80px × 高(H) 60px</div>
+    <div class="info">
+        <b>当前规则：</b>底面与纸接触，每次翻转 90°。<br>
+        “沿长边”滚动：翻转面在 L(120) 和 H(60) 之间切换；“沿短边”滚动：翻转面在 W(80) 和 H(60) 之间切换。
+    </div>
+
+    <div class="scene">
+        <div class="paper" id="paper"></div>
+        <div class="object-track" id="track">
+            <div class="cuboid" id="box">
+                <div class="face front">前</div>
+                <div class="face back">后</div>
+                <div class="face left">左</div>
+                <div class="face right">右</div>
+                <div class="face top">上</div>
+                <div class="face bottom">下</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="mode-selector">
+            <span>滚动方式：</span>
+            <button id="modeL" onclick="switchMode('L')" class="active-mode">沿长边 (120px)</button>
+            <button id="modeW" onclick="switchMode('W')">沿短边 (80px)</button>
+        </div>
+        <button id="rollBtn" onclick="roll()">点击滚动一次</button>
+        <button class="reset-btn" onclick="reset()">重置场景</button>
+    </div>
+
+<script>
+    // 基础尺寸
+    const DIM = { L: 120, W: 80, H: 60 };
+
+    let currentMode = 'L'; // 'L' 代表沿长边滚, 'W' 代表沿短边滚
+    let angle = 0;
+    let offsetX = 0;
+    let isBaseFace = true; // 初始状态：底面(L*W)在下
+    let isMoving = false;
+
+    const box = document.getElementById('box');
+    const track = document.getElementById('track');
+    const paper = document.getElementById('paper');
+    const rollBtn = document.getElementById('rollBtn');
+
+    function init() {
+        paper.innerHTML = '';
+        angle = 0;
+        offsetX = 0;
+        isBaseFace = true;
+        isMoving = false;
+        box.style.transform = `rotateZ(0deg)`;
+        track.style.transform = `translateX(0px) rotateX(-30deg)`;
+        
+        // 重新设定长方体各面
+        // 这里的逻辑：
+        // 如果是沿长边滚，X轴方向是L，Z轴方向是W
+        // 如果是沿短边滚，X轴方向是W，Z轴方向是L (相当于把物体水平转90度)
+        
+        const rollDim = (currentMode === 'L') ? DIM.L : DIM.W; // 滚动的长度方向
+        const sideDim = (currentMode === 'L') ? DIM.W : DIM.L; // 保持不变的宽度方向
+        const heightDim = DIM.H;
+
+        // 设置各个面的大小和位置
+        setupFace('.front',  rollDim, heightDim, `translateZ(${sideDim/2}px)`);
+        setupFace('.back',   rollDim, heightDim, `translateZ(${-sideDim/2}px) rotateY(180deg)`);
+        setupFace('.left',   sideDim, heightDim, `translateX(${-rollDim/2}px) rotateY(-90deg)`);
+        setupFace('.right',  sideDim, heightDim, `translateX(${rollDim/2}px) rotateY(90deg)`);
+        setupFace('.top',    rollDim, sideDim,   `translateY(${-heightDim/2}px) rotateX(90deg)`);
+        setupFace('.bottom', rollDim, sideDim,   `translateY(${heightDim/2}px) rotateX(-90deg)`);
+        
+        box.style.width = rollDim + 'px';
+        box.style.height = heightDim + 'px';
+        
+        // 初始印记
+        addImprint(rollDim, sideDim);
+    }
+
+    function setupFace(selector, w, h, transform) {
+        const el = document.querySelector(selector);
+        el.style.width = w + 'px';
+        el.style.height = h + 'px';
+        el.style.left = '50%';
+        el.style.top = '50%';
+        el.style.marginLeft = -w/2 + 'px';
+        el.style.marginTop = -h/2 + 'px';
+        el.style.transform = transform;
+        // 在面上写上尺寸，方便观察
+        el.innerHTML = `<span class="label-tag">${w}×${h}</span>`;
+    }
+
+    function switchMode(mode) {
+        if (isMoving) return;
+        currentMode = mode;
+        document.getElementById('modeL').classList.toggle('active-mode', mode === 'L');
+        document.getElementById('modeW').classList.toggle('active-mode', mode === 'W');
+        init();
+    }
+
+    function roll() {
+        if (isMoving) return;
+        isMoving = true;
+        rollBtn.disabled = true;
+
+        const rollDim = (currentMode === 'L') ? DIM.L : DIM.W;
+        const sideDim = (currentMode === 'L') ? DIM.W : DIM.L;
+        const heightDim = DIM.H;
+
+        // 确定当前接触地面的宽度
+        const currentStepWidth = isBaseFace ? rollDim : heightDim;
+        // 确定翻转后接触地面的宽度
+        const nextStepWidth = isBaseFace ? heightDim : rollDim;
+
+        // 1. 计算位移：位移量等于翻转前的底边宽度
+        offsetX += currentStepWidth;
+        
+        // 2. 执行动画
+        angle += 90;
+        box.style.transform = `rotateZ(${angle}deg)`;
+        track.style.transform = `translateX(${offsetX}px) rotateX(-30deg)`;
+
+        // 3. 结束后添加印记
+        setTimeout(() => {
+            addImprint(nextStepWidth, sideDim);
+            isBaseFace = !isBaseFace;
+            isMoving = false;
+            rollBtn.disabled = false;
+            
+            // 如果滚动太远，自动滚动纸张视图
+            if (offsetX > 600) {
+                paper.style.transform = `rotateX(60deg) translateY(120px) translateX(${-offsetX + 400}px)`;
+            }
+        }, 600);
+    }
+
+    function addImprint(width, depth) {
+        const div = document.createElement('div');
+        div.className = 'imprint';
+        div.style.width = width + 'px';
+        div.style.height = depth + 'px';
+        div.innerHTML = `${width}×${depth}`;
+        paper.appendChild(div);
+    }
+
+    function reset() {
+        init();
+        paper.style.transform = `rotateX(60deg) translateY(120px) translateX(0px)`;
+    }
+
+    // 启动初始化
+    init();
+</script>
+</body>
+</html>

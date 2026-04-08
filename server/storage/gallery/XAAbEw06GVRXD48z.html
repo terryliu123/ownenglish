@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>质数迷宫 - 正式版</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --danger: #ff5252;
+            --warning: #FFC107;
+            --bg: #1A1A1A;
+        }
+        body {
+            font-family: 'Arial Rounded MT Bold', Arial, sans-serif;
+            background: var(--bg);
+            color: white;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .level {
+            display: none;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            animation: fadeIn 0.5s;
+        }
+        .active {
+            display: block;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+        }
+        .tile {
+            background: #2E2E2E;
+            padding: 15px;
+            text-align: center;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1.2em;
+            border: 2px solid transparent;
+        }
+        .tile:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+        .correct {
+            background: var(--primary) !important;
+            border-color: #388E3C !important;
+        }
+        .wrong {
+            background: var(--danger) !important;
+            border-color: #D32F2F !important;
+            animation: shake 0.5s;
+        }
+        #timer {
+            color: var(--warning);
+            font-size: 2em;
+            text-align: center;
+            margin: 20px 0;
+            text-shadow: 0 0 15px var(--warning);
+        }
+        .progress {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 20px;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(10px); }
+            50% { transform: translateX(-10px); }
+            75% { transform: translateX(5px); }
+            100% { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress">当前关卡：<span id="currentLevel">1</span></div>
+
+    <!-- 第一关：质数地板 -->
+    <div id="level1" class="level active">
+        <h2>🔢 第一关：找出所有质数</h2>
+        <div class="grid" id="grid1"></div>
+        <div>进度：<span id="progress">0/0</span></div>
+    </div>
+
+    <!-- 第二关：最大公因数 -->
+    <div id="level2" class="level">
+        <h2>🔑 第二关：最大公因数挑战</h2>
+        <div class="grid" style="grid-template-columns: 1fr">
+            <div class="tile" id="question">问题加载中...</div>
+            <input type="number" class="tile" id="answer" placeholder="输入答案">
+            <button class="tile" onclick="checkAnswer()" style="background: var(--primary)">提交答案</button>
+        </div>
+    </div>
+
+    <!-- 第三关：BOSS战 -->
+    <div id="level3" class="level">
+        <h2>👾 最终决战：质数防御战</h2>
+        <div id="timer">60</div>
+        <div class="grid" id="bossGrid"></div>
+    </div>
+
+    <script>
+        // 游戏配置
+        const config = {
+            level1: {
+                numbers: 20,
+                range: 100,
+                target: 0
+            },
+            level2: {
+                numbers: []
+            },
+            level3: {
+                time: 90,
+                target: 15
+            }
+        };
+
+        // 游戏状态
+        let currentLevel = 1;
+        let timer;
+        let foundPrimes = 0;
+
+        // 初始化第一关
+        function initLevel1() {
+            const numbers = generateNumbers(config.level1.numbers, config.level1.range);
+            config.level1.target = numbers.filter(n => isPrime(n)).length;
+            
+            document.getElementById('grid1').innerHTML = numbers
+                .map(n => `<div class="tile" onclick="handleTileClick(${n}, this)">${n}</div>`)
+                .join('');
+            
+            document.getElementById('progress').textContent = `0/${config.level1.target}`;
+        }
+
+        // 处理数字点击
+        function handleTileClick(num, element) {
+            if (element.classList.contains('correct') || element.classList.contains('wrong')) return;
+            
+            if (isPrime(num)) {
+                element.classList.add('correct');
+                foundPrimes++;
+                document.getElementById('progress').textContent = 
+                    `${foundPrimes}/${config.level1.target}`;
+                
+                if (foundPrimes === config.level1.target) {
+                    setTimeout(() => switchLevel(2), 1000);
+                }
+            } else {
+                element.classList.add('wrong');
+                setTimeout(() => element.remove(), 1000);
+            }
+        }
+
+        // 初始化第二关
+        function initLevel2() {
+            const [a, b] = generateGCDNumbers();
+            document.getElementById('question').textContent = 
+                `${a} 和 ${b} 的最大公因数是多少？`;
+            document.getElementById('answer').value = '';
+        }
+
+        // 检查答案
+        function checkAnswer() {
+            const answer = parseInt(document.getElementById('answer').value);
+            const [a, b] = document.getElementById('question').textContent.match(/\d+/g);
+            
+            if (gcd(a, b) === answer) {
+                switchLevel(3);
+            } else {
+                alert('答案错误，请重新计算！');
+            }
+        }
+
+        // 初始化第三关
+        function initLevel3() {
+            config.level3.time=100;
+            document.getElementById('timer').textContent = config.level3.time;
+            foundPrimes = 0;
+            
+            // 生成BOSS战数字
+            document.getElementById('bossGrid').innerHTML = 
+                Array.from({length: 100}, () => Math.floor(Math.random() * 99) + 2)
+                    .map(n => `<div class="tile" onclick="handleBossClick(${n}, this)">${n}</div>`)
+                    .join('');
+
+            // 启动计时器
+            timer = setInterval(() => {
+                config.level3.time--;
+                document.getElementById('timer').textContent = config.level3.time;
+                
+                if (config.level3.time <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        // 处理BOSS战点击
+        function handleBossClick(num, element) {
+            if (element.classList.contains('correct')) return;
+            
+            if (isPrime(num)) {
+                element.classList.add('correct');
+                foundPrimes++;
+                if (foundPrimes === config.level3.target) {
+                    endGame(true);
+                }
+            } else {
+                element.classList.add('wrong');
+                config.level3.time = Math.max(0, config.level3.time - 2);
+            }
+        }
+
+        // 切换关卡
+        function switchLevel(level) {
+            document.getElementById(`level${currentLevel}`).classList.remove('active');
+            currentLevel = level;
+            document.getElementById(`level${level}`).classList.add('active');
+            document.getElementById('currentLevel').textContent = level === 3 ? 'BOSS' : level;
+            
+            if (level === 2) initLevel2();
+            if (level === 3) initLevel3();
+        }
+
+        // 游戏结束
+        function endGame(win) {
+            clearInterval(timer);
+            alert(win ? '🎉 恭喜通关！' : '💀 游戏失败！');
+            location.reload();
+        }
+
+        // 工具函数
+        function generateNumbers(count, max) {
+            const set = new Set();
+            while (set.size < count) {
+                set.add(Math.floor(Math.random() * max) + 1);
+            }
+            return [...set];
+        }
+
+        function isPrime(num) {
+            if (num < 2) return false;
+            for (let i = 2; i <= Math.sqrt(num); i++) {
+                if (num % i === 0) return false;
+            }
+            return true;
+        }
+
+        function gcd(a, b) {
+            return b === 0 ? a : gcd(b, a % b);
+        }
+
+        function generateGCDNumbers() {
+            const factors = [2, 3, 5, 7];
+            const factor = factors[Math.floor(Math.random() * factors.length)];
+            return [
+                factor * (Math.floor(Math.random() * 12) + 1),
+                factor * (Math.floor(Math.random() * 12) + 1)
+            ];
+        }
+
+        // 启动游戏
+        initLevel1();
+    </script>
+</body>
+</html>

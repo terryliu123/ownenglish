@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视觉暂留现象 - 创意场景版</title>
+    <style>
+        :root {
+            --bg-color: #e3f2fd; /* 浅蓝背景 */
+            --primary-color: #1e88e5;
+            --slider-color: #ff7043;
+            --btn-color: #43a047;
+            --btn-stop-color: #e53935;
+            --spin-speed: 2s;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            user-select: none;
+        }
+
+        /* 1. 顶部标题 */
+        .header {
+            width: 100%;
+            height: 60px;
+            background: white;
+            display: flex;
+            align-items: center;
+            padding-left: 40px;
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+
+        /* 2. 实验舞台 */
+        .stage-container {
+            position: relative;
+            width: 800px;
+            height: 500px;
+            margin-top: 30px;
+            background: radial-gradient(circle, #e3f2fd 0%, #90caf9 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 50px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        /* 左侧：动画区 */
+        .animation-area {
+            flex: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* 卡片容器 (3D) */
+        .card-scene {
+            width: 300px;
+            height: 300px;
+            perspective: 1000px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            border-radius: 20px;
+        }
+
+        .spinning {
+            animation: spin var(--spin-speed) linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotateY(0deg); }
+            100% { transform: rotateY(360deg); }
+        }
+
+        /* 卡片正反面 */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* 关键：背面不可见 */
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 4px solid #fff;
+            overflow: hidden;
+        }
+
+        .card-front {
+            z-index: 2;
+            transform: rotateY(0deg);
+            background: #f0f8ff; /* 淡蓝色底 */
+        }
+
+        .card-back {
+            transform: rotateY(180deg);
+            background: #fff;
+        }
+
+        /* 木棍 */
+        .stick {
+            width: 12px;
+            height: 200px;
+            background: #5D4037;
+            border-radius: 0 0 6px 6px;
+            margin-top: -50px;
+            z-index: 1;
+            box-shadow: inset 2px 0 5px rgba(0,0,0,0.2);
+        }
+
+        /* SVG 尺寸 */
+        svg { width: 220px; height: 220px; }
+
+        /* 右侧：控制面板 */
+        .controls {
+            width: 260px;
+            background: rgba(255,255,255,0.8);
+            padding: 25px;
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            backdrop-filter: blur(5px);
+        }
+
+        .control-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .label {
+            font-size: 14px;
+            color: #555;
+            font-weight: bold;
+        }
+
+        /* 主题按钮 */
+        .theme-selector {
+            display: flex;
+            gap: 10px;
+        }
+        .theme-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #666;
+            transition: all 0.2s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .theme-btn:hover { transform: translateY(-2px); }
+        .theme-btn.active {
+            background: #E3F2FD;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        .theme-btn svg { width: 36px; height: 36px; fill: none; margin-bottom: 5px;}
+
+        /* 开始/停止按钮 */
+        .toggle-btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            background-color: var(--btn-color);
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .toggle-btn:hover { opacity: 0.9; }
+        .toggle-btn.stop { background-color: var(--btn-stop-color); }
+
+        /* 速度滑块 */
+        .speed-control {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        input[type=range] {
+            width: 100%;
+            accent-color: var(--slider-color);
+            cursor: pointer;
+        }
+
+        /* 3. 底部指南 */
+        .guide {
+            width: 800px;
+            margin-top: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 10px rgba(0,0,0,0.05);
+        }
+        .guide h3 { margin-top: 0; color: #1565C0; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        .guide p { font-size: 14px; line-height: 1.6; color: #555; }
+
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        👁️ 视觉暂留现象
+    </div>
+
+    <div class="stage-container">
+        
+        <!-- 左侧：动画演示 -->
+        <div class="animation-area">
+            <div class="card-scene">
+                <div class="card" id="animCard">
+                    <!-- 正面 (环境) -->
+                    <div class="card-face card-front" id="faceFront"></div>
+                    <!-- 反面 (物体) -->
+                    <div class="card-face card-back" id="faceBack"></div>
+                </div>
+            </div>
+            <div class="stick"></div>
+        </div>
+
+        <!-- 右侧：控制面板 -->
+        <div class="controls">
+            <!-- 1. 主题选择 -->
+            <div class="control-section">
+                <div class="label">选择实验主题</div>
+                <div class="theme-selector">
+                    <button class="theme-btn active" id="btnPlane" onclick="setTheme('plane')">
+                        <!-- 飞机小图标 -->
+                        <svg viewBox="0 0 50 50">
+                            <path d="M5,25 Q15,15 45,25 Q15,35 5,25" fill="#2196F3" />
+                            <circle cx="10" cy="10" r="5" fill="#90CAF9"/>
+                            <circle cx="30" cy="40" r="4" fill="#90CAF9"/>
+                        </svg>
+                        飞机与蓝天
+                    </button>
+                    <button class="theme-btn" id="btnSpider" onclick="setTheme('spider')">
+                        <!-- 蜘蛛小图标 -->
+                        <svg viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" stroke="#555" stroke-width="2" fill="none"/>
+                            <line x1="25" y1="5" x2="25" y2="45" stroke="#555" stroke-width="1"/>
+                            <line x1="5" y1="25" x2="45" y2="25" stroke="#555" stroke-width="1"/>
+                            <circle cx="25" cy="25" r="5" fill="#333"/>
+                        </svg>
+                        蜘蛛与网
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 开始/停止按钮 -->
+            <div class="control-section">
+                <button id="controlBtn" class="toggle-btn" onclick="togglePlay()">
+                    <span>▶ 开始实验</span>
+                </button>
+            </div>
+
+            <!-- 3. 速度调节 -->
+            <div class="control-section">
+                <div class="label">调节旋转速度</div>
+                <div class="speed-control">
+                    <div class="slider-labels">
+                        <span>慢</span>
+                        <span>快</span>
+                    </div>
+                    <input type="range" id="speedSlider" min="1" max="100" value="1" oninput="updateSpeed(this.value)">
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="guide">
+        <h3>📖 实验原理与指南</h3>
+        <p><strong>视觉暂留</strong>是指人眼在观察物体时，光信号传入大脑神经，需经过一段短暂的时间，光的作用结束后，视觉形象并不立即消失，这种残留的视觉称“后像”。</p>
+        <ul>
+            <li><strong>飞机与蓝天</strong>：一面是蓝天白云，一面是飞机。快速旋转时，飞机仿佛飞在蓝天中。</li>
+            <li><strong>蜘蛛与网</strong>：一面是蜘蛛网，一面是蜘蛛。快速旋转时，蜘蛛仿佛正在网上捕食。</li>
+            <li><strong>操作方法</strong>：点击“开始实验”并向右拖动速度滑块，直到两面图像融合。</li>
+        </ul>
+    </div>
+
+    <script>
+        // 资源数据 (SVG绘制)
+        const assets = {
+            plane: {
+                // 蓝天白云
+                front: `
+                    <svg viewBox="0 0 200 200">
+                        <!-- 蓝天背景色在CSS中设置了 -->
+                        <defs>
+                            <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" style="stop-color:#4FC3F7;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#E1F5FE;stop-opacity:1" />
+                            </linearGradient>
+                        </defs>
+                        <rect width="200" height="200" fill="url(#skyGradient)" />
+                        <!-- 云朵 -->
+                        <g fill="white" opacity="0.8">
+                            <circle cx="50" cy="60" r="25" />
+                            <circle cx="80" cy="50" r="30" />
+                            <circle cx="110" cy="60" r="25" />
+                            
+                            <circle cx="140" cy="140" r="20" />
+                            <circle cx="160" cy="130" r="25" />
+                            <circle cx="180" cy="140" r="20" />
+                        </g>
+                    </svg>`,
+                // 飞机
+                back: `
+                    <svg viewBox="0 0 200 200">
+                        <!-- 为了视觉暂留效果更好，背景设为透明或白色，这里设为透明 -->
+                        <g transform="translate(100, 100) rotate(-45) scale(1.2)">
+                             <!-- 机身 -->
+                             <path d="M0,-60 Q15,-30 15,20 L15,50 Q0,60 -15,50 L-15,20 Q-15,-30 0,-60" fill="#ECEFF1" stroke="#546E7A" stroke-width="2"/>
+                             <!-- 机翼 -->
+                             <path d="M15,-10 L70,20 L70,40 L15,30" fill="#B0BEC5" stroke="#546E7A" stroke-width="2"/>
+                             <path d="M-15,-10 L-70,20 L-70,40 L-15,30" fill="#B0BEC5" stroke="#546E7A" stroke-width="2"/>
+                             <!-- 尾翼 -->
+                             <path d="M0,50 L20,70 L-20,70 L0,50" fill="#90A4AE" stroke="#546E7A" stroke-width="2"/>
+                             <!-- 驾驶舱 -->
+                             <path d="M-8,-30 Q0,-40 8,-30 L8,-20 L-8,-20 Z" fill="#29B6F6"/>
+                        </g>
+                    </svg>`
+            },
+            spider: {
+                // 蜘蛛网
+                front: `
+                    <svg viewBox="0 0 200 200">
+                        <g stroke="#757575" stroke-width="2" fill="none">
+                            <!-- 放射线 -->
+                            <line x1="0" y1="0" x2="200" y2="200" />
+                            <line x1="200" y1="0" x2="0" y2="200" />
+                            <line x1="100" y1="0" x2="100" y2="200" />
+                            <line x1="0" y1="100" x2="200" y2="100" />
+                            <!-- 同心圆/网 -->
+                            <path d="M100,20 L140,60 L180,100" stroke="none"/> 
+                            <polygon points="100,20 156,44 180,100 156,156 100,180 44,156 20,100 44,44" stroke-width="1"/>
+                            <polygon points="100,50 135,65 150,100 135,135 100,150 65,135 50,100 65,65" stroke-width="1"/>
+                            <polygon points="100,80 115,86 120,100 115,114 100,120 86,114 80,100 86,86" stroke-width="1"/>
+                        </g>
+                    </svg>`,
+                // 蜘蛛
+                back: `
+                    <svg viewBox="0 0 200 200">
+                        <g transform="translate(100, 100)">
+                            <!-- 腿 (左) -->
+                            <path d="M-10,0 L-40,-30 L-50,-20" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M-10,5 L-45,0 L-55,10" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M-10,10 L-40,30 L-50,40" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M-5,-5 L-30,-50" fill="none" stroke="#212121" stroke-width="3"/>
+                            
+                            <!-- 腿 (右) -->
+                            <path d="M10,0 L40,-30 L50,-20" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M10,5 L45,0 L55,10" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M10,10 L40,30 L50,40" fill="none" stroke="#212121" stroke-width="3"/>
+                            <path d="M5,-5 L30,-50" fill="none" stroke="#212121" stroke-width="3"/>
+
+                            <!-- 丝 -->
+                            <line x1="0" y1="-40" x2="0" y2="-100" stroke="#9E9E9E" stroke-width="1"/>
+
+                            <!-- 身体 -->
+                            <ellipse cx="0" cy="0" rx="15" ry="20" fill="#212121"/>
+                            <circle cx="0" cy="-15" r="10" fill="#212121"/>
+                            <!-- 眼睛 -->
+                            <circle cx="-3" cy="-18" r="2" fill="white"/>
+                            <circle cx="3" cy="-18" r="2" fill="white"/>
+                        </g>
+                    </svg>`
+            }
+        };
+
+        let isPlaying = false;
+        let currentTheme = 'plane';
+
+        window.onload = () => {
+            setTheme('plane');
+        };
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            // 更新卡片内容
+            document.getElementById('faceFront').innerHTML = assets[theme].front;
+            document.getElementById('faceBack').innerHTML = assets[theme].back;
+            
+            // 更新按钮状态
+            document.getElementById('btnPlane').classList.toggle('active', theme === 'plane');
+            document.getElementById('btnSpider').classList.toggle('active', theme === 'spider');
+        }
+
+        function togglePlay() {
+            isPlaying = !isPlaying;
+            const card = document.getElementById('animCard');
+            const btn = document.getElementById('controlBtn');
+
+            if (isPlaying) {
+                card.classList.add('spinning');
+                btn.innerHTML = "⏹ 停止实验";
+                btn.classList.add('stop');
+            } else {
+                card.classList.remove('spinning');
+                btn.innerHTML = "▶ 开始实验";
+                btn.classList.remove('stop');
+            }
+        }
+
+        function updateSpeed(val) {
+            // 速度计算
+            const minDuration = 0.05;
+            const maxDuration = 2.0;
+            const duration = maxDuration - (val / 100) * (maxDuration - minDuration);
+            
+            document.documentElement.style.setProperty('--spin-speed', duration + 's');
+
+            // 拖动滑块时自动开始播放
+            if (!isPlaying && val > 5) {
+                togglePlay();
+            }
+        }
+
+    </script>
+</body>
+</html>

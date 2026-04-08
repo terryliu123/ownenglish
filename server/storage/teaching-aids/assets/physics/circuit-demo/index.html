@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电路物理仿真：串联与并联</title>
+    <style>
+        /* --- 1. 视觉风格定义 (实验室暗色风) --- */
+        :root {
+            --bg-color: #1a1a2e;
+            --card-bg: #16213e;
+            --text-main: #e94560;
+            --text-light: #f1f1f1;
+            --accent-blue: #00d4ff; /* 电流颜色 */
+            --wire-off: #535c68;
+            --bulb-off: #333;
+            --bulb-on: #ffeb3b;
+            --switch-color: #e94560;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        h1 {
+            border-bottom: 2px solid var(--text-main);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+        }
+
+        /* --- 2. 布局容器 --- */
+        .lab-bench {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 40px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1300px;
+        }
+
+        .experiment-card {
+            background: var(--card-bg);
+            border: 1px solid #2a2a40;
+            border-radius: 12px;
+            padding: 25px;
+            width: 550px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+            position: relative;
+            transition: transform 0.3s;
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .badge {
+            background: #0f3460;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            color: var(--accent-blue);
+        }
+
+        /* --- 3. SVG 电路绘制样式 --- */
+        svg {
+            width: 100%;
+            height: 320px;
+            background: radial-gradient(circle at center, #1f2b4d 0%, #16213e 100%);
+            border-radius: 8px;
+            border: 1px solid #333;
+        }
+
+        /* 导线 (静态) */
+        .wire {
+            fill: none;
+            stroke: var(--wire-off);
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* 节点 (分叉点) */
+        .node {
+            fill: #fff;
+            stroke: none;
+        }
+
+        /* 电流 (动态虚线) */
+        .electron-path {
+            fill: none;
+            stroke: var(--accent-blue);
+            stroke-width: 3;
+            stroke-dasharray: 8 12; /* 虚线间隔 */
+            stroke-dashoffset: 0;
+            opacity: 0; /* 默认隐藏 */
+            pointer-events: none;
+            /* 混合模式让电流看起来像在导线上方 */
+            mix-blend-mode: screen; 
+        }
+
+        /* 动画关键帧 */
+        @keyframes flow {
+            to { stroke-dashoffset: -200; }
+        }
+
+        /* 激活状态下的电流 */
+        .active .electron-path {
+            opacity: 1;
+            animation: flow 3s linear infinite;
+        }
+
+        /* 电池 */
+        .battery-pos { stroke: #ff4757; stroke-width: 4; }
+        .battery-neg { stroke: #2ed573; stroke-width: 4; }
+
+        /* 灯泡 */
+        .bulb-glass {
+            fill: var(--bulb-off);
+            stroke: #aaa;
+            stroke-width: 1;
+            transition: all 0.4s ease;
+        }
+        .bulb-filament {
+            fill: none;
+            stroke: #666;
+            stroke-width: 1;
+        }
+
+        /* 灯泡点亮特效 */
+        .active .bulb-glass {
+            fill: var(--bulb-on);
+            stroke: #fff;
+            filter: drop-shadow(0 0 20px var(--bulb-on));
+        }
+        .active .bulb-filament { stroke: #ccad00; }
+
+        /* 开关 */
+        .switch-arm {
+            stroke: var(--switch-color);
+            stroke-width: 5;
+            transform-origin: 0 0; /* 将在JS中设置具体坐标 */
+            transition: transform 0.3s cubic-bezier(0.4, 2, 0.5, 1); /* 弹跳效果 */
+            cursor: pointer;
+        }
+
+        /* 标签文字 */
+        text {
+            font-family: monospace;
+            fill: #8892b0;
+            user-select: none;
+        }
+
+        /* --- 4. 交互与信息区 --- */
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        button {
+            background: var(--accent-blue);
+            color: #000;
+            border: none;
+            padding: 10px 25px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        button:hover { background: #48dbfb; box-shadow: 0 0 10px var(--accent-blue); }
+
+        .status {
+            font-weight: bold;
+            color: #555;
+        }
+        .active .status { color: #2ed573; text-shadow: 0 0 5px #2ed573; }
+
+        /* 公式板 */
+        .blackboard {
+            margin-top: 20px;
+            background: rgba(0,0,0,0.3);
+            padding: 15px;
+            border-left: 4px solid var(--accent-blue);
+            font-family: 'Courier New', monospace;
+        }
+        .math-row {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .variable { color: var(--text-main); font-weight: bold; }
+        .value { color: var(--accent-blue); }
+        .desc { color: #aaa; font-size: 0.9rem; margin-left: auto; }
+
+    </style>
+</head>
+<body>
+
+    <h1>⚡ 电路原理交互演示</h1>
+
+    <div class="lab-bench">
+
+        <!-- === 实验一：串联电路 === -->
+        <div class="experiment-card" id="series-circuit">
+            <div class="card-header">
+                <h2>串联电路 (Series)</h2>
+                <span class="badge">分压不分流</span>
+            </div>
+            
+            <svg viewBox="0 0 500 300">
+                <!-- 1. 基础导线 (单回路) -->
+                <!-- 电池(左) -> 上 -> 右 -> 下 -> 开关 -> 电池 -->
+                <path class="wire" d="M50,150 V50 H450 V200" /> <!-- 上半部 -->
+                <path class="wire" d="M450,200 V250 H300" />    <!-- 右下到开关右侧 -->
+                <path class="wire" d="M250,250 H50 V180" />     <!-- 开关左侧回电池 -->
+
+                <!-- 2. 电流路径 (动画用，与导线重合) -->
+                <!-- 注意：方向是 电池正极 -> 负载 -> 电池负极 -->
+                <path class="electron-path" d="M50,150 V50 H450 V200 V250 H300 M250,250 H50 V150" />
+
+                <!-- 3. 组件 -->
+                <!-- 电池组 -->
+                <g transform="translate(20, 150)">
+                    <!-- 负极 -->
+                    <line x1="20" y1="30" x2="40" y2="30" class="battery-neg" />
+                    <!-- 正极 -->
+                    <line x1="10" y1="0" x2="50" y2="0" class="battery-pos" />
+                    <text x="-10" y="15" font-size="16">+</text>
+                </g>
+
+                <!-- 灯泡 L1 -->
+                <g transform="translate(180, 50)">
+                    <text x="-10" y="-30">L1</text>
+                    <circle cx="0" cy="0" r="20" class="bulb-glass" />
+                    <path d="M-12,12 Q0,-10 12,12" class="bulb-filament" />
+                </g>
+
+                <!-- 灯泡 L2 -->
+                <g transform="translate(320, 50)">
+                    <text x="-10" y="-30">L2</text>
+                    <circle cx="0" cy="0" r="20" class="bulb-glass" />
+                    <path d="M-12,12 Q0,-10 12,12" class="bulb-filament" />
+                </g>
+
+                <!-- 开关 -->
+                <g transform="translate(250, 250)">
+                    <circle cx="0" cy="0" r="4" fill="#fff" /> <!-- 左触点 -->
+                    <circle cx="50" cy="0" r="4" fill="#fff" /> <!-- 右触点 -->
+                    <text x="15" y="30">Switch</text>
+                    <!-- 开关臂：旋转中心在(0,0)即左触点 -->
+                    <line id="arm-series" x1="0" y1="0" x2="48" y2="0" class="switch-arm" />
+                </g>
+            </svg>
+
+            <div class="controls">
+                <button onclick="toggle('series')">⚡ 按下开关</button>
+                <span class="status" id="status-series">当前状态：断路</span>
+            </div>
+
+            <div class="blackboard">
+                <div class="math-row">
+                    <span class="variable">I_总</span> = <span class="value">I₁ = I₂</span>
+                    <span class="desc">电流处处相等</span>
+                </div>
+                <div class="math-row">
+                    <span class="variable">U_总</span> = <span class="value">U₁ + U₂</span>
+                    <span class="desc">电压被分担 (灯泡较暗)</span>
+                </div>
+                <div class="math-row">
+                    <span class="variable">R_总</span> = <span class="value">R₁ + R₂</span>
+                    <span class="desc">电阻叠加</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- === 实验二：并联电路 (修正版) === -->
+        <div class="experiment-card" id="parallel-circuit">
+            <div class="card-header">
+                <h2>并联电路 (Parallel)</h2>
+                <span class="badge">分流不分压</span>
+            </div>
+
+            <svg viewBox="0 0 500 300">
+                <!-- 
+                   并联电路绘制逻辑 (梯形结构):
+                   1. 电源出来到 节点A (Split Node)
+                   2. 节点A 分两路：
+                      - 上路去 L1
+                      - 下路去 L2
+                   3. 两路汇合到 节点B (Merge Node)
+                   4. 节点B 回到开关，回电源
+                -->
+
+                <!-- 节点定义 -->
+                <!-- 节点A: (100, 50) 分流点 -->
+                <!-- 节点B: (400, 50) 汇流点 -->
+
+                <!-- 1. 干路导线 (Main Wire) -->
+                <path class="wire" d="M50,150 V50 H100" /> <!-- 电源正极 -> 节点A -->
+                <path class="wire" d="M400,50 H450 V250 H300" /> <!-- 节点B -> 右侧下行 -> 开关右 -->
+                <path class="wire" d="M250,250 H50 V180" /> <!-- 开关左 -> 电源负极 -->
+
+                <!-- 2. 支路导线 (Branches) -->
+                <!-- 支路1 (上层): 节点A -> L1 -> 节点B -->
+                <path class="wire" d="M100,50 H400" />
+                
+                <!-- 支路2 (下层): 节点A -> 下沉 -> L2 -> 上浮 -> 节点B -->
+                <path class="wire" d="M100,50 V150 H400 V50" />
+
+                <!-- 3. 节点圆点 (Junction Dots) - 视觉强调分流 -->
+                <circle cx="100" cy="50" r="5" class="node" /> <!-- 分流点 -->
+                <circle cx="400" cy="50" r="5" class="node" /> <!-- 汇流点 -->
+
+                <!-- 4. 电流路径 (关键修正：两条独立的回路同时播放) -->
+                
+                <!-- 回路1: 走上层 L1 -->
+                <!-- 路径：电源+ -> A -> 上横线 -> B -> 右下 -> 开关 -> 电源- -->
+                <path class="electron-path" d="M50,150 V50 H400 H450 V250 H300 M250,250 H50 V150" />
+                
+                <!-- 回路2: 走下层 L2 -->
+                <!-- 路径：电源+ -> A -> 下沉 -> L2 -> 上浮 -> B -> 右下 -> ... -->
+                <path class="electron-path" d="M50,150 V50 H100 V150 H400 V50 H450 V250 H300 M250,250 H50 V150" />
+
+                <!-- 5. 组件绘制 -->
+                <!-- 电池 -->
+                <g transform="translate(20, 150)">
+                    <line x1="20" y1="30" x2="40" y2="30" class="battery-neg" />
+                    <line x1="10" y1="0" x2="50" y2="0" class="battery-pos" />
+                    <text x="-10" y="15" font-size="16">+</text>
+                </g>
+
+                <!-- L1 (上层) -->
+                <g transform="translate(250, 50)">
+                    <text x="-10" y="-30">L1</text>
+                    <circle cx="0" cy="0" r="20" class="bulb-glass" />
+                    <path d="M-12,12 Q0,-10 12,12" class="bulb-filament" />
+                </g>
+
+                <!-- L2 (下层) -->
+                <g transform="translate(250, 150)">
+                    <text x="-10" y="-35">L2</text>
+                    <circle cx="0" cy="0" r="20" class="bulb-glass" />
+                    <path d="M-12,12 Q0,-10 12,12" class="bulb-filament" />
+                </g>
+
+                <!-- 干路开关 -->
+                <g transform="translate(250, 250)">
+                    <circle cx="0" cy="0" r="4" fill="#fff" />
+                    <circle cx="50" cy="0" r="4" fill="#fff" />
+                    <text x="10" y="30">Main Switch</text>
+                    <line id="arm-parallel" x1="0" y1="0" x2="48" y2="0" class="switch-arm" />
+                </g>
+            </svg>
+
+            <div class="controls">
+                <button onclick="toggle('parallel')">⚡ 按下总开关</button>
+                <span class="status" id="status-parallel">当前状态：断路</span>
+            </div>
+
+            <div class="blackboard">
+                <div class="math-row">
+                    <span class="variable">I_总</span> = <span class="value">I₁ + I₂</span>
+                    <span class="desc">干路电流等于支路之和</span>
+                </div>
+                <div class="math-row">
+                    <span class="variable">U_总</span> = <span class="value">U₁ = U₂</span>
+                    <span class="desc">电压相等 (灯泡最亮)</span>
+                </div>
+                <div class="math-row">
+                    <span class="variable">R_总</span> < <span class="value">R₁ 或 R₂</span>
+                    <span class="desc">总电阻越并越小</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const state = {
+            series: false,
+            parallel: false
+        };
+
+        function toggle(type) {
+            state[type] = !state[type];
+            render(type);
+        }
+
+        function render(type) {
+            const isActive = state[type];
+            const card = document.getElementById(`${type}-circuit`);
+            const arm = document.getElementById(`arm-${type}`);
+            const statusText = document.getElementById(`status-${type}`);
+
+            if (isActive) {
+                // 激活状态
+                card.classList.add('active');
+                statusText.innerText = "当前状态：通路 (运行中)";
+                statusText.style.color = "#2ed573";
+                
+                // 开关臂闭合 (旋转0度，水平)
+                arm.style.transform = "rotate(0deg)";
+            } else {
+                // 断开状态
+                card.classList.remove('active');
+                statusText.innerText = "当前状态：断路";
+                statusText.style.color = "#555";
+                
+                // 开关臂抬起 (旋转-30度)
+                arm.style.transform = "rotate(-30deg)";
+            }
+        }
+
+        // 初始化渲染
+        render('series');
+        render('parallel');
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中和反应 - 交互式微课件</title>
+    <style>
+        :root {
+            --bg-color: #2c3e50;
+            --beaker-border: rgba(255, 255, 255, 0.4);
+            --liquid-color: rgba(135, 206, 250, 0.4);
+            --ion-size: 36px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft YaHei", sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        /* 容器卡片 */
+        .container {
+            background-color: #34495e;
+            width: 800px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+            color: white;
+            position: relative;
+        }
+
+        /* 顶部标题 */
+        .header {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h2 { margin: 0; font-size: 20px; }
+        .header .badge {
+            font-size: 12px;
+            background: rgba(255,255,255,0.2);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        /* 主要实验区域 */
+        .stage {
+            height: 450px;
+            background: linear-gradient(to bottom, #2c3e50, #22303f);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            overflow: hidden;
+        }
+
+        /* 烧杯样式 */
+        .beaker {
+            width: 300px;
+            height: 350px;
+            border: 4px solid var(--beaker-border);
+            border-top: none;
+            border-radius: 0 0 20px 20px;
+            position: relative;
+            margin-bottom: 50px;
+            backdrop-filter: blur(2px);
+        }
+
+        /* 烧杯口 */
+        .beaker::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -4px;
+            width: calc(100% + 8px);
+            height: 20px;
+            border: 4px solid var(--beaker-border);
+            border-radius: 50%;
+            z-index: 10;
+        }
+
+        /* 液体 */
+        .liquid {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            width: 280px;
+            height: 250px;
+            background: var(--liquid-color);
+            border-radius: 0 0 15px 15px;
+            /* 液体表面 */
+            border-top: 1px solid rgba(255,255,255,0.3);
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.1);
+            overflow: hidden; /* 限制离子活动范围 */
+        }
+
+        /* 离子通用样式 */
+        .ion {
+            width: var(--ion-size);
+            height: var(--ion-size);
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+            transition: all 1.5s ease-in-out; /* 反应时的移动动画 */
+            user-select: none;
+        }
+
+        /* 离子特定颜色 */
+        .ion-h { background: radial-gradient(circleAt 30% 30%, #f1c40f, #f39c12); color: #333; } /* H+ 黄色 */
+        .ion-oh { background: radial-gradient(circleAt 30% 30%, #e74c3c, #c0392b); } /* OH- 红色 */
+        .ion-na { background: radial-gradient(circleAt 30% 30%, #3498db, #2980b9); } /* Na+ 蓝色 */
+        .ion-cl { background: radial-gradient(circleAt 30% 30%, #2ecc71, #27ae60); } /* Cl- 绿色 */
+        
+        /* 水分子 */
+        .molecule-water {
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circleAt 30% 30%, #95a5a6, #7f8c8d);
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(255,255,255,0.5);
+            transition: top 2s, left 2s;
+        }
+
+        /* 悬浮动画 */
+        @keyframes float {
+            0% { transform: translate(0, 0); }
+            25% { transform: translate(5px, -5px); }
+            50% { transform: translate(0, -10px); }
+            75% { transform: translate(-5px, -5px); }
+            100% { transform: translate(0, 0); }
+        }
+        .floating {
+            animation: float 4s infinite ease-in-out;
+        }
+
+        /* 底部说明 */
+        .description {
+            padding: 20px;
+            background: #2c3e50;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            font-size: 14px;
+            line-height: 1.6;
+            color: #bdc3c7;
+        }
+
+        /* 控制面板（按钮） */
+        .controls {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20;
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 18px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            transform: scale(1.05);
+        }
+
+        .btn-play::before {
+            content: '▶'; 
+        }
+        
+        .btn-reset {
+            background: rgba(231, 76, 60, 0.4);
+            border-color: rgba(231, 76, 60, 0.8);
+            display: none; /* 初始隐藏 */
+        }
+
+        /* 滴管效果 */
+        .dropper {
+            position: absolute;
+            top: -80px;
+            width: 20px;
+            height: 80px;
+            background: #ddd;
+            border-radius: 0 0 10px 10px;
+            transition: top 0.5s;
+            z-index: 5;
+        }
+        .dropper::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 5px;
+            width: 10px;
+            height: 10px;
+            background: rgba(135, 206, 250, 0.8);
+            border-radius: 50%;
+            opacity: 0;
+        }
+        .dropper.active {
+            top: 20px;
+        }
+        .dropper.active::after {
+            animation: drop 0.5s linear 0.5s;
+        }
+        @keyframes drop {
+            0% { top: 100%; opacity: 1; }
+            100% { top: 300px; opacity: 0; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h2>中和反应</h2>
+            <span class="badge">可交互式微课件</span>
+        </div>
+
+        <div class="stage">
+            <!-- 播放控制层 -->
+            <div class="controls" id="controls">
+                <button class="btn btn-play" onclick="startSimulation()">开始实验</button>
+                <button class="btn btn-reset" onclick="resetSimulation()">重置</button>
+            </div>
+
+            <!-- 滴管示意 -->
+            <div class="dropper" id="dropper" style="left: 50%; transform: translateX(-50%);"></div>
+
+            <!-- 烧杯 -->
+            <div class="beaker">
+                <div class="liquid" id="liquid">
+                    <!-- 离子将通过 JS 动态生成在这里 -->
+                </div>
+            </div>
+        </div>
+
+        <div class="description">
+            中和反应是酸和碱作用生成盐和水的反应。本微件在两种常见酸和两种常见碱中各选择一种酸（盐酸 HCl）和一种碱（氢氧化钠 NaOH）进行反应，从微观角度认识中和反应的本质是 <span style="color:#f1c40f">H<sup>+</sup></span> 和 <span style="color:#e74c3c">OH<sup>-</sup></span> 结合生成水。
+        </div>
+    </div>
+
+    <script>
+        const liquid = document.getElementById('liquid');
+        const controls = document.getElementById('controls');
+        const playBtn = document.querySelector('.btn-play');
+        const resetBtn = document.querySelector('.btn-reset');
+        const dropper = document.getElementById('dropper');
+
+        // 离子数据
+        let ions = [];
+        
+        // 随机位置生成器
+        function getRandomPosition() {
+            // 烧杯液体宽约280, 高250
+            // 留出边距
+            return {
+                x: Math.random() * (240) + 10, 
+                y: Math.random() * (200) + 20 
+            };
+        }
+
+        // 创建离子 DOM
+        function createIon(type, text, className) {
+            const el = document.createElement('div');
+            el.className = `ion ${className} floating`;
+            el.innerHTML = text;
+            
+            // 随机动画延迟，让它们漂浮看起来不同步
+            el.style.animationDelay = `-${Math.random() * 4}s`;
+            
+            const pos = getRandomPosition();
+            el.style.left = pos.x + 'px';
+            el.style.top = pos.y + 'px';
+            
+            liquid.appendChild(el);
+            return { el, type, x: pos.x, y: pos.y };
+        }
+
+        // 开始实验流程
+        function startSimulation() {
+            playBtn.style.display = 'none';
+            
+            // 1. 先加入 NaOH 溶液 (Na+, OH-)
+            addBaseIons();
+
+            // 2. 模拟滴入 HCl (延迟执行)
+            setTimeout(() => {
+                addAcidDropAnimation();
+            }, 1000);
+        }
+
+        function addBaseIons() {
+            // 添加 3组 NaOH
+            for(let i=0; i<3; i++) {
+                ions.push(createIon('Na', 'Na<sup>+</sup>', 'ion-na'));
+                ions.push(createIon('OH', 'OH<sup>-</sup>', 'ion-oh'));
+            }
+        }
+
+        function addAcidDropAnimation() {
+            dropper.classList.add('active');
+            
+            // 滴液动画结束后，生成酸离子
+            setTimeout(() => {
+                dropper.classList.remove('active');
+                addAcidIons();
+            }, 1000);
+        }
+
+        function addAcidIons() {
+            // 添加 3组 HCl
+            // 这里我们先添加离子，然后立刻触发反应逻辑
+            const newIons = [];
+            for(let i=0; i<3; i++) {
+                let h = createIon('H', 'H<sup>+</sup>', 'ion-h');
+                let cl = createIon('Cl', 'Cl<sup>-</sup>', 'ion-cl');
+                
+                // 刚加入时，位置可以稍微靠上，模拟滴入
+                h.el.style.top = '20px'; 
+                cl.el.style.top = '20px';
+                
+                // 重新随机分散一下
+                setTimeout(() => {
+                    const posH = getRandomPosition();
+                    const posCl = getRandomPosition();
+                    h.el.style.top = posH.y + 'px'; h.el.style.left = posH.x + 'px';
+                    cl.el.style.top = posCl.y + 'px'; cl.el.style.left = posCl.x + 'px';
+                }, 100);
+
+                newIons.push(h);
+                ions.push(cl);
+            }
+            
+            // 将新的 H+ 加入总列表并触发反应
+            // 这里有个小技巧：我们要把刚才创建的 H+ 和 现有的 OH- 配对
+            const existingOH = ions.filter(i => i.type === 'OH');
+            
+            // 开始反应动画
+            setTimeout(() => {
+                performReaction(newIons, existingOH);
+            }, 1500);
+        }
+
+        function performReaction(hIons, ohIons) {
+            // 配对 H+ 和 OH-
+            for (let i = 0; i < hIons.length; i++) {
+                if (i < ohIons.length) {
+                    const h = hIons[i];
+                    const oh = ohIons[i];
+                    
+                    // 1. 停止漂浮动画，准备移动
+                    h.el.classList.remove('floating');
+                    oh.el.classList.remove('floating');
+
+                    // 2. 计算结合点（两点中心）
+                    // 获取当前计算后的位置（因为之前是随机漂浮的）
+                    // 简单起见，我们在CSS中直接修改 top/left，所以用 JS 获取 style 即可，
+                    // 但为了更平滑，我们重新设定一个中间坐标
+                    const targetX = (parseFloat(h.el.style.left) + parseFloat(oh.el.style.left)) / 2;
+                    const targetY = (parseFloat(h.el.style.top) + parseFloat(oh.el.style.top)) / 2;
+
+                    // 3. 移动到一起
+                    h.el.style.left = targetX + 'px';
+                    h.el.style.top = targetY + 'px';
+                    oh.el.style.left = targetX + 'px';
+                    oh.el.style.top = targetY + 'px';
+                    
+                    // 改变透明度或缩放，模拟结合瞬间
+                    h.el.style.transform = 'scale(0.8)';
+                    oh.el.style.transform = 'scale(0.8)';
+
+                    // 4. 结合生成水分子
+                    setTimeout(() => {
+                        // 移除离子 DOM
+                        h.el.remove();
+                        oh.el.remove();
+                        
+                        // 在该位置创建 H2O
+                        createWaterMolecule(targetX, targetY);
+                    }, 1500); // 等待移动动画结束 (CSS transition 1.5s)
+                }
+            }
+            
+            // 旁观离子 Na+ 和 Cl- 继续漂浮，不做处理
+            
+            // 显示重置按钮
+            setTimeout(() => {
+                resetBtn.style.display = 'flex';
+            }, 2000);
+        }
+
+        function createWaterMolecule(x, y) {
+            const el = document.createElement('div');
+            el.className = 'molecule-water floating'; // 水分子也可以轻轻漂浮
+            el.innerHTML = 'H<sub>2</sub>O';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            liquid.appendChild(el);
+        }
+
+        function resetSimulation() {
+            // 清空容器
+            liquid.innerHTML = '';
+            ions = [];
+            resetBtn.style.display = 'none';
+            playBtn.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

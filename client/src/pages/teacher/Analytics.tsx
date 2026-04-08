@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
+import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
 import { reportService, classService } from '../../services/api'
 import { useAppStore } from '../../stores/app-store'
@@ -75,7 +76,7 @@ export default function TeacherAnalytics() {
 
   if (loading) {
     return (
-      <Layout sidebar={<TeacherSidebar activePage="analytics" />}>
+      <Layout sidebar={<TeacherSidebar activePage="analytics" />} leftSidebar={<TeacherLeftSidebar activePage="analytics" />}>
         <div className="card p-12 text-center">
           <p className="text-muted">{t('common.loading')}</p>
         </div>
@@ -84,7 +85,7 @@ export default function TeacherAnalytics() {
   }
 
   return (
-    <Layout sidebar={<TeacherSidebar activePage="analytics" />}>
+    <Layout sidebar={<TeacherSidebar activePage="analytics" />} leftSidebar={<TeacherLeftSidebar activePage="analytics" />}>
       {/* 深蓝顶栏 */}
       <section className="surface-card mb-4 mt-4" style={{ background: 'linear-gradient(135deg, #18324a 0%, #2a4a6a 100%)' }}>
         <div className="p-4">

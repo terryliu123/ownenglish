@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>单位换算小能手 - 唯一整数版</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #f0f9eb;
+        }
+        .game-container {
+            width: 520px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .card {
+            background: #fff;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .card.selected {
+            background: #C8E6C9;
+            transform: scale(0.98);
+        }
+        .card.removed {
+            opacity: 0;
+            transform: scale(0);
+        }
+        .controls {
+            text-align: center;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>单位换算小能手</h1>
+    <div class="game-container">
+        <div class="grid" id="grid"></div>
+        <div class="controls">
+            <button onclick="startNewGame()">新游戏</button>
+            <div id="message" style="color:#4CAF50; height:20px;"></div>
+        </div>
+    </div>
+
+<script>
+// 唯一整数数据池（共30组不同配对）
+const UNIT_POOL = [
+    // 长度单位（10组）
+    [[100, 'cm'], [1, 'm']],
+    [[200, 'cm'], [2, 'm']],
+    [[300, 'cm'], [3, 'm']],
+    [[400, 'cm'], [4, 'm']],
+    [[500, 'cm'], [5, 'm']],
+    [[600, 'cm'], [6, 'm']],
+    [[700, 'cm'], [7, 'm']],
+    [[800, 'cm'], [8, 'm']],
+    [[900, 'cm'], [9, 'm']],
+    [[1000, 'cm'], [10, 'm']],
+    
+    // 质量单位（10组）
+    [[1000, 'g'], [1, 'kg']],
+    [[2000, 'g'], [2, 'kg']],
+    [[3000, 'g'], [3, 'kg']],
+    [[4000, 'g'], [4, 'kg']],
+    [[5000, 'g'], [5, 'kg']],
+    [[6000, 'g'], [6, 'kg']],
+    [[7000, 'g'], [7, 'kg']],
+    [[8000, 'g'], [8, 'kg']],
+    [[9000, 'g'], [9, 'kg']],
+    [[10000, 'g'], [10, 'kg']],
+    
+    // 面积单位（10组）
+    [[1, 'm²'], [10000, 'cm²']],
+    [[2, 'm²'], [20000, 'cm²']],
+    [[3, 'm²'], [30000, 'cm²']],
+    [[4, 'm²'], [40000, 'cm²']],
+    [[5, 'm²'], [50000, 'cm²']],
+    [[6, 'm²'], [60000, 'cm²']],
+    [[7, 'm²'], [70000, 'cm²']],
+    [[8, 'm²'], [80000, 'cm²']],
+    [[9, 'm²'], [90000, 'cm²']],
+    [[10, 'm²'], [100000, 'cm²']]
+];
+
+let currentPairs = [];
+let selectedCards = [];
+
+function startNewGame() {
+    // 生成唯一数据
+    const uniqueValues = new Set();
+    const selectedPairs = [];
+    
+    // 随机选择8组配对
+    while(selectedPairs.length < 8) {
+        const pair = UNIT_POOL[Math.floor(Math.random() * UNIT_POOL.length)];
+        const [a, b] = pair;
+        if(!uniqueValues.has(a[0]) && !uniqueValues.has(b[0])) {
+            selectedPairs.push(pair);
+            uniqueValues.add(a[0]);
+            uniqueValues.add(b[0]);
+        }
+    }
+
+    // 生成16个唯一数值
+    currentPairs = shuffle(selectedPairs.flat().map(p => `${p[0]}${p[1]}`));
+    renderGrid();
+}
+
+function renderGrid() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    
+    currentPairs.forEach(value => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = value;
+        card.addEventListener('click', () => handleClick(card));
+        grid.appendChild(card);
+    });
+}
+
+function handleClick(card) {
+    if(card.classList.contains('removed')) return;
+    
+    card.classList.add('selected');
+    selectedCards.push(card);
+
+    if(selectedCards.length === 2) {
+        setTimeout(checkMatch, 500);
+    }
+}
+
+function checkMatch() {
+    const [card1, card2] = selectedCards;
+    const isValid = UNIT_POOL.some(pair => {
+        const valA = `${pair[0][0]}${pair[0][1]}`;
+        const valB = `${pair[1][0]}${pair[1][1]}`;
+        return (card1.textContent === valA && card2.textContent === valB) ||
+               (card1.textContent === valB && card2.textContent === valA);
+    });
+
+    if(isValid) {
+        selectedCards.forEach(card => {
+            card.classList.add('removed');
+        });
+        document.getElementById('message').textContent = "✓ 正确匹配！";
+        checkWin();
+    } else {
+        selectedCards.forEach(card => card.classList.remove('selected'));
+        document.getElementById('message').textContent = "× 匹配错误，请重试";
+    }
+    selectedCards = [];
+}
+
+function checkWin() {
+    const remaining = document.querySelectorAll('.card:not(.removed)').length;
+    if(remaining === 0) {
+        setTimeout(() => {
+            alert("恭喜完成所有配对！");
+            startNewGame();
+        }, 500);
+    }
+}
+
+function shuffle(array) {
+    for(let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
+// 初始化游戏
+startNewGame();
+</script>
+</body>
+</html>++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

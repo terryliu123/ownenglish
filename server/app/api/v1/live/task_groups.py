@@ -5,15 +5,17 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, File, Form, UploadFile
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 from sqlalchemy.orm import selectinload
 
+from app.core.websocket import manager
 from app.db.session import get_db
 from app.api.v1.auth import get_current_user
 from app.models import (
     User, LiveTaskGroup, LiveTask, Class, ClassEnrollment, UserRole,
-    TaskGroupShare, ActivityType, LiveSession
+    TaskGroupShare, ActivityType, LiveSession, LiveSessionEvent
 )
 from app.services.membership import FEATURE_TASK_GROUPS, assert_teacher_feature_access
 from .schemas import (
@@ -29,6 +31,10 @@ from .ai_import import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class PublishTaskGroupRequest(BaseModel):
+    total_countdown: Optional[int] = None
 
 
 async def _validate_teacher_class_access(class_id: str, current_user: User, db: AsyncSession) -> Class:
@@ -134,6 +140,25 @@ async def _serialize_group_with_tasks(group_id: str, db: AsyncSession) -> dict:
         "created_at": group_with_tasks.created_at,
         "updated_at": group_with_tasks.updated_at,
     }
+
+
+async def _get_latest_active_session(db: AsyncSession, class_id: str) -> Optional[LiveSession]:
+    result = await db.execute(
+        select(LiveSession)
+        .where(
+            LiveSession.class_id == class_id,
+            LiveSession.status == "active",
+        )
+        .order_by(LiveSession.started_at.desc())
+    )
+    sessions = result.scalars().all()
+    if len(sessions) > 1:
+        logger.warning(
+            "[live.publish] multiple_active_sessions class_id=%s session_ids=%s",
+            class_id,
+            [session.id for session in sessions],
+        )
+    return sessions[0] if sessions else None
 
 
 @router.get("/live/task-groups")
@@ -329,6 +354,126 @@ async def update_task_group(
         )
 
     return {"id": group.id, "title": group.title, "status": group.status}
+
+
+@router.post("/live/task-groups/{group_id}/publish")
+async def publish_task_group(
+    group_id: str,
+    data: PublishTaskGroupRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can publish task groups")
+
+    result = await db.execute(
+        select(LiveTaskGroup)
+        .options(selectinload(LiveTaskGroup.tasks))
+        .where(LiveTaskGroup.id == group_id)
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Task group not found")
+
+    await _validate_teacher_class_access(group.class_id, current_user, db)
+
+    active_session = await _get_latest_active_session(db, group.class_id)
+    if not active_session:
+        raise HTTPException(status_code=400, detail="请先开始本节课")
+
+    room = manager.class_rooms.get(group.class_id)
+    if not room or room.get("teacher_id") != current_user.id or room.get("teacher_ws") is None:
+        raise HTTPException(status_code=409, detail="课堂连接未建立，请刷新课堂教学页面后重试")
+
+    ordered_tasks = sorted(group.tasks or [], key=lambda item: item.order or 0)
+    if not ordered_tasks:
+        raise HTTPException(status_code=400, detail="该任务组没有题目")
+
+    group.status = "active"
+
+    task_list = []
+    task_ids = []
+    task_details = []
+    calculated_total_countdown = 0
+    for task in ordered_tasks:
+        task.session_id = active_session.id
+        task.status = "active"
+        task_ids.append(task.id)
+        countdown_seconds = int(task.countdown_seconds or 30)
+        calculated_total_countdown += countdown_seconds
+        question = task.question if isinstance(task.question, dict) else {}
+        task_title = question.get("prompt") or question.get("text") or ""
+        task_details.append(
+            {
+                "task_id": task.id,
+                "task_type": task.type,
+                "task_title": str(task_title or ""),
+            }
+        )
+        task_list.append(
+            {
+                "task_id": task.id,
+                "type": task.type,
+                "question": task.question,
+                "countdown_seconds": countdown_seconds,
+                "correct_answer": task.correct_answer,
+            }
+        )
+
+    total_countdown = data.total_countdown if isinstance(data.total_countdown, int) and data.total_countdown > 0 else calculated_total_countdown + 30
+
+    active_session.group_id = group.id
+    db.add(
+        LiveSessionEvent(
+            live_session_id=active_session.id,
+            event_type="task_published",
+            payload_json={
+                "group_id": group.id,
+                "group_title": group.title,
+                "task_count": len(task_list),
+                "task_ids": task_ids,
+                "session_id": active_session.id,
+                "tasks": task_details,
+            },
+        )
+    )
+    await db.commit()
+
+    manager.set_room_live_session_id(group.class_id, active_session.id)
+    try:
+        await manager.publish_task_group(
+            group.class_id,
+            group.id,
+            group.title,
+            task_list,
+            total_countdown,
+        )
+    except RuntimeError as exc:
+        logger.exception(
+            "[live.publish] publish_task_group_runtime_failed class_id=%s group_id=%s",
+            group.class_id,
+            group.id,
+        )
+        message = str(exc) or "课堂连接未建立，请刷新课堂教学页面后重试"
+        status_code = 409 if (
+            "classroom room missing" in message or "teacher websocket missing" in message
+        ) else 500
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    except Exception as exc:
+        logger.exception(
+            "[live.publish] publish_task_group_broadcast_failed class_id=%s group_id=%s",
+            group.class_id,
+            group.id,
+        )
+        raise HTTPException(status_code=500, detail=f"课堂广播失败: {exc}") from exc
+
+    return {
+        "group_id": group.id,
+        "title": group.title,
+        "task_count": len(task_list),
+        "session_id": active_session.id,
+        "live_session_id": active_session.id,
+    }
 
 
 @router.delete("/live/task-groups/{group_id}")

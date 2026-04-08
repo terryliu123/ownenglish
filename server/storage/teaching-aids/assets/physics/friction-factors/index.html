@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>探究摩擦力 - 高保真实验台</title>
+    <style>
+        :root {
+            --bg-color: #eef2f3;
+            --ui-glass: rgba(255, 255, 255, 0.85);
+            --primary-color: #4facfe;
+            --text-dark: #333;
+            --accent-red: #ff5e62;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Roboto', Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-dark);
+            user-select: none;
+        }
+
+        /* 顶部标题栏 */
+        header {
+            width: 100%;
+            padding: 20px 0;
+            text-align: center;
+            background: #fff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            position: relative;
+            z-index: 10;
+        }
+        h1 { margin: 0; font-weight: 600; color: #2c3e50; letter-spacing: 1px; }
+        p.subtitle { margin: 5px 0 0; font-size: 14px; color: #7f8c8d; }
+
+        /* 实验主舞台 */
+        #stage-container {
+            position: relative;
+            width: 90%;
+            max-width: 900px;
+            height: 450px;
+            margin: 30px auto;
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.05);
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.5);
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: default;
+        }
+
+        /* 交互元素样式 */
+        .drag-handle {
+            cursor: grab;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));
+            transition: transform 0.1s;
+        }
+        .drag-handle:active { cursor: grabbing; transform: scale(0.95); }
+
+        /* 控制面板 (悬浮式) */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            background: var(--ui-glass);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 按钮美化 */
+        button {
+            padding: 8px 16px;
+            border: none;
+            background: #fff;
+            color: #555;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        button.active {
+            background: var(--primary-color);
+            color: white;
+            box-shadow: 0 4px 12px rgba(79, 172, 254, 0.3);
+        }
+        button.danger {
+            color: var(--accent-red);
+            background: rgba(255, 94, 98, 0.1);
+        }
+        button.danger:hover {
+            background: var(--accent-red);
+            color: white;
+        }
+
+        /* 示数显示 */
+        .display-unit {
+            background: #2d3436;
+            color: #00b894;
+            font-family: 'Courier New', monospace;
+            padding: 8px 15px;
+            border-radius: 4px;
+            font-size: 18px;
+            font-weight: bold;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.5);
+            border: 1px solid #444;
+            min-width: 70px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>摩擦力实验模拟</h1>
+        <p class="subtitle">Exploring Factors Affecting Friction Force</p>
+    </header>
+
+    <div id="stage-container">
+        <svg viewBox="0 0 900 450" id="scene">
+            <defs>
+                <!-- 1. 投影滤镜 -->
+                <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur"/>
+                    <feOffset in="blur" dx="2" dy="4" result="offsetBlur"/>
+                    <feComponentTransfer>
+                        <feFuncA type="linear" slope="0.3"/>
+                    </feComponentTransfer>
+                    <feMerge>
+                        <feMergeNode in="offsetBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+
+                <!-- 2. 材质定义 -->
+                <!-- 木纹 -->
+                <pattern id="woodPattern" x="0" y="0" width="100" height="20" patternUnits="userSpaceOnUse">
+                    <rect width="100" height="20" fill="#e6b87c"/>
+                    <path d="M0,5 Q50,0 100,5 M0,15 Q50,20 100,15" stroke="#dda662" stroke-width="1" fill="none"/>
+                </pattern>
+                <!-- 毛巾 -->
+                <pattern id="towelPattern" x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+                    <rect width="8" height="8" fill="#27ae60"/>
+                    <circle cx="2" cy="2" r="1" fill="#2ecc71" opacity="0.6"/>
+                    <circle cx="6" cy="6" r="1" fill="#2ecc71" opacity="0.6"/>
+                </pattern>
+                <!-- 玻璃反光 -->
+                <linearGradient id="glassGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#dbe6f6" />
+                    <stop offset="20%" stop-color="#fff" />
+                    <stop offset="40%" stop-color="#dbe6f6" />
+                    <stop offset="100%" stop-color="#c4d7ed" />
+                </linearGradient>
+
+                <!-- 3. 物体渐变 -->
+                <!-- 木块立体感 -->
+                <linearGradient id="woodBlockGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f4d03f"/>
+                    <stop offset="100%" stop-color="#e67e22"/>
+                </linearGradient>
+                <!-- 砝码金属感 -->
+                <linearGradient id="metalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#95a5a6"/>
+                    <stop offset="30%" stop-color="#ecf0f1"/>
+                    <stop offset="60%" stop-color="#7f8c8d"/>
+                    <stop offset="100%" stop-color="#95a5a6"/>
+                </linearGradient>
+                <!-- 测力计圆柱感 -->
+                <linearGradient id="tubeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#eee" />
+                    <stop offset="50%" stop-color="#fff" />
+                    <stop offset="100%" stop-color="#ccc" />
+                </linearGradient>
+                
+                <!-- 箭头Marker -->
+                <marker id="arrowBlue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#3498db"/>
+                </marker>
+                <marker id="arrowRed" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                    <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
+                </marker>
+            </defs>
+
+            <!-- 背景装饰 -->
+            <rect x="0" y="300" width="900" height="150" fill="#f0f0f0" /> <!-- 桌面侧边 -->
+            
+            <!-- === 1. 接触面 === -->
+            <g id="surface-layer">
+                <!-- 主平面 -->
+                <rect id="surface-rect" x="50" y="300" width="800" height="20" fill="url(#woodPattern)" stroke="#ccc" />
+                <!-- 侧面厚度 (假3D) -->
+                <path id="surface-side" d="M50,320 L850,320 L830,340 L70,340 Z" fill="#c49055" opacity="0.8"/>
+                <!-- 标签 -->
+                <text id="surface-label" x="450" y="380" text-anchor="middle" font-size="20" fill="#bdc3c7" font-weight="bold">木板表面</text>
+            </g>
+
+            <!-- === 2. 木块与砝码 === -->
+            <g id="block-group" transform="translate(100, 220)" filter="url(#dropShadow)">
+                <!-- 木块本体 -->
+                <g>
+                    <rect x="0" y="0" width="120" height="80" rx="2" fill="url(#woodPattern)" stroke="#d35400" stroke-width="1"/>
+                    <!-- 木块高光边 -->
+                    <line x1="2" y1="2" x2="118" y2="2" stroke="rgba(255,255,255,0.5)" stroke-width="2"/>
+                    <text x="60" y="50" text-anchor="middle" fill="#8e44ad" font-size="14" font-weight="bold" opacity="0.7">BLOCK</text>
+                </g>
+
+                <!-- 砝码容器 -->
+                <g id="weights-container" transform="translate(60, 0)"></g>
+
+                <!-- 摩擦力箭头 (f) -->
+                <g id="arrow-friction" opacity="0" transform="translate(0, 40)">
+                    <line x1="-5" y1="0" x2="-50" y2="0" stroke="#e74c3c" stroke-width="5" marker-end="url(#arrowRed)" stroke-linecap="round"/>
+                    <text x="-40" y="-10" fill="#e74c3c" font-weight="bold">f</text>
+                </g>
+            </g>
+
+            <!-- === 3. 弹簧测力计 (Dynamometer) === -->
+            <!-- 初始 X=220 (木块右侧) -->
+            <g id="dynamometer-group" transform="translate(220, 240)" filter="url(#dropShadow)">
+                
+                <!-- 挂钩 (连接木块) -->
+                <path d="M-20,20 L0,20" stroke="#7f8c8d" stroke-width="4" stroke-linecap="round"/>
+                <circle cx="0" cy="20" r="3" fill="#7f8c8d"/>
+
+                <!-- 外壳 (透明管效果) -->
+                <rect x="0" y="0" width="140" height="40" rx="6" fill="url(#tubeGrad)" stroke="#bdc3c7" stroke-width="1"/>
+                
+                <!-- 刻度线 -->
+                <g transform="translate(20, 10)" stroke="#555" stroke-width="1">
+                    <line x1="0" y1="0" x2="0" y2="5"/>
+                    <line x1="20" y1="0" x2="20" y2="8"/>
+                    <line x1="40" y1="0" x2="40" y2="5"/>
+                    <line x1="60" y1="0" x2="60" y2="8"/>
+                    <line x1="80" y1="0" x2="80" y2="5"/>
+                    <line x1="100" y1="0" x2="100" y2="8"/>
+                </g>
+
+                <!-- 真实的弹簧 (动态Path) -->
+                <g transform="translate(5, 20)">
+                     <!-- 这里的path d将由JS动态更新以模拟拉伸 -->
+                     <path id="spring-coil" d="M0,0 L10,0" stroke="#e67e22" stroke-width="2" fill="none"/>
+                     <rect id="indicator-plate" x="10" y="-8" width="4" height="16" fill="#e74c3c" />
+                </g>
+
+                <!-- 拉杆 (连接右侧手柄) -->
+                <line id="pull-rod" x1="0" y1="20" x2="160" y2="20" stroke="#bdc3c7" stroke-width="3"/>
+                
+                <!-- 手柄 (Interactive Handle) -->
+                <g id="drag-handle-group" transform="translate(160, 20)">
+                    <circle cx="0" cy="0" r="14" fill="#fff" stroke="#3498db" stroke-width="4" class="drag-handle"/>
+                    <!-- 手柄上的指示箭头 -->
+                    <path d="M-4,0 L4,0 M1,-3 L4,0 L1,3" stroke="#3498db" stroke-width="2" />
+                </g>
+                
+                <!-- 拉力箭头 (F) -->
+                <g id="arrow-pull" opacity="0" transform="translate(180, 20)">
+                    <line x1="0" y1="0" x2="50" y2="0" stroke="#3498db" stroke-width="5" marker-end="url(#arrowBlue)" stroke-linecap="round"/>
+                    <text x="20" y="-10" fill="#3498db" font-weight="bold">F</text>
+                </g>
+            </g>
+
+        </svg>
+
+        <!-- 悬浮控制面板 -->
+        <div id="controls">
+            <div class="control-group">
+                <span class="label">接触面</span>
+                <button class="active btn-surf" onclick="setSurface('wood')">木板</button>
+                <button class="btn-surf" onclick="setSurface('towel')">毛巾</button>
+                <button class="btn-surf" onclick="setSurface('glass')">玻璃</button>
+            </div>
+
+            <div class="control-group">
+                <span class="label">压力 (砝码)</span>
+                <button onclick="updateWeights(-1)">－</button>
+                <span id="weight-display" style="font-weight:bold; min-width:20px; text-align:center;">0</span>
+                <button onclick="updateWeights(1)">＋</button>
+            </div>
+
+            <div class="control-group" style="margin-left: auto;">
+                <span class="label" style="color:#e74c3c">拉力示数</span>
+                <div class="display-unit"><span id="force-val">0.0</span> N</div>
+                <button class="danger" onclick="resetSystem()" title="复位">↻</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 物理参数配置
+        const CONFIG = {
+            frictionCoeff: { wood: 2.0, towel: 4.5, glass: 0.8 },
+            weightUnit: 1.5, // 每个砝码增加的摩擦力
+            scaleRatio: 25,  // 1N = 25px 像素位移
+            springRestLen: 10, // 弹簧静止长度
+            maxExtension: 120  // 最大拉伸
+        };
+
+        // 状态变量
+        let state = {
+            surface: 'wood',
+            weights: 0,
+            blockPos: 100, // 木块位置
+            springExt: 0,  // 弹簧伸长量 (px)
+            isDragging: false,
+            maxFriction: 2.0 // 当前最大静摩擦力
+        };
+
+        // DOM 引用
+        const els = {
+            svg: document.getElementById('scene'),
+            block: document.getElementById('block-group'),
+            dynamo: document.getElementById('dynamometer-group'),
+            springPath: document.getElementById('spring-coil'),
+            indicator: document.getElementById('indicator-plate'),
+            pullRod: document.getElementById('pull-rod'),
+            handle: document.getElementById('drag-handle-group'),
+            weightContainer: document.getElementById('weights-container'),
+            forceText: document.getElementById('force-val'),
+            arrowPull: document.getElementById('arrow-pull'),
+            arrowFriction: document.getElementById('arrow-friction'),
+            // 表面元素
+            surfRect: document.getElementById('surface-rect'),
+            surfLabel: document.getElementById('surface-label'),
+            surfSide: document.getElementById('surface-side')
+        };
+
+        let dragStartX = 0;
+        let dragStartExt = 0;
+
+        // --- 初始化 ---
+        function init() {
+            updateFriction();
+            renderSpring(0);
+            setupInteraction();
+        }
+
+        // --- 逻辑层 ---
+        function updateFriction() {
+            const base = CONFIG.frictionCoeff[state.surface];
+            const added = state.weights * CONFIG.weightUnit;
+            state.maxFriction = parseFloat((base + added).toFixed(1));
+        }
+
+        function setSurface(type) {
+            state.surface = type;
+            
+            // UI 按钮更新
+            document.querySelectorAll('.btn-surf').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // 视觉材质更新
+            if(type === 'wood') {
+                els.surfRect.setAttribute('fill', 'url(#woodPattern)');
+                els.surfSide.setAttribute('fill', '#c49055');
+                els.surfLabel.textContent = "Roughness: Medium (Wood)";
+            } else if (type === 'towel') {
+                els.surfRect.setAttribute('fill', 'url(#towelPattern)');
+                els.surfSide.setAttribute('fill', '#27ae60');
+                els.surfLabel.textContent = "Roughness: High (Towel)";
+            } else if (type === 'glass') {
+                els.surfRect.setAttribute('fill', 'url(#glassGradient)');
+                els.surfSide.setAttribute('fill', '#aed6f1');
+                els.surfLabel.textContent = "Roughness: Low (Glass)";
+            }
+
+            updateFriction();
+            if(!state.isDragging) resetSystem();
+        }
+
+        function updateWeights(change) {
+            let w = state.weights + change;
+            if(w < 0) w = 0;
+            if(w > 4) w = 4; // 最多4个
+            state.weights = w;
+            document.getElementById('weight-display').textContent = w;
+            
+            renderWeights();
+            updateFriction();
+        }
+
+        // --- 渲染层 ---
+        function renderWeights() {
+            els.weightContainer.innerHTML = '';
+            // 堆叠砝码
+            for(let i=0; i<state.weights; i++) {
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute('transform', `translate(0, ${-15 - (i*12)})`);
+                
+                // 砝码主体
+                const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                rect.setAttribute('x', -15);
+                rect.setAttribute('y', 0);
+                rect.setAttribute('width', 30);
+                rect.setAttribute('height', 10);
+                rect.setAttribute('rx', 2);
+                rect.setAttribute('fill', 'url(#metalGrad)');
+                rect.setAttribute('stroke', '#7f8c8d');
+                
+                // 砝码挂钩头
+                const knob = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                knob.setAttribute('x', -5);
+                knob.setAttribute('y', -3);
+                knob.setAttribute('width', 10);
+                knob.setAttribute('height', 4);
+                knob.setAttribute('fill', '#95a5a6');
+
+                g.appendChild(knob);
+                g.appendChild(rect);
+                els.weightContainer.appendChild(g);
+            }
+        }
+
+        // 绘制逼真的弹簧
+        function renderSpring(extension) {
+            const totalLen = CONFIG.springRestLen + extension;
+            const coils = 12; // 圈数
+            const step = totalLen / coils;
+            
+            let d = `M0,0`;
+            for(let i=0; i<coils; i++) {
+                const x = i * step;
+                // 锯齿状模拟螺旋
+                d += ` L${x + step/4}, -4 L${x + step*0.75}, 4 L${x + step}, 0`;
+            }
+            
+            els.springPath.setAttribute('d', d);
+            els.indicator.setAttribute('x', totalLen);
+            
+            // 更新拉杆位置 (从弹簧末端到手柄)
+            // 手柄在 dynamometer 组内的 x 坐标 = 130 + extension (假设)
+            // 实际上手柄是交互核心，反过来推算
+        }
+
+        function updateView() {
+            // 1. 移动木块
+            els.block.setAttribute('transform', `translate(${state.blockPos}, 220)`);
+            
+            // 2. 移动测力计 (随木块)
+            const dynamoBaseX = state.blockPos + 120;
+            els.dynamo.setAttribute('transform', `translate(${dynamoBaseX}, 240)`);
+
+            // 3. 弹簧视觉
+            renderSpring(state.springExt);
+
+            // 4. 手柄和拉杆
+            // 手柄相对于测力计组的 X 坐标 = 基础偏移(130) + 伸长量
+            const handleLocalX = 130 + state.springExt;
+            els.handle.setAttribute('transform', `translate(${handleLocalX}, 20)`);
+            
+            // 拉杆: 从弹簧末端(state.springExt) 到 手柄(handleLocalX)
+            // 但 renderSpring 里的 totalLen 是相对于 (5,20) 的
+            // 拉杆起点 x = totalLen + 5
+            els.pullRod.setAttribute('x1', state.springExt + 10); // 略微偏移连接板
+            els.pullRod.setAttribute('x2', handleLocalX);
+
+            // 5. 数值显示
+            const force = (state.springExt / CONFIG.scaleRatio).toFixed(1);
+            els.forceText.textContent = force;
+
+            // 6. 箭头可见性
+            if(force > 0.1) {
+                els.arrowPull.style.opacity = 1;
+                els.arrowFriction.style.opacity = 1;
+            } else {
+                els.arrowPull.style.opacity = 0;
+                els.arrowFriction.style.opacity = 0;
+            }
+        }
+
+        function resetSystem() {
+            state.blockPos = 100;
+            state.springExt = 0;
+            state.isDragging = false;
+            updateView();
+        }
+
+        // --- 物理交互引擎 ---
+        function setupInteraction() {
+            const handle = els.handle;
+            
+            // 坐标转换：屏幕 -> SVG空间
+            function getSVGX(clientX) {
+                const pt = els.svg.createSVGPoint();
+                pt.x = clientX;
+                return pt.matrixTransform(els.svg.getScreenCTM().inverse()).x;
+            }
+
+            function onStart(e) {
+                e.preventDefault();
+                state.isDragging = true;
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                dragStartX = getSVGX(cx);
+                // 记录当前的弹簧长度
+                dragStartExt = state.springExt;
+                handle.querySelector('circle').style.fill = "#ecf0f1"; // 高亮
+            }
+
+            function onMove(e) {
+                if(!state.isDragging) return;
+                e.preventDefault();
+
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const currentSVGX = getSVGX(cx);
+                const delta = currentSVGX - dragStartX;
+
+                // 目标伸长量 = 初始 + 鼠标位移
+                let targetExt = dragStartExt + delta;
+                if(targetExt < 0) targetExt = 0;
+                if(targetExt > 130) targetExt = 130; // 物理极限
+
+                const pullForce = targetExt / CONFIG.scaleRatio;
+
+                // 物理判断
+                if (pullForce <= state.maxFriction) {
+                    // 静摩擦：弹簧伸长，木块不动
+                    state.springExt = targetExt;
+                } else {
+                    // 动摩擦：弹簧维持在最大摩擦力对应的长度，多余位移转化为木块移动
+                    state.springExt = state.maxFriction * CONFIG.scaleRatio;
+                    
+                    // 计算由于拉动产生的新位置
+                    // 这里有个简化的逻辑：只有当拉力试图超过最大摩擦力时，物体才移动
+                    // 为了保证手柄跟手，我们需要反推木块位置
+                    
+                    // 当前鼠标对应的“总绝对位置”是固定的
+                    // 鼠标位置 ≈ 木块X + 测力计身长 + 弹簧长 + 偏移
+                    // 所以: 木块X = 鼠标绝对位置 - (测力计身长...)
+                    // 更简单的方法：既然 delta 是向右的，去掉弹簧伸长的部分，剩下的就是木块位移
+                    
+                    // 重新计算 delta
+                    // 实际上，在滑动状态下，SpringExt 固定，在此基础上的鼠标Delta都给木块
+                    // 这稍微复杂，我们采用简单的增量法可能不跟手，采用绝对位置法：
+                    
+                    // 理想手柄位置（世界坐标） = 初始手柄世界坐标 + delta
+                    // 初始手柄世界坐标 = 初始木块X(100) + 120 + 130 + dragStartExt
+                    const initialHandleWorldX = 100 + 120 + 130 + dragStartExt;
+                    const currentHandleWorldX = initialHandleWorldX + delta;
+
+                    // 当前木块X = 当前手柄世界 - (120 + 130 + 当前弹簧长)
+                    state.blockPos = currentHandleWorldX - (250 + state.springExt);
+                    
+                    // 边界
+                    if(state.blockPos > 600) state.blockPos = 600;
+                    if(state.blockPos < 0) state.blockPos = 0;
+                }
+
+                updateView();
+            }
+
+            function onEnd() {
+                state.isDragging = false;
+                handle.querySelector('circle').style.fill = "#fff";
+                reboundSpring();
+            }
+
+            // 弹簧回弹动画
+            function reboundSpring() {
+                if(state.isDragging) return;
+                if(state.springExt > 0) {
+                    state.springExt = state.springExt * 0.7; // 阻尼回弹
+                    if(state.springExt < 1) state.springExt = 0;
+                    updateView();
+                    requestAnimationFrame(reboundSpring);
+                }
+            }
+
+            handle.addEventListener('mousedown', onStart);
+            handle.addEventListener('touchstart', onStart, {passive:false});
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('touchmove', onMove, {passive:false});
+            window.addEventListener('mouseup', onEnd);
+            window.addEventListener('touchend', onEnd);
+        }
+
+        init();
+    </script>
+</body>
+</html>

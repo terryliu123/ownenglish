@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>英语连连看 - 四列大字版</title>
+    <style>
+        :root {
+            --primary: #FF6B6B;
+            --secondary: #4ECDC4;
+            --bg: #F8F9FA;
+            --card-br: 12px;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            margin: 0; padding: 0;
+            height: 100vh; width: 100vw;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        /* 紧凑型顶栏 */
+        #header {
+            height: 60px;
+            background: white;
+            display: flex; justify-content: space-around; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        .info-pill {
+            background: #F1F3F5;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #495057;
+        }
+        .info-val { color: var(--primary); margin-left: 4px; font-size: 18px; }
+
+        /* 游戏区域 - 固定四列 */
+        #game-area {
+            flex: 1;
+            display: flex; align-items: center; justify-content: center;
+            padding: 10px; /* 四周边距 */
+            box-sizing: border-box;
+        }
+
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* 固定四列 */
+            gap: 8px; 
+            width: 100%;
+            max-width: 500px; /* 限制平板上的最大宽度 */
+            margin: 0 auto;
+        }
+
+        /* 卡片设计 */
+        .card {
+            background: white;
+            border-radius: var(--card-br);
+            border: 3px solid #E9ECEF;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center;
+            aspect-ratio: 1/1; /* 保持正方形 */
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .card.selected {
+            border-color: var(--secondary);
+            background: #E0FCF9;
+            transform: scale(0.92);
+        }
+
+        .card.matched {
+            visibility: hidden;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 文字大小适配四列 */
+        .card.word { 
+            font-size: 14px; 
+            font-weight: 800; 
+            padding: 4px; 
+            color: #2D3436;
+            word-break: break-all;
+        }
+        .card.icon { 
+            font-size: 42px; /* 针对四列优化的大图标 */
+        }
+
+        /* 覆盖层 */
+        .overlay {
+            position: fixed; inset: 0;
+            background: white;
+            z-index: 100;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+        }
+
+        .btn {
+            width: 240px; padding: 18px; margin: 12px;
+            border: none; border-radius: 15px;
+            background: var(--primary); color: white;
+            font-size: 20px; font-weight: bold;
+            box-shadow: 0 5px 0 #E55B5B;
+        }
+        .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #E55B5B; }
+
+        #modal {
+            position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white; padding: 30px;
+            border-radius: 25px; box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+            text-align: center; z-index: 200; display: none;
+            width: 280px;
+        }
+
+        #timer.warning { color: #FF0000; animation: blink 0.5s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <div class="info-pill">Level <span id="lvl-txt" class="info-val">1</span></div>
+        <div class="info-pill">Time <span id="timer" class="info-val">30</span>s</div>
+    </div>
+
+    <div id="game-area">
+        <div id="game-board"></div>
+    </div>
+
+    <!-- 首页菜单 -->
+    <div id="menu-overlay" class="overlay">
+        <h1 style="font-size: 32px; color: #333; margin-bottom: 40px;">English Link</h1>
+        <button class="btn" onclick="startGame('animals')">🐾 动物 Animals</button>
+        <button class="btn" onclick="startGame('food')" style="background:#FFD93D; color:#333; box-shadow:0 5px 0 #E5C12B">🍎 食物 Food</button>
+        <button class="btn" onclick="startGame('study')" style="background:var(--secondary); box-shadow:0 5px 0 #3BAEA5">✏️ 文具 Study</button>
+    </div>
+
+    <!-- 结算弹窗 -->
+    <div id="modal">
+        <h2 id="m-title" style="margin-top:0">🌟 太棒了!</h2>
+        <p id="m-msg" style="color: #666;">你完成得非常出色</p>
+        <button id="m-next" class="btn" style="width:100%; margin: 20px 0 10px 0;">下一关</button>
+        <button id="m-retry" class="btn" style="width:100%; background:#ADB5BD; box-shadow:0 5px 0 #868E96; font-size:16px;">重试</button>
+    </div>
+
+<script>
+    const data = {
+        animals: [{w:'Dog',i:'🐶'},{w:'Cat',i:'🐱'},{w:'Lion',i:'🦁'},{w:'Panda',i:'🐼'},{w:'Tiger',i:'🐯'},{w:'Rabbit',i:'🐰'},{w:'Elephant',i:'🐘'},{w:'Frog',i:'🐸'},{w:'Monkey',i:'🐒'},{w:'Bird',i:'🐦'},{w:'Pig',i:'🐷'},{w:'Bee',i:'🐝'},{w:'Sheep',i:'🐑'},{w:'Duck',i:'🦆'},{w:'Bear',i:'🐻'},{w:'Cow',i:'🐮'}],
+        food: [{w:'Apple',i:'🍎'},{w:'Banana',i:'🍌'},{w:'Pizza',i:'🍕'},{w:'Cake',i:'🍰'},{w:'Milk',i:'🥛'},{w:'Egg',i:'🥚'},{w:'Burger',i:'🍔'},{w:'Grapes',i:'🍇'},{w:'Carrot',i:'🥕'},{w:'Bread',i:'🍞'},{w:'Fish',i:'🐟'},{w:'Donut',i:'🍩'},{w:'Corn',i:'🌽'},{w:'Cherry',i:'🍒'},{w:'Candy',i:'🍬'},{w:'Juice',i:'🍹'}],
+        study: [{w:'Pencil',i:'✏️'},{w:'Book',i:'📖'},{w:'Ruler',i:'📏'},{w:'Bag',i:'🎒'},{w:'Eraser',i:'🧼'},{w:'Pen',i:'🖋️'},{w:'Scissors',i:'✂️'},{w:'Globe',i:'🌍'},{w:'Desk',i:'🪑'},{w:'Paper',i:'📄'},{w:'Crayon',i:'🖍️'},{w:'Map',i:'🗺️'},{w:'Clock',i:'⏰'},{w:'Glue',i:'🧪'},{w:'Folder',i:'📂'},{w:'Board',i:'📋'}]
+    };
+
+    let curCat = '', level = 1, timeLeft = 30, timerInt = null;
+    let first = null, lock = false, matches = 0, pairsCount = 0;
+
+    function speak(t) {
+        window.speechSynthesis.cancel();
+        const m = new SpeechSynthesisUtterance(t);
+        m.lang = 'en-US'; m.rate = 1.0;
+        window.speechSynthesis.speak(m);
+    }
+
+    function startGame(cat) {
+        curCat = cat; level = 1;
+        document.getElementById('menu-overlay').style.display = 'none';
+        loadLevel();
+    }
+
+    function loadLevel() {
+        clearInterval(timerInt);
+        const board = document.getElementById('game-board');
+        document.getElementById('modal').style.display = 'none';
+        board.innerHTML = '';
+        
+        // 难度配置: 1-10关
+        const pairMap = [0, 3, 4, 4, 6, 6, 8, 8, 8, 10, 10];
+        pairsCount = pairMap[level];
+        matches = 0; timeLeft = 30; first = null; lock = false;
+
+        document.getElementById('lvl-txt').innerText = level;
+        document.getElementById('timer').innerText = timeLeft;
+        document.getElementById('timer').classList.remove('warning');
+
+        let items = [...data[curCat]].sort(()=>Math.random()-0.5).slice(0, pairsCount);
+        let cards = [];
+        items.forEach((it, idx) => {
+            cards.push({id:idx, type:'word', val:it.w});
+            cards.push({id:idx, type:'icon', val:it.i, w:it.w});
+        });
+        cards.sort(()=>Math.random()-0.5);
+
+        cards.forEach(c => {
+            const div = document.createElement('div');
+            div.className = `card ${c.type}`;
+            div.dataset.id = c.id;
+            div.dataset.w = c.type === 'word' ? c.val : c.w;
+            div.innerText = c.val;
+            
+            // 如果单词太长，字号微调
+            if (c.type === 'word' && c.val.length > 7) {
+                div.style.fontSize = '12px';
+            }
+
+            div.onclick = () => {
+                if(lock || div.classList.contains('selected')) return;
+                speak(div.dataset.w);
+                div.classList.add('selected');
+                if(!first) { first = div; return; }
+                
+                if(first.dataset.id === div.dataset.id && first !== div) {
+                    lock = true;
+                    setTimeout(() => {
+                        first.classList.add('matched');
+                        div.classList.add('matched');
+                        matches++; first = null; lock = false;
+                        if(matches === pairsCount) { clearInterval(timerInt); showWin(true); }
+                    }, 300);
+                } else {
+                    lock = true;
+                    setTimeout(() => {
+                        first.classList.remove('selected');
+                        div.classList.remove('selected');
+                        first = null; lock = false;
+                    }, 500);
+                }
+            };
+            board.appendChild(div);
+        });
+
+        timerInt = setInterval(() => {
+            timeLeft--;
+            document.getElementById('timer').innerText = timeLeft;
+            if(timeLeft <= 5) document.getElementById('timer').classList.add('warning');
+            if(timeLeft <= 0) { clearInterval(timerInt); showWin(false); }
+        }, 1000);
+    }
+
+    function showWin(isWin) {
+        const m = document.getElementById('modal');
+        m.style.display = 'block';
+        document.getElementById('m-title').innerText = isWin ? "🌟 太棒了!" : "⏰ 时间到";
+        document.getElementById('m-msg').innerText = isWin ? "你表现得像个天才！" : "别灰心，再试一次吧。";
+        const nextBtn = document.getElementById('m-next');
+        
+        if(isWin) {
+            if(level < 10) {
+                nextBtn.innerText = "进入第 " + (level + 1) + " 关";
+                nextBtn.onclick = () => { level++; loadLevel(); };
+            } else {
+                nextBtn.innerText = "全关通关！回首页";
+                nextBtn.onclick = () => location.reload();
+            }
+        } else {
+            nextBtn.style.display = 'none';
+        }
+        document.getElementById('m-retry').onclick = () => {
+            nextBtn.style.display = 'block';
+            loadLevel();
+        };
+    }
+
+    document.addEventListener('touchstart', () => {
+        const s = new SpeechSynthesisUtterance("");
+        window.speechSynthesis.speak(s);
+    }, { once: true });
+</script>
+</body>
+</html>

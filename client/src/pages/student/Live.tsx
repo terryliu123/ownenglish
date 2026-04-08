@@ -1,10 +1,11 @@
-﻿import { useState, useEffect, useCallback, useRef } from 'react'
+﻿import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/layout/Layout'
 import { useAppStore } from '../../stores/app-store'
 import { useLiveWebSocket, LiveChallengeSession, LiveTask, RoomInfo, LiveTaskGroupSession, TaskResult, ClassroomShare } from '../../services/websocket'
 import { classService, liveService } from '../../services/api'
 import { useTranslation } from '../../i18n/useTranslation'
+import { useStudentAiContext } from '../../features/student-ai/context/StudentAiContext'
 import {
   isReadingTask,
   readingAnswerRequired,
@@ -17,6 +18,17 @@ import {
 import { buildTaskAnswerFromAnswerMap, evaluateTaskCorrectness, hasTaskAnswer } from '../../features/tasks/task-evaluation'
 import { TaskRichTextOrPlain } from '../../features/tasks/task-preview'
 import { StudentTaskQuestionCard, StudentTaskResultCard } from '../../features/tasks/task-live-components'
+import { debugLive } from '../../features/live-runtime/debug'
+import {
+  getChallengeEntryForStudent,
+  getSingleQuestionWinnerEntry,
+  hasChallengeEntryActivity,
+  hasChallengeEntryFinalSubmission,
+  isChallengeFinished,
+  isChallengeParticipant,
+} from '../../features/live-runtime/challengeRuntime'
+import { AtmosphereEffects, DanmuScreen, useDanmu } from '../../features/danmu'
+import type { ActiveAtmosphereEffect, AtmosphereEffectType } from '../../features/danmu/types/danmu'
 
 
 function shuffleIndices(length: number) {
@@ -99,28 +111,6 @@ function ChallengeStateIcon({ kind }: { kind: 'finished' | 'spectator' }) {
   )
 }
 
-function hasChallengeEntryActivity(entry: {
-  submitted?: boolean
-  answered_count?: number
-  correct_count?: number
-  total_time_ms?: number | null
-}) {
-  return Boolean(
-    entry.submitted
-    || (entry.answered_count ?? 0) > 0
-    || (entry.correct_count ?? 0) > 0
-    || (entry.total_time_ms ?? 0) > 0,
-  )
-}
-
-function hasChallengeEntryFinalSubmission(entry: {
-  submitted?: boolean
-  locked?: boolean
-  eliminated_for_round?: boolean
-}) {
-  return Boolean(entry.submitted || entry.locked || entry.eliminated_for_round)
-}
-
 function parseChallengeTimestamp(value?: string | null) {
   if (!value) return NaN
   const parsed = Date.parse(value)
@@ -152,19 +142,11 @@ function isSingleQuestionDuelChallenge(challenge: LiveChallengeSession | null | 
   return challenge?.mode === 'single_question_duel'
 }
 
-function getSingleQuestionWinnerEntry(challenge: LiveChallengeSession | null | undefined) {
-  if (!challenge?.scoreboard?.length) return null
-  return (
-    challenge.scoreboard.find((entry) => entry.student_id === challenge.winner_student_id)
-    || challenge.scoreboard.find((entry) => Boolean(entry.first_correct_at))
-    || null
-  )
-}
-
 export default function StudentLive() {
   const { t, tWithParams } = useTranslation()
   const { user, token } = useAppStore()
   const navigate = useNavigate()
+  const { setAiContext, loadSettings, setOpen: setAiOpen, settings } = useStudentAiContext()
   const [currentClassId, setCurrentClassId] = useState<string | null>(null)
   const [classLoadState, setClassLoadState] = useState<'loading' | 'ready' | 'empty' | 'selecting'>('loading')
   const [enrolledClasses, setEnrolledClasses] = useState<{id: string; name: string; teacher_name?: string}[]>([])
@@ -188,15 +170,24 @@ export default function StudentLive() {
   const [challengeSubmitState, setChallengeSubmitState] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle')
   const [challengeSubmitMessage, setChallengeSubmitMessage] = useState('')
   const [challengeResult, setChallengeResult] = useState<LiveChallengeSession | null>(null)
-  const [isChallengeParticipant, setIsChallengeParticipant] = useState(false)
   const [challengeIntroCountdown, setChallengeIntroCountdown] = useState(0)
   const [challengeTimeLeft, setChallengeTimeLeft] = useState(0)
+
+  // 弹幕状态
+  const danmu = useDanmu()
+  const [danmuCooldown, setDanmuCooldown] = useState(0)
+  const [activeEffects, setActiveEffects] = useState<ActiveAtmosphereEffect[]>([])
+
+  // Stable danmu callbacks to avoid hooks-in-JSX issue
+  const closeDanmuModal = useCallback(() => danmu.closeDanmuModal(), [danmu])
+  const setDanmuInput = useCallback((v: string) => danmu.setDanmuInput(v), [danmu])
 
   // 单题模式（向后兼容）
   const [currentTask, setCurrentTask] = useState<LiveTask | null>(null)
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null)
 
   const [connectionStatus, setConnectionStatus] = useState<string>(t('connection.waiting'))
+  const [sessionNotStarted, setSessionNotStarted] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const challengeIntroTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const challengeRoundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -205,9 +196,11 @@ export default function StudentLive() {
   const taskStartTimeRef = useRef<string>('')
   const challengeStartTimeRef = useRef<string>('')
   const currentChallengeIdRef = useRef<string | null>(null)
+  const lastChallengeProgressKeyRef = useRef<string | null>(null)
 
   // 课堂分享状态
   const [showShareModal, setShowShareModal] = useState(false)
+  const [fabOpen, setFabOpen] = useState(false)
   const [shareText, setShareText] = useState('')
   const [shareImageFile, setShareImageFile] = useState<File | null>(null)
   const [shareImagePreview, setShareImagePreview] = useState<string | null>(null)
@@ -226,6 +219,11 @@ export default function StudentLive() {
       challengeRoundTimerRef.current = null
     }
   }, [])
+
+  const challengeParticipant = useMemo(
+    () => isChallengeParticipant(currentChallenge, user?.id),
+    [currentChallenge, user],
+  )
 
   // Fetch student's enrolled class
   useEffect(() => {
@@ -308,6 +306,10 @@ export default function StudentLive() {
     currentChallengeIdRef.current = null
     setCurrentChallenge(null)
     setChallengeResult(null)
+    setChallengeSubmitted(false)
+    setChallengeSubmitState('idle')
+    setChallengeSubmitMessage('')
+    setChallengeIntroCountdown(0)
     setCurrentTaskGroup(data)
     setCurrentTask(null)  // 清除单题模式
     setLocalEvaluation(new Map())  // 清除本地评判
@@ -316,7 +318,10 @@ export default function StudentLive() {
       setSubmitted(true)
       setShowResult(false)
       try {
-        const submissionData = await liveService.getMyTaskGroupSubmissions(data.group_id)
+        const submissionData = await liveService.getMyTaskGroupSubmissions(
+          data.group_id,
+          data.session_id || data.live_session_id || undefined,
+        )
         console.log('[StudentLive] Restored submissions:', submissionData)
         // Restore answers from submissions
         const restoredAnswers = new Map<string, string>()
@@ -399,13 +404,29 @@ export default function StudentLive() {
   }, [])
 
   const handleChallengeStarted = useCallback((challenge: LiveChallengeSession, isParticipant?: boolean) => {
-    const fallbackParticipant = Boolean(user?.id && challenge.participant_ids.includes(user.id))
-    const participant = isParticipant ?? fallbackParticipant
-    const myEntry = challenge.scoreboard.find((entry) => entry.student_id === user?.id)
+    const fallbackParticipant = isChallengeParticipant(challenge, user?.id)
+    const participant = isParticipant ?? challenge.is_participant ?? fallbackParticipant
+    const myEntry = getChallengeEntryForStudent(challenge, user?.id)
+    debugLive('student:challenge_started', {
+      challengeId: challenge.id,
+      userId: user?.id,
+      isParticipant,
+      challengeIsParticipant: challenge.is_participant,
+      fallbackParticipant,
+      resolvedParticipant: participant,
+      hasEntry: Boolean(myEntry),
+    })
     const sameChallenge = currentChallengeIdRef.current === challenge.id
+    const nextChallenge = {
+      ...challenge,
+      is_participant: participant,
+    }
 
     currentChallengeIdRef.current = challenge.id
-    setCurrentChallenge(challenge)
+    if (!sameChallenge) {
+      lastChallengeProgressKeyRef.current = null
+    }
+    setCurrentChallenge(nextChallenge)
     setChallengeResult(null)
     setCurrentTaskGroup(null)
     setCurrentTask(null)
@@ -419,7 +440,7 @@ export default function StudentLive() {
     }
     setMatchingLayouts(buildMatchingLayouts(challenge.tasks))
     setSortingLayouts(buildSortingLayouts(challenge.tasks))
-    setChallengeQuestionIndex(getChallengeResumeIndex(myEntry, challenge.tasks.length))
+    setChallengeQuestionIndex(getChallengeResumeIndex(myEntry ?? undefined, nextChallenge.tasks.length))
     const hasFinalSubmission = Boolean(myEntry && hasChallengeEntryFinalSubmission(myEntry))
     setChallengeSubmitted(hasFinalSubmission)
     if (hasFinalSubmission) {
@@ -430,12 +451,15 @@ export default function StudentLive() {
       setChallengeSubmitMessage('')
     }
     challengeStartTimeRef.current = myEntry?.started_at || (sameChallenge ? challengeStartTimeRef.current : new Date().toISOString())
-    setIsChallengeParticipant(participant)
-    const challengeStartedAtMs = getChallengeStartTimeMs(challenge, myEntry)
+    const challengeStartedAtMs = getChallengeStartTimeMs(nextChallenge, myEntry ?? undefined)
     const shouldShowIntro = Number.isFinite(challengeStartedAtMs) && (Date.now() - challengeStartedAtMs < 4000)
-    setChallengeIntroCountdown(shouldShowIntro ? 3 : 0)
-    if (isSingleQuestionDuelChallenge(challenge)) {
-      const countdownSeconds = challenge.tasks[0]?.countdown_seconds ?? 20
+    if (!sameChallenge) {
+      setChallengeIntroCountdown(shouldShowIntro ? 3 : 0)
+    } else if (!shouldShowIntro) {
+      setChallengeIntroCountdown(0)
+    }
+    if (isSingleQuestionDuelChallenge(nextChallenge)) {
+      const countdownSeconds = nextChallenge.tasks[0]?.countdown_seconds ?? 20
       const elapsedSeconds = Number.isFinite(challengeStartedAtMs)
         ? Math.max(0, Math.floor((Date.now() - challengeStartedAtMs) / 1000))
         : 0
@@ -445,15 +469,38 @@ export default function StudentLive() {
     }
   }, [clearChallengeTimers, t, user])
 
-  const handleChallengeScoreboardUpdated = useCallback((data: { challenge_id: string; scoreboard: any[]; status?: string }) => {
+  const handleChallengeScoreboardUpdated = useCallback((data: {
+    challenge_id: string
+    scoreboard: any[]
+    status?: string
+    participant_ids?: string[]
+    current_round?: number
+    current_task_id?: string | null
+    round_status?: string
+    winner_student_id?: string | null
+    lead_student_id?: string | null
+  }) => {
     setCurrentChallenge((prev) => {
       if (!prev || prev.id !== data.challenge_id) return prev
       const nextChallenge = {
         ...prev,
         scoreboard: data.scoreboard,
         status: data.status || prev.status,
+        participant_ids: data.participant_ids ?? prev.participant_ids,
+        current_round: data.current_round ?? prev.current_round,
+        current_task_id: data.current_task_id ?? prev.current_task_id,
+        round_status: data.round_status ?? prev.round_status,
+        winner_student_id: data.winner_student_id ?? prev.winner_student_id,
+        lead_student_id: data.lead_student_id ?? prev.lead_student_id,
       }
-      const myEntry = nextChallenge.scoreboard.find((entry) => entry.student_id === user?.id)
+      const myEntry = getChallengeEntryForStudent(nextChallenge, user?.id)
+      debugLive('student:challenge_update', {
+        challengeId: nextChallenge.id,
+        userId: user?.id,
+        resolvedParticipant: isChallengeParticipant(nextChallenge, user?.id),
+        hasEntry: Boolean(myEntry),
+        status: nextChallenge.status,
+      })
       const hasFinalSubmission = Boolean(myEntry && hasChallengeEntryFinalSubmission(myEntry))
       setChallengeSubmitted(hasFinalSubmission)
       if (hasFinalSubmission) {
@@ -480,14 +527,14 @@ export default function StudentLive() {
       if (myEntry?.started_at) {
         challengeStartTimeRef.current = myEntry.started_at
       }
-      if (isSingleQuestionDuelChallenge(nextChallenge) && nextChallenge.status !== 'ended') {
-        const startedAtMs = getChallengeStartTimeMs(nextChallenge, myEntry)
+      if (isSingleQuestionDuelChallenge(nextChallenge) && !isChallengeFinished(nextChallenge)) {
+        const startedAtMs = getChallengeStartTimeMs(nextChallenge, myEntry ?? undefined)
         const countdownSeconds = nextChallenge.tasks[0]?.countdown_seconds ?? 20
         const elapsedSeconds = Number.isFinite(startedAtMs)
           ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000))
           : 0
         setChallengeTimeLeft(Math.max(0, countdownSeconds - elapsedSeconds))
-      } else if (nextChallenge.status === 'ended') {
+      } else if (isChallengeFinished(nextChallenge)) {
         setChallengeTimeLeft(0)
       }
       return nextChallenge
@@ -515,7 +562,7 @@ export default function StudentLive() {
           : (prev?.scoreboard ?? []),
       status: challenge.status || prev?.status,
     }))
-    const myEntry = challenge.scoreboard.find((entry) => entry.student_id === user?.id)
+    const myEntry = getChallengeEntryForStudent(challenge, user?.id)
     const hasFinalSubmission = Boolean(myEntry && hasChallengeEntryFinalSubmission(myEntry))
     setChallengeSubmitted(hasFinalSubmission)
     if (hasFinalSubmission || (myEntry && hasChallengeEntryActivity(myEntry))) {
@@ -526,15 +573,18 @@ export default function StudentLive() {
       setChallengeSubmitMessage('')
     }
     challengeStartTimeRef.current = myEntry?.started_at || ''
+    lastChallengeProgressKeyRef.current = null
     setChallengeIntroCountdown(0)
     setChallengeTimeLeft(0)
   }, [clearChallengeTimers, currentChallenge, t, user])
 
   const handleChallengeError = useCallback((message: string) => {
+    debugLive('student:challenge_error', { message, state: challengeSubmitState })
     if (challengeSubmitState === 'submitting' && message === 'No active challenge') {
       return
     }
     if (challengeSubmitState === 'submitting') {
+      setChallengeSubmitted(false)
       setChallengeSubmitState('error')
       setChallengeSubmitMessage(t('challenge.submitChallengeFailed'))
     }
@@ -596,9 +646,9 @@ export default function StudentLive() {
     setCurrentChallenge(null)
     setChallengeResult(null)
     setChallengeSubmitted(false)
-    setIsChallengeParticipant(false)
     setChallengeIntroCountdown(0)
     setChallengeTimeLeft(0)
+    lastChallengeProgressKeyRef.current = null
     setCurrentTaskGroup(null)
     setCurrentTask(null)
     setSubmitted(false)
@@ -612,14 +662,18 @@ export default function StudentLive() {
   }, [clearChallengeTimers, navigate])
 
   const handleRoomInfo = useCallback((info: RoomInfo) => {
+    setSessionNotStarted(false)
     setRoomInfo(info)
-    if (info.room_state?.current_challenge) {
-      handleChallengeStarted(
-        info.room_state.current_challenge,
-        Boolean(user?.id && info.room_state.current_challenge.participant_ids.includes(user.id)),
-      )
+    const roomChallenge = info.room_state?.current_challenge ?? (info as RoomInfo & { current_challenge?: LiveChallengeSession | null }).current_challenge
+    if (roomChallenge) {
+      handleChallengeStarted(roomChallenge)
     }
-  }, [handleChallengeStarted, user])
+    // Sync danmu config from server
+    const danmuConfig = (info as any).danmu_config
+    if (danmuConfig) {
+      danmu.handleDanmuConfig(danmuConfig)
+    }
+  }, [handleChallengeStarted])
 
   const ws = useLiveWebSocket({
     classId: currentClassId || '',
@@ -639,6 +693,10 @@ export default function StudentLive() {
     onTaskEnded: handleTaskEnded,
     onSubmissionReceived: handleSubmissionReceived,
     onRoomClosed: handleRoomClosed,
+    onSessionNotStarted: () => {
+      setSessionNotStarted(true)
+      setConnectionStatus(t('studentLive.sessionNotStarted'))
+    },
     onRoomInfo: handleRoomInfo,
     onShareRequestSent: () => {
       setShareSending(false)
@@ -657,7 +715,45 @@ export default function StudentLive() {
     onClassroomShare: (data) => {
       setBroadcastShares((prev) => [...prev.slice(-9), data])
     },
+    onDanmuDisplay: (data) => {
+      danmu.handleDanmuDisplay(data as any)
+    },
+    onDanmuConfig: (data) => {
+      danmu.handleDanmuConfig(data as any)
+    },
+    onDanmuClear: () => {
+      danmu.handleDanmuClear()
+    },
+    onAtmosphereEffect: (data) => {
+      const effect = data.effect as AtmosphereEffectType
+      const newEffect: ActiveAtmosphereEffect = {
+        id: `student-effect-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        effect,
+        sourceName: data.sourceName,
+      }
+      setActiveEffects((prev) => [...prev, newEffect])
+      window.setTimeout(() => {
+        setActiveEffects((prev) => prev.filter((item) => item.id !== newEffect.id))
+      }, 5600)
+    },
   })
+
+  // 弹幕倒计时发送
+  const handleSendDanmu = useCallback(() => {
+    if (!danmu.danmuInput.trim() || ws.status !== 'connected' || danmuCooldown > 0) return
+    ws.sendDanmu(danmu.danmuInput.trim())
+    danmu.setDanmuInput('')
+    setDanmuCooldown(5)
+    const timer = setInterval(() => {
+      setDanmuCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer)
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+  }, [ws, danmu, danmuCooldown])
 
   // 处理分享图片上传预览
   const handleShareImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -719,17 +815,37 @@ export default function StudentLive() {
     return () => ws.disconnect()
   }, [currentClassId, token])
 
+  useEffect(() => {
+    if (!sessionNotStarted || !currentClassId || !token) return
+    const retryTimer = window.setTimeout(() => {
+      ws.connect()
+    }, 3000)
+    return () => window.clearTimeout(retryTimer)
+  }, [sessionNotStarted, currentClassId, token, ws.status])
+
   // 连接成功后获取当前任务（处理任务已开始但后加入的情况）
   useEffect(() => {
     if (ws.status === 'connected') {
+      setSessionNotStarted(false)
       console.log('[StudentLive] WebSocket connected, fetching current task...')
+      // 设置 AI 助手 context
+      const sessionId = ws.roomInfo?.session_id
+      setAiContext({ class_id: currentClassId || '', session_id: sessionId || undefined })
+      loadSettings(currentClassId || '')
       // 延迟一点发送，确保服务器已准备好
       const timer = setTimeout(() => {
         ws.getCurrentTask()
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [ws.status])
+  }, [ws.status, ws.roomInfo?.session_id])
+
+  // 监听统一悬浮球的分享事件
+  useEffect(() => {
+    const handleOpenShare = () => setShowShareModal(true)
+    window.addEventListener('open-share-modal', handleOpenShare)
+    return () => window.removeEventListener('open-share-modal', handleOpenShare)
+  }, [])
 
   useEffect(() => {
     if (!currentChallenge || challengeIntroCountdown <= 0) {
@@ -756,14 +872,14 @@ export default function StudentLive() {
         challengeIntroTimerRef.current = null
       }
     }
-  }, [challengeIntroCountdown, currentChallenge])
+  }, [challengeIntroCountdown, currentChallenge?.id])
 
   useEffect(() => {
     if (
       !currentChallenge
       || !isSingleQuestionDuelChallenge(currentChallenge)
-      || !isChallengeParticipant
-      || currentChallenge.status === 'ended'
+      || !challengeParticipant
+      || isChallengeFinished(currentChallenge)
       || challengeIntroCountdown > 0
       || challengeTimeLeft <= 0
     ) {
@@ -779,7 +895,7 @@ export default function StudentLive() {
             clearInterval(challengeRoundTimerRef.current)
             challengeRoundTimerRef.current = null
           }
-          if (currentChallenge.status !== 'ended') {
+          if (!isChallengeFinished(currentChallenge)) {
             ws.endChallenge(currentChallenge.id)
           }
           return 0
@@ -793,7 +909,7 @@ export default function StudentLive() {
         challengeRoundTimerRef.current = null
       }
     }
-  }, [challengeIntroCountdown, challengeTimeLeft, currentChallenge, isChallengeParticipant, ws])
+  }, [challengeIntroCountdown, challengeParticipant, challengeTimeLeft, currentChallenge, ws])
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -895,7 +1011,11 @@ export default function StudentLive() {
     })
     setLocalEvaluation(evalMap)
 
-    ws.submitTaskGroup(currentTaskGroup.group_id, answersArray)
+      ws.submitTaskGroup(
+        currentTaskGroup.group_id,
+        answersArray,
+        currentTaskGroup.session_id || currentTaskGroup.live_session_id || undefined,
+      )
     setSubmitted(true)
     // 立即显示本地评判结果，不等服务端
     if (evalMap.size > 0) {
@@ -923,8 +1043,8 @@ export default function StudentLive() {
       !currentChallenge
       || challengeSubmitted
       || challengeSubmitState === 'submitting'
-      || !isChallengeParticipant
-      || currentChallenge.status === 'ended'
+      || !challengeParticipant
+      || isChallengeFinished(currentChallenge)
     ) {
       return
     }
@@ -950,16 +1070,16 @@ export default function StudentLive() {
     setChallengeSubmitState('submitted')
     setChallengeSubmitted(true)
     ws.submitChallenge(currentChallenge.id, challengeAnswers, challengeStartTimeRef.current || null)
-  }, [buildChallengeAnswers, challengeSubmitted, challengeSubmitState, currentChallenge, isChallengeParticipant, t, ws])
+  }, [buildChallengeAnswers, challengeParticipant, challengeSubmitted, challengeSubmitState, currentChallenge, t, ws])
 
   const submitSingleQuestionDuelAnswer = useCallback((taskId: string, answer: string) => {
     if (
       !currentChallenge
-      || !isChallengeParticipant
+      || !challengeParticipant
       || !isSingleQuestionDuelChallenge(currentChallenge)
       || challengeSubmitted
       || challengeSubmitState === 'submitting'
-      || currentChallenge.status === 'ended'
+      || isChallengeFinished(currentChallenge)
       || challengeIntroCountdown > 0
     ) {
       return
@@ -983,7 +1103,7 @@ export default function StudentLive() {
     challengeSubmitState,
     challengeSubmitted,
     currentChallenge,
-    isChallengeParticipant,
+    challengeParticipant,
     t,
     ws,
   ])
@@ -1089,22 +1209,35 @@ export default function StudentLive() {
   useEffect(() => {
     if (
       !currentChallenge
-      || !isChallengeParticipant
+      || !challengeParticipant
       || challengeSubmitted
       || challengeSubmitState === 'submitting'
       || isSingleQuestionDuelChallenge(currentChallenge)
     ) {
       return
     }
+    const challengeAnswers = buildChallengeAnswers(currentChallenge)
+    const answeredCount = getChallengeAnsweredCount()
+    const progressKey = JSON.stringify({
+      challengeId: currentChallenge.id,
+      currentIndex: challengeQuestionIndex,
+      answeredCount,
+      startedAt: challengeStartTimeRef.current || null,
+      answers: challengeAnswers,
+    })
+    if (lastChallengeProgressKeyRef.current === progressKey) {
+      return
+    }
+    lastChallengeProgressKeyRef.current = progressKey
     ws.updateChallengeProgress(
       currentChallenge.id,
       challengeQuestionIndex,
-      getChallengeAnsweredCount(),
+      answeredCount,
       challengeStartTimeRef.current || null,
-      buildChallengeAnswers(currentChallenge),
+      challengeAnswers,
       false,
     )
-  }, [buildChallengeAnswers, challengeQuestionIndex, challengeSubmitState, challengeSubmitted, currentChallenge, getChallengeAnsweredCount, isChallengeParticipant, ws])
+  }, [buildChallengeAnswers, challengeParticipant, challengeQuestionIndex, challengeSubmitState, challengeSubmitted, currentChallenge, getChallengeAnsweredCount, ws])
 
   // 格式化时间显示
   const formatTime = (seconds: number) => {
@@ -1143,10 +1276,83 @@ export default function StudentLive() {
       {sharePending && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 bg-amber-50 border border-amber-200 text-amber-800 px-5 py-3 rounded-2xl text-sm shadow-lg font-medium">{t('classroomShare.waitingReview')}</div>
       )}
-      {ws.status === 'connected' && !sharePending && (
-        <button onClick={() => setShowShareModal(true)} className="fixed bottom-8 right-8 z-40 bg-gradient-to-br from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-white rounded-full w-16 h-16 flex items-center justify-center shadow-xl transition-all hover:scale-110 active:scale-95" title={t('classroomShare.raiseHand')}>
-          <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" /></svg>
+      {/* 统一悬浮球 */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {fabOpen && (
+          <div className="absolute bottom-16 right-0 mb-2 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden" style={{ minWidth: '160px' }}>
+            {danmu.config.enabled && (
+              <button
+                onClick={() => { danmu.openDanmuModal(); setFabOpen(false) }}
+                disabled={ws.status !== 'connected'}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-pink-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <span className="text-lg">🎆</span>
+                <span className="font-medium text-gray-700">{t('danmu.send')}</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setShowShareModal(true); setFabOpen(false) }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-amber-50 transition-colors border-t border-gray-100"
+            >
+              <span className="text-lg">✋</span>
+              <span className="font-medium text-gray-700">{t('classroomShare.raiseHand')}</span>
+            </button>
+            {settings?.enabled && (
+              <button
+                onClick={() => { setAiContext({ class_id: currentClassId || '', session_id: ws.roomInfo?.session_id || undefined }); loadSettings(currentClassId || ''); setAiOpen(true); setFabOpen(false) }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-blue-50 transition-colors border-t border-gray-100"
+              >
+                <span className="text-lg">🤖</span>
+                <span className="font-medium text-gray-700">AI 助手</span>
+              </button>
+            )}
+          </div>
+        )}
+        <button
+          onClick={() => setFabOpen(!fabOpen)}
+          className="w-14 h-14 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg hover:from-pink-400 hover:to-rose-400 transition-all hover:scale-110 flex items-center justify-center overflow-hidden"
+          style={{ boxShadow: '0 4px 20px rgba(236, 72, 153, 0.4)' }}
+        >
+          {fabOpen ? (
+            <span className="text-2xl">✕</span>
+          ) : (
+            <img src="/logo.png" alt="菜单" className="w-8 h-8 rounded-lg object-contain" />
+          )}
         </button>
+      </div>
+      {/* 弹幕发送弹窗 */}
+      {danmu.showDanmuModal && (
+        <div className="fixed inset-0 z-[1400] bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center" onClick={() => closeDanmuModal()}>
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-lg sm:p-6 p-5 pb-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-100 to-rose-200 flex items-center justify-center"><span className="text-xl">🎆</span></div>
+              <h3 className="text-xl font-bold text-gray-800">{t('danmu.send')}</h3>
+              <button onClick={() => closeDanmuModal()} className="ml-auto w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">✕</button>
+            </div>
+            <div className="mb-4">
+              <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{t('danmu.presets')}</div>
+              <div className="flex flex-wrap gap-2">
+                {['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'].map((phrase) => (
+                  <button key={phrase} onClick={() => setDanmuInput(phrase)} className="px-3 py-1.5 rounded-full bg-pink-50 border border-pink-200 text-pink-600 text-sm hover:bg-pink-100 transition-colors">{phrase}</button>
+                ))}
+              </div>
+            </div>
+            <textarea value={danmu.danmuInput} onChange={e => setDanmuInput(e.target.value.slice(0, 50))} placeholder={t('danmu.placeholder')} className="w-full border-2 border-gray-200 focus:border-pink-400 rounded-2xl p-4 text-base resize-none focus:outline-none transition-colors" rows={3} autoFocus />
+            <div className="flex items-center justify-between mt-1 mb-4">
+              <span className="text-xs text-gray-400">{danmu.danmuInput.length}/50</span>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => closeDanmuModal()} className="flex-1 ghost-button py-3">{t('common.cancel')}</button>
+              <button
+                onClick={handleSendDanmu}
+                disabled={(!danmu.danmuInput.trim() && danmuCooldown === 0) || ws.status !== 'connected' || danmuCooldown > 0}
+                className={`flex-1 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 px-4 py-3 text-white font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${danmuCooldown > 0 ? 'opacity-70' : 'hover:from-pink-400 hover:to-rose-400'}`}
+              >
+                {danmuCooldown > 0 ? `${danmuCooldown}秒后可再发` : t('danmu.sendButton')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {showShareModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[1100] flex items-end sm:items-center justify-center sm:p-4" onClick={() => setShowShareModal(false)}>
@@ -1209,9 +1415,10 @@ export default function StudentLive() {
       )}
     </>
   )
+  const classroomAtmosphere = <AtmosphereEffects effects={activeEffects} />
 
   if (challengeResult) {
-    const myEntry = challengeResult.scoreboard.find((entry) => entry.student_id === user?.id)
+    const myEntry = getChallengeEntryForStudent(challengeResult, user?.id)
     const myEntrySubmitted = myEntry ? hasChallengeEntryFinalSubmission(myEntry) : false
     const challengeWinner = getSingleQuestionWinnerEntry(challengeResult)
     const isSingleQuestionResult = isSingleQuestionDuelChallenge(challengeResult)
@@ -1221,6 +1428,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="student-card text-center">
@@ -1299,11 +1507,11 @@ export default function StudentLive() {
   if (currentChallenge) {
     const currentChallengeTask = currentChallenge.tasks[challengeQuestionIndex]
     const answeredCount = getChallengeAnsweredCount()
-    const myChallengeEntry = currentChallenge.scoreboard.find((entry) => entry.student_id === user?.id)
+    const myChallengeEntry = getChallengeEntryForStudent(currentChallenge, user?.id)
     const isSingleQuestionMode = isSingleQuestionDuelChallenge(currentChallenge)
     const challengeWinner = getSingleQuestionWinnerEntry(currentChallenge)
     const singleQuestionResolved = Boolean(
-      currentChallenge.status === 'ended'
+      isChallengeFinished(currentChallenge)
       || challengeWinner
       || currentChallenge.round_status === 'draw'
       || currentChallenge.scoreboard.every((entry) => hasChallengeEntryFinalSubmission(entry)),
@@ -1315,7 +1523,7 @@ export default function StudentLive() {
     const singleQuestionInteractionLocked = Boolean(
       isSingleQuestionMode && (
         challengeIntroCountdown > 0
-        || currentChallenge.status === 'ended'
+        || isChallengeFinished(currentChallenge)
         || mySingleQuestionWon
         || mySingleQuestionLost
         || mySingleQuestionFailed
@@ -1323,10 +1531,11 @@ export default function StudentLive() {
       ),
     )
 
-    if (!isChallengeParticipant) {
+    if (!challengeParticipant) {
       return (
         <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
           <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="student-card text-center">
@@ -1366,6 +1575,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-4">
           <div className="sticky top-0 z-10 bg-white shadow-sm border-b">
             <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -1382,11 +1592,6 @@ export default function StudentLive() {
                         total: currentChallenge.tasks.length,
                       })}
                 </p>
-                {currentChallenge.mode === 'class_challenge' && myChallengeEntry?.rank ? (
-                  <p className="text-sm mt-1" style={{ color: 'var(--muted)' }}>
-                    {tWithParams('challenge.currentRank', { rank: myChallengeEntry.rank })}
-                  </p>
-                ) : null}
               </div>
               <div className="text-sm" style={{ color: 'var(--muted)' }}>
                 {isSingleQuestionMode
@@ -1581,6 +1786,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1604,6 +1810,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1620,11 +1827,43 @@ export default function StudentLive() {
     )
   }
 
+  // Session not started — teacher hasn't clicked "开始本节课"
+  if (sessionNotStarted) {
+    return (
+      <Layout>
+        {shareOverlay}
+        {classroomAtmosphere}
+        <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
+          <div className="student-card max-w-md w-full text-center">
+            <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center text-4xl mx-auto mb-6">
+              ⏳
+            </div>
+            <h2 className="text-2xl font-display font-bold mb-3 text-amber-800">{t('studentLive.sessionNotStartedTitle')}</h2>
+            <p className="text-amber-700 mb-6 text-sm leading-relaxed">
+              {t('studentLive.sessionNotStartedDesc')}
+            </p>
+            <button
+              onClick={() => {
+                setSessionNotStarted(false)
+                ws.connect()
+              }}
+              className="solid-button"
+            >
+              {t('studentLive.retryConnect')}
+            </button>
+          </div>
+        </div>
+      </Layout>
+    )
+  }
+
   // No active task
   if (!currentTaskGroup && !currentTask) {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
+        <DanmuScreen activeDanmus={danmu.activeDanmus} config={danmu.config} />
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1674,6 +1913,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
           <div className="max-w-3xl mx-auto">
             {/* 结果头部 */}
@@ -1727,6 +1967,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-4">
           {/* 顶部进度栏 */}
           <div className="sticky top-0 z-10 bg-white shadow-sm border-b">
@@ -1813,6 +2054,7 @@ export default function StudentLive() {
     return (
       <Layout>
         {shareOverlay}
+        {classroomAtmosphere}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-lg w-full">
             <div className="text-center mb-6">
@@ -1866,6 +2108,7 @@ export default function StudentLive() {
 
   // Active task - student answering (单题模式)
   return (
+    <>
     <Layout>
       <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
         <div className="student-card max-w-lg w-full">
@@ -1979,5 +2222,6 @@ export default function StudentLive() {
         </div>
       </div>
     </Layout>
+    </>
   )
 }

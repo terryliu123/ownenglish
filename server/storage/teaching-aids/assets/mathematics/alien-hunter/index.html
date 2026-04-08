@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心理学实验：外星人猎手</title>
+    <style>
+        :root {
+            --bg-color: #2d3436;
+            --text-color: #dfe6e9;
+            --target-color: #ff7675; /* 红色 */
+            --distractor-color: #74b9ff; /* 蓝色 */
+            --accent: #fdcb6e;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 600px;
+            width: 90%;
+        }
+
+        h1 { color: var(--accent); margin-bottom: 5px; }
+        
+        /* 游戏区域 */
+        .game-board {
+            position: relative;
+            width: 100%;
+            height: 400px; /* 固定高度 */
+            background: #1e272e;
+            border: 2px solid #636e72;
+            border-radius: 10px;
+            margin: 20px 0;
+            cursor: crosshair;
+            overflow: hidden;
+        }
+
+        /* 形状样式 */
+        .shape {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            transition: transform 0.1s;
+        }
+        .shape:active { transform: scale(0.9); }
+
+        /* 圆形和方形 */
+        .circle { border-radius: 50%; }
+        .square { border-radius: 4px; }
+
+        /* 界面切换 */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        button {
+            background-color: var(--accent);
+            color: #2d3436;
+            border: none;
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { filter: brightness(1.1); transform: scale(1.05); }
+
+        .target-preview {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background-color: var(--target-color);
+            border-radius: 50%; /* 目标总是红圆 */
+            vertical-align: middle;
+            margin: 0 5px;
+        }
+
+        .stats-box {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            text-align: left;
+        }
+
+        .theory-box {
+            background: #dfe6e9;
+            color: #2d3436;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: left;
+            margin-top: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 首页 -->
+    <div id="start-screen" class="screen active container">
+        <h1>👽 外星人猎手</h1>
+        <p>基于“视觉搜索”与“特征整合理论”</p>
+        
+        <div class="stats-box">
+            <p><strong>任务目标：</strong></p>
+            <p>在所有关卡中，你的目标永远是找到：</p>
+            <div style="text-align: center; margin: 10px;">
+                <span class="target-preview"></span> <strong>红色圆形</strong>
+            </div>
+            <p>请以<strong>最快速度</strong>点击它！我们将测量你的反应时间。</p>
+        </div>
+
+        <button onclick="startGame()">开始实验</button>
+    </div>
+
+    <!-- 游戏页 -->
+    <div id="game-screen" class="screen container">
+        <h2 id="round-title">阶段 1: 热身</h2>
+        <p>请点击 <span class="target-preview"></span></p>
+        <div class="game-board" id="board">
+            <!-- JS 生成图形 -->
+        </div>
+    </div>
+
+    <!-- 结果页 -->
+    <div id="result-screen" class="screen container">
+        <h1>实验报告</h1>
+        
+        <div class="stats-box">
+            <p>阶段 1 (简单模式) 平均耗时: <strong id="time-easy" style="color: #00b894;">0 ms</strong></p>
+            <p>阶段 2 (困难模式) 平均耗时: <strong id="time-hard" style="color: #d63031;">0 ms</strong></p>
+            <hr style="border-color: #666;">
+            <p>差异: <span id="time-diff">0</span> ms</p>
+        </div>
+
+        <div class="theory-box">
+            <h3>🔬 为什么第二阶段慢那么多？</h3>
+            <p><strong>阶段 1 (弹出效应)：</strong> 目标是唯一的红色。它的颜色特征太明显了，大脑进行的是<strong>“平行加工”</strong>，就像目标自动“跳”进你眼里一样，不需要费力。</p>
+            <p><strong>阶段 2 (序列搜索)：</strong> 干扰项里既有红色的方形，又有蓝色的圆形。目标（红圆）没有独一无二的特征。大脑必须进行<strong>“序列加工”</strong>，也就是像排队一样，把注意力聚焦到一个物体上，判断“你是红圆吗？不是”，再看下一个。这非常消耗认知资源！</p>
+        </div>
+
+        <button onclick="location.reload()">重新测试</button>
+    </div>
+
+    <script>
+        // 配置
+        const TOTAL_ITEMS = 30; // 屏幕上物体的总数
+        const ROUNDS_PER_STAGE = 5; // 每个阶段测试几次取平均值
+        
+        // 状态
+        let stage = 1; // 1=Pop-out(简单), 2=Conjunction(困难)
+        let round = 0;
+        let startTime = 0;
+        let timesEasy = [];
+        let timesHard = [];
+
+        // DOM
+        const board = document.getElementById('board');
+
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function startGame() {
+            stage = 1;
+            round = 0;
+            timesEasy = [];
+            timesHard = [];
+            startRound();
+        }
+
+        function startRound() {
+            showScreen('game-screen');
+            
+            // 更新标题
+            const titleEl = document.getElementById('round-title');
+            if (stage === 1) {
+                titleEl.textContent = `阶段 1: 简单模式 (${round + 1}/${ROUNDS_PER_STAGE})`;
+                titleEl.style.color = '#00b894';
+            } else {
+                titleEl.textContent = `阶段 2: 困难模式 (${round + 1}/${ROUNDS_PER_STAGE})`;
+                titleEl.style.color = '#ff7675';
+            }
+
+            renderBoard();
+            startTime = Date.now();
+        }
+
+        function renderBoard() {
+            board.innerHTML = '';
+            
+            // 1. 创建目标 (Red Circle)
+            const target = createShape('circle', 'red', true);
+            
+            // 2. 创建干扰项 (Distractors)
+            const fragments = document.createDocumentFragment();
+            fragments.appendChild(target);
+
+            for (let i = 0; i < TOTAL_ITEMS - 1; i++) {
+                let shapeType, colorType;
+
+                if (stage === 1) {
+                    // 简单模式：特征搜索 (Feature Search)
+                    // 目标是红圆。干扰项全部是蓝色圆形。
+                    // 颜色不同，形状相同 (或者形状颜色都不同也可以，重点是颜色唯一)
+                    shapeType = 'circle'; 
+                    colorType = 'blue';
+                } else {
+                    // 困难模式：结合搜索 (Conjunction Search)
+                    // 目标是红圆。
+                    // 干扰项混合了：红色方形 + 蓝色圆形。
+                    // 目标没有单一的独特特征（红色不唯一，圆形也不唯一）。
+                    if (Math.random() > 0.5) {
+                        shapeType = 'square'; colorType = 'red'; // 共享颜色
+                    } else {
+                        shapeType = 'circle'; colorType = 'blue'; // 共享形状
+                    }
+                }
+                
+                fragments.appendChild(createShape(shapeType, colorType, false));
+            }
+
+            board.appendChild(fragments);
+        }
+
+        function createShape(shape, color, isTarget) {
+            const el = document.createElement('div');
+            el.className = `shape ${shape}`;
+            
+            // 颜色样式
+            if (color === 'red') el.style.backgroundColor = 'var(--target-color)';
+            else el.style.backgroundColor = 'var(--distractor-color)';
+
+            // 随机位置 (防止重叠的简易算法：虽有重叠但因为是div层级，不影响点击)
+            // 减去30px防止溢出边界
+            const x = Math.floor(Math.random() * (board.offsetWidth - 40)); 
+            const y = Math.floor(Math.random() * (board.offsetHeight - 40));
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+
+            // 点击事件
+            el.onmousedown = (e) => {
+                // 阻止事件冒泡防止误触背景
+                e.stopPropagation(); 
+                if (isTarget) {
+                    handleSuccess();
+                } else {
+                    // 点错了给予视觉惩罚（比如变暗一下）
+                    el.style.opacity = 0.2;
+                }
+            };
+
+            return el;
+        }
+
+        function handleSuccess() {
+            const endTime = Date.now();
+            const reactionTime = endTime - startTime;
+
+            if (stage === 1) {
+                timesEasy.push(reactionTime);
+            } else {
+                timesHard.push(reactionTime);
+            }
+
+            round++;
+
+            if (round < ROUNDS_PER_STAGE) {
+                // 继续当前阶段下一轮
+                startRound();
+            } else {
+                // 当前阶段结束
+                if (stage === 1) {
+                    // 进入第二阶段
+                    stage = 2;
+                    round = 0;
+                    alert("准备好了吗？\n\n刚才很简单对吧？\n接下来外星人学会了伪装！难度升级！");
+                    startRound();
+                } else {
+                    // 全部结束
+                    showResults();
+                }
+            }
+        }
+
+        function showResults() {
+            // 计算平均值
+            const avgEasy = Math.round(timesEasy.reduce((a, b) => a + b) / timesEasy.length);
+            const avgHard = Math.round(timesHard.reduce((a, b) => a + b) / timesHard.length);
+            
+            document.getElementById('time-easy').textContent = avgEasy + ' ms';
+            document.getElementById('time-hard').textContent = avgHard + ' ms';
+            
+            const diff = avgHard - avgEasy;
+            const diffEl = document.getElementById('time-diff');
+            diffEl.textContent = diff > 0 ? `+${diff}` : diff;
+            
+            showScreen('result-screen');
+        }
+    </script>
+</body>
+</html>
