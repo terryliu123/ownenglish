@@ -1,16 +1,21 @@
 """Student submissions management endpoints."""
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, select, func, delete
 
+from app.core.websocket import manager
 from app.db.session import get_db
 from app.api.v1.auth import get_current_user
 from app.models import (
-    User, LiveTaskGroup, LiveTaskGroupSubmission, LiveSessionEvent, Class, UserRole
+    User, LiveTask, LiveTaskGroup, LiveTaskGroupSubmission, LiveSubmission,
+    LiveChallengeSession, LiveSessionEvent, Class, UserRole
 )
+from .logging_utils import log_live_transport
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -200,3 +205,238 @@ async def delete_task_group_submissions(
     await db.commit()
 
     logger.info(f"[Submissions] Teacher {current_user.id} deleted submissions for group {group_id}, session {session_id}")
+
+
+# ── P0-4: HTTP fallback submission endpoints ──
+
+class TaskGroupSubmitRequest(BaseModel):
+    group_id: str
+    class_id: Optional[str] = None
+    answers: list[dict]  # [{task_id, answer}]
+    session_id: Optional[str] = None
+
+
+class ChallengeSubmitRequest(BaseModel):
+    challenge_id: str
+    answers: list[dict]  # [{task_id, answer}]
+    started_at: Optional[str] = None
+
+
+@router.post("/live/submit/task-group")
+async def http_submit_task_group(
+    body: TaskGroupSubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """HTTP fallback for task group submission when WebSocket is disconnected."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can submit")
+    student_id = current_user.id
+    group_id = body.group_id
+    log_live_transport(
+        logger,
+        "task_group_submit_requested",
+        class_id=body.class_id,
+        group_id=group_id,
+        session_id=body.session_id,
+        student_id=student_id,
+        transport="http-fallback",
+    )
+
+    # Find session_id and class_id
+    class_id = body.class_id or await _find_class_id_for_student(student_id, db, allow_enrollment_fallback=False)
+    session_id = body.session_id
+    if not session_id and class_id:
+        from app.api.v1.live.websocket_handlers import _get_active_live_session
+        active_session = await _get_active_live_session(class_id, db)
+        session_id = active_session.id if active_session else None
+    if not class_id:
+        raise HTTPException(status_code=400, detail="Class context required for HTTP fallback submission")
+
+    # Duplicate check — include session_id when available
+    dedup_stmt = select(LiveTaskGroupSubmission).where(
+        LiveTaskGroupSubmission.group_id == group_id,
+        LiveTaskGroupSubmission.student_id == student_id,
+    )
+    if session_id:
+        dedup_stmt = dedup_stmt.where(LiveTaskGroupSubmission.session_id == session_id)
+    existing = await db.execute(dedup_stmt.limit(1))
+    if existing.scalar_one_or_none():
+        log_live_transport(
+            logger,
+            "task_group_submit_duplicate",
+            class_id=class_id,
+            group_id=group_id,
+            session_id=session_id,
+            student_id=student_id,
+            transport="http-fallback",
+        )
+        return {"status": "already_submitted", "group_id": group_id}
+
+    # Find the task group to get correct answers
+    group_result = await db.execute(
+        select(LiveTaskGroup).where(LiveTaskGroup.id == group_id)
+    )
+    group = group_result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Task group not found")
+
+    task_result = await db.execute(
+        select(LiveTask).where(LiveTask.group_id == group_id).order_by(LiveTask.order)
+    )
+    tasks = {t.id: t for t in task_result.scalars().all()}
+
+    from app.api.v1.live.utils import _answers_match
+
+    for ans in body.answers:
+        task_id = ans.get("task_id")
+        answer = ans.get("answer")
+        task = tasks.get(task_id)
+        correct_answer = task.correct_answer if task else None
+        is_correct = _answers_match(task.type if task else None, answer, correct_answer) if task else None
+
+        db.add(LiveSubmission(
+            task_id=task_id, student_id=student_id, answer=answer, is_correct=is_correct,
+        ))
+        db.add(LiveTaskGroupSubmission(
+            group_id=group_id, session_id=session_id, student_id=student_id,
+            task_id=task_id, answer=answer, is_correct=is_correct,
+        ))
+
+    await db.commit()
+
+    # Notify via WebSocket if room exists
+    await manager.submit_task_group_answer(class_id, group_id, student_id, body.answers)
+    log_live_transport(
+        logger,
+        "task_group_submitted",
+        class_id=class_id,
+        group_id=group_id,
+        session_id=session_id,
+        student_id=student_id,
+        answer_count=len(body.answers),
+        transport="http-fallback",
+    )
+
+    return {"status": "ok", "group_id": group_id}
+
+
+@router.post("/live/submit/challenge")
+async def http_submit_challenge(
+    body: ChallengeSubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """HTTP fallback for challenge submission when WebSocket is disconnected."""
+    if current_user.role != UserRole.STUDENT:
+        raise HTTPException(status_code=403, detail="Only students can submit")
+
+    student_id = current_user.id
+    challenge_id = body.challenge_id
+
+    result = await db.execute(
+        select(LiveChallengeSession).where(LiveChallengeSession.id == challenge_id)
+    )
+    challenge = result.scalar_one_or_none()
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+    if challenge.status in {"ended", "cancelled"}:
+        return {"status": "already_ended", "challenge_id": challenge_id}
+    if student_id not in (challenge.participant_ids or []):
+        raise HTTPException(status_code=403, detail="Not a participant")
+
+    # Check existing submission
+    scoreboard = list(challenge.scoreboard or [])
+    existing = next((e for e in scoreboard if e.get("student_id") == student_id), None)
+    if existing and existing.get("submitted"):
+        return {"status": "already_submitted", "challenge_id": challenge_id}
+
+    # Score answers
+    from app.api.v1.live_challenges import score_challenge_answers
+    from app.api.v1.live.websocket_handlers import _serialize_challenge_runtime
+
+    challenge_payload = await _serialize_challenge_runtime(challenge, db)
+    score = score_challenge_answers(challenge_payload["tasks"], body.answers)
+    if score["answered_count"] <= 0:
+        raise HTTPException(status_code=400, detail="No answers submitted")
+
+    # Parse started_at
+    started_at = None
+    if body.started_at:
+        try:
+            started_at = datetime.fromisoformat(body.started_at.replace("Z", "+00:00"))
+        except Exception:
+            pass
+    if not started_at:
+        started_at = challenge.started_at.replace(tzinfo=None) if challenge.started_at else datetime.now(timezone.utc).replace(tzinfo=None)
+    total_time_ms = max(0, int((datetime.now(timezone.utc).replace(tzinfo=None) - started_at.replace(tzinfo=None)).total_seconds() * 1000))
+
+    participant_name = current_user.name or ""
+    if not existing:
+        existing = {
+            "student_id": student_id, "student_name": participant_name,
+            "answered_count": 0, "correct_count": 0, "total_tasks": score["total_count"],
+            "current_index": 0, "total_time_ms": None, "started_at": None,
+            "submitted": False, "locked": False, "eliminated_for_round": False,
+            "first_correct_at": None, "current_task_id": None, "rank": None,
+        }
+        scoreboard.append(existing)
+
+    existing["answered_count"] = score["answered_count"]
+    existing["correct_count"] = score["correct_count"]
+    existing["total_tasks"] = score["total_count"]
+    existing["current_index"] = score["total_count"]
+    existing["submitted"] = True
+    existing["total_time_ms"] = total_time_ms
+    existing["started_at"] = started_at.isoformat()
+    existing["student_name"] = participant_name
+
+    from app.api.v1.live_challenges import rank_challenge_scoreboard
+    scoreboard = rank_challenge_scoreboard(scoreboard)
+
+    from sqlalchemy.orm.attributes import flag_modified
+    challenge.scoreboard = [dict(e) for e in scoreboard]
+    flag_modified(challenge, "scoreboard")
+
+    all_submitted = all(e.get("submitted") for e in scoreboard)
+    if all_submitted:
+        challenge.status = "ended"
+        challenge.ended_at = datetime.now(timezone.utc)
+    await db.commit()
+
+    # Notify via WebSocket
+    class_id = challenge.class_id
+    if class_id:
+        from app.api.v1.live.websocket_handlers import _extract_challenge_runtime_fields
+        from copy import deepcopy
+        runtime = await _serialize_challenge_runtime(challenge, db)
+        runtime["scoreboard"] = deepcopy(scoreboard)
+        runtime["status"] = challenge.status
+        fields = _extract_challenge_runtime_fields(runtime)
+        if all_submitted:
+            await manager.end_challenge(class_id, challenge_id, scoreboard, status="ended", challenge_fields=fields)
+        else:
+            await manager.update_challenge_scoreboard(class_id, challenge_id, scoreboard, status="active", challenge_fields=fields)
+
+    return {"status": "ok", "challenge_id": challenge_id, "correct_count": score["correct_count"], "total": score["total_count"]}
+
+
+async def _find_class_id_for_student(
+    student_id: str,
+    db: AsyncSession,
+    allow_enrollment_fallback: bool = True,
+) -> Optional[str]:
+    """Find the class_id that a student is currently connected to in a room."""
+    for cid, room in manager.class_rooms.items():
+        if student_id in room.get("student_wss", {}):
+            return cid
+    if not allow_enrollment_fallback:
+        return None
+    # Fallback: find from enrollment
+    from app.models import ClassEnrollment
+    result = await db.execute(
+        select(ClassEnrollment.class_id).where(
+            ClassEnrollment.student_id == student_id, ClassEnrollment.status == "active"
+        ).limit(1)
+    )
+    return result.scalars().first()

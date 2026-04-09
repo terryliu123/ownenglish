@@ -11,6 +11,7 @@ class UserCreate(BaseModel):
     password: str = Field(..., min_length=6)
     name: str = Field(..., min_length=1)
     role: str  # "teacher" or "student"
+    invitation_code: Optional[str] = None
 
 
 class UserLogin(BaseModel):

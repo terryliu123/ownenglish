@@ -136,6 +136,60 @@ export default function TeacherMembership() {
         </div>
       </section>
 
+      {/* Expiry warning */}
+      {membership?.expires_at && membership.status !== 'free' && (() => {
+        const daysLeft = Math.ceil((new Date(membership.expires_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        if (daysLeft <= 0) return (
+          <div className="mt-4 px-4 py-3 rounded-xl bg-red-100 border border-red-300 text-red-700 text-sm font-medium">
+            您的会员已过期，部分功能受限，请续费后继续使用。
+          </div>
+        )
+        if (daysLeft <= 7) return (
+          <div className="mt-4 px-4 py-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-700 text-sm font-medium">
+            会员将在 {daysLeft} 天后到期，请及时续费以免影响使用。
+          </div>
+        )
+        return null
+      })()}
+
+      {/* Current membership status */}
+      {membership && (
+        <section className="surface-card mt-6">
+          <div className="surface-head">
+            <h3>当前会员状态</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
+            <div>
+              <p className="text-xs text-slate-500 mb-1">会员方案</p>
+              <p className="font-semibold">{membership.plan_name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-1">状态</p>
+              <p className={`font-semibold ${
+                membership.status === 'active' ? 'text-emerald-600' :
+                membership.status === 'trial' ? 'text-amber-600' :
+                membership.status === 'expired' ? 'text-red-600' :
+                'text-slate-500'
+              }`}>
+                {membership.status === 'active' ? '有效' :
+                 membership.status === 'trial' ? '试用中' :
+                 membership.status === 'expired' ? '已过期' : '免费'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-1">生效时间</p>
+              <p className="font-medium text-sm">{formatDate(membership.started_at)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 mb-1">到期时间</p>
+              <p className={`font-medium text-sm ${membership.expires_at && new Date(membership.expires_at) < new Date() ? 'text-red-600' : 'text-slate-700'}`}>
+                {membership.expires_at ? formatDate(membership.expires_at) : '永久有效'}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Row 1: Plans in 3 columns */}
       <section className="surface-card mt-6">
         <div className="surface-head">
@@ -184,10 +238,24 @@ export default function TeacherMembership() {
                     <span className="font-medium">{formatLimit(plan.max_study_packs)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500">AI</span>
+                    <span className="text-slate-500">胖鼠AI副班</span>
                     <span className={`status-badge ${plan.can_use_ai ? 'active' : 'archived'}`}>
                       {plan.can_use_ai ? t('membership.aiEnabled') : t('membership.aiDisabled')}
                     </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">胖鼠学习助手</span>
+                    <span className={`status-badge ${plan.can_use_ai ? 'active' : 'archived'}`}>
+                      {plan.can_use_ai ? '支持开启' : '不支持'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">大屏互动内容</span>
+                    <span className="font-medium">{plan.can_use_ai ? '不限' : '5'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">大屏互动活动</span>
+                    <span className="font-medium">{plan.can_use_ai ? '不限' : '2'}</span>
                   </div>
                 </div>
                 <div className="mt-4">

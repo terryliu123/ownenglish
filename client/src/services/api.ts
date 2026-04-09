@@ -69,12 +69,11 @@ api.interceptors.response.use(
           return api(originalRequest)
         } catch (refreshError) {
           processQueue(refreshError, null)
-          const isGuest = localStorage.getItem('was_guest') === 'true'
           localStorage.removeItem('token')
           localStorage.removeItem('refresh_token')
           localStorage.removeItem('guest_expires_at')
           localStorage.removeItem('was_guest')
-          window.location.href = isGuest ? '/join?expired=1' : '/login'
+          window.location.href = '/login'
           return Promise.reject(refreshError)
         } finally {
           isRefreshing = false
@@ -82,13 +81,11 @@ api.interceptors.response.use(
       }
 
       // No refresh token available
-      const isGuest = localStorage.getItem('was_guest') === 'true'
       localStorage.removeItem('token')
       localStorage.removeItem('refresh_token')
       localStorage.removeItem('guest_expires_at')
       localStorage.removeItem('was_guest')
-      // Guests redirect to /join (session expired), regular users to /login
-      window.location.href = isGuest ? '/join?expired=1' : '/login'
+      window.location.href = '/login'
     }
     return Promise.reject(error)
   }
@@ -840,6 +837,27 @@ export const liveService = {
     const response = await api.delete(`/live/task-groups/shares/${shareId}`)
     return response.data
   },
+
+  // P0-4: HTTP fallback submissions (when WS disconnected)
+  httpSubmitTaskGroup: async (
+    groupId: string,
+    classId: string,
+    answers: { task_id: string; answer: unknown }[],
+    sessionId?: string | null,
+  ) => {
+    const response = await api.post('/live/submit/task-group', {
+      group_id: groupId,
+      class_id: classId,
+      answers,
+      session_id: sessionId || undefined,
+    })
+    return response.data
+  },
+
+  httpSubmitChallenge: async (challengeId: string, answers: { task_id: string; answer: unknown }[], startedAt?: string | null) => {
+    const response = await api.post('/live/submit/challenge', { challenge_id: challengeId, answers, started_at: startedAt || undefined })
+    return response.data
+  },
 }
 
 export const liveTaskSubmissionService = {
@@ -909,6 +927,7 @@ export interface RegisterData {
   password: string
   name: string
   role: 'teacher' | 'student'
+  invitation_code?: string
 }
 
 export interface CreateClassData {

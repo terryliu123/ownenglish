@@ -15,19 +15,20 @@ export default function WhiteboardAiLauncher() {
           e.stopPropagation()
           setOpen(!isOpen)
         }}
-        className={`flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-110 ${
-          isOpen ? 'bg-slate-600' : 'bg-gradient-to-br from-blue-500 to-indigo-600'
+        className={`group flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 ${
+          isOpen
+            ? 'bg-white/[0.08] border border-white/[0.1] shadow-black/30'
+            : 'bg-gradient-to-br from-blue-500 to-violet-500 shadow-blue-500/25 hover:shadow-blue-500/40'
         }`}
-        style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}
       >
         {isLoading ? (
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
         ) : isOpen ? (
-          <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         ) : (
-          <img src="/logo.png" alt="AI 助手" className="h-8 w-8 rounded-lg" />
+          <img src="/logo.png" alt="胖鼠AI副班" className="h-7 w-7 rounded-lg" />
         )}
       </button>
     </div>

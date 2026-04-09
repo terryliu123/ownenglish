@@ -41,6 +41,7 @@ import AdminActivities from './pages/admin/Activities'
 import AdminMembershipSettings from './pages/admin/MembershipSettings'
 import AdminTeachingAids from './pages/admin/TeachingAids'
 import AdminTeachingAidDetail from './pages/admin/TeachingAidDetail'
+import AdminInvitationCodes from './pages/admin/InvitationCodes'
 import { StudentAiProvider } from './features/student-ai/context/StudentAiContext'
 import StudentAiPanel from './features/student-ai/components/StudentAiPanel'
 
@@ -102,6 +103,7 @@ function App() {
               <Route path="messages" element={<AdminMessages />} />
               <Route path="activities" element={<AdminActivities />} />
               <Route path="membership" element={<AdminMembershipSettings />} />
+              <Route path="invitation-codes" element={<AdminInvitationCodes />} />
               <Route path="teaching-aids" element={<AdminTeachingAids />} />
               <Route path="teaching-aids/:aidId" element={<AdminTeachingAidDetail />} />
             </Route>

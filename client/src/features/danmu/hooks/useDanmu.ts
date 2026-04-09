@@ -29,6 +29,7 @@ export function useDanmu(options: UseDanmuOptions = {}) {
     density: 'medium',
     area: 'bottom',
     bgColor: 'rgba(0, 0, 0, 0.75)',
+    presetPhrases: ['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'],
   })
 
   const [activeDanmus, setActiveDanmus] = useState<ActiveDanmu[]>([])
@@ -95,6 +96,7 @@ export function useDanmu(options: UseDanmuOptions = {}) {
       density: msg.density,
       area: msg.area,
       bgColor: msg.bgColor ?? prev.bgColor,
+      presetPhrases: msg.presetPhrases ?? prev.presetPhrases,
     }))
   }, [])
 

@@ -1,6 +1,6 @@
 {
   "homepageV2": {
-    "heroBadge": "专为英语直播课堂打造的互动教学平台",
+    "heroBadge": "专为直播课和线下课打造的互动教学平台",
     "teacherTitle": "教师端",
     "studentTitle": "学生端",
     "teacherDashboard": "教师工作台",
@@ -43,8 +43,8 @@
     "featureCards": {
       "liveTitle": "实时互动课堂",
       "liveDesc": "WebSocket 即时推送，支持单选、判断、填空、匹配等 10+ 题型，答题数据实时汇总，全班学情一目了然",
-      "bigscreenTitle": "大屏互动",
-      "bigscreenDesc": "投影大屏全班围观，双人对战、抢答挑战、弹幕互动，课堂氛围瞬间点燃",
+      "bigscreenTitle": "大屏互动+平板互动",
+      "bigscreenDesc": "大屏投影双人对战、抢答弹幕，平板独立作答实时汇总，两种模式灵活搭配满足不同场景",
       "teachingAidsTitle": "数字化教具",
       "teachingAidsDesc": "内置计时器、骰子、随机点名等教具，支持导入第三方教学资源，一键调取辅助教学",
       "reviewTitle": "课堂回顾",
@@ -89,6 +89,9 @@
       "users": "用户管理",
       "messages": "系统消息",
       "activities": "系统日志",
+      "membership": "会员设置",
+      "invitationCodes": "邀请码管理",
+      "teachingAids": "数字化教具",
       "verifying": "验证中...",
       "title": "管理后台",
       "logout": "退出登录"

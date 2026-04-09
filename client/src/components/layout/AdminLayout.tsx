@@ -14,6 +14,7 @@ export default function AdminLayout() {
     { path: '/admin/messages', label: t('adminUi.layout.messages'), icon: '📝' },
     { path: '/admin/activities', label: t('adminUi.layout.activities'), icon: '📑' },
     { path: '/admin/membership', label: t('adminUi.layout.membership'), icon: '👑' },
+    { path: '/admin/invitation-codes', label: t('adminUi.layout.invitationCodes'), icon: '🎫' },
     { path: '/admin/teaching-aids', label: t('adminUi.layout.teachingAids'), icon: '🧪' },
   ]
 

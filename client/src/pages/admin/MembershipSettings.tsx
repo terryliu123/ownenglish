@@ -282,7 +282,10 @@ export default function AdminMembershipSettings() {
                         checked={form.can_use_ai}
                         onChange={(event) => updatePlanField(plan.code, 'can_use_ai', event.target.checked)}
                       />
-                      <span>{t('adminMembership.fields.canUseAi')}</span>
+                      <div>
+                        <span>{t('adminMembership.fields.canUseAi')}</span>
+                        <p className="text-xs text-slate-500 mt-0.5">胖鼠AI副班 + 胖鼠学习助手 + 大屏互动不限</p>
+                      </div>
                     </label>
                     <label className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 text-sm text-slate-200">
                       <input

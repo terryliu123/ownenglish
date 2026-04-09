@@ -2,7 +2,6 @@
 # 本地违禁词库 + 第三方API（阿里云/腾讯云文本审核）
 
 import re
-import aiohttp
 from app.core.config import get_settings
 
 # 本地违禁词库（与客户端保持一致）
@@ -100,6 +99,7 @@ async def _check_aliyun(content: str, settings) -> dict:
     }
 
     url = f"{endpoint}/green/sensitiveword/check"
+    import aiohttp
     async with aiohttp.ClientSession() as session:
         async with session.post(url, data=payload.encode(), headers=headers) as resp:
             if resp.status != 200:

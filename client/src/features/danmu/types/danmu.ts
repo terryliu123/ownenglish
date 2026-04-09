@@ -13,6 +13,7 @@ export interface DanmuConfigMessage {
   speed: 'slow' | 'medium' | 'fast'
   density: 'low' | 'medium' | 'high'
   area?: 'full' | 'bottom' | 'middle'
+  presetPhrases?: string[]
 }
 
 export interface DanmuTriggerMessage {
@@ -29,7 +30,7 @@ export interface DanmuDisplayMessage {
   speed: 'slow' | 'medium' | 'fast'
   density: 'low' | 'medium' | 'high'
   area?: 'full' | 'bottom' | 'middle'
-  bgColor?: string  // 弹幕背景颜色
+  bgColor?: string
 }
 
 export interface DanmuClearMessage {
@@ -61,7 +62,6 @@ export type DanmuIncomingMessage =
   | DanmuClearMessage
   | DanmuErrorMessage
 
-// Danmu configuration state
 export interface DanmuConfig {
   enabled: boolean
   showStudent: boolean
@@ -69,10 +69,10 @@ export interface DanmuConfig {
   speed: 'slow' | 'medium' | 'fast'
   density: 'low' | 'medium' | 'high'
   area: 'full' | 'bottom' | 'middle'
-  bgColor?: string  // 弹幕背景颜色，如 'rgba(0,0,0,0.75)' 或 'rgba(255,100,100,0.6)'
+  bgColor?: string
+  presetPhrases?: string[]
 }
 
-// Active danmu item on screen
 export interface ActiveDanmu {
   id: string
   content: string
@@ -81,10 +81,9 @@ export interface ActiveDanmu {
   sourceName?: string
   speed: 'slow' | 'medium' | 'fast'
   elementId?: string
-  bgColor?: string  // 弹幕背景颜色
+  bgColor?: string
 }
 
-// Atmosphere effect types
 export type AtmosphereEffectType = 'cheer' | 'fireworks' | 'stars' | 'hearts' | 'flame'
 
 export interface AtmosphereEffectMessage {

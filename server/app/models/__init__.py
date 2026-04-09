@@ -23,6 +23,7 @@ class User(Base):
     role = Column(SQLEnum(UserRole, values_callable=lambda x: [e.value for e in x]), nullable=False)
     is_active = Column(Boolean, default=True)
     is_guest = Column(Boolean, default=False)
+    invitation_code_id = Column(String(36), nullable=True)
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -604,6 +605,18 @@ class BigscreenActivitySession(Base):
     live_session = relationship("LiveSession")
 
 
+class InvitationCode(Base):
+    """邀请码"""
+    __tablename__ = "invitation_codes"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    code = Column(String(20), unique=True, index=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+    used_count = Column(Integer, default=0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class DanmuRecord(Base):
     """弹幕记录"""
     __tablename__ = "danmu_records"
@@ -619,3 +632,17 @@ class DanmuRecord(Base):
 
     session = relationship("LiveSession")
     sender = relationship("User")
+
+
+class LiveRoomSnapshot(Base):
+    """课堂房间运行时快照 - 用于服务器重启后恢复状态"""
+    __tablename__ = "live_room_snapshots"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    class_id = Column(String(36), ForeignKey("classes.id"), nullable=False, unique=True, index=True)
+    teacher_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    live_session_id = Column(String(36), ForeignKey("live_sessions.id"), nullable=True)
+    room_state = Column(JSON, nullable=True)  # {current_task_group, current_challenge, danmu_config, published_history}
+    version = Column(Integer, default=0, nullable=False)  # 乐观并发控制
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

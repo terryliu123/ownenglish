@@ -906,7 +906,7 @@
     "hero": {
       "title": "让每一节课",
       "subtitle": "都充满互动",
-      "description": "实时互动课堂 + 大屏互动 + 课堂回顾，覆盖课前准备到课后复盘的完整教学闭环。",
+      "description": "实时互动课堂 + 平板互动 + 课堂回顾，覆盖课前准备到课后复盘的完整教学闭环。",
       "startFree": "免费开始使用",
       "login": "登录账号"
     },
@@ -926,7 +926,7 @@
     "securityTitle": "安全隐私保护",
     "securityDesc": "数据加密存储，符合教育行业安全标准",
     "usageProcess": "使用流程",
-    "threeSteps": "三步开启智慧课堂",
+    "threeSteps": "三步开启互动课堂",
     "teacherCreate": "老师创建班级",
     "teacherCreateDesc": "注册账号，创建班级，获得专属邀请码",
     "studentJoin": "学生加入学习",

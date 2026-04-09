@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
-from app.core.websocket import manager
+from app.core.websocket import manager, sanitize_danmu_preset_phrases
 from app.core.presence import presence_manager
 from app.core.security import decode_token
 from app.db.session import get_db, async_session_maker
@@ -29,6 +29,7 @@ from app.api.v1.live_challenges import (
 from .utils import _parse_challenge_started_at, _answers_match
 from .classroom_sessions import _get_next_session_number
 from .schemas import WS_TEACHER_MESSAGE_SCHEMAS, WS_STUDENT_MESSAGE_SCHEMAS
+from .logging_utils import log_live_transport
 from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
@@ -243,6 +244,7 @@ async def _load_danmu_config(class_id: str, db: AsyncSession, active_session) ->
         room["danmu_density"] = config.get("density", "medium")
         room["danmu_area"] = config.get("area", "bottom")
         room["danmu_bg_color"] = config.get("bgColor")
+        room["danmu_preset_phrases"] = sanitize_danmu_preset_phrases(config.get("presetPhrases"))
         logger.info(f"[Danmu] Loaded config from session {session.id}: enabled={config.get('enabled')}")
     else:
         # Default config
@@ -252,6 +254,7 @@ async def _load_danmu_config(class_id: str, db: AsyncSession, active_session) ->
         room["danmu_speed"] = "medium"
         room["danmu_density"] = "medium"
         room["danmu_area"] = "bottom"
+        room["danmu_preset_phrases"] = sanitize_danmu_preset_phrases(None)
         logger.info(f"[Danmu] Using default config for class {class_id}")
 
 
@@ -658,6 +661,7 @@ async def handle_teacher_connection(websocket: WebSocket, class_id: str, teacher
             try:
                 data = await websocket.receive_json()
                 msg_type = data.get('type')
+                manager.touch_teacher(teacher_id)
                 print(f"[DEBUG] Received message from teacher: msg_type={msg_type}")
                 logger.info(f"[WebSocket] Received message from teacher: {msg_type}")
                 try:
@@ -698,6 +702,7 @@ async def handle_student_connection(websocket: WebSocket, class_id: str, student
         return
 
     logger.info(f"[WebSocket] Student {student_id} joined room {class_id}")
+    manager.touch_student(student_id)
 
     # 获取学生姓名
     student_result = await db.execute(select(User).where(User.id == student_id))
@@ -800,6 +805,7 @@ async def handle_student_connection(websocket: WebSocket, class_id: str, student
 
         while True:
             data = await websocket.receive_json()
+            manager.touch_student(student_id)
             await handle_student_message(websocket, class_id, student_id, data, db)
 
     except WebSocketDisconnect:
@@ -1085,6 +1091,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
             task_list,
             total_countdown
         )
+        await manager.save_snapshot(class_id)
 
         _room = manager.class_rooms.get(class_id, {})
         logger.info(
@@ -1248,6 +1255,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
             logger.info("[WebSocket] Cleared group_id on LiveSession %s for task group %s", session.id, group_id)
 
         await manager.end_task_group(class_id, group_id)
+        await manager.save_snapshot(class_id)
 
         await websocket.send_json({
             "type": "task_group_ended",
@@ -1364,6 +1372,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
         challenge_payload = await _serialize_challenge_runtime(challenge, db)
         logger.info("[live.challenge] calling manager.start_challenge for class_id=%s challenge_id=%s", class_id, challenge.id)
         await manager.start_challenge(class_id, challenge_payload)
+        await manager.save_snapshot(class_id)
         logger.info("[live.challenge] manager.start_challenge completed")
 
         # Record challenge_started event
@@ -1472,10 +1481,12 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
             "status": "ended",
             **challenge_fields,
         })
+        await manager.save_snapshot(class_id)
 
     elif msg_type == "end_session":
         # 只发送下课通知，不自动结束会话记录
         # 会话记录应该通过 API /live/sessions/{id}/end 显式结束
+        await manager.save_snapshot(class_id)
         await manager.close_room(class_id)
 
     elif msg_type == "get_room_info":
@@ -1519,6 +1530,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
         density = data.get("density", "medium")
         area = data.get("area", "bottom")
         bg_color = data.get("bgColor")
+        preset_phrases = sanitize_danmu_preset_phrases(data.get("presetPhrases"))
 
         await manager.update_danmu_config(
             class_id,
@@ -1529,6 +1541,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
             density=density,
             area=area,
             bg_color=bg_color,
+            preset_phrases=preset_phrases,
         )
 
         # Persist to database (active session or most recent session for this class)
@@ -1540,6 +1553,7 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
             "density": density,
             "area": area,
             "bgColor": bg_color,
+            "presetPhrases": preset_phrases,
         }
         session = await _get_active_live_session(class_id, db)
         if session:
@@ -1626,7 +1640,30 @@ async def handle_teacher_message(websocket: WebSocket, class_id: str, teacher_id
         await websocket.send_json({"type": "atmosphere_effect_ack", "effect": effect})
 
     elif msg_type == "ping":
+        manager.touch_teacher(teacher_id)
+        logger.debug(
+            "[live.ws] heartbeat role=teacher class_id=%s teacher_id=%s",
+            class_id,
+            teacher_id,
+        )
         await websocket.send_json({"type": "pong"})
+
+    elif msg_type == "token_refresh":
+        # P0-2: WS token refresh for teacher
+        new_token = data.get("token")
+        if not new_token:
+            await websocket.send_json({"type": "error", "message": "Token required"})
+            return
+        try:
+            async with async_session_maker() as token_db:
+                refreshed_user = await get_user_from_token(new_token, token_db)
+            if refreshed_user.id != teacher_id:
+                await websocket.send_json({"type": "error", "message": "Token user mismatch"})
+                return
+            await websocket.send_json({"type": "token_refresh_ack", "status": "ok"})
+            logger.info("[live.ws] teacher token refreshed: %s", teacher_id)
+        except Exception as e:
+            await websocket.send_json({"type": "error", "message": f"Token refresh failed: {e}"})
 
 
 async def handle_student_message(websocket: WebSocket, class_id: str, student_id: str, data: dict, db: AsyncSession):
@@ -1635,6 +1672,7 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
     from uuid import uuid4
 
     msg_type = data.get("type")
+    logger.info(f"[STUDENT_MSG] student={student_id} type={msg_type} keys={list(data.keys())}")
 
     # Validate message schema for critical types
     schema_cls = WS_STUDENT_MESSAGE_SCHEMAS.get(msg_type)
@@ -1693,9 +1731,19 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
 
     elif msg_type == "submit_challenge":
         from copy import deepcopy
+        _client_msg_id = data.get("msg_id")
         challenge_id = data.get("challenge_id")
         answers = data.get("answers", [])
         client_started_at = _parse_challenge_started_at(data.get("started_at"))
+        log_live_transport(
+            logger,
+            "challenge_submit_requested",
+            class_id=class_id,
+            challenge_id=challenge_id,
+            student_id=student_id,
+            answer_count=len(answers),
+            transport="ws",
+        )
         if not challenge_id:
             await websocket.send_json({"type": "error", "message": "Challenge ID required"})
             return
@@ -1743,6 +1791,14 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
             or existing_entry.get("eliminated_for_round")
             or existing_entry.get("locked")
         ):
+            log_live_transport(
+                logger,
+                "challenge_submit_duplicate",
+                class_id=class_id,
+                challenge_id=challenge.id,
+                student_id=student_id,
+                transport="ws",
+            )
             logger.info("[live.challenge] submit_duplicate class_id=%s challenge_id=%s student_id=%s", class_id, challenge.id, student_id)
             await websocket.send_json({
                 "type": "challenge_scoreboard_updated",
@@ -1847,10 +1903,35 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
         should_end = challenge_status == "ended"
         challenge.scoreboard = [dict(entry) for entry in scoreboard]
         challenge.status = challenge_status
+        if should_end:
+            challenge.ended_at = datetime.now(timezone.utc)
         runtime_payload = await _serialize_challenge_runtime(challenge, db)
         runtime_payload["scoreboard"] = deepcopy(scoreboard)
         runtime_payload["status"] = challenge_status
         challenge_fields = _extract_challenge_runtime_fields(runtime_payload)
+
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(challenge, "scoreboard")
+        await db.commit()
+        log_live_transport(
+            logger,
+            "challenge_submitted",
+            class_id=class_id,
+            challenge_id=challenge.id,
+            live_session_id=challenge.live_session_id,
+            student_id=student_id,
+            status=challenge_status,
+            answer_count=len(answers),
+            transport="ws",
+        )
+
+        # Send ACK only after durable persistence succeeds
+        if _client_msg_id:
+            try:
+                await websocket.send_json({"type": "ack", "msg_id": _client_msg_id})
+            except Exception:
+                logger.warning("[WebSocket] Failed to send challenge ACK to student student_id=%s", student_id)
+
         if should_end:
             await manager.end_challenge(
                 class_id,
@@ -1859,21 +1940,6 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
                 status="ended",
                 challenge_fields=challenge_fields,
             )
-            _bg_scoreboard = deepcopy(scoreboard)
-            _bg_challenge_id = challenge.id
-
-            async def _bg_persist():
-                async with async_session_maker() as bg_db:
-                    challenge = await bg_db.get(LiveChallengeSession, _bg_challenge_id)
-                    if challenge:
-                        challenge.scoreboard = [dict(entry) for entry in _bg_scoreboard]
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(challenge, "scoreboard")
-                        challenge.status = "ended"
-                        challenge.ended_at = datetime.now(timezone.utc)
-                        await bg_db.commit()
-
-            _track_background_task(_bg_persist())
         else:
             await manager.update_challenge_scoreboard(
                 class_id,
@@ -1882,19 +1948,6 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
                 status="active",
                 challenge_fields=challenge_fields,
             )
-            _bg_scoreboard = deepcopy(scoreboard)
-            _bg_challenge_id = challenge.id
-
-            async def _bg_persist():
-                async with async_session_maker() as bg_db:
-                    challenge = await bg_db.get(LiveChallengeSession, _bg_challenge_id)
-                    if challenge:
-                        challenge.scoreboard = [dict(entry) for entry in _bg_scoreboard]
-                        from sqlalchemy.orm.attributes import flag_modified
-                        flag_modified(challenge, "scoreboard")
-                        await bg_db.commit()
-
-            _track_background_task(_bg_persist())
 
     elif msg_type == "submit_answer":
         current_task = manager.class_rooms[class_id]["current_task"]
@@ -1947,9 +2000,20 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
         await manager.submit_answer(class_id, task_id, student_id, answer)
 
     elif msg_type == "submit_task_group":
+        _client_msg_id = data.get("msg_id")
         group_id = data.get("group_id")
         answers = data.get("answers", [])
         session_id = data.get("session_id")
+        log_live_transport(
+            logger,
+            "task_group_submit_requested",
+            class_id=class_id,
+            group_id=group_id,
+            session_id=session_id,
+            student_id=student_id,
+            answer_count=len(answers),
+            transport="ws",
+        )
 
         logger.info(f"[WebSocket] submit_task_group received: student_id={student_id}, class_id={class_id}, group_id={group_id}, answers_count={len(answers)}")
         if class_id not in manager.class_rooms:
@@ -2015,6 +2079,15 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
 
         existing_submission = await db.execute(existing_submission_stmt.limit(1))
         if existing_submission.scalar_one_or_none():
+            log_live_transport(
+                logger,
+                "task_group_submit_duplicate",
+                class_id=class_id,
+                group_id=group_id,
+                session_id=session_id,
+                student_id=student_id,
+                transport="ws",
+            )
             logger.warning(f"[WebSocket] Duplicate submission detected: student_id={student_id}, group_id={group_id}, session_id={session_id}")
             await websocket.send_json({
                 "type": "task_group_submission_received",
@@ -2080,7 +2153,24 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
             db.add(group_submission)
 
         await db.commit()
+        log_live_transport(
+            logger,
+            "task_group_submitted",
+            class_id=class_id,
+            group_id=group_id,
+            session_id=session_id,
+            student_id=student_id,
+            answer_count=len(answers),
+            transport="ws",
+        )
         logger.info(f"[WebSocket] Task group submission committed: student_id={student_id}, group_id={group_id}, answer_count={len(answers)}")
+
+        # Send ACK after successful persistence
+        if _client_msg_id:
+            try:
+                await websocket.send_json({"type": "ack", "msg_id": _client_msg_id})
+            except Exception:
+                logger.warning("[WebSocket] Failed to send ACK to student student_id=%s", student_id)
 
         # Notify student of successful persistence
         try:
@@ -2213,6 +2303,7 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
     elif msg_type == "danmu_send":
         # Student sends a danmu
         content = data.get("content", "").strip()
+        logger.info(f"[DANMU_DEBUG] student={student_id} class={class_id} content={content!r}")
         if not content:
             await websocket.send_json({"type": "error", "message": "弹幕内容不能为空"})
             return
@@ -2259,6 +2350,7 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
 
         # Broadcast to big screen if enabled
         room = manager.class_rooms.get(class_id)
+        logger.info(f"[DANMU_DEBUG] room_exists={bool(room)} danmu_enabled={room.get('danmu_enabled') if room else 'N/A'} danmu_show_student={room.get('danmu_show_student') if room else 'N/A'}")
         if room and room.get("danmu_enabled"):
             if room.get("danmu_show_student"):
                 # Assign a row (0-3)
@@ -2275,4 +2367,26 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
         # Silent success (no explicit feedback to student)
 
     elif msg_type == "ping":
+        manager.touch_student(student_id)
+        logger.debug(
+            "[live.ws] heartbeat role=student class_id=%s student_id=%s",
+            class_id,
+            student_id,
+        )
         await websocket.send_json({"type": "pong"})
+
+    elif msg_type == "token_refresh":
+        new_token = data.get("token")
+        if not new_token:
+            await websocket.send_json({"type": "error", "message": "Token required"})
+            return
+        try:
+            async with async_session_maker() as token_db:
+                refreshed_user = await get_user_from_token(new_token, token_db)
+            if refreshed_user.id != student_id:
+                await websocket.send_json({"type": "error", "message": "Token user mismatch"})
+                return
+            await websocket.send_json({"type": "token_refresh_ack", "status": "ok"})
+            logger.info("[live.ws] student token refreshed: %s", student_id)
+        except Exception as e:
+            await websocket.send_json({"type": "error", "message": f"Token refresh failed: {e}"})

@@ -181,6 +181,10 @@ export default function StudentLive() {
   // Stable danmu callbacks to avoid hooks-in-JSX issue
   const closeDanmuModal = useCallback(() => danmu.closeDanmuModal(), [danmu])
   const setDanmuInput = useCallback((v: string) => danmu.setDanmuInput(v), [danmu])
+  const danmuPresetPhrases = useMemo(
+    () => danmu.config.presetPhrases?.slice(0, 5) || ['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'],
+    [danmu.config.presetPhrases],
+  )
 
   // 单题模式（向后兼容）
   const [currentTask, setCurrentTask] = useState<LiveTask | null>(null)
@@ -679,6 +683,7 @@ export default function StudentLive() {
     classId: currentClassId || '',
     token: token || '',
     role: 'student',
+    selfUserId: user?.id,
     onError: handleChallengeError,
     // 整组任务
     onNewTaskGroup: handleNewTaskGroup,
@@ -740,10 +745,17 @@ export default function StudentLive() {
 
   // 弹幕倒计时发送
   const handleSendDanmu = useCallback(() => {
+    console.log('[DANMU_DEBUG] handleSendDanmu called', {
+      input: danmu.danmuInput,
+      inputTrimmed: danmu.danmuInput.trim(),
+      wsStatus: ws.status,
+      cooldown: danmuCooldown,
+    })
     if (!danmu.danmuInput.trim() || ws.status !== 'connected' || danmuCooldown > 0) return
+    console.log('[DANMU_DEBUG] sending danmu via ws:', danmu.danmuInput.trim())
     ws.sendDanmu(danmu.danmuInput.trim())
     danmu.setDanmuInput('')
-    setDanmuCooldown(5)
+    setDanmuCooldown(3)
     const timer = setInterval(() => {
       setDanmuCooldown(prev => {
         if (prev <= 1) {
@@ -1015,6 +1027,7 @@ export default function StudentLive() {
         currentTaskGroup.group_id,
         answersArray,
         currentTaskGroup.session_id || currentTaskGroup.live_session_id || undefined,
+        currentClassId || undefined,
       )
     setSubmitted(true)
     // 立即显示本地评判结果，不等服务端
@@ -1332,7 +1345,7 @@ export default function StudentLive() {
             <div className="mb-4">
               <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">{t('danmu.presets')}</div>
               <div className="flex flex-wrap gap-2">
-                {['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'].map((phrase) => (
+                {danmuPresetPhrases.map((phrase) => (
                   <button key={phrase} onClick={() => setDanmuInput(phrase)} className="px-3 py-1.5 rounded-full bg-pink-50 border border-pink-200 text-pink-600 text-sm hover:bg-pink-100 transition-colors">{phrase}</button>
                 ))}
               </div>
@@ -1416,6 +1429,7 @@ export default function StudentLive() {
     </>
   )
   const classroomAtmosphere = <AtmosphereEffects effects={activeEffects} />
+  const classroomDanmu = <DanmuScreen activeDanmus={danmu.activeDanmus} config={danmu.config} />
 
   if (challengeResult) {
     const myEntry = getChallengeEntryForStudent(challengeResult, user?.id)
@@ -1429,6 +1443,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
           <div className="max-w-3xl mx-auto space-y-6">
             <div className="student-card text-center">
@@ -1536,6 +1551,7 @@ export default function StudentLive() {
         <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
           <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
             <div className="max-w-3xl mx-auto space-y-6">
               <div className="student-card text-center">
@@ -1576,6 +1592,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-4">
           <div className="sticky top-0 z-10 bg-white shadow-sm border-b">
             <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -1787,6 +1804,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1811,6 +1829,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1833,6 +1852,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-amber-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center text-4xl mx-auto mb-6">
@@ -1863,7 +1883,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
-        <DanmuScreen activeDanmus={danmu.activeDanmus} config={danmu.config} />
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-md w-full text-center">
             <img src="/logo.png" alt="胖鼠互动课堂系统" className="mx-auto mb-4" style={{ width: 48, height: 48, borderRadius: 12 }} />
@@ -1914,6 +1934,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-6 px-4">
           <div className="max-w-3xl mx-auto">
             {/* 结果头部 */}
@@ -1968,6 +1989,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white py-4">
           {/* 顶部进度栏 */}
           <div className="sticky top-0 z-10 bg-white shadow-sm border-b">
@@ -2055,6 +2077,7 @@ export default function StudentLive() {
       <Layout>
         {shareOverlay}
         {classroomAtmosphere}
+        {classroomDanmu}
         <div className="min-h-screen bg-gradient-to-b from-navy-50 to-white flex items-center justify-center p-4">
           <div className="student-card max-w-lg w-full">
             <div className="text-center mb-6">

@@ -3,14 +3,16 @@ import { Link, useLocation } from 'react-router-dom'
 
 const STORAGE_KEY = 'teacher_sidebar_collapsed'
 
-const navItems = [
-  { id: 'home', label: '导览', path: '/teacher', icon: 'H', end: true },
+const navItems: { id: string; label?: string; path?: string; icon?: string; end?: boolean }[] = [
+  { id: 'home', label: '快速开启', path: '/teacher', icon: 'H', end: true },
   { id: 'classes', label: '班级管理', path: '/teacher/classes', icon: 'C' },
+  { id: 'whiteboard', label: '互动课堂', path: '/teacher/whiteboard', icon: 'W' },
+  { id: 'classroom-review', label: '课堂回顾', path: '/teacher/classroom-review', icon: 'R' },
+  { id: 'divider' },
   { id: 'task-groups', label: '平板任务', path: '/teacher/task-groups', icon: 'T' },
   { id: 'bigscreen-activities', label: '大屏任务', path: '/teacher/bigscreen-activities', icon: 'B' },
-  { id: 'whiteboard', label: '课堂教学', path: '/teacher/whiteboard', icon: 'W' },
-  { id: 'classroom-review', label: '课堂回顾', path: '/teacher/classroom-review', icon: 'R' },
   { id: 'teaching-aids', label: '数字化教具', path: '/teacher/teaching-aids', icon: 'D' },
+  { id: 'membership', label: '会员中心', path: '/teacher/membership', icon: 'V' },
 ]
 
 export default function TeacherLeftSidebar({ activePage }: { activePage: string }) {
@@ -25,6 +27,7 @@ export default function TeacherLeftSidebar({ activePage }: { activePage: string 
 
   const isActive = (item: typeof navItems[0]) => {
     if (activePage && activePage === item.id) return true
+    if (!item.path) return false
     if (item.end) return location.pathname === item.path
     return location.pathname.startsWith(item.path)
   }
@@ -39,11 +42,14 @@ export default function TeacherLeftSidebar({ activePage }: { activePage: string 
     >
       <div className="flex flex-col gap-1">
         {navItems.map((item) => {
+          if (item.id === 'divider') {
+            return <div key="divider" className="my-2 mx-2 border-t border-slate-200" />
+          }
           const active = isActive(item)
           return (
             <Link
               key={item.id}
-              to={item.path}
+              to={item.path!}
               title={collapsed ? item.label : undefined}
               className={`flex items-center gap-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active

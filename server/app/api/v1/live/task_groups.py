@@ -24,6 +24,7 @@ from .schemas import (
     AiImportTaskGroupRequest, AiGenerateTaskGroupRequest
 )
 from .utils import log_activity
+from .logging_utils import log_live_transport
 from .ai_import import (
     _build_import_questions_with_ai, _build_generated_questions_with_ai,
     _build_reading_import_task, _extract_docx_text
@@ -121,6 +122,28 @@ async def _serialize_group_with_tasks(group_id: str, db: AsyncSession) -> dict:
         .where(LiveTaskGroup.id == group_id)
     )
     group_with_tasks = result.scalar_one()
+    log_live_transport(
+        logger,
+        "task_group_published",
+        class_id=group.class_id,
+        group_id=group.id,
+        live_session_id=active_session.id,
+        teacher_id=current_user.id,
+        task_count=len(task_list),
+        transport="http",
+    )
+
+    log_live_transport(
+        logger,
+        "task_group_published",
+        class_id=group.class_id,
+        group_id=group.id,
+        live_session_id=active_session.id,
+        teacher_id=current_user.id,
+        task_count=len(task_list),
+        transport="http",
+    )
+
     return {
         "id": group_with_tasks.id,
         "class_id": group_with_tasks.class_id,
@@ -376,6 +399,13 @@ async def publish_task_group(
         raise HTTPException(status_code=404, detail="Task group not found")
 
     await _validate_teacher_class_access(group.class_id, current_user, db)
+    log_live_transport(
+        logger,
+        "task_group_publish_requested",
+        class_id=group.class_id,
+        group_id=group.id,
+        teacher_id=current_user.id,
+    )
 
     active_session = await _get_latest_active_session(db, group.class_id)
     if not active_session:
@@ -449,6 +479,15 @@ async def publish_task_group(
             total_countdown,
         )
     except RuntimeError as exc:
+        log_live_transport(
+            logger,
+            "task_group_publish_failed",
+            class_id=group.class_id,
+            group_id=group.id,
+            live_session_id=active_session.id,
+            teacher_id=current_user.id,
+            reason=str(exc),
+        )
         logger.exception(
             "[live.publish] publish_task_group_runtime_failed class_id=%s group_id=%s",
             group.class_id,
@@ -460,6 +499,15 @@ async def publish_task_group(
         ) else 500
         raise HTTPException(status_code=status_code, detail=message) from exc
     except Exception as exc:
+        log_live_transport(
+            logger,
+            "task_group_publish_failed",
+            class_id=group.class_id,
+            group_id=group.id,
+            live_session_id=active_session.id,
+            teacher_id=current_user.id,
+            reason=str(exc),
+        )
         logger.exception(
             "[live.publish] publish_task_group_broadcast_failed class_id=%s group_id=%s",
             group.class_id,

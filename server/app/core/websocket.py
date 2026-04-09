@@ -2,15 +2,44 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
+import time
 from typing import Dict, Optional, Set
 
 from fastapi import WebSocket
 
+SNAPSHOT_INTERVAL = 60  # persist active rooms every 60s
+
 
 SHANGHAI_TZ = timezone(timedelta(hours=8))
 logger = logging.getLogger(__name__)
+
+# Heartbeat / cleanup constants
+ZOMBIE_TIMEOUT = 90          # seconds without any message → consider dead
+STALE_ROOM_TIMEOUT = 12 * 3600  # 12 hours max room lifetime
+EMPTY_ROOM_GRACE = 300       # 5 min grace for empty rooms
+TEACHERLESS_GRACE = 1800     # 30 min grace for rooms with students but no teacher
+CLEANUP_INTERVAL = 30        # cleanup scan every 30s
+
+DEFAULT_DANMU_PRESET_PHRASES = ["太棒了！", "加油！", "答对了！", "真厉害！", "准备好了！"]
+
+
+def sanitize_danmu_preset_phrases(phrases: Optional[list]) -> list[str]:
+    if not phrases:
+        return DEFAULT_DANMU_PRESET_PHRASES.copy()
+    normalized: list[str] = []
+    for raw in phrases:
+        if not isinstance(raw, str):
+            continue
+        phrase = raw.strip()
+        if not phrase or phrase in normalized:
+            continue
+        normalized.append(phrase[:20])
+        if len(normalized) >= 5:
+            break
+    return normalized or DEFAULT_DANMU_PRESET_PHRASES.copy()
 
 
 def shanghai_now() -> datetime:
@@ -25,6 +54,20 @@ class ConnectionManager:
         self.student_connections: Dict[str, WebSocket] = {}
         self.teacher_connections: Dict[str, WebSocket] = {}
         self.task_submissions: Dict[str, Set[str]] = {}
+        # Heartbeat tracking
+        self._teacher_last_seen: Dict[str, float] = {}
+        self._student_last_seen: Dict[str, float] = {}
+        self._cleanup_task: Optional[asyncio.Task] = None
+        self._snapshot_tick: int = 0
+
+    @staticmethod
+    def _get_task_group_submission_count(room: dict, group_id: Optional[str]) -> int:
+        if not group_id:
+            return 0
+        count_map = room.get("task_group_submission_counts", {})
+        if group_id in count_map:
+            return count_map.get(group_id, 0)
+        return len(room.get("task_group_submissions", {}).get(group_id, set()))
 
     async def create_room(self, class_id: str, teacher_id: str, teacher_ws: WebSocket, live_session_id: Optional[str] = None):
         self.class_rooms[class_id] = {
@@ -37,6 +80,7 @@ class ConnectionManager:
             "current_challenge": None,
             "task_submissions": {},
             "task_group_submissions": {},
+            "task_group_submission_counts": {},
             "published_tasks_history": [],
             "pending_shares": {},
             "share_rate_limit": {},
@@ -48,9 +92,11 @@ class ConnectionManager:
             "danmu_speed": "medium",
             "danmu_density": "medium",
             "danmu_area": "bottom",
+            "danmu_preset_phrases": DEFAULT_DANMU_PRESET_PHRASES.copy(),
             "created_at": shanghai_now().isoformat(),
         }
         self.teacher_connections[teacher_id] = teacher_ws
+        self.touch_teacher(teacher_id)
         logger.info("[live.ws] create_room class_id=%s teacher_id=%s live_session_id=%s", class_id, teacher_id, live_session_id)
         return self.class_rooms[class_id]
 
@@ -67,6 +113,7 @@ class ConnectionManager:
 
         self.class_rooms[class_id]["student_wss"][student_id] = student_ws
         self.student_connections[student_id] = student_ws
+        self.touch_student(student_id)
         logger.info("[live.ws] join_room class_id=%s student_id=%s", class_id, student_id)
         return True
 
@@ -93,7 +140,14 @@ class ConnectionManager:
         # Clean up pending shares and rate limits
         room.pop("pending_shares", None)
         room.pop("share_rate_limit", None)
+        room.pop("danmu_rate_limit", None)
+        # Clean up heartbeat tracking for all participants
+        self._teacher_last_seen.pop(teacher_id, None)
+        for student_id in list(room.get("student_wss", {}).keys()):
+            self._student_last_seen.pop(student_id, None)
         del self.class_rooms[class_id]
+        # P0-1: Remove snapshot on clean room close
+        await self.delete_snapshot(class_id)
 
     async def broadcast_to_students(self, class_id: str, message: dict, exclude: Optional[str] = None):
         if class_id not in self.class_rooms:
@@ -157,7 +211,7 @@ class ConnectionManager:
         return True
 
     def _check_danmu_rate_limit(self, class_id: str, student_id: str) -> bool:
-        """Return True if the student is within danmu rate limit (1 per 10s)."""
+        """Return True if the student is within danmu rate limit (1 per 3s)."""
         import time
         room = self.class_rooms.get(class_id)
         if not room:
@@ -165,8 +219,8 @@ class ConnectionManager:
         key = student_id
         now = time.time()
         timestamps = room.get("danmu_rate_limit", {}).get(key, [])
-        # Keep only timestamps within last 10s
-        timestamps = [t for t in timestamps if now - t < 10]
+        # Keep only timestamps within last 3s
+        timestamps = [t for t in timestamps if now - t < 3]
         room.setdefault("danmu_rate_limit", {})[key] = timestamps
         if len(timestamps) >= 1:
             return False
@@ -302,6 +356,7 @@ class ConnectionManager:
             raise RuntimeError(f"teacher websocket missing for class_id={class_id}")
         room.setdefault("published_tasks_history", [])
         room.setdefault("task_group_submissions", {})
+        room.setdefault("task_group_submission_counts", {})
         room.setdefault("student_wss", {})
         task_group_data = {
             "group_id": group_id,
@@ -317,6 +372,7 @@ class ConnectionManager:
         room["current_task"] = None
         room["current_challenge"] = None
         room["task_group_submissions"] = {}
+        room["task_group_submission_counts"] = {}
         room["published_tasks_history"].append(
             {
                 "type": "task_group",
@@ -369,13 +425,17 @@ class ConnectionManager:
         # Always add to task_group_submissions if not a duplicate
         if not is_duplicate:
             room["task_group_submissions"].setdefault(group_id, set()).add(student_id)
+            room.setdefault("task_group_submission_counts", {})[group_id] = len(
+                room["task_group_submissions"].get(group_id, set())
+            )
 
         # Use db_submission_count if provided (for duplicate detection after teacher refresh)
         # Otherwise fall back to in-memory count
         if db_submission_count is not None:
             submission_count = db_submission_count
+            room.setdefault("task_group_submission_counts", {})[group_id] = db_submission_count
         else:
-            submission_count = len(room["task_group_submissions"].get(group_id, set()))
+            submission_count = self._get_task_group_submission_count(room, group_id)
         logger.info(f"[submit_task_group_answer] final submission_count={submission_count} for group_id={group_id}")
 
         for history_entry in room["published_tasks_history"]:
@@ -407,7 +467,7 @@ class ConnectionManager:
         if not current_group or current_group["group_id"] != group_id:
             return
 
-        submission_count = len(room.get("task_group_submissions", {}).get(group_id, set()))
+        submission_count = self._get_task_group_submission_count(room, group_id)
         for history_entry in room["published_tasks_history"]:
             if history_entry.get("group_id") == group_id:
                 history_entry["status"] = "ended"
@@ -627,9 +687,7 @@ class ConnectionManager:
         current_task_group = room.get("current_task_group")
         current_task_group_id = current_task_group.get("group_id") if current_task_group else None
         current_challenge = room.get("current_challenge")
-        task_group_submission_count = 0
-        if current_task_group_id:
-            task_group_submission_count = len(room.get("task_group_submissions", {}).get(current_task_group_id, set()))
+        task_group_submission_count = self._get_task_group_submission_count(room, current_task_group_id)
 
         return {
             "class_id": class_id,
@@ -652,6 +710,7 @@ class ConnectionManager:
                 "density": room.get("danmu_density", "medium"),
                 "area": room.get("danmu_area", "bottom"),
                 "bgColor": room.get("danmu_bg_color"),
+                "presetPhrases": room.get("danmu_preset_phrases", DEFAULT_DANMU_PRESET_PHRASES.copy()),
             },
         }
 
@@ -695,6 +754,7 @@ class ConnectionManager:
                 "density": room.get("danmu_density", "medium"),
                 "area": room.get("danmu_area", "bottom"),
                 "bgColor": room.get("danmu_bg_color"),
+                "presetPhrases": room.get("danmu_preset_phrases", DEFAULT_DANMU_PRESET_PHRASES.copy()),
             },
             "created_at": room["created_at"],
         }
@@ -717,6 +777,7 @@ class ConnectionManager:
         density: str = "medium",
         area: str = "bottom",
         bg_color: Optional[str] = None,
+        preset_phrases: Optional[list[str]] = None,
     ):
         """Update danmu configuration."""
         room = self.class_rooms.get(class_id)
@@ -730,6 +791,7 @@ class ConnectionManager:
         room["danmu_density"] = density
         room["danmu_area"] = area
         room["danmu_bg_color"] = bg_color
+        room["danmu_preset_phrases"] = sanitize_danmu_preset_phrases(preset_phrases)
 
         # Broadcast config to all connected clients (students and big screen)
         config_payload = {
@@ -741,6 +803,7 @@ class ConnectionManager:
             "density": density,
             "area": area,
             "bgColor": bg_color,
+            "presetPhrases": room["danmu_preset_phrases"],
         }
         await self.broadcast_to_students(class_id, config_payload)
         await self.send_to_teacher(class_id, config_payload)
@@ -778,6 +841,384 @@ class ConnectionManager:
         payload = {"type": "danmu_clear"}
         await self.broadcast_to_students(class_id, payload)
         await self.send_to_teacher(class_id, payload)
+
+    # ── Runtime State Snapshot (P0-1) ──
+
+    async def save_snapshot(self, class_id: str):
+        """Persist room runtime state to database with compare-and-swap concurrency."""
+        room = self.class_rooms.get(class_id)
+        if not room:
+            return
+
+        from app.db.session import async_session_maker
+        from app.models import LiveRoomSnapshot
+
+        room.setdefault("task_group_submission_counts", {})
+
+        # Serialize serializable room state (skip WebSocket objects, sets, etc.)
+        has_tg = bool(room.get("current_task_group"))
+        has_ch = bool(room.get("current_challenge"))
+        state = {
+            "current_task_group": room.get("current_task_group"),
+            "current_challenge": room.get("current_challenge"),
+            "current_task": room.get("current_task"),
+            "danmu_enabled": room.get("danmu_enabled", False),
+            "danmu_show_student": room.get("danmu_show_student", True),
+            "danmu_show_source": room.get("danmu_show_source", False),
+            "danmu_speed": room.get("danmu_speed", "medium"),
+            "danmu_density": room.get("danmu_density", "medium"),
+            "danmu_area": room.get("danmu_area", "bottom"),
+            "danmu_bg_color": room.get("danmu_bg_color"),
+            "danmu_preset_phrases": room.get("danmu_preset_phrases", DEFAULT_DANMU_PRESET_PHRASES.copy()),
+            "published_tasks_history": room.get("published_tasks_history", []),
+            "task_group_submissions_counts": {
+                gid: room.get("task_group_submission_counts", {}).get(gid, len(sids))
+                for gid, sids in room.get("task_group_submissions", {}).items()
+            },
+        }
+        for gid, count in room.get("task_group_submission_counts", {}).items():
+            state["task_group_submissions_counts"].setdefault(gid, count)
+
+        live_session_id = room.get("live_session_id")
+        try:
+            async with async_session_maker() as db:
+                from sqlalchemy import select, update as sa_update
+                from sqlalchemy.exc import IntegrityError
+
+                saved_version = None
+                for _ in range(3):
+                    result = await db.execute(
+                        select(LiveRoomSnapshot).where(LiveRoomSnapshot.class_id == class_id)
+                    )
+                    snapshot = result.scalar_one_or_none()
+                    if snapshot:
+                        old_version = snapshot.version or 0
+                        update_result = await db.execute(
+                            sa_update(LiveRoomSnapshot)
+                            .where(
+                                LiveRoomSnapshot.class_id == class_id,
+                                LiveRoomSnapshot.version == old_version,
+                            )
+                            .values(
+                                teacher_id=room["teacher_id"],
+                                live_session_id=live_session_id,
+                                room_state=state,
+                                version=old_version + 1,
+                            )
+                        )
+                        if update_result.rowcount == 1:
+                            saved_version = old_version + 1
+                            await db.commit()
+                            break
+                        await db.rollback()
+                        continue
+
+                    snapshot = LiveRoomSnapshot(
+                        class_id=class_id,
+                        teacher_id=room["teacher_id"],
+                        live_session_id=live_session_id,
+                        room_state=state,
+                        version=1,
+                    )
+                    db.add(snapshot)
+                    try:
+                        await db.commit()
+                        saved_version = 1
+                        break
+                    except IntegrityError:
+                        await db.rollback()
+                        continue
+
+                if saved_version is None:
+                    raise RuntimeError(f"snapshot compare-and-swap failed for class_id={class_id}")
+            logger.info(
+                "snapshot_saved result=ok class_id=%s live_session_id=%s has_task_group=%s has_challenge=%s version=%s",
+                class_id, live_session_id, has_tg, has_ch, saved_version,
+            )
+        except Exception as e:
+            logger.error(
+                "snapshot_saved result=error class_id=%s live_session_id=%s error=%s",
+                class_id, live_session_id, e,
+            )
+
+    async def delete_snapshot(self, class_id: str):
+        """Delete room snapshot when room is properly closed."""
+        from app.db.session import async_session_maker
+        from app.models import LiveRoomSnapshot
+        try:
+            async with async_session_maker() as db:
+                from sqlalchemy import select, delete as sa_delete
+                await db.execute(
+                    sa_delete(LiveRoomSnapshot).where(LiveRoomSnapshot.class_id == class_id)
+                )
+                await db.commit()
+            logger.info("[live.snapshot] deleted class_id=%s", class_id)
+        except Exception as e:
+            logger.error("[live.snapshot] delete failed class_id=%s: %s", class_id, e)
+
+    async def restore_snapshots(self):
+        """Restore rooms from snapshots on server startup."""
+        from app.db.session import async_session_maker
+        from app.models import LiveRoomSnapshot, LiveSession, LiveChallengeSession
+        try:
+            async with async_session_maker() as db:
+                from sqlalchemy import select
+                result = await db.execute(
+                    select(LiveRoomSnapshot).order_by(LiveRoomSnapshot.updated_at.desc())
+                )
+                snapshots = result.scalars().all()
+
+                # Prefetch valid IDs for reference integrity checks
+                valid_session_ids = {s[0] for s in (await db.execute(select(LiveSession.id))).all()}
+                valid_challenge_ids = {c[0] for c in (await db.execute(select(LiveChallengeSession.id))).all()}
+
+            restored = 0
+            skipped = 0
+            for snap in snapshots:
+                if snap.class_id in self.class_rooms:
+                    continue  # already active
+                state = snap.room_state or {}
+
+                # Reference integrity: skip stale references
+                lsid = snap.live_session_id
+                if lsid and lsid not in valid_session_ids:
+                    logger.warning(
+                        "snapshot_restore result=skip_stale_session class_id=%s live_session_id=%s",
+                        snap.class_id, lsid,
+                    )
+                    lsid = None
+
+                # Validate challenge reference
+                ch = state.get("current_challenge")
+                if ch and ch.get("id") and ch["id"] not in valid_challenge_ids:
+                    logger.warning(
+                        "snapshot_restore result=skip_stale_challenge class_id=%s challenge_id=%s",
+                        snap.class_id, ch["id"],
+                    )
+                    ch = None
+                    state["current_challenge"] = None
+
+                # Restore submission counts from snapshot
+                sub_counts = state.get("task_group_submissions_counts", {})
+
+                self.class_rooms[snap.class_id] = {
+                    "teacher_ws": None,
+                    "teacher_id": snap.teacher_id,
+                    "live_session_id": lsid,
+                    "student_wss": {},
+                    "current_task": state.get("current_task"),
+                    "current_task_group": state.get("current_task_group"),
+                    "current_challenge": ch,
+                    "task_submissions": {},
+                    "task_group_submissions": {gid: set() for gid in sub_counts},
+                    "task_group_submission_counts": dict(sub_counts),
+                    "published_tasks_history": state.get("published_tasks_history", []),
+                    "pending_shares": {},
+                    "share_rate_limit": {},
+                    "_recently_ended_challenges": set(),
+                    "danmu_enabled": state.get("danmu_enabled", False),
+                    "danmu_show_student": state.get("danmu_show_student", True),
+                    "danmu_show_source": state.get("danmu_show_source", False),
+                    "danmu_speed": state.get("danmu_speed", "medium"),
+                    "danmu_density": state.get("danmu_density", "medium"),
+                    "danmu_area": state.get("danmu_area", "bottom"),
+                    "danmu_bg_color": state.get("danmu_bg_color"),
+                    "danmu_preset_phrases": sanitize_danmu_preset_phrases(state.get("danmu_preset_phrases")),
+                    "created_at": shanghai_now().isoformat(),
+                }
+                restored += 1
+                has_tg = bool(state.get("current_task_group"))
+                has_ch = bool(ch)
+                logger.info(
+                    "snapshot_restore result=ok class_id=%s teacher_id=%s live_session_id=%s has_task_group=%s has_challenge=%s",
+                    snap.class_id, snap.teacher_id, lsid, has_tg, has_ch,
+                )
+
+            if restored or skipped:
+                logger.info(
+                    "snapshot_restore_summary total=%d restored=%d skipped=%d",
+                    len(snapshots), restored, skipped,
+                )
+        except Exception as e:
+            logger.error("snapshot_restore result=error error=%s", e)
+
+
+    # ── Heartbeat & Cleanup (P0-3) ──
+
+    def touch_teacher(self, teacher_id: str):
+        self._teacher_last_seen[teacher_id] = time.time()
+
+    def touch_student(self, student_id: str):
+        self._student_last_seen[student_id] = time.time()
+
+    async def _drop_teacher_connection(self, class_id: str, teacher_id: str, reason: str) -> None:
+        room = self.class_rooms.get(class_id)
+        if not room:
+            self._teacher_last_seen.pop(teacher_id, None)
+            self.teacher_connections.pop(teacher_id, None)
+            return
+
+        ws = room.get("teacher_ws")
+        if ws:
+            try:
+                await ws.close(code=4001, reason=reason[:120])
+            except Exception:
+                pass
+        room["teacher_ws"] = None
+        self._teacher_last_seen.pop(teacher_id, None)
+        self.teacher_connections.pop(teacher_id, None)
+        logger.info(
+            "[live.cleanup] drop_teacher_connection class_id=%s teacher_id=%s reason=%s",
+            class_id,
+            teacher_id,
+            reason,
+        )
+
+    async def _drop_student_connection(self, class_id: str, student_id: str, reason: str) -> None:
+        room = self.class_rooms.get(class_id)
+        if not room:
+            self._student_last_seen.pop(student_id, None)
+            self.student_connections.pop(student_id, None)
+            return
+
+        ws = room.get("student_wss", {}).get(student_id)
+        if ws:
+            try:
+                await ws.close(code=4001, reason=reason[:120])
+            except Exception:
+                pass
+        room.get("student_wss", {}).pop(student_id, None)
+        self.student_connections.pop(student_id, None)
+        self._student_last_seen.pop(student_id, None)
+        logger.info(
+            "[live.cleanup] drop_student_connection class_id=%s student_id=%s reason=%s",
+            class_id,
+            student_id,
+            reason,
+        )
+
+    def start_cleanup_task(self):
+        if self._cleanup_task is None or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+            logger.info("[live.ws] cleanup task started")
+
+    def stop_cleanup_task(self):
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+            self._cleanup_task = None
+
+    async def _cleanup_loop(self):
+        while True:
+            try:
+                await asyncio.sleep(CLEANUP_INTERVAL)
+                await self._cleanup_zombies()
+                await self._cleanup_stale_rooms()
+                # P0-1: Periodic snapshot save
+                self._snapshot_tick += 1
+                if self._snapshot_tick >= (SNAPSHOT_INTERVAL // CLEANUP_INTERVAL):
+                    self._snapshot_tick = 0
+                    await self._save_all_snapshots()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("[live.ws] cleanup error: %s", e)
+
+    async def _save_all_snapshots(self):
+        """Save snapshots for all active rooms with state."""
+        for cid in list(self.class_rooms):
+            room = self.class_rooms[cid]
+            # Only snapshot rooms that have active content or a live session
+            if room.get("current_task_group") or room.get("current_challenge") or room.get("live_session_id"):
+                await self.save_snapshot(cid)
+
+    async def _cleanup_zombies(self):
+        now = time.time()
+        for tid in list(self._teacher_last_seen):
+            idle_seconds = now - self._teacher_last_seen[tid]
+            if idle_seconds <= ZOMBIE_TIMEOUT:
+                continue
+
+            found_room = False
+            for cid, room in list(self.class_rooms.items()):
+                if room.get("teacher_id") != tid:
+                    continue
+                found_room = True
+                await self._drop_teacher_connection(
+                    cid,
+                    tid,
+                    f"heartbeat_timeout:{int(idle_seconds)}s",
+                )
+                break
+            if not found_room:
+                self._teacher_last_seen.pop(tid, None)
+                self.teacher_connections.pop(tid, None)
+
+        for sid in list(self._student_last_seen):
+            idle_seconds = now - self._student_last_seen[sid]
+            if idle_seconds <= ZOMBIE_TIMEOUT:
+                continue
+
+            found_room = False
+            for cid, room in list(self.class_rooms.items()):
+                if sid not in room.get("student_wss", {}):
+                    continue
+                found_room = True
+                await self._drop_student_connection(
+                    cid,
+                    sid,
+                    f"heartbeat_timeout:{int(idle_seconds)}s",
+                )
+                break
+            if not found_room:
+                self._student_last_seen.pop(sid, None)
+                self.student_connections.pop(sid, None)
+
+    async def _cleanup_stale_rooms(self):
+        now = time.time()
+        # Phase 4: TTL cleanup for _recently_ended_challenges (1h)
+        for cid in list(self.class_rooms):
+            room = self.class_rooms[cid]
+            stale_ch = room.get("_recently_ended_challenges", set())
+            if stale_ch and len(stale_ch) > 20:
+                room["_recently_ended_challenges"] = set(list(stale_ch)[-20:])
+
+        for cid in list(self.class_rooms):
+            room = self.class_rooms[cid]
+            # Too old
+            try:
+                created = datetime.fromisoformat(room["created_at"]).timestamp()
+                if now - created > STALE_ROOM_TIMEOUT:
+                    logger.info("[live.cleanup] stale room %s removed (>12h)", cid)
+                    await self.close_room(cid)
+                    continue
+            except Exception:
+                pass
+            # Empty room
+            has_teacher = room.get("teacher_ws") is not None
+            has_students = bool(room.get("student_wss"))
+            if not has_teacher and not has_students:
+                empty_since = room.get("_empty_since")
+                if empty_since is None:
+                    room["_empty_since"] = now
+                elif now - empty_since > EMPTY_ROOM_GRACE:
+                    logger.info("[live.cleanup] empty room %s removed", cid)
+                    await self.close_room(cid)
+            elif not has_teacher and has_students:
+                # Teacher disconnected but students still in room
+                teacherless_since = room.get("_teacherless_since")
+                if teacherless_since is None:
+                    room["_teacherless_since"] = now
+                    logger.info("[live.cleanup] teacherless_room_detected class_id=%s", cid)
+                elif now - teacherless_since > TEACHERLESS_GRACE:
+                    logger.info(
+                        "[live.cleanup] teacherless_room_removed class_id=%s idle_seconds=%s",
+                        cid,
+                        int(now - teacherless_since),
+                    )
+                    await self.close_room(cid)
+            else:
+                room.pop("_empty_since", None)
+                room.pop("_teacherless_since", None)
 
 
 manager = ConnectionManager()

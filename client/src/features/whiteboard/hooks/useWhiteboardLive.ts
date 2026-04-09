@@ -1,7 +1,7 @@
 ﻿import { useCallback, useEffect, useRef, useState } from 'react'
-import axios from 'axios'
 import { useAppStore } from '../../../stores/app-store'
 import { api, liveTaskService } from '../../../services/api'
+import { buildLiveWsUrl, getFreshAccessToken as ensureFreshAccessToken } from '../../../services/ws-auth'
 import type { LiveTaskGroup } from '../../../services/api'
 import type { LiveChallengeSession, TaskHistoryItem } from '../../../services/websocket'
 import type { ActiveDanmu, DanmuConfig, ActiveAtmosphereEffect, AtmosphereEffectType } from '../../danmu/types/danmu'
@@ -139,19 +139,6 @@ function getLiveSessionIdFromPayload(payload: any) {
   return undefined
 }
 
-function readJwtExp(token: string | null): number | null {
-  if (!token) return null
-  try {
-    const [, payload] = token.split('.')
-    if (!payload) return null
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = JSON.parse(window.atob(normalized))
-    return typeof decoded.exp === 'number' ? decoded.exp : null
-  } catch {
-    return null
-  }
-}
-
 export function useWhiteboardLive(classId: string | null) {
   const { user, token } = useAppStore()
   const wsRef = useRef<WebSocket | null>(null)
@@ -186,50 +173,15 @@ export function useWhiteboardLive(classId: string | null) {
     elapsedSeconds: 0,
     taskHistory: [],
     endedTaskGroups: [],
-    danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)' },
+    danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)', presetPhrases: ['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'] },
     activeEffects: [],
     activeDanmus: [],
   })
 
   const getFreshAccessToken = useCallback(async () => {
-    const currentToken = localStorage.getItem('token') || token
-    if (!currentToken) {
-      return null
-    }
-
-    const exp = readJwtExp(currentToken)
-    const now = Math.floor(Date.now() / 1000)
-    const isExpired = exp !== null && exp <= now
-    const shouldRefresh = exp !== null && exp - now <= 60
-    if (!shouldRefresh) {
-      return currentToken
-    }
-
-    const refreshToken = localStorage.getItem('refresh_token')
-    if (!refreshToken) {
-      return isExpired ? null : currentToken
-    }
-
-    try {
-      const response = await axios.post('/api/v1/auth/refresh', {
-        refresh_token: refreshToken,
-      })
-      const accessToken = response.data?.access_token as string | undefined
-      const nextRefreshToken = response.data?.refresh_token as string | undefined
-      if (!accessToken) {
-        return currentToken
-      }
-
-      localStorage.setItem('token', accessToken)
-      if (nextRefreshToken) {
-        localStorage.setItem('refresh_token', nextRefreshToken)
-      }
+    return ensureFreshAccessToken(token, (accessToken) => {
       useAppStore.getState().setToken(accessToken)
-      return accessToken
-    } catch (error) {
-      console.error('[WhiteboardLive] Failed to refresh access token before websocket connect:', error)
-      return isExpired ? null : currentToken
-    }
+    })
   }, [token])
 
   useEffect(() => {
@@ -252,17 +204,10 @@ export function useWhiteboardLive(classId: string | null) {
       endedTaskGroups: [],
       error: null,
       roomInfoHydrated: false,
-      danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)' },
+      danmuConfig: { enabled: false, showStudent: true, showSource: false, speed: 'medium', density: 'medium', area: 'bottom', bgColor: 'rgba(0, 0, 0, 0.75)', presetPhrases: ['太棒了！', '加油！', '答对了！', '真厉害！', '准备好了！'] },
     activeEffects: [],
       activeDanmus: [],
     }))
-  }, [classId])
-
-  const getWsUrl = useCallback((accessToken: string) => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    // Use Vite dev server proxy in development (port 5173)
-    const host = window.location.host
-    return `${protocol}//${host}/api/v1/live/ws?token=${encodeURIComponent(accessToken)}&class_id=${encodeURIComponent(classId || '')}`
   }, [classId])
 
   const loadClassPresence = useCallback(async () => {
@@ -437,9 +382,19 @@ export function useWhiteboardLive(classId: string | null) {
         if (pendingPublishRef.current?.groupId === msg.group_id) {
           settlePendingPublish()
         }
+        // 服务端 task_group_data 使用 group_id 而非 id，需规范化
+        const rawTaskGroup = msg.task_group as LiveTaskGroup | undefined
+        const normalizedTaskGroup: LiveTaskGroup = rawTaskGroup
+          ? {
+              ...rawTaskGroup,
+              id: rawTaskGroup.id || (rawTaskGroup as any).group_id || msg.group_id,
+              class_id: rawTaskGroup.class_id || classId || '',
+              status: rawTaskGroup.status || 'active',
+            } as LiveTaskGroup
+          : buildActiveTaskGroup(classId, msg)
         setState((prev) => ({
           ...prev,
-          activeTaskGroup: (msg.task_group as LiveTaskGroup | undefined) ?? buildActiveTaskGroup(classId, msg),
+          activeTaskGroup: normalizedTaskGroup,
           currentChallenge: null,
           submissions: [],
           submissionCount: 0,
@@ -566,6 +521,9 @@ export function useWhiteboardLive(classId: string | null) {
             density: msg.density ?? prev.danmuConfig.density,
             area: msg.area ?? prev.danmuConfig.area,
             bgColor: (msg as any).bgColor ?? prev.danmuConfig.bgColor,
+            presetPhrases: Array.isArray((msg as any).presetPhrases)
+              ? (msg as any).presetPhrases
+              : prev.danmuConfig.presetPhrases,
           },
         }))
         break
@@ -657,7 +615,7 @@ export function useWhiteboardLive(classId: string | null) {
         return
       }
 
-      const ws = new WebSocket(getWsUrl(accessToken))
+      const ws = new WebSocket(buildLiveWsUrl(classId, accessToken))
       wsRef.current = ws
 
       ws.onopen = () => {
@@ -712,7 +670,7 @@ export function useWhiteboardLive(classId: string | null) {
         }
       }
     })()
-  }, [classId, getFreshAccessToken, getWsUrl, handleMessage, loadClassPresence, settlePendingPublish, settleSocketWaiters, startHeartbeat, user])
+  }, [classId, getFreshAccessToken, handleMessage, loadClassPresence, settlePendingPublish, settleSocketWaiters, startHeartbeat, user])
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {

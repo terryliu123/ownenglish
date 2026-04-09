@@ -17,6 +17,7 @@ export default function RegisterPage() {
     confirmPassword: '',
     name: '',
     role: 'student',
+    invitation_code: '',
   })
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
@@ -248,6 +249,20 @@ export default function RegisterPage() {
                   {t('roles.student')}
                 </button>
               </div>
+            </div>
+
+            <div>
+              <label style={labelStyle}>邀请码（选填）</label>
+              <input
+                type="text"
+                value={formData.invitation_code || ''}
+                onChange={(e) => setFormData({ ...formData, invitation_code: e.target.value })}
+                style={inputStyle}
+                placeholder="有邀请码？在此输入"
+                onFocus={inputFocus}
+                onBlur={inputBlur}
+              />
+              <p style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '4px' }}>教师注册使用邀请码可获赠1个月VIP会员</p>
             </div>
 
             <button

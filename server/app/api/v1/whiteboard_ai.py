@@ -90,14 +90,14 @@ async def whiteboard_ai_respond(request: WhiteboardAiRequest):
     has_image = bool(request.image_base64)
     context_text = build_context_text(request.context)
 
-    if request.action != "free_question" and not context_text and not has_image:
-        raise HTTPException(status_code=400, detail="当前白板没有可供 AI 参考的内容")
+    if not context_text and not has_image and not request.question:
+        raise HTTPException(status_code=400, detail="请输入问题或提供白板内容")
 
-    if request.action == "free_question" and not context_text:
+    if not context_text:
         user_content = f"老师的问题：{request.question or ''}"
     else:
         user_content = template["user_template"].format(
-            context=context_text or "[图片内容]",
+            context=context_text,
             question=request.question or "",
         )
 

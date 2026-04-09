@@ -124,14 +124,16 @@ export function TeacherSidebar({
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
 
-  const links = [
-    { id: 'home', label: '导览', path: '/teacher', icon: 'H' },
+  const links: { id: string; label?: string; path?: string; icon?: string }[] = [
+    { id: 'home', label: '快速开启', path: '/teacher', icon: 'H' },
     { id: 'classes', label: '班级管理', path: '/teacher/classes', icon: 'C' },
+    { id: 'whiteboard', label: '互动课堂', path: '/teacher/whiteboard', icon: 'W' },
+    { id: 'classroom-review', label: '课堂回顾', path: '/teacher/classroom-review', icon: 'R' },
+    { id: 'divider' },
     { id: 'task-groups', label: t('nav.taskGroups'), path: '/teacher/task-groups', icon: 'T' },
     { id: 'bigscreen-activities', label: t('nav.bigscreenActivities'), path: '/teacher/bigscreen-activities', icon: 'B' },
-    { id: 'whiteboard', label: t('nav.whiteboard'), path: '/teacher/whiteboard', icon: 'W' },
-    { id: 'classroom-review', label: t('classroom.review'), path: '/teacher/classroom-review', icon: 'R' },
     { id: 'teaching-aids', label: t('nav.teachingAids'), path: '/teacher/teaching-aids', icon: 'D' },
+    { id: 'membership', label: '会员中心', path: '/teacher/membership', icon: 'V' },
   ]
 
   return (
@@ -141,9 +143,10 @@ export function TeacherSidebar({
         {open && (
           <nav className="min-w-[180px] rounded-2xl border border-gray-100 bg-white py-2 shadow-xl" style={{ animation: 'slideIn 0.2s ease-out' }}>
             {links.map((link) => (
+              link.id === 'divider' ? <div key="divider" className="my-1 mx-4 border-t border-gray-100" /> :
               <Link
                 key={link.id}
-                to={link.path}
+                to={link.path!}
                 className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors hover:bg-gray-50 ${activePage === link.id ? 'text-coral' : 'text-gray-700'}`}
                 onClick={() => setOpen(false)}
               >

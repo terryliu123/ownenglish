@@ -1,4 +1,3 @@
-import { useTranslation } from '../../../i18n/useTranslation'
 import type { LiveTaskGroup } from '../../../services/api'
 import type { WhiteboardTheme } from '../types'
 
@@ -6,13 +5,9 @@ interface TaskPanelProps {
   taskGroups: LiveTaskGroup[]
   publishedGroups?: LiveTaskGroup[]
   previewingGroup?: LiveTaskGroup | null
-  onPublishAll: () => void
   onClose: () => void
   onRevertToDraft?: (group: LiveTaskGroup) => void
   onEndTask?: (group: LiveTaskGroup) => void
-  onStartClassChallenge?: () => void
-  onStartDuel?: () => void
-  onStartQuickAnswer?: () => void
   onPreview?: (group: LiveTaskGroup) => void
   onRefresh?: () => void
   theme?: WhiteboardTheme
@@ -30,13 +25,9 @@ export function TaskPanel({
   taskGroups,
   publishedGroups = [],
   previewingGroup,
-  onPublishAll,
   onClose,
   onRevertToDraft,
   onEndTask,
-  onStartClassChallenge,
-  onStartDuel,
-  onStartQuickAnswer,
   onPreview,
   onRefresh,
   theme = 'dark',
@@ -46,7 +37,6 @@ export function TaskPanel({
   onViewDetails,
   onClearCompleted,
 }: TaskPanelProps) {
-  const { t } = useTranslation()
 
   // 根据主题获取样式
   const getThemeClasses = () => {
@@ -116,68 +106,6 @@ export function TaskPanel({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
-      </div>
-
-      {/* 发送任务区域 - 紧凑布局 */}
-      <div className={`p-3 border-b ${tc.divider}`}>
-        <div className="grid grid-cols-4 gap-1.5 mb-2">
-          {/* 全班挑战 */}
-          <button
-            onClick={onStartClassChallenge}
-            className="p-2 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 hover:border-indigo-500/50 transition-all text-center group"
-            title={t('whiteboard.classChallenge')}
-          >
-            <div className="w-6 h-6 mx-auto mb-1 rounded-full bg-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-3 h-3 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate block">{t('whiteboard.classChallenge')}</span>
-          </button>
-
-          {/* PK对决 */}
-          <button
-            onClick={onStartDuel}
-            className="p-2 rounded-lg bg-gradient-to-br from-amber-500/20 to-red-500/20 border border-amber-500/30 hover:border-amber-500/50 transition-all text-center group"
-            title={t('whiteboard.pkDuel')}
-          >
-            <div className="w-6 h-6 mx-auto mb-1 rounded-full bg-amber-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate block">{t('whiteboard.pkDuel')}</span>
-          </button>
-
-          {/* 抢答模式 */}
-          <button
-            onClick={onStartQuickAnswer}
-            className="p-2 rounded-lg bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 hover:border-emerald-500/50 transition-all text-center group"
-            title="抢答模式"
-          >
-            <div className="w-6 h-6 mx-auto mb-1 rounded-full bg-emerald-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate block">抢答模式</span>
-          </button>
-
-          {/* 发布全部 */}
-          <button
-            onClick={onPublishAll}
-            disabled={taskGroups.length === 0}
-            className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-500/30 hover:border-blue-500/50 transition-all text-center group disabled:opacity-50 disabled:cursor-not-allowed"
-            title="发布给学生"
-          >
-            <div className="w-6 h-6 mx-auto mb-1 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <svg className="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 truncate block">发布给学生</span>
-          </button>
-        </div>
       </div>
 
       {/* 进行中的任务 - 独立于 API 任务列表 */}

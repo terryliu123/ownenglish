@@ -296,6 +296,12 @@ export default function WhiteboardMode() {
   const [showAiSettings, setShowAiSettings] = useState(false)
   const [openedTeachingAid, setOpenedTeachingAid] = useState<{ name: string; entryUrl: string } | null>(null)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
+  const [classesLoaded, setClassesLoaded] = useState(false)
+
+  // 快速创建班级状态（必须放在所有条件返回之前）
+  const [quickClassName, setQuickClassName] = useState('')
+  const [quickCreating, setQuickCreating] = useState(false)
+  const [quickError, setQuickError] = useState('')
 
   // 画笔设置
   const [strokeColor, setStrokeColor] = useState('#6366f1')
@@ -311,6 +317,8 @@ export default function WhiteboardMode() {
   // 氛围设置面板
   const [showDanmuSettings, setShowDanmuSettings] = useState(false)
   const danmuSettingsRef = useRef<HTMLDivElement>(null)
+  const [danmuPresetDrafts, setDanmuPresetDrafts] = useState<string[]>([])
+  const [showDanmuPresetEditor, setShowDanmuPresetEditor] = useState(false)
 
   // 点击外部关闭氛围设置面板
   useEffect(() => {
@@ -323,6 +331,52 @@ export default function WhiteboardMode() {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showDanmuSettings])
+
+  useEffect(() => {
+    setDanmuPresetDrafts((danmuConfig.presetPhrases || []).slice(0, 5))
+  }, [danmuConfig.presetPhrases, showDanmuSettings])
+
+  useEffect(() => {
+    if (!showDanmuSettings) {
+      setShowDanmuPresetEditor(false)
+    }
+  }, [showDanmuSettings])
+
+  const normalizeDanmuPresetPhrases = useCallback((phrases: string[]) => {
+    const normalized: string[] = []
+    phrases.forEach((phrase) => {
+      const trimmed = phrase.trim()
+      if (!trimmed || normalized.includes(trimmed)) return
+      normalized.push(trimmed.slice(0, 20))
+    })
+    return normalized.slice(0, 5)
+  }, [])
+
+  const persistDanmuPresetPhrases = useCallback((phrases: string[]) => {
+    const normalized = normalizeDanmuPresetPhrases(phrases)
+    setDanmuPresetDrafts(normalized)
+    sendDanmuConfig({ ...danmuConfig, presetPhrases: normalized })
+  }, [danmuConfig, normalizeDanmuPresetPhrases, sendDanmuConfig])
+
+  const handleDanmuPresetDraftChange = useCallback((index: number, value: string) => {
+    setDanmuPresetDrafts((prev) => {
+      const next = [...prev]
+      next[index] = value.slice(0, 20)
+      return next
+    })
+  }, [])
+
+  const addDanmuPresetPhrase = useCallback(() => {
+    if (danmuPresetDrafts.length >= 5) return
+    const next = [...danmuPresetDrafts, `预设语句${danmuPresetDrafts.length + 1}`]
+    persistDanmuPresetPhrases(next)
+  }, [danmuPresetDrafts, persistDanmuPresetPhrases])
+
+  const removeDanmuPresetPhrase = useCallback((index: number) => {
+    const next = [...danmuPresetDrafts]
+    next.splice(index, 1)
+    persistDanmuPresetPhrases(next)
+  }, [danmuPresetDrafts, persistDanmuPresetPhrases])
 
   // 分析和明细 Modal 状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
@@ -425,6 +479,7 @@ export default function WhiteboardMode() {
         api.get('/live/sessions', { params: { status: 'active', limit: 20 } }).then((r) => r.data).catch(() => []),
       ])
       setClasses(data)
+      setClassesLoaded(true)
       if (data.length === 0) {
         setCurrentClassId(null)
         localStorage.removeItem(selectedClassStorageKey)
@@ -704,12 +759,6 @@ export default function WhiteboardMode() {
   }, [endTaskGroup, getSourceGroupId])
 
   // 发布全部（发布第一个任务给所有学生）
-  const handlePublishAll = useCallback(async () => {
-    if (taskGroups.length === 0) return
-    const firstGroup = taskGroups[0]
-    await handlePublishTask(firstGroup)
-  }, [taskGroups, handlePublishTask])
-
   // 退回草稿
   const handleRevertToDraft = useCallback(async (group: WhiteboardTaskGroup) => {
     if (!window.confirm(`确定要将任务组「${group.title}」退回草稿状态吗？`)) {
@@ -741,6 +790,8 @@ export default function WhiteboardMode() {
       setAnalyticsData(analytics)
     } catch (e) {
       console.error('Failed to load analysis:', e)
+      setShowAnalysisModal(false)
+      alert('加载分析数据失败，该任务可能已被删除')
     } finally {
       setAnalyticsLoading(false)
     }
@@ -772,6 +823,8 @@ export default function WhiteboardMode() {
       setSubmissionData(submissions)
     } catch (e) {
       console.error('Failed to load details:', e)
+      setShowDetailModal(false)
+      alert('加载答题明细失败，该任务可能已被删除')
     } finally {
       setSubmissionLoading(false)
     }
@@ -1329,6 +1382,70 @@ export default function WhiteboardMode() {
     return null
   }
 
+  // 没有班级时显示引导弹窗
+  if (classesLoaded && classes.length === 0) {
+    const handleQuickCreateClass = async () => {
+      const name = quickClassName.trim()
+      if (!name) { setQuickError('请输入班级名称'); return }
+      setQuickCreating(true)
+      setQuickError('')
+      try {
+        const newClass = await classService.create({ name })
+        setClasses([newClass])
+        setCurrentClassId(newClass.id)
+        setClassesLoaded(true)
+      } catch (e: any) {
+        setQuickError(e?.response?.data?.detail || '创建失败')
+      } finally {
+        setQuickCreating(false)
+      }
+    }
+
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#0f0f13] text-slate-100">
+        <div className="max-w-md w-full mx-4">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-4xl mx-auto mb-6 shadow-lg shadow-indigo-500/30">
+              🏫
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-3">还没有创建班级</h2>
+            <p className="text-slate-400 leading-relaxed">
+              请先创建一个班级，才能开始互动课堂。学生加入班级后即可参与实时互动。
+            </p>
+          </div>
+          <div className="bg-[#1a1a22] rounded-2xl p-6 border border-slate-700">
+            <h3 className="text-base font-semibold text-white mb-4">快速创建班级</h3>
+            <input
+              type="text"
+              value={quickClassName}
+              onChange={(e) => { setQuickClassName(e.target.value); setQuickError('') }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleQuickCreateClass() }}
+              placeholder="输入班级名称，如：周六上午班"
+              className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              autoFocus
+            />
+            {quickError && <p className="mt-2 text-sm text-red-400">{quickError}</p>}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={handleQuickCreateClass}
+                disabled={quickCreating}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg hover:shadow-indigo-500/30 transition-all disabled:opacity-50"
+              >
+                {quickCreating ? '创建中...' : '创建并进入'}
+              </button>
+              <button
+                onClick={() => navigate('/teacher/classes')}
+                className="px-4 py-2.5 bg-slate-700 text-slate-300 rounded-xl text-sm font-medium hover:bg-slate-600 transition-colors"
+              >
+                班级管理
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <WhiteboardAiProvider>
     <div className={`h-screen flex flex-col overflow-hidden ${tc.bg} ${tc.text}`}>
@@ -1368,7 +1485,7 @@ export default function WhiteboardMode() {
             {showDanmuSettings && (
               <div
                 className="absolute left-0 top-full mt-2 z-[200] rounded-xl shadow-2xl border"
-                style={{ minWidth: '340px', background: theme === 'dark' ? '#1e293b' : '#fff' }}
+                style={{ minWidth: '420px', background: theme === 'dark' ? '#1e293b' : '#fff' }}
               >
                 <div className="p-4 border-b border-slate-200/20">
                   <h4 className="text-base font-semibold" style={{ color: theme === 'dark' ? '#e2e8f0' : '#334155' }}>🎆 氛围设置</h4>
@@ -1467,6 +1584,106 @@ export default function WhiteboardMode() {
                   </div>
 
                   {/* 氛围效果 */}
+                  <div className="rounded-xl border border-slate-200/20 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-medium" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>
+                          弹幕预制语句
+                        </div>
+                        <div className="text-xs mt-1" style={{ color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                          最多 5 条，学生端发送弹幕时会显示这些语句。
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowDanmuPresetEditor((prev) => !prev)
+                        }}
+                        disabled={false}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          danmuPresetDrafts.length >= 5
+                            ? theme === 'dark'
+                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            : theme === 'dark'
+                            ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        新增
+                      </button>
+                    </div>
+
+                    {showDanmuPresetEditor && (
+                      <>
+                        <div className="flex justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              addDanmuPresetPhrase()
+                            }}
+                            disabled={danmuPresetDrafts.length >= 5}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                              danmuPresetDrafts.length >= 5
+                                ? theme === 'dark'
+                                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : theme === 'dark'
+                                ? 'bg-slate-700 text-slate-200 hover:bg-slate-600'
+                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                            }`}
+                          >
+                            新增语句
+                          </button>
+                        </div>
+                    <div className="space-y-2">
+                      {danmuPresetDrafts.length > 0 ? (
+                        danmuPresetDrafts.map((phrase, index) => (
+                          <div key={`danmu-preset-${index}`} className="flex items-center gap-2">
+                            <input
+                              value={phrase}
+                              maxLength={20}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => handleDanmuPresetDraftChange(index, e.target.value)}
+                              onBlur={() => persistDanmuPresetPhrases(danmuPresetDrafts)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  persistDanmuPresetPhrases(danmuPresetDrafts)
+                                }
+                              }}
+                              placeholder={`预设语句 ${index + 1}`}
+                              className={`flex-1 rounded-lg px-3 py-2 text-sm border focus:outline-none focus:ring-2 focus:ring-pink-500/40 ${
+                                theme === 'dark'
+                                  ? 'bg-slate-800 border-slate-700 text-slate-100 placeholder:text-slate-500'
+                                  : 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-400'
+                              }`}
+                            />
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                removeDanmuPresetPhrase(index)
+                              }}
+                              className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                                theme === 'dark'
+                                  ? 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20'
+                                  : 'bg-rose-50 text-rose-600 hover:bg-rose-100'
+                              }`}
+                            >
+                              删除
+                            </button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-xs" style={{ color: theme === 'dark' ? '#94a3b8' : '#64748b' }}>
+                          暂无预制语句，点击“新增语句”开始设置。
+                        </div>
+                      )}
+                    </div>
+                      </>
+                    )}
+                  </div>
+
                   <div className="pt-2 border-t border-slate-200/20">
                     <span className="text-sm font-medium flex-shrink-0" style={{ color: theme === 'dark' ? '#cbd5e1' : '#475569' }}>氛围效果</span>
                     <div className="flex gap-2 mt-3 flex-wrap">
@@ -1805,13 +2022,9 @@ export default function WhiteboardMode() {
             publishedGroups={publishedGroups.filter((g) => !hiddenGroupIds.has(g.id))}
             onClearCompleted={handleClearCompleted}
             previewingGroup={previewingGroup}
-            onPublishAll={handlePublishAll}
             onClose={() => setShowRightPanel(false)}
             onRevertToDraft={handleRevertToDraft}
             onEndTask={handleEndTask}
-            onStartClassChallenge={handleStartClassChallenge}
-            onStartDuel={handleStartDuel}
-            onStartQuickAnswer={handleStartQuickAnswer}
             onPreview={handlePreviewTask}
             onRefresh={() => void refreshWhiteboardOverview()}
               theme={theme}

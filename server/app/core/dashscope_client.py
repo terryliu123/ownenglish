@@ -4,9 +4,8 @@ import base64
 import json
 import logging
 from typing import List, Optional, Union
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
+import httpx
 from fastapi import HTTPException
 from app.core.config import get_settings
 
@@ -26,11 +25,15 @@ def encode_image_base64(image_data: Union[str, bytes]) -> str:
 
 
 def call_dashscope_sync(messages: List[dict], image_url: Optional[str] = None) -> dict:
-    """同步调用百炼 API"""
+    """同步调用百炼 API（含重试）"""
     if not settings.DASHSCOPE_API_KEY:
         raise HTTPException(status_code=500, detail="DASHSCOPE_API_KEY is not configured")
 
     url = settings.DASHSCOPE_API_URL
+    headers = {
+        "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
     # 构建请求体
     if image_url:
@@ -68,16 +71,10 @@ def call_dashscope_sync(messages: List[dict], image_url: Optional[str] = None) -
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "")
-            if role == "system":
-                formatted_messages.append({
-                    "role": "system",
-                    "content": [{"text": content}]
-                })
-            else:
-                formatted_messages.append({
-                    "role": role,
-                    "content": [{"text": content}]
-                })
+            formatted_messages.append({
+                "role": role,
+                "content": [{"text": content}]
+            })
 
         payload = {
             "model": settings.DASHSCOPE_MODEL,
@@ -87,34 +84,115 @@ def call_dashscope_sync(messages: List[dict], image_url: Optional[str] = None) -
             "parameters": {"max_tokens": 2000}
         }
 
-    body = json.dumps(payload).encode("utf-8")
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            with httpx.Client(timeout=settings.DASHSCOPE_TIMEOUT_SECONDS) as client:
+                resp = client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                result = resp.json()
+                if "output" in result and "choices" in result["output"]:
+                    return result["output"]["choices"]
+                return result
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text
+            logger.error(f"DashScope HTTP error: {detail}")
+            raise HTTPException(status_code=502, detail=f"DashScope request failed: {detail}")
+        except (httpx.ConnectError, httpx.ReadError, httpx.WriteError, httpx.PoolTimeout, httpx.ConnectTimeout, httpx.ReadTimeout, OSError) as exc:
+            if attempt < max_retries:
+                import time
+                logger.warning("DashScope network error (attempt %d/%d): %s, retrying...", attempt + 1, max_retries + 1, exc)
+                time.sleep(1 * (attempt + 1))
+                continue
+            logger.error(f"DashScope network error: {exc}")
+            raise HTTPException(status_code=502, detail=f"DashScope network error: {exc}")
+        except Exception as exc:
+            logger.error(f"DashScope error: {exc}")
+            raise HTTPException(status_code=500, detail=f"DashScope error: {exc}")
+
+
+async def call_dashscope(messages: List[dict], image_url: Optional[str] = None) -> dict:
+    """异步调用百炼 API"""
+    if not settings.DASHSCOPE_API_KEY:
+        raise HTTPException(status_code=500, detail="DASHSCOPE_API_KEY is not configured")
+
+    url = settings.DASHSCOPE_API_URL
     headers = {
         "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
         "Content-Type": "application/json",
     }
 
-    try:
-        request = Request(url, data=body, headers=headers, method="POST")
-        with urlopen(request, timeout=settings.DASHSCOPE_TIMEOUT_SECONDS) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            if "output" in result and "choices" in result["output"]:
-                return result["output"]["choices"]
-            return result
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        logger.error(f"DashScope HTTP error: {detail}")
-        raise HTTPException(status_code=502, detail=f"DashScope request failed: {detail or exc.reason}")
-    except URLError as exc:
-        logger.error(f"DashScope URL error: {exc.reason}")
-        raise HTTPException(status_code=502, detail=f"DashScope network error: {exc.reason}")
-    except Exception as exc:
-        logger.error(f"DashScope error: {exc}")
-        raise HTTPException(status_code=500, detail=f"DashScope error: {exc}")
+    # 构建请求体
+    if image_url:
+        system_prompt = ""
+        user_text = ""
+        for msg in messages:
+            if msg.get("role") == "system":
+                system_prompt = msg.get("content", "")
+            else:
+                user_text = msg.get("content", "")
 
+        text_content = user_text
+        if system_prompt:
+            text_content = f"{system_prompt}\n\n{user_text}"
 
-async def call_dashscope(messages: List[dict], image_url: Optional[str] = None) -> dict:
-    """异步调用百炼 API"""
-    return await asyncio.to_thread(call_dashscope_sync, messages, image_url)
+        payload = {
+            "model": settings.DASHSCOPE_MODEL,
+            "input": {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"image": image_url},
+                            {"text": text_content}
+                        ]
+                    }
+                ]
+            },
+            "parameters": {"max_tokens": 2000}
+        }
+    else:
+        formatted_messages = []
+        for msg in messages:
+            role = msg.get("role", "user")
+            content = msg.get("content", "")
+            formatted_messages.append({
+                "role": role,
+                "content": [{"text": content}]
+            })
+
+        payload = {
+            "model": settings.DASHSCOPE_MODEL,
+            "input": {
+                "messages": formatted_messages
+            },
+            "parameters": {"max_tokens": 2000}
+        }
+
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=settings.DASHSCOPE_TIMEOUT_SECONDS) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                result = resp.json()
+                if "output" in result and "choices" in result["output"]:
+                    return result["output"]["choices"]
+                return result
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text
+            logger.error(f"DashScope HTTP error: {detail}")
+            raise HTTPException(status_code=502, detail=f"DashScope request failed: {detail}")
+        except (httpx.ConnectError, httpx.ReadError, httpx.WriteError, httpx.PoolTimeout, httpx.ConnectTimeout, httpx.ReadTimeout, OSError) as exc:
+            if attempt < max_retries:
+                logger.warning("DashScope network error (attempt %d/%d): %s, retrying...", attempt + 1, max_retries + 1, exc)
+                await asyncio.sleep(1 * (attempt + 1))
+                continue
+            logger.error(f"DashScope network error: {exc}")
+            raise HTTPException(status_code=502, detail=f"DashScope network error: {exc}")
+        except Exception as exc:
+            logger.error(f"DashScope error: {exc}")
+            raise HTTPException(status_code=500, detail=f"DashScope error: {exc}")
 
 
 def call_dashscope_image_gen_sync(prompt: str, ref_image_base64: Optional[str] = None) -> dict:
@@ -122,9 +200,7 @@ def call_dashscope_image_gen_sync(prompt: str, ref_image_base64: Optional[str] =
     if not settings.DASHSCOPE_API_KEY:
         raise HTTPException(status_code=500, detail="DASHSCOPE_API_KEY is not configured")
 
-    # 异步模式 URL
     url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation"
-
     payload = {
         "model": "wan2.7-image",
         "input": {
@@ -140,8 +216,6 @@ def call_dashscope_image_gen_sync(prompt: str, ref_image_base64: Optional[str] =
             "n": 1
         }
     }
-
-    body = json.dumps(payload).encode("utf-8")
     headers = {
         "Authorization": f"Bearer {settings.DASHSCOPE_API_KEY}",
         "Content-Type": "application/json",
@@ -149,18 +223,19 @@ def call_dashscope_image_gen_sync(prompt: str, ref_image_base64: Optional[str] =
     }
 
     try:
-        request = Request(url, data=body, headers=headers, method="POST")
-        with urlopen(request, timeout=120) as response:
-            result = json.loads(response.read().decode("utf-8"))
+        with httpx.Client(timeout=120) as client:
+            resp = client.post(url, json=payload, headers=headers)
+            resp.raise_for_status()
+            result = resp.json()
             logger.info(f"[DashScope ImageGen] async response: {str(result)[:500]}")
             return result
-    except HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
+    except httpx.HTTPStatusError as exc:
+        detail = exc.response.text
         logger.error(f"DashScope ImageGen HTTP error: {detail}")
-        raise HTTPException(status_code=502, detail=f"DashScope image generation failed: {detail or exc.reason}")
-    except URLError as exc:
-        logger.error(f"DashScope ImageGen URL error: {exc.reason}")
-        raise HTTPException(status_code=502, detail=f"DashScope network error: {exc.reason}")
+        raise HTTPException(status_code=502, detail=f"DashScope image generation failed: {detail}")
+    except (httpx.ConnectError, httpx.ReadError, httpx.WriteError, httpx.PoolTimeout, httpx.ConnectTimeout, httpx.ReadTimeout, OSError) as exc:
+        logger.error(f"DashScope ImageGen network error: {exc}")
+        raise HTTPException(status_code=502, detail=f"DashScope network error: {exc}")
     except Exception as exc:
         logger.error(f"DashScope ImageGen error: {exc}")
         raise HTTPException(status_code=500, detail=f"DashScope image generation error: {exc}")
@@ -168,7 +243,6 @@ def call_dashscope_image_gen_sync(prompt: str, ref_image_base64: Optional[str] =
 
 async def call_dashscope_image_gen(prompt: str, ref_image_base64: Optional[str] = None) -> dict:
     """异步调用百炼 wan2.7-image 模型进行图片生成（异步模式+轮询）"""
-    import time
     result = await asyncio.to_thread(call_dashscope_image_gen_sync, prompt, ref_image_base64)
     # 异步模式返回 task_id，需要轮询获取结果
     task_id = result.get("output", {}).get("task_id")
@@ -183,21 +257,20 @@ async def call_dashscope_image_gen(prompt: str, ref_image_base64: Optional[str] 
     for _ in range(60):  # 最多等60秒
         await asyncio.sleep(2)
         try:
-            req = Request(status_url, headers=headers, method="GET")
-            with urlopen(req, timeout=30) as resp:
-                status_result = json.loads(resp.read().decode("utf-8"))
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(status_url, headers=headers)
+                resp.raise_for_status()
+                status_result = resp.json()
                 logger.info(f"[DashScope ImageGen] poll full: {status_result}")
                 output = status_result.get("output", {})
                 task_status = output.get("task_status")
                 if task_status == "SUCCEEDED":
-                    # wan2.7-image 返回格式: output.choices[0].message.content[0].image 或 content[0] 直接是URL字符串
                     choices = output.get("choices")
                     if choices:
                         message = choices[0].get("message", {})
                         content = message.get("content", [])
                         if content and isinstance(content, list):
                             first_content = content[0]
-                            # content[0] 可能是 {"image": "url", "type": "image"} 或直接是 "url" 字符串
                             if isinstance(first_content, dict):
                                 image_url = first_content.get("image") or first_content.get("url")
                             elif isinstance(first_content, str):

@@ -132,6 +132,7 @@ class WsDanmuConfigMessage(BaseModel):
     speed: Optional[str] = None
     density: Optional[str] = None
     area: Optional[str] = None
+    presetPhrases: Optional[List[str]] = None
     class Config:
         extra = "allow"
 

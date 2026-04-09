@@ -8,7 +8,7 @@ from typing import Any, Optional, List
 from pydantic import BaseModel
 
 from app.db.session import get_db
-from app.models import User, UserRole, Class, LiveTaskGroup, LiveSession, Notification, NotificationType, ActivityLog, ActivityType, MembershipPlan, TeacherMembership
+from app.models import User, UserRole, Class, LiveTaskGroup, LiveSession, Notification, NotificationType, ActivityLog, ActivityType, MembershipPlan, TeacherMembership, InvitationCode
 from app.api.v1.auth import get_current_user
 from app.services.notifications import create_notification, create_bulk_notifications
 from app.services.membership import ensure_membership_plans
@@ -21,7 +21,7 @@ async def get_current_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """Require admin role."""
-    if current_user.role != UserRole.ADMIN:
+    if str(current_user.role) != str(UserRole.ADMIN) and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
 
@@ -642,4 +642,122 @@ async def list_activities(
         "total": total or 0,
         "limit": limit,
         "offset": offset,
+    }
+
+
+# ===== 邀请码管理 =====
+
+import random
+import string
+
+
+@router.get("/invitation-codes")
+async def list_invitation_codes(
+    limit: int = Query(50, le=100),
+    offset: int = Query(0),
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(InvitationCode).order_by(InvitationCode.created_at.desc()).limit(limit).offset(offset)
+    )
+    codes = result.scalars().all()
+    total_result = await db.execute(select(func.count(InvitationCode.id)))
+    total = total_result.scalar() or 0
+    return {
+        "items": [
+            {
+                "id": c.id,
+                "code": c.code,
+                "is_active": c.is_active,
+                "used_count": c.used_count,
+                "notes": c.notes,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in codes
+        ],
+        "total": total,
+    }
+
+
+class CreateInvitationCodeRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+@router.post("/invitation-codes")
+async def create_invitation_code(
+    request: CreateInvitationCodeRequest,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    code_str = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    inv = InvitationCode(code=code_str, notes=request.notes)
+    db.add(inv)
+    await db.commit()
+    await db.refresh(inv)
+    return {"id": inv.id, "code": inv.code, "is_active": inv.is_active, "used_count": inv.used_count, "notes": inv.notes}
+
+
+@router.patch("/invitation-codes/{code_id}")
+async def update_invitation_code(
+    code_id: str,
+    is_active: Optional[bool] = None,
+    notes: Optional[str] = None,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(InvitationCode).where(InvitationCode.id == code_id))
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(status_code=404, detail="邀请码不存在")
+    if is_active is not None:
+        inv.is_active = is_active
+    if notes is not None:
+        inv.notes = notes
+    await db.commit()
+    return {"id": inv.id, "code": inv.code, "is_active": inv.is_active, "used_count": inv.used_count}
+
+
+@router.delete("/invitation-codes/{code_id}")
+async def delete_invitation_code(
+    code_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(InvitationCode).where(InvitationCode.id == code_id))
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(status_code=404, detail="邀请码不存在")
+    await db.delete(inv)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/invitation-codes/{code_id}/users")
+async def get_invitation_code_users(
+    code_id: str,
+    current_user: User = Depends(get_current_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(InvitationCode).where(InvitationCode.id == code_id))
+    inv = result.scalar_one_or_none()
+    if not inv:
+        raise HTTPException(status_code=404, detail="邀请码不存在")
+    users_result = await db.execute(
+        select(User).where(User.invitation_code_id == code_id).order_by(User.created_at.desc())
+    )
+    users = users_result.scalars().all()
+    return {
+        "code": inv.code,
+        "users": [
+            {
+                "id": u.id,
+                "name": u.name,
+                "email": u.email,
+                "role": u.role.value if hasattr(u.role, 'value') else str(u.role),
+                "created_at": u.created_at.isoformat() if u.created_at else None,
+            }
+            for u in users
+        ],
+        "total": len(users),
     }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { debugLive } from '../features/live-runtime/debug'
+import { buildLiveWsUrl, getFreshAccessToken as ensureFreshAccessToken } from './ws-auth'
 import {
   normalizeChallengePayload,
   normalizeRoomInfoPayload,
@@ -168,6 +169,7 @@ interface UseLiveWebSocketOptions {
   classId: string
   token: string
   role: 'teacher' | 'student'
+  selfUserId?: string
   onError?: (message: string) => void
   onNewTask?: (task: LiveTask) => void
   onTaskEnded?: (data: { task_id: string; correct_answer: unknown; total_submissions: number }) => void
@@ -222,6 +224,7 @@ export function useLiveWebSocket({
   classId,
   token,
   role,
+  selfUserId,
   onError,
   onNewTask,
   onTaskEnded,
@@ -252,13 +255,18 @@ export function useLiveWebSocket({
   onAtmosphereEffect,
 }: UseLiveWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null)
+  const statusRef = useRef<WebSocketStatus>('disconnected')
   const [status, setStatus] = useState<WebSocketStatus>('disconnected')
   const [roomInfo, setRoomInfo] = useState<RoomInfo | null>(null)
+  const roomInfoRef = useRef<RoomInfo | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttempts = useRef(0)
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const tokenRefreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pendingMessagesRef = useRef<string[]>([])
   const MAX_PENDING_MESSAGES = 100
+  const ackCallbacksRef = useRef<Map<string, { resolve: () => void; timer: ReturnType<typeof setTimeout> }>>(new Map())
+  const pendingAckMetaRef = useRef<Map<string, { kind: 'task_group' | 'challenge'; targetId: string }>>(new Map())
 
   const callbacksRef = useRef({
     onError,
@@ -372,6 +380,12 @@ export function useLiveWebSocket({
           live_session_id: liveSessionId,
           session_id: liveSessionId ?? undefined,
         })
+        roomInfoRef.current = {
+          ...normalizedRoomInfo,
+          is_reconnect: data.is_reconnect as boolean | undefined,
+          live_session_id: liveSessionId,
+          session_id: liveSessionId ?? undefined,
+        }
         setRoomInfo({
           ...normalizedRoomInfo,
           is_reconnect: data.is_reconnect as boolean | undefined,
@@ -395,6 +409,16 @@ export function useLiveWebSocket({
         cbs.onSubmissionReceived?.({ task_id: data.task_id as string })
         break
       case 'task_group_submission_received':
+        for (const [msgId, meta] of Array.from(ackCallbacksRef.current.keys()).map((id) => [id, pendingAckMetaRef.current.get(id)] as const)) {
+          if (meta?.kind !== 'task_group' || meta.targetId !== (data.group_id as string)) continue
+          const pending = ackCallbacksRef.current.get(msgId)
+          if (pending) {
+            clearTimeout(pending.timer)
+            pending.resolve()
+            ackCallbacksRef.current.delete(msgId)
+            pendingAckMetaRef.current.delete(msgId)
+          }
+        }
         cbs.onTaskGroupSubmissionReceived?.({ group_id: data.group_id as string })
         break
       case 'student_joined':
@@ -422,6 +446,7 @@ export function useLiveWebSocket({
         break
       case 'room_info': {
         const normalizedRoomInfo = normalizeRoomInfoPayload(data as Record<string, unknown>)
+        roomInfoRef.current = normalizedRoomInfo
         cbs.onRoomInfo?.(normalizedRoomInfo)
         setRoomInfo(normalizedRoomInfo)
         break
@@ -468,6 +493,21 @@ export function useLiveWebSocket({
       case 'challenge_progress_updated':
       case 'challenge_scoreboard_updated': {
         const normalizedChallenge = normalizeChallengePayload(data as Record<string, unknown>)
+        if (selfUserId && normalizedChallenge.id) {
+          const selfEntry = normalizedChallenge.scoreboard?.find((entry) => entry.student_id === selfUserId)
+          if (selfEntry?.submitted) {
+            for (const [msgId, meta] of Array.from(ackCallbacksRef.current.keys()).map((id) => [id, pendingAckMetaRef.current.get(id)] as const)) {
+              if (meta?.kind !== 'challenge' || meta.targetId !== normalizedChallenge.id) continue
+              const pending = ackCallbacksRef.current.get(msgId)
+              if (pending) {
+                clearTimeout(pending.timer)
+                pending.resolve()
+                ackCallbacksRef.current.delete(msgId)
+                pendingAckMetaRef.current.delete(msgId)
+              }
+            }
+          }
+        }
         const payload = {
           challenge_id: (data.challenge_id as string) || normalizedChallenge.id,
           scoreboard: normalizedChallenge.scoreboard,
@@ -487,6 +527,19 @@ export function useLiveWebSocket({
         break
       }
       case 'challenge_ended':
+        if ((data.challenge_id as string | undefined) || (data.id as string | undefined)) {
+          const endedChallengeId = (data.challenge_id as string | undefined) || (data.id as string | undefined)
+          for (const [msgId, meta] of Array.from(ackCallbacksRef.current.keys()).map((id) => [id, pendingAckMetaRef.current.get(id)] as const)) {
+            if (meta?.kind !== 'challenge' || meta.targetId !== endedChallengeId) continue
+            const pending = ackCallbacksRef.current.get(msgId)
+            if (pending) {
+              clearTimeout(pending.timer)
+              pending.resolve()
+              ackCallbacksRef.current.delete(msgId)
+              pendingAckMetaRef.current.delete(msgId)
+            }
+          }
+        }
         cbs.onChallengeEnded?.(normalizeChallengePayload(data as Record<string, unknown>))
         break
       case 'error':
@@ -539,6 +592,22 @@ export function useLiveWebSocket({
           sourceName: data.sourceName as string | undefined,
         })
         break
+      case 'token_refresh_ack':
+        // Token refresh acknowledged by server — no action needed
+        break
+      case 'ack': {
+        const ackedMsgId = data.msg_id as string
+        if (ackedMsgId) {
+          const pending = ackCallbacksRef.current.get(ackedMsgId)
+          if (pending) {
+            clearTimeout(pending.timer)
+            pending.resolve()
+            ackCallbacksRef.current.delete(ackedMsgId)
+            pendingAckMetaRef.current.delete(ackedMsgId)
+          }
+        }
+        break
+      }
       default:
         break
     }
@@ -547,7 +616,6 @@ export function useLiveWebSocket({
   const connect = useCallback(() => {
     if (
       !classId ||
-      !token ||
       wsRef.current?.readyState === WebSocket.OPEN ||
       wsRef.current?.readyState === WebSocket.CONNECTING
     ) {
@@ -555,18 +623,25 @@ export function useLiveWebSocket({
     }
 
     setStatus('connecting')
+    statusRef.current = 'connecting'
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    // Use Vite dev server proxy in development (port 5173)
-    const host = window.location.host
-    const wsUrl = `${protocol}//${host}/api/v1/live/ws?token=${encodeURIComponent(token)}&class_id=${encodeURIComponent(classId)}`
-    const ws = new WebSocket(wsUrl)
-    wsRef.current = ws
+    void (async () => {
+      const accessToken = await ensureFreshAccessToken(localStorage.getItem('token') || token || null)
+      if (!accessToken) {
+        setStatus('error')
+        statusRef.current = 'error'
+        callbacksRef.current.onError?.('Missing access token')
+        return
+      }
 
-    ws.onopen = () => {
+      const ws = new WebSocket(buildLiveWsUrl(classId, accessToken))
+      wsRef.current = ws
+
+      ws.onopen = () => {
       console.log('[WebSocket] Connection opened')
       debugLive('ws:open', { classId, role })
       setStatus('connected')
+      statusRef.current = 'connected'
       reconnectAttempts.current = 0
       // Start keep-alive ping every 25s
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current)
@@ -575,6 +650,20 @@ export function useLiveWebSocket({
           send({ type: 'ping' })
         }
       }, 25000)
+      // Token refresh via HTTP /auth/refresh every 10min to prevent expiry during long sessions.
+      // If refresh fails, disconnect and let reconnect use the new token from login redirect.
+      if (tokenRefreshIntervalRef.current) clearInterval(tokenRefreshIntervalRef.current)
+      tokenRefreshIntervalRef.current = setInterval(async () => {
+        if (wsRef.current?.readyState !== WebSocket.OPEN) return
+        try {
+          await ensureFreshAccessToken(localStorage.getItem('token') || token || null)
+          debugLive('ws:token-refreshed', { via: 'http' })
+        } catch (err) {
+          console.warn('[WebSocket] HTTP token refresh failed, reconnecting with current token', err)
+          debugLive('ws:token-refresh-failed', { via: 'http' })
+          // Don't force disconnect — the next reconnect will use whatever token is in localStorage
+        }
+      }, 600000)
       if (pendingMessagesRef.current.length > 0) {
         const queued = [...pendingMessagesRef.current]
         pendingMessagesRef.current = []
@@ -586,16 +675,21 @@ export function useLiveWebSocket({
           }
         })
       }
-    }
+      }
 
-    ws.onclose = (event) => {
+      ws.onclose = (event) => {
       console.log('[WebSocket] Connection closed:', event.code, event.reason)
       debugLive('ws:close', { code: event.code, reason: event.reason, classId, role })
       setStatus('disconnected')
+      statusRef.current = 'disconnected'
       wsRef.current = null
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current)
         pingIntervalRef.current = null
+      }
+      if (tokenRefreshIntervalRef.current) {
+        clearInterval(tokenRefreshIntervalRef.current)
+        tokenRefreshIntervalRef.current = null
       }
 
       // 4003 = session not started — don't reconnect, notify student
@@ -604,8 +698,16 @@ export function useLiveWebSocket({
         return
       }
 
+      // 4002 = room not found / classroom not active — stop reconnecting
+      if (event.code === 4002) {
+        callbacksRef.current.onRoomClosed?.()
+        return
+      }
+
       if (event.code !== 1000 && reconnectAttempts.current < 5) {
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)
+        const baseDelay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)
+        const jitter = Math.random() * baseDelay * 0.3
+        const delay = baseDelay + jitter
         reconnectTimeoutRef.current = setTimeout(() => {
           reconnectAttempts.current += 1
           connect()
@@ -615,21 +717,23 @@ export function useLiveWebSocket({
       if (event.code === 1000 && event.reason === 'room_closed') {
         callbacksRef.current.onRoomClosed?.()
       }
-    }
+      }
 
-    ws.onerror = () => {
+      ws.onerror = () => {
       debugLive('ws:onerror', { classId, role })
       setStatus('error')
-    }
+      statusRef.current = 'error'
+      }
 
-    ws.onmessage = (event) => {
+      ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data)
         handleMessage(data)
       } catch (error) {
         console.error('Failed to parse WebSocket message:', error)
       }
-    }
+      }
+    })()
   }, [classId, token, handleMessage])
 
   const disconnect = useCallback(() => {
@@ -641,15 +745,27 @@ export function useLiveWebSocket({
       clearInterval(pingIntervalRef.current)
       pingIntervalRef.current = null
     }
+    if (tokenRefreshIntervalRef.current) {
+      clearInterval(tokenRefreshIntervalRef.current)
+      tokenRefreshIntervalRef.current = null
+    }
+    // Clean up pending ACK callbacks
+    ackCallbacksRef.current.forEach(({ timer }) => clearTimeout(timer))
+    ackCallbacksRef.current.clear()
+    pendingAckMetaRef.current.clear()
+    // Clean up pending messages
+    pendingMessagesRef.current = []
     if (wsRef.current) {
       wsRef.current.close(1000, 'User disconnected')
       wsRef.current = null
     }
     setStatus('disconnected')
+    statusRef.current = 'disconnected'
   }, [])
 
   const send = useCallback((data: Record<string, unknown>) => {
     const payload = JSON.stringify(data)
+    console.log('[DANMU_DEBUG] ws.send called, type:', data.type, 'wsState:', wsRef.current?.readyState, 'isOpen:', wsRef.current?.readyState === WebSocket.OPEN)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       debugLive('ws:send', data)
       wsRef.current.send(payload)
@@ -740,13 +856,58 @@ export function useLiveWebSocket({
     send({ type: 'get_current_task' })
   }, [send])
 
-  const submitTaskGroup = useCallback((groupId: string, answers: { task_id: string; answer: unknown }[], sessionId?: string | null) => {
-    send({
+  const submitTaskGroup = useCallback((groupId: string, answers: { task_id: string; answer: unknown }[], sessionId?: string | null, classId?: string) => {
+    // HTTP fallback when WS is disconnected
+    if (statusRef.current !== 'connected') {
+      debugLive('ws:http-fallback', { type: 'task-group', groupId })
+      import('./api').then(({ liveService }) => {
+        liveService.httpSubmitTaskGroup(groupId, classId || '', answers, sessionId)
+          .catch((err: unknown) => console.error('[WebSocket] HTTP fallback task-group submit failed:', err))
+      })
+      return
+    }
+
+    const msgId = `tg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const payload = {
       type: 'submit_task_group',
+      msg_id: msgId,
       group_id: groupId,
       answers,
       session_id: sessionId ?? undefined,
-    })
+    }
+    const queryTaskGroupState = () => {
+      send({ type: 'get_room_info' })
+    }
+
+    // Retry with exponential backoff; before retry, query room state once
+    const trySend = (attempt: number) => {
+      const timeout = setTimeout(() => {
+        if (ackCallbacksRef.current.has(msgId)) {
+          if (attempt < 3) {
+            queryTaskGroupState()
+            setTimeout(() => {
+              if (!ackCallbacksRef.current.has(msgId)) {
+                return
+              }
+              ackCallbacksRef.current.delete(msgId)
+              pendingAckMetaRef.current.delete(msgId)
+              debugLive('ws:retry', { msgId, attempt: attempt + 1, reason: 'ack-timeout-after-room-info' })
+              trySend(attempt + 1)
+            }, 500)
+            return
+          }
+          ackCallbacksRef.current.delete(msgId)
+          pendingAckMetaRef.current.delete(msgId)
+        }
+      }, 3000 * Math.pow(2, attempt))
+      ackCallbacksRef.current.set(msgId, {
+        resolve: () => { clearTimeout(timeout) },
+        timer: timeout,
+      })
+      pendingAckMetaRef.current.set(msgId, { kind: 'task_group', targetId: groupId })
+      send(payload)
+    }
+    trySend(0)
   }, [send])
 
   const updateChallengeProgress = useCallback((
@@ -773,13 +934,84 @@ export function useLiveWebSocket({
     answers: { task_id: string; answer: unknown }[],
     startedAt?: string | null,
   ) => {
-    send({
+    // HTTP fallback when WS is disconnected
+    if (statusRef.current !== 'connected') {
+      debugLive('ws:http-fallback', { type: 'challenge', challengeId })
+      import('./api').then(({ liveService }) => {
+        liveService.httpSubmitChallenge(challengeId, answers, startedAt)
+          .catch((err: unknown) => console.error('[WebSocket] HTTP fallback challenge submit failed:', err))
+      })
+      return
+    }
+
+    const msgId = `ch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    const payload = {
       type: 'submit_challenge',
+      msg_id: msgId,
       challenge_id: challengeId,
       answers,
       started_at: startedAt ?? undefined,
-    })
-  }, [send])
+    }
+    const queryChallengeState = () => {
+      send({ type: 'get_room_info' })
+    }
+    const trySend = (attempt: number) => {
+      const timeout = setTimeout(() => {
+        if (ackCallbacksRef.current.has(msgId)) {
+          const currentChallenge = roomInfoRef.current?.room_state?.current_challenge
+          const selfEntry = selfUserId
+            ? currentChallenge?.scoreboard?.find((entry) => entry.student_id === selfUserId)
+            : undefined
+          if (selfEntry?.submitted) {
+            const pending = ackCallbacksRef.current.get(msgId)
+            if (pending) {
+              clearTimeout(pending.timer)
+            }
+            ackCallbacksRef.current.delete(msgId)
+            pendingAckMetaRef.current.delete(msgId)
+            debugLive('ws:ack-recovered', { msgId, challengeId, source: 'room-info' })
+            return
+          }
+          if (attempt < 3) {
+            queryChallengeState()
+            setTimeout(() => {
+              if (!ackCallbacksRef.current.has(msgId)) {
+                return
+              }
+              const refreshedChallenge = roomInfoRef.current?.room_state?.current_challenge
+              const refreshedEntry = selfUserId
+                ? refreshedChallenge?.scoreboard?.find((entry) => entry.student_id === selfUserId)
+                : undefined
+              if (refreshedEntry?.submitted) {
+                const pending = ackCallbacksRef.current.get(msgId)
+                if (pending) {
+                  clearTimeout(pending.timer)
+                }
+                ackCallbacksRef.current.delete(msgId)
+                pendingAckMetaRef.current.delete(msgId)
+                debugLive('ws:ack-recovered', { msgId, challengeId, source: 'room-info-refresh' })
+                return
+              }
+              ackCallbacksRef.current.delete(msgId)
+              pendingAckMetaRef.current.delete(msgId)
+              debugLive('ws:retry', { msgId, attempt: attempt + 1, reason: 'ack-timeout-after-room-info' })
+              trySend(attempt + 1)
+            }, 500)
+            return
+          }
+          ackCallbacksRef.current.delete(msgId)
+          pendingAckMetaRef.current.delete(msgId)
+        }
+      }, 3000 * Math.pow(2, attempt))
+      ackCallbacksRef.current.set(msgId, {
+        resolve: () => { clearTimeout(timeout) },
+        timer: timeout,
+      })
+      pendingAckMetaRef.current.set(msgId, { kind: 'challenge', targetId: challengeId })
+      send(payload)
+    }
+    trySend(0)
+  }, [selfUserId, send])
 
   const ping = useCallback(() => {
     send({ type: 'ping' })
@@ -811,10 +1043,12 @@ export function useLiveWebSocket({
 
   // Danmu methods
   const sendDanmu = useCallback((content: string) => {
+    console.log('[DANMU_DEBUG] ws.sendDanmu called, content:', content)
     send({
       type: 'danmu_send',
       content,
     })
+    console.log('[DANMU_DEBUG] ws.sendDanmu sent')
   }, [send])
 
   const sendDanmuConfig = useCallback((config: {
@@ -824,6 +1058,7 @@ export function useLiveWebSocket({
     speed: string
     density: string
     area?: string
+    presetPhrases?: string[]
   }) => {
     send({
       type: 'danmu_config',

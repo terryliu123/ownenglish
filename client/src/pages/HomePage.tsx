@@ -27,7 +27,7 @@ export default function HomePage() {
 
   const features = [
     { icon: '⚡', title: t('homepageV2.featureCards.liveTitle'), desc: t('homepageV2.featureCards.liveDesc'), color: 'from-blue-500 to-cyan-400', border: 'border-blue-500/30', glow: 'rgba(59,130,246,0.15)' },
-    { icon: '🎮', title: t('homepageV2.featureCards.bigscreenTitle'), desc: t('homepageV2.featureCards.bigscreenDesc'), color: 'from-violet-500 to-purple-400', border: 'border-violet-500/30', glow: 'rgba(139,92,246,0.15)' },
+    { icon: '📱', title: t('homepageV2.featureCards.bigscreenTitle'), desc: t('homepageV2.featureCards.bigscreenDesc'), color: 'from-violet-500 to-purple-400', border: 'border-violet-500/30', glow: 'rgba(139,92,246,0.15)' },
     { icon: '🧰', title: t('homepageV2.featureCards.teachingAidsTitle'), desc: t('homepageV2.featureCards.teachingAidsDesc'), color: 'from-emerald-500 to-green-400', border: 'border-emerald-500/30', glow: 'rgba(52,211,153,0.15)' },
     { icon: '📝', title: t('homepageV2.featureCards.taskTitle'), desc: t('homepageV2.featureCards.taskDesc'), color: 'from-amber-500 to-orange-400', border: 'border-amber-500/30', glow: 'rgba(245,158,11,0.15)' },
     { icon: '📊', title: t('homepageV2.featureCards.reviewTitle'), desc: t('homepageV2.featureCards.reviewDesc'), color: 'from-pink-500 to-rose-400', border: 'border-pink-500/30', glow: 'rgba(236,72,153,0.15)' },
@@ -59,7 +59,7 @@ export default function HomePage() {
       <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${scrolled ? 'bg-[#0a0e1a]/90 backdrop-blur-xl shadow-lg shadow-black/20 border-b border-white/5' : 'bg-transparent'}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+            <div className="w-9 h-9 flex items-center justify-center">
               <img src="/logo.png" alt="" className="w-9 h-9 rounded-xl" />
             </div>
             <span className="font-bold text-white text-lg tracking-tight">胖鼠互动课堂</span>
@@ -422,9 +422,6 @@ export default function HomePage() {
             <Link to="/register" className="px-8 py-4 bg-white text-[#0a0e1a] rounded-2xl font-bold text-lg hover:shadow-2xl hover:-translate-y-0.5 transition-all duration-300">
               {t('homepageV2.registerNow')}
             </Link>
-            <Link to="/free" className="px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-2xl font-semibold text-lg border border-white/20 hover:bg-white/20 transition-all duration-300">
-              {t('homepageV2.browseFreePractice')}
-            </Link>
           </div>
         </div>
       </section>
@@ -434,12 +431,15 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
+              <div className="w-8 h-8 flex items-center justify-center">
                 <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg" />
               </div>
               <span className="font-semibold text-white">胖鼠互动课堂</span>
             </div>
             <p className="text-slate-600 text-sm">{t('homepageV2.footerCopyright')}</p>
+            <a href="mailto:terry.liu@lugertech.com" className="text-slate-500 text-sm hover:text-slate-300 transition-colors">
+              terry.liu@lugertech.com
+            </a>
             <div className="flex items-center gap-6 text-sm text-slate-600">
               <Link to="/login" className="hover:text-white transition-colors">{t('homepageV2.footerLogin')}</Link>
               <Link to="/register" className="hover:text-white transition-colors">{t('homepageV2.footerRegister')}</Link>

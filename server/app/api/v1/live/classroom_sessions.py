@@ -24,6 +24,7 @@ from app.models import (
     User,
     UserRole,
 )
+from .logging_utils import log_live_transport
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/live")
@@ -191,6 +192,15 @@ async def start_classroom_session(
     existing_session = await _get_latest_active_session(db, request.class_id)
     if existing_session:
         manager.set_room_live_session_id(request.class_id, existing_session.id)
+        log_live_transport(
+            logger,
+            "classroom_session_resumed",
+            class_id=request.class_id,
+            live_session_id=existing_session.id,
+            teacher_id=current_user.id,
+            entry_mode=existing_session.entry_mode,
+            transport="http",
+        )
         logger.info("[ClassroomSession] Resume active session %s for class %s", existing_session.id, request.class_id)
         return StartSessionResponse(
             id=existing_session.id,
@@ -230,6 +240,16 @@ async def start_classroom_session(
     await db.refresh(session)
 
     manager.set_room_live_session_id(request.class_id, session.id)
+    await manager.save_snapshot(request.class_id)
+    log_live_transport(
+        logger,
+        "classroom_session_started",
+        class_id=request.class_id,
+        live_session_id=session.id,
+        teacher_id=current_user.id,
+        entry_mode=request.entry_mode,
+        transport="http",
+    )
     logger.info("[ClassroomSession] Started session %s for class %s", session.id, request.class_id)
     return StartSessionResponse(
         id=session.id,
@@ -275,10 +295,20 @@ async def end_classroom_session(
     )
     await db.commit()
     if session.class_id in manager.class_rooms:
+        await manager.save_snapshot(session.class_id)
         await manager.close_room(session.class_id)
     else:
         manager.set_room_live_session_id(session.class_id, None)
 
+    log_live_transport(
+        logger,
+        "classroom_session_ended",
+        class_id=session.class_id,
+        live_session_id=session.id,
+        teacher_id=current_user.id,
+        duration_seconds=duration_seconds,
+        transport="http",
+    )
     logger.info("[ClassroomSession] Ended session %s", session.id)
     return EndSessionResponse(
         id=session.id,

@@ -11,7 +11,7 @@ import uuid
 logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
-from app.models import User, TeacherProfile, StudentProfile, UserRole, GuestSession, ClassEnrollment, VerificationCode, PasswordResetToken
+from app.models import User, TeacherProfile, StudentProfile, UserRole, GuestSession, ClassEnrollment, VerificationCode, PasswordResetToken, InvitationCode, TeacherMembership, MembershipPlan
 from app.schemas import (
     UserCreate, UserLogin, Token, UserResponse, ChangePasswordRequest,
     SendVerificationCodeRequest, VerifyCodeRequest, ForgotPasswordRequest, ResetPasswordRequest,
@@ -27,7 +27,7 @@ from app.core.security import (
 )
 from app.core.password_validation import check_password_strength
 from app.core.config import get_settings
-from app.services.membership import ensure_teacher_membership, serialize_teacher_membership_snapshot
+from app.services.membership import ensure_teacher_membership, ensure_membership_plans, serialize_teacher_membership_snapshot, PAID_MONTHLY_PLAN_CODE
 
 settings = get_settings()
 
@@ -156,6 +156,19 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
         logger.info(f"Creating user: {user_data.email}")
 
+        # Validate invitation code if provided
+        invitation = None
+        if user_data.invitation_code:
+            result = await db.execute(
+                select(InvitationCode).where(InvitationCode.code == user_data.invitation_code)
+            )
+            invitation = result.scalar_one_or_none()
+            if not invitation or not invitation.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="邀请码无效或已停用",
+                )
+
         # Create user
         password_hash = get_password_hash(user_data.password)
         logger.info(f"Password hash created, length: {len(password_hash)}")
@@ -166,6 +179,7 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             password_hash=password_hash,
             name=user_data.name,
             role=UserRole(normalized_role),
+            invitation_code_id=invitation.id if invitation else None,
         )
         db.add(user)
         await db.flush()
@@ -180,8 +194,25 @@ async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         db.add(profile)
         logger.info(f"Profile created for user: {user.id}")
         await db.flush()
+
         if user.role == UserRole.TEACHER:
-            await ensure_teacher_membership(db, user.id, create_trial=True)
+            if invitation:
+                # Invitation code: grant 1-month VIP
+                await ensure_membership_plans(db)
+                now = datetime.now(timezone.utc)
+                mem = TeacherMembership(
+                    teacher_id=user.id,
+                    plan_code=PAID_MONTHLY_PLAN_CODE,
+                    status="active",
+                    started_at=now,
+                    expires_at=now + timedelta(days=30),
+                    source="invitation",
+                )
+                db.add(mem)
+                invitation.used_count = (invitation.used_count or 0) + 1
+                await db.flush()
+            else:
+                await ensure_teacher_membership(db, user.id, create_trial=True)
 
         await db.commit()
         await db.refresh(user)

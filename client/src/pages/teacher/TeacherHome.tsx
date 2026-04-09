@@ -63,44 +63,70 @@ export default function TeacherHome() {
     return '晚上好'
   }
 
-  const quickAccess = [
+  const getExpiryWarning = () => {
+    const exp = user?.membership?.expires_at
+    if (!exp || user?.membership?.status === 'free') return null
+    const daysLeft = Math.ceil((new Date(exp).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    if (daysLeft <= 0) return { text: '您的会员已过期，部分功能受限', color: 'bg-red-100 border-red-300 text-red-700' }
+    if (daysLeft <= 7) return { text: `会员将在 ${daysLeft} 天后到期，请及时续费`, color: 'bg-amber-100 border-amber-300 text-amber-700' }
+    return null
+  }
+
+  // 快速创建班级
+  const [quickClassName, setQuickClassName] = useState('')
+  const [quickCreating, setQuickCreating] = useState(false)
+
+  const handleQuickCreateClass = async () => {
+    const name = quickClassName.trim()
+    if (!name) return
+    setQuickCreating(true)
+    try {
+      await classService.create({ name })
+      setQuickClassName('')
+      loadData()
+    } catch {
+      alert('创建失败，请重试')
+    } finally {
+      setQuickCreating(false)
+    }
+  }
+
+  const steps = [
     {
-      step: '第一步',
-      title: '准备阶段',
-      items: [
-        { title: '班级管理', desc: '管理学生和班级', icon: '🏫', path: '/teacher/classes' },
-        { title: '数字化教具（资源）', desc: '教学工具库', icon: '🧰', path: '/teacher/teaching-aids' },
-      ],
-      color: 'from-blue-500 to-indigo-600',
-      bgColor: 'bg-blue-50 border-blue-200',
-    },
-    {
-      step: '第二步',
+      num: '01',
+      icon: '🏫',
       title: '课前准备',
+      desc: '创建班级邀请学生加入',
+      color: 'from-blue-500 to-indigo-600',
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
       items: [
-        { title: '平板任务', desc: '创建和管理任务', icon: '📝', path: '/teacher/task-groups' },
-        { title: '大屏任务', desc: '双人对战活动', icon: '🎮', path: '/teacher/bigscreen-activities' },
+        { title: '创建班级（必备）', desc: '创建班级、邀请学生', icon: '🏫', path: '/teacher/classes' },
       ],
+    },
+    {
+      num: '02',
+      icon: '🚀',
+      title: '开始上课',
+      desc: '进入互动课堂，AI设置和氛围设置（可选步骤）',
       color: 'from-violet-500 to-purple-600',
-      bgColor: 'bg-violet-50 border-violet-200',
-    },
-    {
-      step: '第三步',
-      title: '课堂教学',
+      bg: 'bg-violet-50',
+      border: 'border-violet-200',
       items: [
-        { title: '课堂教学', desc: '发布任务给学生', icon: '🎯', path: '/teacher/whiteboard' },
+        { title: '互动课堂', desc: '发起实时课堂，发布任务', icon: '🎯', path: '/teacher/whiteboard' },
       ],
-      color: 'from-emerald-500 to-teal-600',
-      bgColor: 'bg-emerald-50 border-emerald-200',
     },
     {
-      step: '第四步',
+      num: '03',
+      icon: '📊',
       title: '课后回顾',
+      desc: '查看课堂记录、学生答题详情、正确率统计和互动数据',
+      color: 'from-emerald-500 to-teal-600',
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-200',
       items: [
-        { title: '课堂回顾', desc: '查看历史记录', icon: '📅', path: '/teacher/classroom-review' },
+        { title: '课堂回顾', desc: '历史课堂记录与统计', icon: '📅', path: '/teacher/classroom-review' },
       ],
-      color: 'from-amber-500 to-orange-600',
-      bgColor: 'bg-amber-50 border-amber-200',
     },
   ]
 
@@ -144,36 +170,77 @@ export default function TeacherHome() {
           </div>
         </section>
 
+        {/* Membership expiry warning */}
+        {getExpiryWarning() && (
+          <div className={`mt-3 mx-6 px-4 py-3 rounded-xl border flex items-center justify-between ${getExpiryWarning()!.color}`}>
+            <span className="text-sm font-medium">{getExpiryWarning()!.text}</span>
+            <Link to="/teacher/membership" className="text-sm font-semibold underline ml-4 whitespace-nowrap">
+              前往会员中心
+            </Link>
+          </div>
+        )}
+
         {/* Main Content */}
         <div className="max-w-6xl mx-auto px-6 pt-4 pb-8 space-y-8">
-          {/* Quick Access Grid */}
+          {/* Three Steps */}
           <section>
-            <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--navy)' }}>使用流程</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {quickAccess.map((card) => (
-                <div
-                  key={card.title}
-                  className={`rounded-2xl border-2 ${card.bgColor} overflow-hidden`}
-                >
-                  {/* Card Header */}
-                  <div className={`px-4 py-3 bg-gradient-to-r ${card.color}`}>
-                    <p className="font-semibold text-sm text-white">{card.step}：{card.title}</p>
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--navy)' }}>快速开启</h2>
+            <div className="grid md:grid-cols-3 gap-6 relative">
+              {/* Connecting line */}
+              <div className="hidden md:block absolute top-12 left-[calc(16.67%+24px)] right-[calc(16.67%+24px)] h-px bg-gradient-to-r from-blue-400/50 via-violet-400/50 to-emerald-400/50" />
+
+              {steps.map((step) => (
+                <div key={step.num} className="relative">
+                  {/* Step header */}
+                  <div className="text-center mb-4 relative">
+                    <div className={`inline-flex w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} items-center justify-center text-3xl shadow-lg shadow-blue-500/15`}>
+                      {step.icon}
+                    </div>
+                    <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-white border-2 border-slate-200 flex items-center justify-center text-xs font-bold text-slate-400 shadow-sm" style={{ left: 'calc(50% + 20px)' }}>
+                      {step.num}
+                    </div>
                   </div>
-                  {/* Card Items */}
-                  <div className="p-3 space-y-2">
-                    {card.items.map((item) => (
+                  <div className="text-center mb-3">
+                    <h3 className="text-lg font-bold text-slate-800">{step.title}</h3>
+                    <p className="text-sm text-slate-500 mt-1">{step.desc}</p>
+                  </div>
+                  {/* Items */}
+                  <div className={`rounded-xl border ${step.border} ${step.bg} overflow-hidden`}>
+                    {step.items.map((item) => (
                       <Link
                         key={item.path}
                         to={item.path}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/50 transition-colors"
+                        className="flex items-center gap-3 px-4 py-3 hover:bg-white/60 transition-colors border-b border-slate-100 last:border-b-0"
                       >
-                        <span className="text-xl">{item.icon}</span>
+                        <span className="text-lg">{item.icon}</span>
                         <div>
                           <p className="font-medium text-slate-800 text-sm">{item.title}</p>
                           <p className="text-xs text-slate-500">{item.desc}</p>
                         </div>
                       </Link>
                     ))}
+                    {/* 第一步：快速创建班级 */}
+                    {step.num === '01' && (
+                      <div className="px-4 py-3 border-t border-slate-100 bg-white/40">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={quickClassName}
+                            onChange={(e) => setQuickClassName(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleQuickCreateClass() }}
+                            placeholder="输入班级名称快速创建"
+                            className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:border-blue-400 transition-colors"
+                          />
+                          <button
+                            onClick={handleQuickCreateClass}
+                            disabled={quickCreating || !quickClassName.trim()}
+                            className="px-4 py-2 text-sm font-medium text-white rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 hover:shadow-md transition-all disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {quickCreating ? '...' : '创建'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

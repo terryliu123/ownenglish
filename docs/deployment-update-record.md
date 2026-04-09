@@ -689,3 +689,237 @@ px tsc --noEmit 通过
 1. 白板页长时间停留后，再发布任务不再出现后台 `Invalid token` 的 WebSocket 403
 2. 白板页刷新或重连后，教师 WebSocket 能正常恢复
 3. 开始本节课后，发布任务学生端能收到
+## 2026-04-09 - 课堂通信稳定性二次收口
+
+### 修改范围
+- 修正 HTTP fallback 课堂上下文绑定
+- 修正 challenge ACK 持久化语义
+
+### 主要文件
+- `server/app/api/v1/live/submissions.py`
+- `server/app/api/v1/live/websocket_handlers.py`
+- `client/src/services/api.ts`
+- `client/src/pages/student/Live.tsx`
+
+### 关键调整
+- HTTP fallback 提交任务组时，显式传递 `class_id`，不再依赖“当前 enrollment / room 猜班级”
+- HTTP fallback 任务组提交在缺少课堂上下文时明确报错，不再静默落到错误班级
+- `submit_challenge` 的 ACK 调整为在数据库持久化成功后返回，避免客户端在未持久化完成时停止重试
+
+### 部署要求
+- 前端需要重发版
+- 后端需要重启
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 学生端 WS 断开时，任务组提交通过 HTTP fallback 仍能落到正确班级和正确课堂会话
+2. 同一任务组跨不同课堂会话提交时，不会被 HTTP fallback 误判为重复提交
+3. challenge 提交只有在服务端完成持久化后才会收到 ACK
+## 2026-04-09 - 课堂通信稳定性 Phase 复核补丁
+
+### 修改范围
+- 修复课堂运行态快照恢复后任务组提交计数归零
+- 修复 `LiveRoomSnapshot.version` 只有自增、没有真正并发保护的问题
+
+### 主要文件
+- `server/app/core/websocket.py`
+
+### 关键调整
+- 在 room 内新增并维护 `task_group_submission_counts`
+- `room_info.task_group_submission_count` 优先使用提交计数字典，不再只依赖内存 `set`
+- 快照恢复时同步恢复 `task_group_submission_counts`
+- `save_snapshot()` 改为带 `version` 条件的 compare-and-swap 更新，失败时自动重试
+
+### 部署要求
+- 后端需要重启
+- 前端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+- 教师刷新/服务重启后，当前任务组提交人数不回到 0
+- 快照保存并发写入时，不再只是“version 自增”而没有实际保护
+## 2026-04-09 - WS 基础设施统一第一轮
+
+### 修改范围
+- 抽离共享的 WebSocket token 刷新与 URL 构造逻辑
+- 白板实时 hook 与通用 websocket hook 统一使用同一套认证工具
+
+### 主要文件
+- `client/src/services/ws-auth.ts`
+- `client/src/services/websocket.ts`
+- `client/src/features/whiteboard/hooks/useWhiteboardLive.ts`
+
+### 关键调整
+- 新增 `ws-auth.ts`
+  - `readJwtExp()`
+  - `getFreshAccessToken()`
+  - `buildLiveWsUrl()`
+- 白板模式建连前继续通过共享工具获取最新 access token
+- 通用课堂 websocket 客户端改为复用共享 URL 构造和 HTTP refresh 逻辑
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+- 白板模式与学生端都能正常建连
+- 长课堂中 token 刷新后，普通 HTTP 与 WS 不再走两套逻辑
+## 2026-04-09 - WS 基础设施统一第二轮
+
+### 修改范围
+- 通用 websocket 客户端首次建连前统一走共享 token 刷新
+- 服务端 ping/pong 心跳补充活跃打点
+- 关键课堂通信链路补充统一结构化日志
+
+### 主要文件
+- `client/src/services/websocket.ts`
+- `client/src/services/ws-auth.ts`
+- `server/app/api/v1/live/websocket_handlers.py`
+- `server/app/api/v1/live/logging_utils.py`
+- `server/app/api/v1/live/task_groups.py`
+- `server/app/api/v1/live/submissions.py`
+- `server/app/api/v1/live/classroom_sessions.py`
+
+### 关键调整
+- 通用 `useLiveWebSocket` 首次建连前改为先调用共享 `getFreshAccessToken()`
+- 通用 websocket 与白板 websocket 统一使用 `buildLiveWsUrl()`
+- 服务端收到 `ping` 时同步刷新 teacher/student 的 last seen
+- 新增统一日志 helper `log_live_transport()`
+- 关键链路开始输出统一格式日志：
+  - 开始/恢复/结束本节课
+  - 发布任务组
+  - HTTP fallback 提交任务组
+  - WS 提交任务组
+  - WS 提交 challenge
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端需要重启
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+- 学生端首次建连前 token 即将过期时仍能正常连上
+- 长课堂中 ping/pong 后，zombie cleanup 不会误清理正常在线用户
+
+## 2026-04-09 - 服务端心跳超时清理收口
+
+### 修改范围
+- 收口 `ConnectionManager` 的心跳超时判定和 stale 连接剔除
+- 连接建立时立即刷新 teacher/student 活跃时间
+
+### 主要文件
+- `server/app/core/websocket.py`
+
+### 关键调整
+- `create_room()` / `join_room()` 建立连接时立即 `touch_teacher()` / `touch_student()`
+- 僵尸清理不再依赖“超时后先发一个 ping 试探”，改成按 `last_seen` 超时直接剔除 stale teacher/student 连接
+- 新增统一的 teacher/student stale 连接移除逻辑，并补充清理日志
+- teacherless room 首次进入宽限期时记录日志，超时移除时输出明确 `idle_seconds`
+
+### 部署要求
+- 后端需要重启
+- 前端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 正常在线 teacher/student 不会因为 cleanup 被误踢
+2. 长时间静默断开的 teacher/student 会被清理，房间状态不再残留 stale 连接
+3. teacher 断线 30 分钟后仍无人恢复时，teacherless room 会被自动清理
+
+## 2026-04-09 - 关键消息 ACK / Recovery 最后一轮
+
+### 修改范围
+- 调整学生端关键提交消息的 ACK 超时处理
+- ACK 超时后先查课堂状态，再决定是否补发
+
+### 主要文件
+- `client/src/services/websocket.ts`
+- `client/src/pages/student/Live.tsx`
+
+### 关键调整
+- `submit_task_group` 在 ACK 超时后先请求一次 `room_info`，再决定是否继续重试
+- `task_group_submission_received` 业务确认事件会直接解除对应 pending ACK
+- `submit_challenge` 在 ACK 超时后先检查本地/刷新后的 challenge scoreboard；若当前学生已标记为 `submitted`，则停止重试
+- 学生端 websocket 显式传入 `selfUserId`，用于按 scoreboard 判定 challenge 提交是否已被服务端接收
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 任务组提交 ACK 丢失时，不会立刻盲重试；收到 `task_group_submission_received` 后会停止重试
+2. challenge 提交 ACK 超时后，如果 scoreboard 已显示当前学生 `submitted=true`，不会继续补发
+3. 网络抖动时，学生端不会因为 ACK 单次丢失导致重复提交明显增加
+
+## 2026-04-09 - 学生端弹幕覆盖结束态补丁
+
+### 修改范围
+- 修复学生端在任务结果页、抢答/PK 结束态、等待态等分支下不显示弹幕的问题
+
+### 主要文件
+- `client/src/pages/student/Live.tsx`
+
+### 关键调整
+- 抽出统一的 `classroomDanmu` 叠加层
+- 将弹幕层挂到学生端主要课堂分支，包括：
+  - 挑战结果页
+  - 挑战观战/结束态
+  - 无任务等待页
+  - 整组任务结果页
+  - 整组任务作答页
+  - 单题结果页
+  - 单题作答页
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 学生端在刚结束抢答、PK、整组任务后，仍能看到新弹幕
+2. 学生端等待任务页仍能显示弹幕
+3. 弹幕显示不影响原有分享层和氛围特效层
+
+## 2026-04-09 - 教师端弹幕预制语句设置
+
+### 修改范围
+- 在课堂教学白板页的氛围设置中，增加弹幕预制语句设置
+- 教师端最多可配置 5 条预制语句，学生端弹幕输入面板同步展示
+
+### 主要文件
+- `client/src/pages/teacher/WhiteboardMode.tsx`
+- `client/src/pages/student/Live.tsx`
+- `client/src/features/danmu/hooks/useDanmu.ts`
+- `client/src/features/danmu/types/danmu.ts`
+- `client/src/features/whiteboard/hooks/useWhiteboardLive.ts`
+- `client/src/services/websocket.ts`
+- `server/app/core/websocket.py`
+- `server/app/api/v1/live/websocket_handlers.py`
+- `server/app/api/v1/live/schemas.py`
+
+### 关键调整
+- 教师端氛围设置面板新增“弹幕预制语句”配置区
+- 最多允许 5 条预制语句
+- 预制语句进入 danmu 配置广播、课堂快照和恢复链路
+- 学生端弹幕面板改为读取服务端同步下发的预制语句
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端需要同步代码并重启
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 教师端可新增、编辑、删除弹幕预制语句，最多 5 条
+2. 学生端弹幕面板显示教师端配置后的预制语句
+3. 教师刷新、课堂恢复后，预制语句配置仍能保留
+4. 未配置自定义语句时，系统默认预制语句仍可用

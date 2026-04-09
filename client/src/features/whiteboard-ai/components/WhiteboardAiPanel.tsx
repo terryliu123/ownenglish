@@ -30,16 +30,16 @@ function stripMarkdown(text: string): string {
 function renderMarkdown(text: string): string {
   if (!text) return ''
   let html = text
-  html = html.replace(/```([\s\S]*?)```/g, '<pre class="my-1 overflow-x-auto rounded bg-slate-800 p-2 text-xs text-slate-100"><code>$1</code></pre>')
-  html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-slate-100 px-1 text-xs text-pink-600">$1</code>')
-  html = html.replace(/^### (.+)$/gm, '<h4 class="mb-1 mt-2 text-sm font-bold">$1</h4>')
-  html = html.replace(/^## (.+)$/gm, '<h3 class="mb-1 mt-2 text-base font-bold">$1</h3>')
-  html = html.replace(/^# (.+)$/gm, '<h2 class="mb-1 mt-2 text-lg font-bold">$1</h2>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="my-1 overflow-x-auto rounded-lg bg-black/30 p-2 text-xs text-blue-200 border border-white/[0.06]"><code>$1</code></pre>')
+  html = html.replace(/`([^`]+)`/g, '<code class="rounded bg-blue-500/20 px-1 text-xs text-blue-300">$1</code>')
+  html = html.replace(/^### (.+)$/gm, '<h4 class="mb-1 mt-2 text-sm font-bold text-white">$1</h4>')
+  html = html.replace(/^## (.+)$/gm, '<h3 class="mb-1 mt-2 text-base font-bold text-white">$1</h3>')
+  html = html.replace(/^# (.+)$/gm, '<h2 class="mb-1 mt-2 text-lg font-bold text-white">$1</h2>')
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong class="text-white">$1</strong>')
   html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
   html = html.replace(/\n\n/g, '</p><p class="my-2">')
   html = html.replace(/\n/g, '<br/>')
-  return `<p class="my-1">${html}</p>`
+  return `<p class="my-1 text-slate-300">${html}</p>`
 }
 
 function getMessageText(content: string | Array<string | { text?: string }>): string {
@@ -131,19 +131,27 @@ export default function WhiteboardAiPanel({ context }: Props) {
 
   return (
     <div
-      className="fixed z-50 flex h-[520px] max-h-[calc(100vh-80px)] w-96 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+      className="fixed z-50 flex h-[520px] max-h-[calc(100vh-80px)] w-96 flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0e1a]/95 shadow-2xl shadow-black/40 backdrop-blur-xl"
       style={{ right: `${launcherPosition.x}px`, bottom: `${launcherPosition.y + 64}px` }}
     >
-      <div className="shrink-0 bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-3 text-white">
+      {/* Header */}
+      <div className="shrink-0 bg-gradient-to-r from-blue-500/20 to-violet-500/20 border-b border-white/[0.06] px-4 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">AI</span>
-          <p className="font-semibold text-white">白板 AI 助手</p>
+          <img src="/logo.png" alt="胖鼠AI副班" className="h-6 w-6 rounded-lg" />
+          <p className="font-semibold text-white text-sm">胖鼠AI副班</p>
+          <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">AI</span>
         </div>
       </div>
 
+      {/* Messages */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {messages.length === 0 ? (
-          <p className="py-4 text-center text-sm text-slate-400">选择快捷动作，或直接输入课堂问题。</p>
+          <div className="flex flex-col items-center justify-center py-8 gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-violet-500/20 flex items-center justify-center border border-white/[0.06]">
+              <img src="/logo.png" alt="" className="w-7 h-7 rounded-lg opacity-60" />
+            </div>
+            <p className="text-sm text-slate-500 text-center">选择快捷动作，或直接输入课堂问题。</p>
+          </div>
         ) : (
           <div className="space-y-3">
             {messages.map((msg, idx) => {
@@ -153,7 +161,9 @@ export default function WhiteboardAiPanel({ context }: Props) {
                 <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[90%] rounded-xl px-3 py-2 text-sm ${
-                      msg.role === 'user' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-800'
+                      msg.role === 'user'
+                        ? 'bg-gradient-to-r from-blue-500 to-violet-500 text-white'
+                        : 'bg-white/[0.05] border border-white/[0.06] text-slate-300'
                     }`}
                   >
                     {isImageGenResult ? (
@@ -167,13 +177,13 @@ export default function WhiteboardAiPanel({ context }: Props) {
                         <div className="mt-2 flex gap-2">
                           <button
                             onClick={() => projectImageToWhiteboard(displayContent)}
-                            className="rounded bg-indigo-500 px-2 py-1 text-xs text-white hover:bg-indigo-600"
+                            className="rounded-lg bg-blue-500/20 border border-blue-500/25 px-2 py-1 text-xs text-blue-300 hover:bg-blue-500/30 transition-colors"
                           >
                             添加到白板
                           </button>
                           <button
                             onClick={() => setLightboxUrl(`data:image/png;base64,${displayContent}`)}
-                            className="rounded bg-slate-500 px-2 py-1 text-xs text-white hover:bg-slate-600"
+                            className="rounded-lg bg-white/[0.06] border border-white/[0.08] px-2 py-1 text-xs text-slate-400 hover:bg-white/[0.1] transition-colors"
                           >
                             放大查看
                           </button>
@@ -189,7 +199,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
                         {msg.role === 'assistant' && (
                           <button
                             onClick={() => projectTextToWhiteboard(displayContent)}
-                            className="mt-2 rounded bg-indigo-500 px-2 py-1 text-xs text-white hover:bg-indigo-600"
+                            className="mt-2 rounded-lg bg-blue-500/20 border border-blue-500/25 px-2 py-1 text-xs text-blue-300 hover:bg-blue-500/30 transition-colors"
                           >
                             投影到白板
                           </button>
@@ -203,7 +213,12 @@ export default function WhiteboardAiPanel({ context }: Props) {
 
             {isLoading && (
               <div className="flex justify-start">
-                <div className="rounded-xl bg-slate-100 px-4 py-2 text-sm text-slate-500">AI 正在分析...</div>
+                <div className="rounded-xl bg-white/[0.05] border border-white/[0.06] px-4 py-2 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                    AI 正在分析...
+                  </span>
+                </div>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -211,30 +226,31 @@ export default function WhiteboardAiPanel({ context }: Props) {
         )}
 
         {error && (
-          <div className="mt-2 cursor-pointer rounded-lg bg-red-50 p-2 text-sm text-red-600" onClick={clearError}>
+          <div className="mt-2 cursor-pointer rounded-lg bg-red-500/10 border border-red-500/20 p-2 text-sm text-red-400" onClick={clearError}>
             {error}，点击关闭
           </div>
         )}
       </div>
 
-      <div className="shrink-0 space-y-2 border-t border-slate-100 px-4 py-2">
+      {/* Input area */}
+      <div className="shrink-0 space-y-2 border-t border-white/[0.06] bg-[#0a0e1a]/80 px-4 py-2">
         <div className="flex gap-2">
           <button
             onClick={() => toggleAction('reference')}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
               selectedActions.has('reference')
-                ? 'bg-indigo-500 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-lg shadow-blue-500/20'
+                : 'bg-white/[0.05] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08] hover:text-slate-300'
             }`}
           >
             参考板书
           </button>
           <button
             onClick={() => toggleAction('image_gen')}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200 ${
               selectedActions.has('image_gen')
-                ? 'bg-indigo-500 text-white'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                ? 'bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-lg shadow-blue-500/20'
+                : 'bg-white/[0.05] text-slate-400 border border-white/[0.06] hover:bg-white/[0.08] hover:text-slate-300'
             }`}
           >
             生成图片
@@ -249,12 +265,12 @@ export default function WhiteboardAiPanel({ context }: Props) {
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               placeholder={selectedActions.has('image_gen') ? '描述你想生成的课堂图片...' : '输入你想让 AI 处理的问题...'}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500/40 focus:bg-white/[0.06] focus:outline-none transition-colors"
             />
             <button
               onClick={handleSubmit}
               disabled={!prompt.trim() || isLoading}
-              className="w-full rounded-lg bg-indigo-500 px-4 py-2 text-sm text-white transition-colors hover:bg-indigo-600 disabled:opacity-50"
+              className="w-full rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-2 text-sm text-white font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20 disabled:opacity-40"
             >
               {selectedActions.has('image_gen') ? '生成图片' : '提交'}
             </button>
@@ -267,12 +283,12 @@ export default function WhiteboardAiPanel({ context }: Props) {
               onChange={(e) => setFreeInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
               placeholder="输入课堂问题..."
-              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+              className="flex-1 rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-blue-500/40 focus:bg-white/[0.06] focus:outline-none transition-colors"
             />
             <button
               onClick={handleSubmit}
               disabled={!freeInput.trim() || isLoading}
-              className="rounded-lg bg-blue-500 px-4 py-2 text-sm text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+              className="rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 px-4 py-2 text-sm text-white font-medium transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/20 disabled:opacity-40"
             >
               发送
             </button>
@@ -293,7 +309,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
           />
           <button
             onClick={() => setLightboxUrl(null)}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-xl text-white transition-colors hover:bg-white/40"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-xl text-white transition-colors hover:bg-white/20"
           >
             ×
           </button>
