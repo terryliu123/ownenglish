@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
 import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
-import { membershipService, type MembershipPlanData, type MembershipSnapshot, type PaymentOrderData } from '../../services/api'
-import { useTranslation } from '../../i18n/useTranslation'
+import TeacherPageHeader from '../../components/layout/TeacherPageHeader'
+import {
+  membershipService,
+  type MembershipPlanData,
+  type MembershipSnapshot,
+  type PaymentOrderData,
+} from '../../services/api'
 
 function formatDate(value?: string | null) {
   if (!value) return '-'
@@ -23,8 +28,55 @@ function formatLimit(value: number | null) {
   return value == null ? '不限' : String(value)
 }
 
+function getStatusLabel(status: MembershipSnapshot['status']) {
+  switch (status) {
+    case 'active':
+      return '有效'
+    case 'trial':
+      return '试用中'
+    case 'expired':
+      return '已过期'
+    default:
+      return '免费版'
+  }
+}
+
+function getOrderStatusLabel(status: PaymentOrderData['status']) {
+  switch (status) {
+    case 'pending':
+      return '待支付'
+    case 'paid':
+      return '已支付'
+    case 'failed':
+      return '支付失败'
+    case 'cancelled':
+      return '已取消'
+    case 'expired':
+      return '已失效'
+    default:
+      return status
+  }
+}
+
+function getExpiryNotice(membership: MembershipSnapshot | null) {
+  if (!membership?.expires_at || membership.status === 'free') return null
+  const daysLeft = Math.ceil((new Date(membership.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+  if (daysLeft <= 0) {
+    return {
+      tone: 'danger',
+      text: '当前会员已过期，部分高级能力已受限。请完成续费后继续使用。',
+    }
+  }
+  if (daysLeft <= 7) {
+    return {
+      tone: 'warn',
+      text: `当前会员将在 ${daysLeft} 天后到期，建议提前续费避免影响课堂使用。`,
+    }
+  }
+  return null
+}
+
 export default function TeacherMembership() {
-  const { t, tWithParams } = useTranslation()
   const [membership, setMembership] = useState<MembershipSnapshot | null>(null)
   const [plans, setPlans] = useState<MembershipPlanData[]>([])
   const [orders, setOrders] = useState<PaymentOrderData[]>([])
@@ -45,13 +97,11 @@ export default function TeacherMembership() {
       setOrders(ordersData.items || [])
     } catch (error) {
       console.error('Failed to load membership data:', error)
-    } finally {
-      // no-op
     }
   }
 
   useEffect(() => {
-    loadData()
+    void loadData()
   }, [])
 
   useEffect(() => {
@@ -66,20 +116,20 @@ export default function TeacherMembership() {
     try {
       setPayingPlan(planCode)
       const order = await membershipService.createOrder(planCode)
-
       const codeUrl = order.payment?.code_url
-      if (codeUrl) {
-        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(codeUrl)}`
-        setQrCodeUrl(qrUrl)
-        setShowQrModal(true)
-        startPolling(order.order_no)
-      } else {
-        console.error('No code_url in response:', order)
-        alert('创建订单失败：未获取到支付二维码')
+
+      if (!codeUrl) {
+        alert('创建订单成功，但没有返回微信支付二维码。请检查支付配置。')
+        return
       }
+
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(codeUrl)}`
+      setQrCodeUrl(qrUrl)
+      setShowQrModal(true)
+      startPolling(order.order_no)
     } catch (error: any) {
       const detail = error?.response?.data?.detail
-      alert(typeof detail === 'string' ? detail : detail?.message || t('membership.createOrderFailed'))
+      alert(typeof detail === 'string' ? detail : detail?.message || '创建订单失败，请稍后重试。')
     } finally {
       setPayingPlan(null)
     }
@@ -96,10 +146,11 @@ export default function TeacherMembership() {
         if (order.status === 'paid') {
           stopPolling()
           setShowQrModal(false)
+          setQrCodeUrl('')
           await loadData()
         }
       } catch (error) {
-        console.error('Polling error:', error)
+        console.error('Polling order status failed:', error)
       }
     }, 3000)
   }
@@ -118,223 +169,263 @@ export default function TeacherMembership() {
   }
 
   const currentPlan = useMemo(
-    () => plans.find((p) => p.code === membership?.plan_code) || null,
+    () => plans.find((plan) => plan.code === membership?.plan_code) || null,
     [plans, membership]
   )
 
+  const expiryNotice = getExpiryNotice(membership)
+
+  const usageTiles = membership
+    ? [
+        { label: '班级数量', value: `${membership.usage.class_count} / ${formatLimit(membership.limits.max_classes)}` },
+        { label: '平板任务', value: `${membership.usage.task_group_count} / ${formatLimit(membership.limits.max_task_groups)}` },
+        { label: '学习包', value: `${membership.usage.study_pack_count} / ${formatLimit(membership.limits.max_study_packs)}` },
+        {
+          label: '大屏素材',
+          value: `${membership.usage.bigscreen_content_asset_count} / ${formatLimit(membership.limits.max_bigscreen_content_assets)}`,
+        },
+        {
+          label: '大屏活动',
+          value: `${membership.usage.bigscreen_activity_pack_count} / ${formatLimit(membership.limits.max_bigscreen_activity_packs)}`,
+        },
+      ]
+    : []
+
   return (
     <Layout sidebar={<TeacherSidebar activePage="membership" />} leftSidebar={<TeacherLeftSidebar activePage="membership" />}>
-      <section className="panel-head">
-        <div>
-          <p className="eyebrow">{t('membership.centerEntry')}</p>
-          <h2>{t('membership.title')}</h2>
-        </div>
-        <div className="panel-actions">
-          <button className="ghost-button" onClick={() => void loadData()}>
-            {t('membership.refresh')}
-          </button>
-        </div>
-      </section>
+      <div className="teacher-page">
+        <TeacherPageHeader
+          eyebrow="会员中心"
+          title="管理订阅与使用额度"
+          description="查看当前会员状态、升级可用权益，并跟踪最近的支付订单。"
+          icon={
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 9l2.5 6h9L19 9m-2.5 6L12 19l-4.5-4M7.5 15L5 9l4 .5L12 5l3 4.5 4-.5-2.5 6" />
+            </svg>
+          }
+          meta={currentPlan ? <span className="teacher-page-pill">当前方案：{currentPlan.name}</span> : null}
+          actions={
+            <button className="ghost-button" type="button" onClick={() => void loadData()}>
+              刷新数据
+            </button>
+          }
+        />
 
-      {/* Expiry warning */}
-      {membership?.expires_at && membership.status !== 'free' && (() => {
-        const daysLeft = Math.ceil((new Date(membership.expires_at!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-        if (daysLeft <= 0) return (
-          <div className="mt-4 px-4 py-3 rounded-xl bg-red-100 border border-red-300 text-red-700 text-sm font-medium">
-            您的会员已过期，部分功能受限，请续费后继续使用。
+        {expiryNotice ? (
+          <div
+            className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+              expiryNotice.tone === 'danger'
+                ? 'border-red-300 bg-red-50 text-red-700'
+                : 'border-amber-300 bg-amber-50 text-amber-700'
+            }`}
+          >
+            {expiryNotice.text}
           </div>
-        )
-        if (daysLeft <= 7) return (
-          <div className="mt-4 px-4 py-3 rounded-xl bg-amber-100 border border-amber-300 text-amber-700 text-sm font-medium">
-            会员将在 {daysLeft} 天后到期，请及时续费以免影响使用。
-          </div>
-        )
-        return null
-      })()}
+        ) : null}
 
-      {/* Current membership status */}
-      {membership && (
-        <section className="surface-card mt-6">
+        {membership ? (
+          <section className="surface-card">
+            <div className="surface-head">
+              <h3>当前会员状态</h3>
+              <span>会员有效期、额度和 AI 能力一目了然。</span>
+            </div>
+            <div className="teacher-stat-grid p-4">
+              <article className="teacher-stat-tile">
+                <span className="teacher-stat-label">会员方案：</span>
+                <strong className="teacher-stat-value">{membership.plan_name}</strong>
+                <p className="teacher-stat-copy">来源：{membership.source || '系统分配'}</p>
+              </article>
+              <article className="teacher-stat-tile">
+                <span className="teacher-stat-label">状态：</span>
+                <strong className="teacher-stat-value">{getStatusLabel(membership.status)}</strong>
+                <p className="teacher-stat-copy">{membership.can_use_ai ? '已包含课堂 AI 能力' : '不包含课堂 AI 能力'}</p>
+              </article>
+              <article className="teacher-stat-tile">
+                <span className="teacher-stat-label">生效时间：</span>
+                <strong className="teacher-stat-value !text-lg">{formatDate(membership.started_at)}</strong>
+                <p className="teacher-stat-copy">试用到期：{formatDate(membership.trial_ends_at)}</p>
+              </article>
+              <article className="teacher-stat-tile">
+                <span className="teacher-stat-label">到期时间：</span>
+                <strong className="teacher-stat-value !text-lg">{membership.expires_at ? formatDate(membership.expires_at) : '长期有效'}</strong>
+                <p className="teacher-stat-copy">
+                  微信支付:{membership.wechat_pay_configured ? '已配置' : '未配置'}
+                </p>
+              </article>
+            </div>
+          </section>
+        ) : null}
+
+        {usageTiles.length > 0 ? (
+          <section className="surface-card">
+            <div className="surface-head">
+              <h3>当前额度使用情况</h3>
+              <span>用于判断是否需要升级方案。</span>
+            </div>
+            <div className="teacher-stat-grid p-4">
+              {usageTiles.map((tile) => (
+                <article key={tile.label} className="teacher-stat-tile">
+                  <span className="teacher-stat-label">{tile.label}</span>
+                  <strong className="teacher-stat-value !text-2xl">{tile.value}</strong>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section className="surface-card">
           <div className="surface-head">
-            <h3>当前会员状态</h3>
+            <h3>会员方案</h3>
+            <span>对比不同方案的班级、任务和大屏互动能力。</span>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4">
-            <div>
-              <p className="text-xs text-slate-500 mb-1">会员方案</p>
-              <p className="font-semibold">{membership.plan_name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-1">状态</p>
-              <p className={`font-semibold ${
-                membership.status === 'active' ? 'text-emerald-600' :
-                membership.status === 'trial' ? 'text-amber-600' :
-                membership.status === 'expired' ? 'text-red-600' :
-                'text-slate-500'
-              }`}>
-                {membership.status === 'active' ? '有效' :
-                 membership.status === 'trial' ? '试用中' :
-                 membership.status === 'expired' ? '已过期' : '免费'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-1">生效时间</p>
-              <p className="font-medium text-sm">{formatDate(membership.started_at)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-500 mb-1">到期时间</p>
-              <p className={`font-medium text-sm ${membership.expires_at && new Date(membership.expires_at) < new Date() ? 'text-red-600' : 'text-slate-700'}`}>
-                {membership.expires_at ? formatDate(membership.expires_at) : '永久有效'}
-              </p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Row 1: Plans in 3 columns */}
-      <section className="surface-card mt-6">
-        <div className="surface-head">
-          <h3>{t('membership.plans')}</h3>
-          <span>{t('membership.planDescription')}</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-          {plans.map((plan) => {
-            const isCurrent = currentPlan?.code === plan.code
-            return (
-              <div key={plan.code} className={`rounded-2xl border p-5 flex flex-col ${isCurrent ? 'border-emerald-300 bg-emerald-50' : 'border-line bg-white'}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h4 className="text-base font-semibold">{plan.name}</h4>
-                    <p className="text-sm text-slate-500 mt-0.5">{plan.description}</p>
+          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3">
+            {plans.map((plan) => {
+              const isCurrent = currentPlan?.code === plan.code
+              const isFree = plan.code === 'free'
+              return (
+                <article
+                  key={plan.code}
+                  className={`flex flex-col rounded-2xl border p-5 ${
+                    isCurrent ? 'border-emerald-300 bg-emerald-50' : 'border-line bg-white'
+                  }`}
+                >
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="text-lg font-semibold text-[var(--ink)]">{plan.name}</h4>
+                      <p className="mt-1 text-sm text-slate-500">{plan.description || '适合不同阶段的课堂使用需求。'}</p>
+                    </div>
+                    {isCurrent ? <span className="teacher-page-pill">当前方案</span> : null}
                   </div>
-                  {isCurrent && (
-                    <span className="shrink-0 rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700">
-                      {t('membership.currentPlan')}
-                    </span>
-                  )}
-                </div>
-                <div className="text-center mb-4">
-                  <div className="mt-2">
-                    <strong className="text-2xl">{plan.price_cents > 0 ? formatMoney(plan.price_cents) : t('membership.freePrice')}</strong>
-                    {plan.duration_days && (
-                      <p className="text-xs text-slate-400 mt-1">{tWithParams('membership.durationDays', { days: plan.duration_days })}</p>
+
+                  <div className="mb-5">
+                    <div className="text-3xl font-semibold text-[var(--ink)]">
+                      {plan.price_cents > 0 ? formatMoney(plan.price_cents) : '免费'}
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {plan.duration_days ? `${plan.duration_days} 天有效期` : '长期使用'}
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">班级数量</span>
+                      <span className="font-medium text-[var(--ink)]">{formatLimit(plan.max_classes)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">单班学生数</span>
+                      <span className="font-medium text-[var(--ink)]">{formatLimit(plan.max_students_per_class)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">平板任务</span>
+                      <span className="font-medium text-[var(--ink)]">{formatLimit(plan.max_task_groups)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">学习包</span>
+                      <span className="font-medium text-[var(--ink)]">{formatLimit(plan.max_study_packs)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">课堂 AI</span>
+                      <span className={`status-badge ${plan.can_use_ai ? 'active' : 'archived'}`}>
+                        {plan.can_use_ai ? '支持' : '不支持'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">大屏互动素材</span>
+                      <span className="font-medium text-[var(--ink)]">{plan.can_use_ai ? '不限' : '5'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">大屏互动活动</span>
+                      <span className="font-medium text-[var(--ink)]">{plan.can_use_ai ? '不限' : '2'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    {isFree ? (
+                      <div className="py-2 text-center text-sm text-slate-400">{isCurrent ? '当前正在使用免费版' : '基础能力默认开放'}</div>
+                    ) : !membership?.wechat_pay_configured ? (
+                      <div className="rounded-2xl bg-amber-50 px-4 py-3 text-center text-sm text-amber-700">
+                        微信支付未配置，暂时无法在线购买。
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="solid-button wide-button"
+                        disabled={payingPlan === plan.code}
+                        onClick={() => void handlePurchase(plan.code)}
+                      >
+                        {payingPlan === plan.code ? '正在创建订单…' : '立即购买'}
+                      </button>
                     )}
                   </div>
-                </div>
-                <div className="space-y-2 text-sm flex-1">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('membership.planClassesLabel')}</span>
-                    <span className="font-medium">{formatLimit(plan.max_classes)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('membership.planStudentsLabel')}</span>
-                    <span className="font-medium">{formatLimit(plan.max_students_per_class)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('membership.planTaskGroupsLabel')}</span>
-                    <span className="font-medium">{formatLimit(plan.max_task_groups)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">{t('membership.planStudyPacksLabel')}</span>
-                    <span className="font-medium">{formatLimit(plan.max_study_packs)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">胖鼠AI副班</span>
-                    <span className={`status-badge ${plan.can_use_ai ? 'active' : 'archived'}`}>
-                      {plan.can_use_ai ? t('membership.aiEnabled') : t('membership.aiDisabled')}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">胖鼠学习助手</span>
-                    <span className={`status-badge ${plan.can_use_ai ? 'active' : 'archived'}`}>
-                      {plan.can_use_ai ? '支持开启' : '不支持'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">大屏互动内容</span>
-                    <span className="font-medium">{plan.can_use_ai ? '不限' : '5'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">大屏互动活动</span>
-                    <span className="font-medium">{plan.can_use_ai ? '不限' : '2'}</span>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  {plan.code === 'free' ? (
-                    <div className="text-center text-sm text-slate-400 py-2">
-                      {isCurrent ? t('membership.currentPlan') : ''}
-                    </div>
-                  ) : !membership?.wechat_pay_configured ? (
-                    <div className="text-center text-sm text-amber-600 py-2">
-                      {t('membership.wechatNotConfigured')}
-                    </div>
-                  ) : (
-                    <button
-                      className="solid-button w-full"
-                      disabled={payingPlan === plan.code}
-                      onClick={() => void handlePurchase(plan.code)}
-                    >
-                      {payingPlan === plan.code ? t('membership.processing') : t('membership.purchase')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </section>
+                </article>
+              )
+            })}
+          </div>
+        </section>
 
-      {/* Row 2: Order History - full width */}
-      <section className="surface-card mt-6">
-        <div className="surface-head">
-          <h3>{t('membership.orderHistory')}</h3>
-          <span>{t('membership.recentOrders')}</span>
-        </div>
-        {orders.length === 0 ? (
-          <p className="p-6 text-center text-slate-400">{t('membership.noOrders')}</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500">
-                  <th className="py-2">{t('membership.plan')}</th>
-                  <th className="py-2">{t('membership.amount')}</th>
-                  <th className="py-2">{t('membership.orderStatus')}</th>
-                  <th className="py-2">{t('membership.createdAt')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => (
-                  <tr key={order.order_no} className="border-t border-line">
-                    <td className="py-2">{plans.find((p) => p.code === order.plan_code)?.name || order.plan_code}</td>
-                    <td className="py-2">{formatMoney(order.amount)}</td>
-                    <td className="py-2">{t(`membership.orderStatuses.${order.status}`)}</td>
-                    <td className="py-2">{formatDate(order.created_at)}</td>
+        <section className="surface-card">
+          <div className="surface-head">
+            <h3>订单记录</h3>
+            <span>最近的购买订单和支付状态会显示在这里。</span>
+          </div>
+          {orders.length === 0 ? (
+            <p className="p-6 text-center text-sm text-slate-400">暂时没有订单记录。</p>
+          ) : (
+            <div className="table-wrapper">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <th>方案</th>
+                    <th>金额</th>
+                    <th>状态</th>
+                    <th>支付渠道</th>
+                    <th>创建时间</th>
+                    <th>支付时间</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.order_no}>
+                      <td>{plans.find((plan) => plan.code === order.plan_code)?.name || order.plan_code}</td>
+                      <td>{formatMoney(order.amount)}</td>
+                      <td>{getOrderStatusLabel(order.status)}</td>
+                      <td>{order.payment_channel || '-'}</td>
+                      <td>{formatDate(order.created_at)}</td>
+                      <td>{formatDate(order.paid_at)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
-      {/* QR Code Modal */}
-      {showQrModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">{t('membership.wechatPay')}</h3>
-              <button onClick={closeQrModal} className="text-slate-400 hover:text-slate-600">✕</button>
+        {showQrModal ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+            <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl">
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--ink)]">微信支付</h3>
+                  <p className="mt-1 text-sm text-[var(--muted)]">请使用微信扫码完成支付，系统会自动刷新支付状态。</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeQrModal}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="flex justify-center rounded-2xl bg-slate-50 p-5">
+                {qrCodeUrl ? <img src={qrCodeUrl} alt="微信支付二维码" className="h-56 w-56" /> : null}
+              </div>
+              <p className="mt-4 text-center text-xs text-slate-500">支付完成后弹窗会自动关闭，并刷新当前会员状态。</p>
             </div>
-            <p className="text-sm text-slate-600 mb-4">{t('membership.scanToPay')}</p>
-            <div className="flex justify-center">
-              {qrCodeUrl && (
-                <img src={qrCodeUrl} alt="WeChat Pay QR Code" className="w-48 h-48" />
-              )}
-            </div>
-            <p className="text-xs text-slate-500 text-center mt-4">{t('membership.autoCloseAfterPay')}</p>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
     </Layout>
   )
 }

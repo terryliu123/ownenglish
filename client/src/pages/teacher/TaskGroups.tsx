@@ -2,6 +2,7 @@
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
 import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
+import TeacherPageHeader from '../../components/layout/TeacherPageHeader'
 import {
   classService,
   liveTaskService,
@@ -358,80 +359,47 @@ export default function TeacherTaskGroups() {
 
   return (
     <Layout sidebar={<TeacherSidebar activePage="task-groups" />} leftSidebar={<TeacherLeftSidebar activePage="task-groups" />}>
-      <div className="panel-page">
-        {/* 深蓝顶栏 */}
-        <section className="surface-card mb-4 mt-4" style={{ background: 'linear-gradient(135deg, #18324a 0%, #2a4a6a 100%)' }}>
-          <div className="p-4">
-            <div className="flex items-center justify-between gap-4">
-              {/* 左侧：标题 */}
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)' }}>
-                  <span className="text-lg">📋</span>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.6)' }}>{t('taskGroup.preClassEyebrow')}</p>
-                  <h2 className="text-base font-semibold" style={{ color: '#fff' }}>{t('taskGroup.managementTitle')}</h2>
-                </div>
-              </div>
-
-              {/* 右侧：会员 + 创建按钮 */}
-              <div className="flex items-center gap-3">
-                {membership && (
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer"
-                    style={{ background: 'rgba(255,255,255,0.1)' }}
-                    onClick={() => window.location.href = '/teacher/membership'}
-                    title={membership.plan_name}
-                  >
-                    <span className="text-sm" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                      {t('membership.usageTaskGroups').replace('{{used}}', String(taskGroupUsage)).replace('{{limit}}', taskGroupLimit == null ? '∞' : String(taskGroupLimit))}
-                    </span>
-                  </div>
-                )}
+      <div className="teacher-page">
+        <TeacherPageHeader
+          eyebrow={t('taskGroup.preClassEyebrow')}
+          title={t('taskGroup.managementTitle')}
+          description="统一创建、编辑和分享平板任务组。"
+          icon="任"
+          actions={
+            <>
+              {membership ? (
                 <button
-                  onClick={openCreateModal}
-                  className="px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2"
-                  disabled={!canCreateTaskGroup}
-                  style={{
-                    background: 'rgba(255,255,255,0.15)',
-                    color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    opacity: canCreateTaskGroup ? 1 : 0.5,
-                    cursor: canCreateTaskGroup ? 'pointer' : 'not-allowed',
-                  }}
+                  type="button"
+                  className="teacher-page-pill"
+                  onClick={() => window.location.href = '/teacher/membership'}
+                  title={membership.plan_name}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  {t('taskGroup.createTask')}
+                  {t('membership.usageTaskGroups').replace('{{used}}', String(taskGroupUsage)).replace('{{limit}}', taskGroupLimit == null ? '∞' : String(taskGroupLimit))}
                 </button>
-              </div>
-            </div>
-          </div>
-        </section>
+              ) : null}
+              <button onClick={openCreateModal} className="teacher-action-button" disabled={!canCreateTaskGroup}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>{t('taskGroup.createTask')}</span>
+              </button>
+            </>
+          }
+        />
 
-        {/* 鐝骇閫夋嫨鍜屾悳绱㈡爮 */}
-        <section className="panel-section mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            {/* 鐝骇閫夋嫨 */}
-            <div className="flex items-center gap-3">
-              <label className="text-sm font-medium text-slate-600 whitespace-nowrap">{t('taskGroup.selectClassLabel')}</label>
+        <section className="surface-card">
+          <div className="teacher-toolbar">
+            <div className="teacher-toolbar__group">
+              <label className="teacher-toolbar__label">{t('taskGroup.selectClassLabel')}</label>
               {classes.length === 0 ? (
-                <div className="flex items-center gap-3">
+                <div className="teacher-toolbar__group">
                   <span className="text-sm text-slate-400">{t('class.noClass')}</span>
-                  <a
-                    href="/teacher/classes"
-                    className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                  >
+                  <a href="/teacher/classes" className="ghost-button">
                     {t('class.createFirst')}
                   </a>
                 </div>
               ) : (
-                <select
-                  value={selectedClassId}
-                  onChange={(e) => setSelectedClassId(e.target.value)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 min-w-[180px]"
-                >
+                <select value={selectedClassId} onChange={(e) => setSelectedClassId(e.target.value)} className="teacher-control min-w-[180px]">
                   {classes.map((cls) => (
                     <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))}
@@ -439,13 +407,11 @@ export default function TeacherTaskGroups() {
               )}
             </div>
 
-            {/* 鍒嗛殧绾?*/}
-            <div className="hidden sm:block w-px h-8 bg-slate-200" />
+            <div className="teacher-toolbar__spacer" />
 
-            {/* 鎼滅储 */}
-            <div className="flex items-center gap-3 flex-1 w-full sm:w-auto">
-              <div className="relative flex-1 max-w-md">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="teacher-toolbar__group" style={{ flex: 1, justifyContent: 'flex-end' }}>
+              <div className="teacher-search max-w-md">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
@@ -453,7 +419,7 @@ export default function TeacherTaskGroups() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t('taskGroup.searchGroupsPlaceholder')}
-                  className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  className="teacher-control"
                 />
               </div>
               <span className="text-sm text-slate-500 whitespace-nowrap">
@@ -463,8 +429,7 @@ export default function TeacherTaskGroups() {
           </div>
         </section>
 
-        {/* 浠诲姟缁勫垪琛?*/}
-        <section className="panel-section flex-1">
+        <section className="surface-card">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />

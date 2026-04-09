@@ -1,61 +1,66 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/layout/Layout'
-import { useTranslation } from '../../i18n/useTranslation'
 import { classService } from '../../services/api'
 import { useAppStore } from '../../stores/app-store'
 
+type StudentClassSummary = {
+  id: string
+  name: string
+  teacher?: { name?: string | null } | null
+}
+
+function formatGuestRemaining(expiresAt: string) {
+  const diff = new Date(expiresAt).getTime() - Date.now()
+  if (diff <= 0) return '0 分钟'
+  const totalMinutes = Math.ceil(diff / 60000)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours <= 0) return `${minutes} 分钟`
+  return `${hours} 小时 ${minutes} 分钟`
+}
+
 function GuestBanner({ expiresAt }: { expiresAt: string }) {
-  const { t } = useTranslation()
-  const [timeLeft, setTimeLeft] = useState('')
+  const [remaining, setRemaining] = useState(() => formatGuestRemaining(expiresAt))
 
   useEffect(() => {
-    const updateTimer = () => {
-      const now = Date.now()
-      const expires = new Date(expiresAt).getTime()
-      const diff = expires - now
-
-      if (diff <= 0) {
-        setTimeLeft('0:00')
-        return
-      }
-
-      const hours = Math.floor(diff / 3600000)
-      const minutes = Math.floor((diff % 3600000) / 60000)
-      setTimeLeft(hours > 0 ? `${hours}:${minutes.toString().padStart(2, '0')}` : `${minutes}m`)
-    }
-
-    updateTimer()
-    const interval = setInterval(updateTimer, 30000)
-    return () => clearInterval(interval)
+    const update = () => setRemaining(formatGuestRemaining(expiresAt))
+    update()
+    const timer = window.setInterval(update, 30000)
+    return () => window.clearInterval(timer)
   }, [expiresAt])
 
   return (
-    <div className="bg-amber-50 border-b border-amber-200">
-      <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">⏰</span>
+    <div className="student-panel">
+      <div className="student-panel-body flex items-center justify-between gap-4 bg-amber-50/80">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
           <div>
-            <p className="text-sm font-medium text-amber-800">{t('class.guestBannerTitle')}</p>
-            <p className="text-xs text-amber-600">{t('class.guestBannerDesc')}</p>
+            <p className="text-sm font-semibold text-amber-900">游客身份已启用</p>
+            <p className="text-sm text-amber-700">请尽快登录正式账号，避免课堂记录和进度丢失。</p>
           </div>
         </div>
-        <div className="text-amber-700 font-bold text-lg tabular-nums">{timeLeft}</div>
+        <div className="rounded-full bg-white px-4 py-2 text-sm font-semibold text-amber-800 shadow-sm">
+          剩余 {remaining}
+        </div>
       </div>
     </div>
   )
 }
 
 export default function StudentHome() {
-  const { t, tWithParams } = useTranslation()
   const { user, token, isGuest, expiresAt } = useAppStore()
-  const [classes, setClasses] = useState<any[]>([])
+  const [classes, setClasses] = useState<StudentClassSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-    return () => clearInterval(timer)
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 60000)
+    return () => window.clearInterval(timer)
   }, [])
 
   useEffect(() => {
@@ -63,41 +68,37 @@ export default function StudentHome() {
       setLoading(false)
       return
     }
-    loadData()
+    void loadClasses()
   }, [user, token])
 
-  async function loadData() {
-    if (!user) {
-      setLoading(false)
-      return
-    }
+  async function loadClasses() {
     try {
-      const classesData = await classService.getAll()
-      setClasses(classesData)
-      if (classesData.length > 0) {
-        localStorage.setItem('last_student_class_id', classesData[0].id)
+      const allClasses = await classService.getAll()
+      setClasses(allClasses)
+      if (allClasses.length > 0) {
+        localStorage.setItem('last_student_class_id', allClasses[0].id)
       }
-    } catch (e) {
-      console.error('Failed to load data:', e)
+    } catch (error) {
+      console.error('Failed to load classes:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const getGreeting = () => {
+  const greeting = useMemo(() => {
     const hour = currentTime.getHours()
-    if (hour < 12) return t('studentHome.morningGreeting')
-    if (hour < 18) return t('studentHome.afternoonGreeting')
-    return t('studentHome.eveningGreeting')
-  }
+    if (hour < 12) return '上午好'
+    if (hour < 18) return '下午好'
+    return '晚上好'
+  }, [currentTime])
 
   if (loading) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-slate-600">{t('common.loading')}</span>
+        <div className="flex min-h-[70vh] items-center justify-center">
+          <div className="flex items-center gap-3 rounded-full bg-white/80 px-5 py-3 shadow-sm">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--navy)] border-t-transparent" />
+            <span className="text-sm font-medium text-[var(--muted)]">正在加载课堂信息…</span>
           </div>
         </div>
       </Layout>
@@ -106,108 +107,130 @@ export default function StudentHome() {
 
   return (
     <Layout>
-      <div className="min-h-screen bg-slate-50">
-        {isGuest && expiresAt && <GuestBanner expiresAt={expiresAt} />}
+      <div className="student-page">
+        <div className="student-page-shell">
+          {isGuest && expiresAt ? <GuestBanner expiresAt={expiresAt} /> : null}
 
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white">
-          <div className="max-w-lg mx-auto px-4 py-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <p className="text-white/60 text-sm mb-1">{getGreeting()}</p>
-                <h1 className="text-2xl font-bold">{user?.name || t('studentHome.classmate')}</h1>
+          <section className="student-hero">
+            <div className="relative z-10 flex flex-col gap-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="eyebrow !mb-2 !text-white/70">{greeting}</p>
+                  <h1 className="text-3xl font-semibold !text-white">{user?.name || '同学'}</h1>
+                  <p className="mt-2 max-w-xl text-sm text-white/80">
+                    这里是你的课堂入口。进入课堂作答、查看已加入班级和继续今天的学习，都从这里开始。
+                  </p>
+                </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/14 text-white shadow-lg backdrop-blur">
+                  <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422A12.083 12.083 0 0112 20.055a12.083 12.083 0 01-6.16-9.477L12 14z" />
+                  </svg>
+                </div>
               </div>
-              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center text-2xl">
-                👤
+
+              <div className="student-count-grid">
+                <div className="student-count-tile">
+                  <div className="text-2xl font-bold text-white">{classes.length}</div>
+                  <div className="mt-1 text-xs text-white/70">已加入班级</div>
+                </div>
+                <div className="student-count-tile">
+                  <div className="text-2xl font-bold text-white">{currentTime.getHours().toString().padStart(2, '0')}:{currentTime.getMinutes().toString().padStart(2, '0')}</div>
+                  <div className="mt-1 text-xs text-white/70">当前时间</div>
+                </div>
               </div>
             </div>
-
-            <div className="flex gap-3 mt-6">
-              <div className="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-3">
-                <div className="text-2xl font-bold">{classes.length}</div>
-                <div className="text-xs text-white/60">{t('studentHome.myClasses')}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-          <section>
-            <Link
-              to="/student/live"
-              className="group relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/25 flex items-center gap-4"
-            >
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">🎯</div>
-              <div>
-                <div className="font-semibold text-lg">{t('studentHome.classroomTasks')}</div>
-                <div className="text-sm text-blue-100">{t('studentHome.realtimeAnswer')}</div>
-              </div>
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
-            </Link>
           </section>
 
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">{t('studentHome.myClasses')}</h2>
-              <Link to="/join" className="text-sm text-blue-600 hover:text-blue-700">
-                + {t('studentHome.joinClass')}
-              </Link>
+          <Link to="/student/live" className="student-feature-link">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/18">
+              <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 19h8a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
             </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-semibold">进入课堂任务</div>
+              <div className="mt-1 text-sm text-blue-100">接收老师发布的任务、挑战和课堂互动。</div>
+            </div>
+            <div className="text-sm font-semibold text-white/80">立即进入</div>
+          </Link>
 
-            {classes.length === 0 ? (
-              <div className="bg-white rounded-2xl p-6 text-center border border-slate-100">
-                <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center text-3xl mx-auto mb-3">🏫</div>
-                <p className="text-slate-500 text-sm mb-3">{t('studentHome.noClassYet')}</p>
-                <Link to="/join" className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors">
-                  {t('studentHome.enterCode')}
+          <section className="student-panel">
+            <div className="student-panel-body space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-[var(--ink)]">我的班级</h2>
+                  <p className="mt-1 text-sm text-[var(--muted)]">查看已加入班级，或通过邀请码加入新的课堂。</p>
+                </div>
+                <Link to="/join" className="solid-button">
+                  加入班级
                 </Link>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {classes.map((cls) => (
-                  <div key={cls.id} className="bg-white rounded-2xl p-4 border border-slate-100">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-lg font-bold">
-                        {cls.name?.charAt(0) || 'C'}
+
+              {classes.length === 0 ? (
+                <div className="rounded-[20px] border border-dashed border-[rgba(24,36,58,0.14)] bg-white/70 px-6 py-10 text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(30,58,95,0.08)] text-[var(--navy)]">
+                    <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4v-4z" />
+                    </svg>
+                  </div>
+                  <h3 className="mt-4 text-lg font-semibold text-[var(--ink)]">还没有加入任何班级</h3>
+                  <p className="mt-2 text-sm text-[var(--muted)]">输入老师提供的邀请码后，课堂任务和互动会自动出现在这里。</p>
+                  <div className="mt-5">
+                    <Link to="/join" className="ghost-button">
+                      输入邀请码
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {classes.map((cls) => (
+                    <div key={cls.id} className="flex items-center gap-4 rounded-[20px] border border-[rgba(24,36,58,0.08)] bg-white px-4 py-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(30,58,95,0.1)] text-base font-semibold text-[var(--navy)]">
+                        {cls.name?.trim()?.charAt(0) || '班'}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-slate-900 truncate">{cls.name}</h3>
-                        <p className="text-xs text-slate-500">{t('studentHome.teacher')}: {cls.teacher?.name || t('studentHome.unknown')}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-base font-semibold text-[var(--ink)]">{cls.name}</div>
+                        <div className="mt-1 text-sm text-[var(--muted)]">任课老师：{cls.teacher?.name || '暂未显示'}</div>
                       </div>
                       <button
                         onClick={async () => {
-                          if (confirm(tWithParams('studentHome.leaveConfirm', { name: cls.name }))) {
-                            try {
-                              await classService.leave(cls.id)
-                              loadData()
-                            } catch (e: any) {
-                              alert(e.response?.data?.detail || t('studentHome.leaveFailed'))
-                            }
+                          if (!window.confirm(`确认退出「${cls.name}」吗？`)) return
+                          try {
+                            await classService.leave(cls.id)
+                            await loadClasses()
+                          } catch (error: any) {
+                            alert(error?.response?.data?.detail || '退出班级失败，请稍后重试。')
                           }
                         }}
-                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        className="ghost-button"
+                        type="button"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
+                        退出
                       </button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </section>
 
-          {!isGuest && (
-            <section className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl p-4 border border-blue-100">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-xl shadow-sm">💡</div>
+          {!isGuest ? (
+            <section className="student-panel">
+              <div className="student-panel-body flex items-start gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(74,139,122,0.12)] text-[var(--sage)]">
+                  <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z" />
+                  </svg>
+                </div>
                 <div>
-                  <h4 className="font-semibold text-slate-900 text-sm mb-1">{t('studentHome.learningTip')}</h4>
-                  <p className="text-xs text-slate-600">{t('student.practiceTip')}</p>
+                  <h3 className="text-base font-semibold text-[var(--ink)]">学习提示</h3>
+                  <p className="mt-1 text-sm text-[var(--muted)]">
+                    上课前先确认网络稳定。进入课堂后尽量保持页面常驻，老师发布任务、抢答和弹幕互动都会实时显示。
+                  </p>
                 </div>
               </div>
             </section>
-          )}
+          ) : null}
         </div>
       </div>
     </Layout>

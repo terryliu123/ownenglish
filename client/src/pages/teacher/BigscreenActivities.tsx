@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout, { TeacherSidebar } from '../../components/layout/Layout'
 import TeacherLeftSidebar from '../../components/layout/TeacherLeftSidebar'
 import { useTranslation } from '../../i18n/useTranslation'
+import TeacherPageHeader from '../../components/layout/TeacherPageHeader'
 import {
   bigscreenActivityService,
   membershipService,
@@ -161,36 +162,37 @@ export default function TeacherBigscreenActivities() {
 
   return (
     <Layout sidebar={<TeacherSidebar activePage="bigscreen-activities" />} leftSidebar={<TeacherLeftSidebar activePage="bigscreen-activities" />}>
-      <section className="surface-card mt-4">
-        {/* Header */}
-        <div className="surface-head" style={{ paddingBottom: '24px', borderBottom: '1px solid rgba(0,0,0,0.08)', marginBottom: '32px' }}>
-          <div>
-            <h2>{t('bigscreenActivities.title')}</h2>
-            <p className="mt-2 text-sm" style={{ color: 'var(--muted)' }}>{t('bigscreenActivities.subtitle')}</p>
-            <p className="mt-2 text-xs text-slate-500">
-              {membership?.is_paid
-                ? '付费会员：大屏互动素材和活动包不限量'
-                : `免费会员：素材 ${assetUsage}/${assetLimit ?? '-'}，活动包 ${packUsage}/${packLimit ?? '-'}`
-              }
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:flex">
+      <div className="teacher-page">
+      <TeacherPageHeader
+        eyebrow="Bigscreen"
+        title={t('bigscreenActivities.title')}
+        description={
+          membership?.is_paid
+            ? '付费会员可不限量创建大屏互动素材和活动包。'
+            : `免费会员：素材 ${assetUsage}/${assetLimit ?? '-'}，活动包 ${packUsage}/${packLimit ?? '-'}。`
+        }
+        icon="屏"
+        actions={
+          <>
+            <div className="hidden items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white/90 md:flex">
               <div className="text-right">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">素材可创建</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{assetQuotaText}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/60">素材可创建</div>
+                <div className="mt-1 text-sm font-semibold text-white">{assetQuotaText}</div>
               </div>
-              <div className="h-8 w-px bg-slate-200" />
+              <div className="h-8 w-px bg-white/10" />
               <div className="text-right">
-                <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500">活动包可创建</div>
-                <div className="mt-1 text-sm font-semibold text-slate-900">{packQuotaText}</div>
+                <div className="text-[11px] uppercase tracking-[0.18em] text-white/60">活动包可创建</div>
+                <div className="mt-1 text-sm font-semibold text-white">{packQuotaText}</div>
               </div>
             </div>
             <button className="ghost-button" onClick={() => navigate('/teacher/whiteboard')}>
               {t('bigscreenActivities.run.back')}
             </button>
-          </div>
-        </div>
+          </>
+        }
+      />
+
+      <section className="surface-card">
 
         <div className="mb-6 flex rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:hidden">
           <div className="flex-1">
@@ -447,6 +449,7 @@ export default function TeacherBigscreenActivities() {
           </div>
         )}
       </section>
+      </div>
 
       <BigscreenAssetEditor
         open={assetEditorOpen}
