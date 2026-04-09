@@ -79,7 +79,7 @@ export function StudentPanel({
   const classroomList = Array.from(classroomStudents.values())
 
   return (
-    <aside className={`w-72 border-r backdrop-blur-xl flex flex-col ${tc.bg}`}>
+    <aside data-tour="whiteboard-student-panel" className={`w-72 border-r backdrop-blur-xl flex flex-col ${tc.bg}`}>
       {/* 头部 - 教室内学生 + 举手图标 */}
       <div className={`p-4 flex items-center justify-between border-b ${tc.divider}`}>
         <div className="flex items-center gap-2">

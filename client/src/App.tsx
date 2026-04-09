@@ -44,6 +44,7 @@ import AdminTeachingAidDetail from './pages/admin/TeachingAidDetail'
 import AdminInvitationCodes from './pages/admin/InvitationCodes'
 import { StudentAiProvider } from './features/student-ai/context/StudentAiContext'
 import StudentAiPanel from './features/student-ai/components/StudentAiPanel'
+import { ProductTourProvider } from './features/product-tour/ProductTourProvider'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,57 +59,59 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/join" element={<JoinClass />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/share/task-group/:token" element={<ShareView />} />
-            <Route path="/notifications" element={<Notifications />} />
+        <ProductTourProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/join" element={<JoinClass />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/share/task-group/:token" element={<ShareView />} />
+              <Route path="/notifications" element={<Notifications />} />
 
-            <Route path="/teacher" element={<TeacherHome />} />
-            <Route path="/teacher/classes" element={<TeacherClasses />} />
-            <Route path="/teacher/task-groups" element={<TeacherTaskGroups />} />
-            <Route path="/teacher/live" element={<TeacherLive />} />
-            <Route path="/teacher/whiteboard" element={<TeacherWhiteboard />} />
-            <Route path="/teacher/classroom-review" element={<TeacherClassroomReview />} />
-            <Route path="/teacher/classroom-review/:id" element={<TeacherClassroomReviewDetail />} />
-            <Route path="/teacher/teaching-aids" element={<TeacherTeachingAids />} />
-            <Route path="/import/teaching-aid/:shareCode" element={<ImportTeachingAid />} />
-            <Route path="/teacher/bigscreen-activities" element={<TeacherBigscreenActivities />} />
-            <Route path="/teacher/bigscreen-activities/run/:sessionId" element={<TeacherBigscreenActivityRun />} />
-            <Route path="/teacher/packs" element={<TeacherPacks />} />
-            <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
-            <Route path="/teacher/membership" element={<TeacherMembership />} />
-            <Route path="/teacher/payment-result" element={<PaymentResult />} />
+              <Route path="/teacher" element={<TeacherHome />} />
+              <Route path="/teacher/classes" element={<TeacherClasses />} />
+              <Route path="/teacher/task-groups" element={<TeacherTaskGroups />} />
+              <Route path="/teacher/live" element={<TeacherLive />} />
+              <Route path="/teacher/whiteboard" element={<TeacherWhiteboard />} />
+              <Route path="/teacher/classroom-review" element={<TeacherClassroomReview />} />
+              <Route path="/teacher/classroom-review/:id" element={<TeacherClassroomReviewDetail />} />
+              <Route path="/teacher/teaching-aids" element={<TeacherTeachingAids />} />
+              <Route path="/import/teaching-aid/:shareCode" element={<ImportTeachingAid />} />
+              <Route path="/teacher/bigscreen-activities" element={<TeacherBigscreenActivities />} />
+              <Route path="/teacher/bigscreen-activities/run/:sessionId" element={<TeacherBigscreenActivityRun />} />
+              <Route path="/teacher/packs" element={<TeacherPacks />} />
+              <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
+              <Route path="/teacher/membership" element={<TeacherMembership />} />
+              <Route path="/teacher/payment-result" element={<PaymentResult />} />
 
-            <Route path="/student" element={<StudentHome />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/teacher/settings" element={<Settings />} />
-            <Route path="/student/settings" element={<Settings />} />
-            <Route path="/student/live" element={<StudentAiProvider><StudentLive /><StudentAiPanel /></StudentAiProvider>} />
-            <Route path="/student/pack" element={<StudentPack />} />
-            <Route path="/student/practice" element={<StudentPractice />} />
-            <Route path="/student/speaking" element={<StudentSpeaking />} />
-            <Route path="/student/report" element={<StudentReport />} />
-            <Route path="/student/free" element={<StudentFree />} />
+              <Route path="/student" element={<StudentHome />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/teacher/settings" element={<Settings />} />
+              <Route path="/student/settings" element={<Settings />} />
+              <Route path="/student/live" element={<StudentAiProvider><StudentLive /><StudentAiPanel /></StudentAiProvider>} />
+              <Route path="/student/pack" element={<StudentPack />} />
+              <Route path="/student/practice" element={<StudentPractice />} />
+              <Route path="/student/speaking" element={<StudentSpeaking />} />
+              <Route path="/student/report" element={<StudentReport />} />
+              <Route path="/student/free" element={<StudentFree />} />
 
-            <Route path="/admin/login" element={<AdminLoginPage />} />
-            <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="messages" element={<AdminMessages />} />
-              <Route path="activities" element={<AdminActivities />} />
-              <Route path="membership" element={<AdminMembershipSettings />} />
-              <Route path="invitation-codes" element={<AdminInvitationCodes />} />
-              <Route path="teaching-aids" element={<AdminTeachingAids />} />
-              <Route path="teaching-aids/:aidId" element={<AdminTeachingAidDetail />} />
-            </Route>
-          </Routes>
-        </BrowserRouter>
+              <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route path="/admin" element={<AdminLayout />}>
+                <Route index element={<AdminDashboard />} />
+                <Route path="users" element={<AdminUsers />} />
+                <Route path="messages" element={<AdminMessages />} />
+                <Route path="activities" element={<AdminActivities />} />
+                <Route path="membership" element={<AdminMembershipSettings />} />
+                <Route path="invitation-codes" element={<AdminInvitationCodes />} />
+                <Route path="teaching-aids" element={<AdminTeachingAids />} />
+                <Route path="teaching-aids/:aidId" element={<AdminTeachingAidDetail />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </ProductTourProvider>
       </AppProvider>
     </QueryClientProvider>
   )

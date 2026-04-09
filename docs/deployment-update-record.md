@@ -923,3 +923,51 @@ px tsc --noEmit 通过
 2. 学生端弹幕面板显示教师端配置后的预制语句
 3. 教师刷新、课堂恢复后，预制语句配置仍能保留
 4. 未配置自定义语句时，系统默认预制语句仍可用
+
+## 2026-04-09 - 教师端互动课堂首次使用引导（白板页 v1）
+
+### 修改范围
+- 教师端白板页新增首次进入使用引导
+- 首轮仅覆盖白板页，不扩展到互动管理、课堂回顾、大屏互动独立页面
+
+### 主要文件
+- `client/src/App.tsx`
+- `client/src/main.tsx`
+- `client/src/pages/teacher/WhiteboardMode.tsx`
+- `client/src/features/whiteboard/components/StudentPanel.tsx`
+- `client/src/features/whiteboard/components/TaskPanel.tsx`
+- `client/src/features/product-tour/ProductTourProvider.tsx`
+- `client/src/features/product-tour/TourPopover.tsx`
+- `client/src/features/product-tour/whiteboard-tour-steps.tsx`
+- `client/src/features/product-tour/useProductTour.ts`
+- `client/src/features/product-tour/useWhiteboardTour.ts`
+- `client/src/features/product-tour/tour-keys.ts`
+
+### 关键调整
+- 全局接入 `@reactour/tour` 的 `TourProvider`
+- 白板页增加稳定的 `data-tour` 锚点：
+  - 班级选择
+  - 课堂会话控制
+  - 左侧学生区
+  - 右侧待发布任务区
+  - 氛围设置入口
+- 首次进入白板页且未开始本节课时，自动弹出一次引导
+- 引导完成状态只记录在本机 `localStorage`
+- 白板顶部增加“查看引导”入口，可手动重新打开
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端不需要更新
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 教师首次进入白板页，自动弹出引导
+2. 点击跳过或完成后，本机再次进入白板页不再自动弹出
+3. 点击“查看引导”可重新打开完整引导
+4. 已开始本节课时不自动打断，但手动入口仍可用
+5. 白板原有开始/结束课堂、任务区、学生区、氛围设置交互不受影响
+
+### 后续微调
+- “发布课堂任务”步骤的引导弹层位置调整到待发布任务面板旁边
+- 新增“AI 设置”步骤，补齐教师对白板课堂 AI 控制的引导

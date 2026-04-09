@@ -97,7 +97,7 @@ export function TaskPanel({
   }
 
   return (
-    <aside className={`w-80 border-l backdrop-blur-xl flex flex-col ${tc.bg}`}>
+    <aside data-tour="whiteboard-task-panel" className={`w-80 border-l backdrop-blur-xl flex flex-col ${tc.bg}`}>
       {/* 头部 */}
       <div className={`p-3 flex items-center justify-between border-b ${tc.divider}`}>
         <h3 className={`font-medium text-sm ${tc.headerText}`}>控制台</h3>

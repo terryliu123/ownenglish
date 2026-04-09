@@ -26,6 +26,8 @@ import { TeachingAidLibraryModal } from '../../features/teaching-aids/TeachingAi
 import ClassAiSettingsModal from '../../features/whiteboard-ai/components/ClassAiSettingsModal'
 import { DanmuScreen, AtmosphereEffects } from '../../features/danmu'
 import type { ActiveDanmu, DanmuConfig } from '../../features/danmu/types/danmu'
+import { getWhiteboardTourSteps } from '../../features/product-tour/whiteboard-tour-steps'
+import { useWhiteboardTour } from '../../features/product-tour/useWhiteboardTour'
 import {
   SUPPORTED_CHALLENGE_TASK_TYPES,
   SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES,
@@ -341,6 +343,23 @@ export default function WhiteboardMode() {
       setShowDanmuPresetEditor(false)
     }
   }, [showDanmuSettings])
+
+  const ensureTourLayout = useCallback(() => {
+    setMode('interactive')
+    setShowLeftPanel(true)
+    setShowRightPanel(true)
+  }, [])
+
+  const whiteboardTourSteps = useMemo(
+    () => getWhiteboardTourSteps({ ensureInteractiveLayout: ensureTourLayout }),
+    [ensureTourLayout]
+  )
+
+  const { openTour } = useWhiteboardTour({
+    steps: whiteboardTourSteps,
+    canAutoStart: Boolean(currentClassId && classesLoaded && !hasActiveClassroomSession && !openedTeachingAid),
+    beforeOpen: ensureTourLayout,
+  })
 
   const normalizeDanmuPresetPhrases = useCallback((phrases: string[]) => {
     const normalized: string[] = []
@@ -1466,7 +1485,7 @@ export default function WhiteboardMode() {
           <div className={`h-6 w-px ${tc.divider}`} />
 
           {/* 氛围设置按钮 - 放在左侧 */}
-          <div className="relative" ref={danmuSettingsRef}>
+          <div className="relative" ref={danmuSettingsRef} data-tour="whiteboard-danmu-settings">
             <button
               onClick={() => setShowDanmuSettings(!showDanmuSettings)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all shadow-lg ${
@@ -1716,8 +1735,9 @@ export default function WhiteboardMode() {
           <div className="flex items-center gap-2">
             <span className={`${tc.textMuted} text-sm`}>{t('class.current')}:</span>
             {classes.length > 0 ? (
-              <select
-                value={currentClassId || ''}
+                <select
+                  data-tour="whiteboard-class-select"
+                  value={currentClassId || ''}
                 onChange={(e) => {
                   const newClassId = e.target.value
                   if (newClassId !== currentClassId) {
@@ -1835,6 +1855,7 @@ export default function WhiteboardMode() {
 
                 <button
                   onClick={() => setShowAiSettings(true)}
+                  data-tour="whiteboard-ai-settings"
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                     theme === 'dark'
                       ? 'bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 border-purple-500/30'
@@ -1844,10 +1865,22 @@ export default function WhiteboardMode() {
                   <span className="text-lg">🤖</span>
                   <span className="text-sm">AI 设置</span>
                 </button>
+                <button
+                  onClick={openTour}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                    theme === 'dark'
+                      ? 'bg-slate-800/80 text-slate-200 hover:bg-slate-700 border-slate-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border-slate-200'
+                  }`}
+                >
+                  <span className="text-sm">?</span>
+                  <span className="text-sm">查看引导</span>
+                </button>
             </>
           )}
 
           {/* 课堂会话控制 */}
+          <div data-tour="whiteboard-session-controls" className="flex items-center gap-3">
           {!hasActiveClassroomSession ? (
             <button
               onClick={handleStartSession}
@@ -1877,6 +1910,7 @@ export default function WhiteboardMode() {
               </button>
             </>
           )}
+          </div>
 
         </div>
       </header>
