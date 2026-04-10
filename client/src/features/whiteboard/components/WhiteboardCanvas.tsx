@@ -29,11 +29,19 @@ export function WhiteboardCanvas({
   scale = 1,
   onScaleChange,
   onReady,
-}: WhiteboardCanvasProps) {
+  onTextSelect,
+  onTextDeselect,
+}: WhiteboardCanvasProps & {
+  onTextSelect?: (text: IText, canvas: Canvas) => void
+  onTextDeselect?: () => void
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fabricRef = useRef<Canvas | null>(null)
   const eraserCursorRef = useRef<HTMLDivElement | null>(null)
   const laserCursorRef = useRef<HTMLDivElement | null>(null)
+  const historyRef = useRef<string[]>([])
+  const historyIdxRef = useRef(-1)
+  const skipHistoryRef = useRef(false)
   const currentThemeRef = useRef<WhiteboardTheme>(theme)
   const scaleRef = useRef(scale)
 
@@ -160,18 +168,48 @@ export function WhiteboardCanvas({
         onScaleChange?.(newScale)
       },
       resetZoom: () => onScaleChange?.(1),
-      toJSON: () => fabricRef.current?.toJSON(),
+      toJSON: () => {
+        const canvas = fabricRef.current
+        if (!canvas) return null
+        const json = canvas.toJSON()
+        // 将远程图片转为 base64 内嵌，确保刷新后可恢复
+        const fabricObjects = canvas.getObjects()
+        if (json.objects) {
+          json.objects.forEach((obj: any, index: number) => {
+            if (obj.type === 'image' && obj.src && !obj.src.startsWith('data:')) {
+              const fabricObj = fabricObjects[index]
+              if (fabricObj) {
+                try {
+                  const el = (fabricObj as any).getElement?.()
+                  if (el && el instanceof HTMLImageElement) {
+                    const c = document.createElement('canvas')
+                    c.width = el.naturalWidth || el.width
+                    c.height = el.naturalHeight || el.height
+                    const ctx = c.getContext('2d')
+                    if (ctx) {
+                      ctx.drawImage(el, 0, 0)
+                      obj.src = c.toDataURL('image/png')
+                    }
+                  }
+                } catch {
+                  // 跨域图片无法 toDataURL，保留原 src
+                }
+              }
+            }
+          })
+        }
+        return json
+      },
       loadJSON: (json: any) => {
         const canvas = fabricRef.current
         if (!canvas) return
         canvas.loadFromJSON(json).then(() => {
-          // 确保加载后背景正确
           canvas.backgroundColor = themeConfig.canvasBg
           if (canvas.wrapperEl) {
             canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
           }
           canvas.renderAll()
-          console.log('[WhiteboardCanvas] Canvas data loaded successfully')
+          console.log('[WhiteboardCanvas] Canvas loaded, objects:', canvas.getObjects().length)
         }).catch((e: any) => {
           console.error('[WhiteboardCanvas] Failed to load canvas data:', e)
         })
@@ -230,6 +268,28 @@ export function WhiteboardCanvas({
       console.log('[WhiteboardCanvas] Canvas ready, calling onReady')
       onReady?.()
     }, 300)
+
+    // 文本选中事件
+    const handleSelectionCreated = (e: any) => {
+      const target = e.selected?.[0] || e.target
+      if (target && (target.type === 'i-text' || target.type === 'text')) {
+        onTextSelect?.(target as IText, canvas)
+      }
+    }
+    const handleSelectionUpdated = (e: any) => {
+      const target = e.selected?.[0] || e.target
+      if (target && (target.type === 'i-text' || target.type === 'text')) {
+        onTextSelect?.(target as IText, canvas)
+      } else {
+        onTextDeselect?.()
+      }
+    }
+    const handleSelectionCleared = () => {
+      onTextDeselect?.()
+    }
+    canvas.on('selection:created', handleSelectionCreated)
+    canvas.on('selection:updated', handleSelectionUpdated)
+    canvas.on('selection:cleared', handleSelectionCleared)
 
     // 创建橡皮擦光标元素
     const eraserCursor = document.createElement('div')
@@ -682,11 +742,18 @@ export function WhiteboardCanvas({
 
   // 绘制事件处理
   const notifyChange = useCallback(() => {
-    // 通知父组件画布已变化，需要保存
     const canvas = fabricRef.current
     if (canvas) {
       const json = canvas.toJSON()
       ;(window as any).whiteboardData = json
+      if (!skipHistoryRef.current) {
+        const state = JSON.stringify(json)
+        historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1)
+        historyRef.current.push(state)
+        historyIdxRef.current = historyRef.current.length - 1
+        if (historyRef.current.length > 50) { historyRef.current.shift(); historyIdxRef.current-- }
+      }
+      skipHistoryRef.current = false
     }
   }, [])
 
@@ -892,6 +959,30 @@ export function WhiteboardCanvas({
       api.zoomIn = zoomIn
       api.zoomOut = zoomOut
       api.resetZoom = resetZoom
+      api.undo = () => {
+        if (historyIdxRef.current <= 0) return
+        historyIdxRef.current--
+        const canvas = fabricRef.current
+        if (!canvas) return
+        skipHistoryRef.current = true
+        canvas.loadFromJSON(JSON.parse(historyRef.current[historyIdxRef.current])).then(() => {
+          canvas.backgroundColor = currentThemeRef.current === 'dark' ? '#0f0f13' : currentThemeRef.current === 'light' ? '#f8fafc' : '#f5f3ff'
+          canvas.renderAll()
+          setTimeout(() => { const e = new CustomEvent('whiteboard:save'); window.dispatchEvent(e) }, 100)
+        })
+      }
+      api.redo = () => {
+        if (historyIdxRef.current >= historyRef.current.length - 1) return
+        historyIdxRef.current++
+        const canvas = fabricRef.current
+        if (!canvas) return
+        skipHistoryRef.current = true
+        canvas.loadFromJSON(JSON.parse(historyRef.current[historyIdxRef.current])).then(() => {
+          canvas.backgroundColor = currentThemeRef.current === 'dark' ? '#0f0f13' : currentThemeRef.current === 'light' ? '#f8fafc' : '#f5f3ff'
+          canvas.renderAll()
+          setTimeout(() => { const e = new CustomEvent('whiteboard:save'); window.dispatchEvent(e) }, 100)
+        })
+      }
     }
   }, [addText, addImage, clearCanvas, zoomIn, zoomOut, resetZoom])
 

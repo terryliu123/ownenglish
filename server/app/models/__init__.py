@@ -511,12 +511,21 @@ class Notification(Base):
 
 
 class ActivityType(str, Enum):
-    CREATE_TASK_GROUP = "create_task_group"       # 创建课前准备
-    PUBLISH_TASK = "publish_task"                  # 发布任务
-    SHARE_TASK = "share_task"                     # 分享任务
-    CREATE_CLASS = "create_class"                 # 创建班级
-    CREATE_STUDY_PACK = "create_study_pack"       # 创建学习包
-    STUDENT_JOIN_CLASS = "student_join_class"      # 学生加入班级
+    CREATE_TASK_GROUP = "create_task_group"
+    PUBLISH_TASK = "publish_task"
+    SHARE_TASK = "share_task"
+    CREATE_CLASS = "create_class"
+    CREATE_STUDY_PACK = "create_study_pack"
+    STUDENT_JOIN_CLASS = "student_join_class"
+    SESSION_START = "session_start"
+    SESSION_END = "session_end"
+    AI_ASSISTANT_USE = "ai_assistant_use"
+    CLASSROOM_REVIEW_USE = "classroom_review_use"
+    TEACHING_AID_CREATE = "teaching_aid_create"
+    TEACHING_AID_OPEN = "teaching_aid_open"
+    BIGSCREEN_CREATE = "bigscreen_create"
+    BIGSCREEN_USE = "bigscreen_use"
+    DELETE_TASK = "delete_task"
 
 
 class ActivityLog(Base):
@@ -525,7 +534,7 @@ class ActivityLog(Base):
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
-    type = Column(SQLEnum(ActivityType), nullable=False)
+    type = Column(String(50), nullable=False, index=True)
     description = Column(String(500), nullable=False)  # 活动描述
     entity_type = Column(String(50), nullable=True)   # 关联实体类型，如 task_group, class, study_pack
     entity_id = Column(String(36), nullable=True)     # 关联实体ID

@@ -16,6 +16,8 @@ from app.api.v1.auth import get_current_user
 from app.models import User as UserModel
 from app.core.security import create_access_token
 from app.services.membership import FEATURE_CLASS_STUDENTS, FEATURE_CREATE_CLASS, assert_teacher_feature_access
+from app.services.activity_logger import log_activity
+from app.models import ActivityType
 
 router = APIRouter(prefix="/classes", tags=["Classes"])
 
@@ -272,6 +274,8 @@ async def create_class(
         db.add(new_class)
         await db.commit()
         await db.refresh(new_class)
+
+        await log_activity(db, teacher.user_id, ActivityType.CREATE_CLASS, f"创建班级「{new_class.name}」", entity_type="class", entity_id=new_class.id)
 
         return {
             "id": new_class.id,

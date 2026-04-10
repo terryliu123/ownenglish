@@ -90,6 +90,7 @@
       "messages": "系统消息",
       "activities": "系统日志",
       "membership": "会员设置",
+      "orders": "订单管理",
       "invitationCodes": "邀请码管理",
       "teachingAids": "数字化教具",
       "verifying": "验证中...",
@@ -146,7 +147,16 @@
         "share_task": "分享任务",
         "create_class": "创建班级",
         "create_study_pack": "创建学习包",
-        "student_join_class": "学生加入班级"
+        "student_join_class": "学生加入班级",
+        "session_start": "开始课程",
+        "session_end": "结束课程",
+        "ai_assistant_use": "AI助手使用",
+        "classroom_review_use": "课堂回顾使用",
+        "teaching_aid_create": "教具创建",
+        "teaching_aid_open": "教具打开",
+        "bigscreen_create": "大屏互动创建",
+        "bigscreen_use": "大屏互动使用",
+        "delete_task": "删除任务"
       }
     },
     "dashboard": {

@@ -145,6 +145,7 @@ export function useWhiteboardLive(classId: string | null) {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const shareFallbackTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const shouldReconnectRef = useRef(true)
   const pendingPublishRef = useRef<{
     groupId: string
     resolve: () => void
@@ -603,6 +604,7 @@ export function useWhiteboardLive(classId: string | null) {
     if (existingState === WebSocket.OPEN || existingState === WebSocket.CONNECTING) {
       return
     }
+    shouldReconnectRef.current = true
     isConnectingRef.current = true
     setState((prev) => ({ ...prev, isConnecting: true, error: null }))
 
@@ -641,9 +643,11 @@ export function useWhiteboardLive(classId: string | null) {
           clearInterval(heartbeatIntervalRef.current)
           heartbeatIntervalRef.current = null
         }
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect()
-        }, 2000)
+        if (shouldReconnectRef.current) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            connect()
+          }, 2000)
+        }
       }
 
       ws.onerror = () => {
@@ -673,6 +677,7 @@ export function useWhiteboardLive(classId: string | null) {
   }, [classId, getFreshAccessToken, handleMessage, loadClassPresence, settlePendingPublish, settleSocketWaiters, startHeartbeat, user])
 
   const disconnect = useCallback(() => {
+    shouldReconnectRef.current = false
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current)
       reconnectTimeoutRef.current = null

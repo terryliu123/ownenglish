@@ -13,6 +13,7 @@ from app.api.v1.auth import get_current_user
 from app.core.websocket import manager
 from app.db.session import get_db
 from app.models import (
+    ActivityType,
     Class,
     DanmuRecord,
     LiveChallengeSession,
@@ -24,6 +25,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.services.activity_logger import log_activity
 from .logging_utils import log_live_transport
 
 logger = logging.getLogger(__name__)
@@ -187,7 +189,7 @@ async def start_classroom_session(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await _require_teacher_class(request.class_id, current_user, db)
+    class_obj = await _require_teacher_class(request.class_id, current_user, db)
 
     existing_session = await _get_latest_active_session(db, request.class_id)
     if existing_session:
@@ -224,6 +226,7 @@ async def start_classroom_session(
     )
     db.add(session)
     await db.flush()
+    await log_activity(db, current_user.id, ActivityType.SESSION_START, f"开始课堂「{class_obj.name}」", entity_type="session", entity_id=session.id)
 
     db.add(
         LiveSessionEvent(
@@ -294,6 +297,7 @@ async def end_classroom_session(
         )
     )
     await db.commit()
+    await log_activity(db, current_user.id, ActivityType.SESSION_END, "结束课堂", entity_type="session", entity_id=session_id)
     if session.class_id in manager.class_rooms:
         await manager.save_snapshot(session.class_id)
         await manager.close_room(session.class_id)
@@ -494,6 +498,8 @@ async def get_classroom_session_detail(
     teacher_result = await db.execute(select(User).where(User.id == session.teacher_id))
     teacher = teacher_result.scalar_one_or_none()
     teacher_name = teacher.name if teacher else "未知教师"
+
+    await log_activity(db, current_user.id, ActivityType.CLASSROOM_REVIEW_USE, f"查看课堂回顾「{session.title or class_name}」", entity_type="session", entity_id=session_id)
 
     return SessionDetailResponse(
         id=session.id,

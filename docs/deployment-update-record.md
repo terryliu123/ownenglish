@@ -1192,3 +1192,80 @@ px tsc --noEmit 通过
 2. 小屏或窄宽度下，右下快捷菜单仍可打开
 3. 左侧主导航标签全部为正常中文
 4. 左侧菜单在一屏高度内可正常滚动和折叠
+
+## 2026-04-09 白板 AI 副班 Phase 1：语音讲解与快捷输入
+
+### 涉及文件
+- `client/src/features/whiteboard-ai/context/WhiteboardAiContext.tsx`
+- `client/src/features/whiteboard-ai/services/whiteboardAiService.ts`
+- `client/src/features/whiteboard-ai/components/WhiteboardAiPanel.tsx`
+- `client/src/features/whiteboard-ai/components/AiQuickPrompts.tsx`
+- `client/src/features/whiteboard-ai/components/VoiceExplainCard.tsx`
+- `server/app/api/v1/whiteboard_ai.py`
+- `server/app/services/whiteboard_ai_tts.py`
+- `server/app/core/config.py`
+
+### 关键调整
+- 在现有胖鼠 AI 副班中增加快捷输入 chips：
+  - 解释这部分
+  - 换更简单的说法
+  - 总结当前重点
+  - 生成 1 道检测题
+  - 生成 3 个追问
+  - 检查表达问题
+- 新增 `voice_explain` action，继续复用 `/api/v1/whiteboard-ai/respond`
+- AI 面板新增语音讲解结果卡，支持：
+  - 播放 / 暂停
+  - 重播
+  - 复制文字稿
+  - 重新生成
+- 后端新增 DashScope TTS service，生成受控音频文件
+- 新增受鉴权保护的语音访问路径：
+  - `/api/v1/whiteboard-ai/audio/{filename}`
+- 默认仍基于整张当前白板内容构造上下文，不按当前可视区域裁剪
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端需要同步代码并重启
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 现有文本问答、自由问答、参考白板、生成图片能力不回退
+2. 快捷输入 chips 行为正确：
+   - `总结当前重点` / `生成 1 道检测题` / `生成 3 个追问` 直接执行
+   - `解释这部分` / `换更简单的说法` / `检查表达问题` 只填入输入框
+3. 点击 `语音讲解` 后可生成讲解卡片，并手动播放音频
+4. 语音讲解默认不自动播放，不广播给学生端和大屏
+
+## 2026-04-09 白板 AI 副班输入方式收口
+
+### 涉及文件
+- `client/src/features/whiteboard-ai/components/WhiteboardAiPanel.tsx`
+
+### 关键调整
+- 将原有快捷输入、参考白板、生成图片入口统一收进发送框的 `"/"` 指令模式
+- 新增 slash commands：
+  - `/reference`
+  - `/image`
+  - `/voice`
+  - `/explain`
+  - `/simple`
+  - `/summary`
+  - `/quiz`
+  - `/followups`
+  - `/check`
+- AI 回复正文提亮为高对比度白色，提升深色面板下的可读性
+- AI 面板会直接从当前白板 JSON 提取整张白板文本，作为快捷执行和语音讲解的默认上下文
+
+### 部署要求
+- 前端需要重新 build 并发布
+- 后端不需要额外改动（若上一轮语音讲解后端尚未发布，则前后端一起发）
+- 不需要数据库迁移
+- 不需要环境变量变更
+
+### 回归重点
+1. 输入 `/` 后能弹出快捷指令列表
+2. `/reference` / `/image` 能切换输入模式
+3. `/voice` / `/summary` / `/quiz` / `/followups` 能直接执行
+4. AI 回复正文在深色面板下清晰可读

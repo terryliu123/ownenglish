@@ -269,6 +269,52 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ===== AI ASSISTANT SHOWCASE ===== */}
+      <section className="py-28 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-950/20 to-transparent" />
+        <div className="max-w-6xl mx-auto relative">
+          {/* Title */}
+          <div className="text-center mb-12">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-purple-500/10 text-purple-400 text-sm font-semibold mb-4 border border-purple-500/20">AI 赋能教学</span>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4 leading-tight">
+              胖鼠AI副班 · <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">你的智能课堂助手</span>
+            </h2>
+            <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
+              基于白板内容实时理解课堂场景，语音提问、智能解答、生成讲解稿，让 AI 成为你的教学搭档。
+            </p>
+          </div>
+
+          {/* Full-width screenshot */}
+          <div className="relative mb-12">
+            <div className="absolute -inset-6 bg-gradient-to-r from-purple-600/15 to-pink-600/15 rounded-3xl blur-3xl" />
+            <div className="relative rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-purple-500/10">
+              <img
+                src="/ai-assistant-screenshot.png"
+                alt="胖鼠AI副班"
+                className="w-full object-cover"
+                onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600"><rect fill="#1a1a2e" width="1200" height="600"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#666" font-size="24">胖鼠AI副班</text></svg>') }}
+              />
+            </div>
+          </div>
+
+          {/* Feature pills */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: '看黑板', desc: 'AI 实时读取白板内容，基于板书和题目智能回答', icon: '👁️' },
+              { label: '语音输入', desc: '直接语音提问，课堂上解放双手', icon: '🎙️' },
+              { label: '语音讲解', desc: '一键生成口语化讲解稿，直接播放', icon: '🔊' },
+              { label: '智能画图', desc: '描述需求即可生成课堂配图和素材', icon: '🎨' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl bg-white/[0.03] border border-purple-500/15 p-5 hover:bg-white/[0.06] hover:border-purple-500/30 transition-all duration-300">
+                <div className="text-2xl mb-2">{item.icon}</div>
+                <h4 className="font-semibold text-white mb-1">{item.label}</h4>
+                <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ===== INTERACTION MODES ===== */}
       <section className="py-28 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-cyan-950/15 to-transparent" />

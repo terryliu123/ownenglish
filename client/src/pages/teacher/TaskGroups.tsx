@@ -122,8 +122,12 @@ export default function TeacherTaskGroups() {
   async function loadGroups() {
     setLoading(true)
     try {
-      const data = await liveTaskService.getTaskGroups(selectedClassId)
+      const [data, membershipData] = await Promise.all([
+        liveTaskService.getTaskGroups(selectedClassId),
+        membershipService.getMyMembership(),
+      ])
       setGroups(data)
+      setMembership(membershipData)
     } catch (error) {
       console.error('Failed to load task groups:', error)
     } finally {

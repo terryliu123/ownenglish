@@ -569,24 +569,21 @@ async def handle_teacher_connection(websocket: WebSocket, class_id: str, teacher
         if not session:
             # Try any active session for this class (e.g., created by teacher via API)
             session = await _get_active_live_session(class_id, db)
-        if not session:
-            # Only create a new session if no active session exists at all
-            session = LiveSession(
-                class_id=class_id,
-                group_id=current_task_group["group_id"],
-                topic=current_task_group["title"],
-                status="active"
-            )
-            db.add(session)
-            await db.commit()
-            await db.refresh(session)
-            logger.info(f"[WebSocket] Created LiveSession on reconnect: {session.id}")
-        else:
+        if session:
             # Reuse existing session — update its group_id if needed
             if not session.group_id:
                 session.group_id = current_task_group["group_id"]
                 await db.commit()
                 logger.info("[WebSocket] Reused existing LiveSession %s for task_group %s", session.id, current_task_group["group_id"])
+        else:
+            logger.warning(
+                "[live.runtime] stale_task_group_without_active_session class_id=%s group_id=%s; clearing room runtime",
+                class_id,
+                current_task_group.get("group_id"),
+            )
+            manager.class_rooms[class_id]["current_task_group"] = None
+            manager.class_rooms[class_id]["current_task"] = None
+            manager.class_rooms[class_id]["current_challenge"] = None
     elif not current_challenge and not current_task:
         # No active task group — try to find existing active session (created by teacher via API).
         # Do NOT end sessions here; only the teacher's explicit "结束本节课" action should end a session.
@@ -2104,7 +2101,20 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
             )
             actual_count = count_result.scalar() or 0
             # Notify teacher about duplicate submission attempt with actual count
-            await manager.submit_task_group_answer(class_id, group_id, student_id, answers, is_duplicate=True, db_submission_count=actual_count)
+            delivered = await manager.submit_task_group_answer(
+                class_id,
+                group_id,
+                student_id,
+                answers,
+                is_duplicate=True,
+                db_submission_count=actual_count,
+            )
+            if not delivered:
+                logger.warning(
+                    "[WebSocket] Duplicate submission notification not delivered to teacher: group_id=%s student_id=%s",
+                    group_id,
+                    student_id,
+                )
             return
 
         for ans in answers:
@@ -2184,12 +2194,17 @@ async def handle_student_message(websocket: WebSocket, class_id: str, student_id
 
         # Broadcast to teacher with retry
         try:
-            await manager.submit_task_group_answer(class_id, group_id, student_id, answers)
+            delivered = await manager.submit_task_group_answer(class_id, group_id, student_id, answers)
+            if delivered:
+                return
+            raise RuntimeError("teacher delivery failed")
         except Exception:
             logger.warning("[WebSocket] Teacher broadcast failed, retrying in 1s: group_id=%s student_id=%s", group_id, student_id)
             try:
                 await asyncio.sleep(1)
-                await manager.submit_task_group_answer(class_id, group_id, student_id, answers)
+                delivered = await manager.submit_task_group_answer(class_id, group_id, student_id, answers)
+                if not delivered:
+                    raise RuntimeError("teacher delivery failed")
             except Exception:
                 logger.error("[WebSocket] Teacher broadcast retry also failed: group_id=%s student_id=%s (data persisted)", group_id, student_id)
 

@@ -42,6 +42,9 @@ import AdminMembershipSettings from './pages/admin/MembershipSettings'
 import AdminTeachingAids from './pages/admin/TeachingAids'
 import AdminTeachingAidDetail from './pages/admin/TeachingAidDetail'
 import AdminInvitationCodes from './pages/admin/InvitationCodes'
+import AdminOrders from './pages/admin/Orders'
+import AdminChangePassword from './pages/admin/AdminChangePassword'
+import AdminClassroomSessions from './pages/admin/ClassroomSessions'
 import { StudentAiProvider } from './features/student-ai/context/StudentAiContext'
 import StudentAiPanel from './features/student-ai/components/StudentAiPanel'
 import { ProductTourProvider } from './features/product-tour/ProductTourProvider'
@@ -105,9 +108,12 @@ function App() {
                 <Route path="messages" element={<AdminMessages />} />
                 <Route path="activities" element={<AdminActivities />} />
                 <Route path="membership" element={<AdminMembershipSettings />} />
+                <Route path="orders" element={<AdminOrders />} />
                 <Route path="invitation-codes" element={<AdminInvitationCodes />} />
                 <Route path="teaching-aids" element={<AdminTeachingAids />} />
                 <Route path="teaching-aids/:aidId" element={<AdminTeachingAidDetail />} />
+                <Route path="classroom-sessions" element={<AdminClassroomSessions />} />
+                <Route path="change-password" element={<AdminChangePassword />} />
               </Route>
             </Routes>
           </BrowserRouter>

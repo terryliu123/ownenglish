@@ -113,7 +113,7 @@ from .schemas import (
     ImportSharedTaskGroupRequest,
 )
 
-from .utils import log_activity, _answers_match
+from .utils import _answers_match
 
 __all__ = [
     "router",
@@ -126,6 +126,5 @@ __all__ = [
     "AiGenerateTaskGroupRequest",
     "ShareTaskGroupRequest",
     "ImportSharedTaskGroupRequest",
-    "log_activity",
     "_answers_match",
 ]

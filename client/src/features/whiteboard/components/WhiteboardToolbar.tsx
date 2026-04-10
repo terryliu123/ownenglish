@@ -310,10 +310,7 @@ export function WhiteboardToolbar({
       </button>
 
       <button
-        onClick={() => {
-          const json = (window as any).whiteboardAPI?.toJSON()
-          console.log('Whiteboard state:', json)
-        }}
+        onClick={() => (window as any).whiteboardAPI?.undo()}
         className={`w-11 h-11 rounded-xl flex items-center justify-center ${getTextColor()} hover:bg-black/5 transition-all`}
         title={t('whiteboard.undo')}
       >
@@ -321,7 +318,7 @@ export function WhiteboardToolbar({
       </button>
 
       <button
-        onClick={() => {}}
+        onClick={() => (window as any).whiteboardAPI?.redo()}
         className={`w-11 h-11 rounded-xl flex items-center justify-center ${getTextColor()} hover:bg-black/5 transition-all`}
         title={t('whiteboard.redo')}
       >

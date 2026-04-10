@@ -1,7 +1,9 @@
 import { api } from '../../../services/api'
 
+export type WhiteboardAiAction = 'reference' | 'generate_image' | 'free_question' | 'voice_explain'
+
 export interface WhiteboardAiRequest {
-  action: 'reference' | 'generate_image' | 'free_question'
+  action: WhiteboardAiAction
   question?: string
   context: {
     whiteboard_text?: string
@@ -11,12 +13,19 @@ export interface WhiteboardAiRequest {
     session_id?: string
   }
   image_base64?: string
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>
+}
+
+export interface VoiceExplainPayload {
+  title: string
+  script: string
+  estimated_seconds: number
 }
 
 export interface WhiteboardAiResponse {
-  type: 'structured' | 'text' | 'image' | 'image_pending'
+  type: 'structured' | 'text' | 'image' | 'image_pending' | 'voice_explain'
   content: string
-  parsed?: Record<string, unknown>
+  parsed?: Record<string, unknown> | VoiceExplainPayload
 }
 
 export const whiteboardAiService = {

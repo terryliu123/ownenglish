@@ -17,7 +17,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
-from app.models import TeachingAid, TeachingAidSession, User, UserRole
+from app.models import ActivityType, TeachingAid, TeachingAidSession, User, UserRole
+from app.services.activity_logger import log_activity
+from app.services.activity_logger import log_activity
 from app.services.teaching_aids import (
     get_teaching_aids_manifest_path,
     get_teaching_aids_root,
@@ -338,6 +340,7 @@ async def launch_teaching_aid(
     )
     await db.commit()  # 确保 session 保存到数据库
     await db.refresh(session)
+    await log_activity(db, current_user.id, ActivityType.TEACHING_AID_OPEN, f"打开教具「{aid.name}」", entity_type="teaching_aid", entity_id=aid.id)
     return {
         "session_id": session.session_token,
         "entry_url": f"/api/v1/teaching-aids/session/{session.session_token}/{aid.entry_file}",
@@ -440,6 +443,7 @@ async def create_teaching_aid(
     )
     db.add(aid)
     await db.flush()
+    await log_activity(db, current_user.id, ActivityType.TEACHING_AID_CREATE, f"创建教具「{payload.name.strip()}」", entity_type="teaching_aid", entity_id=aid.id)
     return _serialize_teaching_aid(aid)
 
 

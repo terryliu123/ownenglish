@@ -8,6 +8,8 @@ import { classService, liveTaskService, api, liveTaskSubmissionService } from '.
 import { useWhiteboardLive } from '../../features/whiteboard/hooks/useWhiteboardLive'
 import { WhiteboardCanvas } from '../../features/whiteboard/components/WhiteboardCanvas'
 import { WhiteboardToolbar } from '../../features/whiteboard/components/WhiteboardToolbar'
+import { saveCanvasData, loadCanvasData, removeCanvasData } from '../../features/whiteboard/utils/canvasStorage'
+import { TextFormatBar } from '../../features/whiteboard/components/TextFormatBar'
 import { StudentPanel } from '../../features/whiteboard/components/StudentPanel'
 import { TaskPanel } from '../../features/whiteboard/components/TaskPanel'
 import { TaskPreviewCard } from '../../features/whiteboard/components/TaskPreviewCard'
@@ -33,6 +35,7 @@ import {
   SUPPORTED_SINGLE_QUESTION_DUEL_TASK_TYPES,
 } from '../../features/teacher-live/hooks/useChallenges'
 import type { WhiteboardTool, WhiteboardElement, WhiteboardTheme } from '../../features/whiteboard/types'
+import type { IText, Canvas } from 'fabric'
 import type { LiveTaskGroup } from '../../services/api'
 import type { TaskHistoryItem } from '../../services/websocket'
 
@@ -132,41 +135,39 @@ export default function WhiteboardMode() {
     return `${minutes}:${secs.toString().padStart(2, '0')}`
   }
 
-  // localStorage 存储键
+  // 存储键
   const getStorageKey = useCallback((key: string) => `whiteboard_${key}_${currentClassId || 'global'}`, [currentClassId])
 
-  // 从 localStorage 加载白板内容（在画布准备好后）
+  // 从 IndexedDB 加载白板内容（在画布准备好后）
   useEffect(() => {
     if (!currentClassId || !canvasReady) return
-    // 延迟一点时间确保 Fabric.js 完全初始化
     const timer = setTimeout(() => {
-      try {
-        const saved = localStorage.getItem(getStorageKey('canvas'))
-        if (saved) {
-          const canvasData = JSON.parse(saved)
-          // 恢复画布内容
+      const key = getStorageKey('canvas')
+      loadCanvasData(key).then((canvasData) => {
+        if (canvasData) {
           const api = (window as any).whiteboardAPI
-          if (api && canvasData) {
-            console.log('[Whiteboard] Restoring canvas data:', canvasData)
+          if (api) {
+            console.log('[Whiteboard] Restoring canvas data, objects:', canvasData.objects?.length)
             api.loadJSON?.(canvasData)
           }
         }
-      } catch (e) {
+      }).catch((e) => {
         console.error('Failed to load whiteboard canvas:', e)
-      }
+      })
     }, 300)
     return () => clearTimeout(timer)
   }, [currentClassId, canvasReady, getStorageKey])
 
-  // 保存白板内容到 localStorage
+  // 保存白板内容到 IndexedDB
   const saveCanvasToStorage = useCallback(() => {
     if (!currentClassId) return
     const api = (window as any).whiteboardAPI
     if (api) {
       const canvasData = api.toJSON?.()
       if (canvasData) {
-        localStorage.setItem(getStorageKey('canvas'), JSON.stringify(canvasData))
-        console.log('[Whiteboard] Saved canvas data')
+        saveCanvasData(getStorageKey('canvas'), canvasData).catch((e) => {
+          console.warn('[Whiteboard] Failed to save canvas:', e)
+        })
       }
     }
   }, [currentClassId, getStorageKey])
@@ -191,8 +192,7 @@ export default function WhiteboardMode() {
   const clearWhiteboardData = useCallback((classIdToClear?: string) => {
     const targetClassId = classIdToClear || currentClassId
     if (!targetClassId) return
-    const key = (key: string) => `whiteboard_${key}_${targetClassId}`
-    localStorage.removeItem(key('canvas'))
+    removeCanvasData(`whiteboard_canvas_${targetClassId}`).catch(() => {})
     setElements([])
     setTaskGroups([])
     setPublishedGroups([])
@@ -312,6 +312,10 @@ export default function WhiteboardMode() {
 
   // 画布缩放
   const [scale, setScale] = useState(1)
+
+  // 文本格式化
+  const [selectedText, setSelectedText] = useState<IText | null>(null)
+  const [canvasRef, setCanvasRef] = useState<Canvas | null>(null)
 
   // 主题设置
   const [theme, setTheme] = useState<WhiteboardTheme>('dark')
@@ -1496,7 +1500,9 @@ export default function WhiteboardMode() {
                   : 'bg-white/90 text-slate-600 hover:bg-white shadow-black/10'
               }`}
             >
-              <span className="text-lg">🎆</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+              </svg>
               <span className="text-sm font-medium">氛围</span>
             </button>
 
@@ -1862,7 +1868,9 @@ export default function WhiteboardMode() {
                       : 'bg-purple-100 text-purple-700 hover:bg-purple-200 border-purple-300'
                   }`}
                 >
-                  <span className="text-lg">🤖</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
+                  </svg>
                   <span className="text-sm">AI 设置</span>
                 </button>
                 <button
@@ -1979,6 +1987,15 @@ export default function WhiteboardMode() {
               scale={scale}
               onScaleChange={setScale}
               onReady={() => setCanvasReady(true)}
+              onTextSelect={(text, canvas) => { setSelectedText(text); setCanvasRef(canvas) }}
+              onTextDeselect={() => setSelectedText(null)}
+            />
+
+            <TextFormatBar
+              selectedText={selectedText}
+              canvas={canvasRef}
+              theme={theme}
+              onFormatChange={saveCanvasToStorage}
             />
 
             {/* 任务预览卡片 */}

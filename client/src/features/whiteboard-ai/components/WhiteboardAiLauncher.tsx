@@ -1,20 +1,17 @@
 import { useWhiteboardAiContext } from '../context/WhiteboardAiContext'
-import { useAppStore } from '../../../stores/app-store'
 
 export default function WhiteboardAiLauncher() {
   const { isOpen, isLoading, setOpen, launcherPosition } = useWhiteboardAiContext()
-  const { user } = useAppStore()
-  const isPaid = user?.membership?.status === 'active'
 
-  if (!isPaid) return null
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setOpen(!isOpen)
+  }
 
   return (
     <div className="fixed z-50" style={{ right: `${launcherPosition.x}px`, bottom: `${launcherPosition.y}px` }}>
       <button
-        onClick={(e) => {
-          e.stopPropagation()
-          setOpen(!isOpen)
-        }}
+        onClick={handleClick}
         className={`group flex h-12 w-12 items-center justify-center rounded-2xl shadow-lg transition-all duration-300 hover:scale-110 ${
           isOpen
             ? 'bg-white/[0.08] border border-white/[0.1] shadow-black/30'

@@ -166,22 +166,29 @@ class ConnectionManager:
             self.class_rooms[class_id]["student_wss"].pop(sid, None)
             self.student_connections.pop(sid, None)
 
-    async def send_to_teacher(self, class_id: str, message: dict):
+    async def send_to_teacher(self, class_id: str, message: dict) -> bool:
         room = self.class_rooms.get(class_id)
         if not room:
             logger.warning(f"[send_to_teacher] Room not found for class_id={class_id}")
-            return
+            return False
 
         teacher_ws = room.get("teacher_ws")
         if not teacher_ws:
             logger.warning(f"[send_to_teacher] teacher_ws not found for class_id={class_id}")
-            return
+            return False
 
         try:
             await teacher_ws.send_json(message)
             logger.info(f"[send_to_teacher] Sent to teacher for class_id={class_id}: type={message.get('type')}")
+            return True
         except Exception as e:
             logger.error(f"[send_to_teacher] Failed to send to teacher for class_id={class_id}: {e}")
+            room["teacher_ws"] = None
+            teacher_id = room.get("teacher_id")
+            if teacher_id:
+                self.teacher_connections.pop(teacher_id, None)
+                self._teacher_last_seen.pop(teacher_id, None)
+            return False
 
     async def send_to_student(self, class_id: str, student_id: str, message: dict):
         ws = self.class_rooms.get(class_id, {}).get("student_wss", {}).get(student_id)
@@ -413,10 +420,10 @@ class ConnectionManager:
             },
         )
 
-    async def submit_task_group_answer(self, class_id: str, group_id: str, student_id: str, answers: list, is_duplicate: bool = False, db_submission_count: int = None):
+    async def submit_task_group_answer(self, class_id: str, group_id: str, student_id: str, answers: list, is_duplicate: bool = False, db_submission_count: int = None) -> bool:
         if class_id not in self.class_rooms:
             logger.warning(f"[submit_task_group_answer] class_rooms does not contain class_id={class_id}")
-            return
+            return False
 
         room = self.class_rooms[class_id]
         current_group = room.get("current_task_group")
@@ -447,7 +454,7 @@ class ConnectionManager:
         logger.info(f"[submit_task_group_answer] teacher_ws exists: {teacher_ws is not None}")
 
         # Always notify teacher about submission (even duplicates)
-        await self.send_to_teacher(
+        delivered = await self.send_to_teacher(
             class_id,
             {
                 "type": "new_task_group_submission",
@@ -457,6 +464,7 @@ class ConnectionManager:
                 "is_duplicate": is_duplicate,
             },
         )
+        return delivered
 
     async def end_task_group(self, class_id: str, group_id: str):
         if class_id not in self.class_rooms:

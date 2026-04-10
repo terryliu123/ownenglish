@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { adminService, type AdminMembershipPlanConfig, type AdminWeChatPaySettingItem } from '../../services/api'
+import { adminService, type AdminMembershipPlanConfig } from '../../services/api'
 import { useTranslation } from '../../i18n/useTranslation'
 
 type PlanFormState = {
@@ -44,10 +44,7 @@ export default function AdminMembershipSettings() {
   const [loading, setLoading] = useState(true)
   const [plans, setPlans] = useState<AdminMembershipPlanConfig[]>([])
   const [planForms, setPlanForms] = useState<Record<string, PlanFormState>>({})
-  const [wechatSettings, setWechatSettings] = useState<AdminWeChatPaySettingItem[]>([])
-  const [wechatForm, setWechatForm] = useState<Record<string, string>>({})
   const [savingPlanCode, setSavingPlanCode] = useState<string | null>(null)
-  const [savingWechat, setSavingWechat] = useState(false)
   const [message, setMessage] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
@@ -63,10 +60,6 @@ export default function AdminMembershipSettings() {
       setPlans(data.plans)
       setPlanForms(
         Object.fromEntries(data.plans.map((plan) => [plan.code, toPlanForm(plan)])),
-      )
-      setWechatSettings(data.wechat_pay_settings)
-      setWechatForm(
-        Object.fromEntries(data.wechat_pay_settings.map((item) => [item.key, item.value ?? ''])),
       )
     } catch (error) {
       console.error('Failed to load admin membership config:', error)
@@ -115,25 +108,6 @@ export default function AdminMembershipSettings() {
       setErrorMessage(t('adminMembership.planSaveFailed'))
     } finally {
       setSavingPlanCode(null)
-    }
-  }
-
-  async function saveWechatSettings() {
-    try {
-      setSavingWechat(true)
-      setMessage('')
-      setErrorMessage('')
-      const result = await adminService.updateWeChatPaySettings(wechatForm)
-      setWechatSettings(result.wechat_pay_settings)
-      setWechatForm(
-        Object.fromEntries(result.wechat_pay_settings.map((item) => [item.key, item.value ?? ''])),
-      )
-      setMessage(t('adminMembership.wechatSaved'))
-    } catch (error) {
-      console.error('Failed to save wechat pay settings:', error)
-      setErrorMessage(t('adminMembership.wechatSaveFailed'))
-    } finally {
-      setSavingWechat(false)
     }
   }
 
@@ -310,48 +284,6 @@ export default function AdminMembershipSettings() {
               </article>
             )
           })}
-        </div>
-      </section>
-
-      <section className="rounded-3xl border border-slate-700 bg-slate-800/80 p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-white">{t('adminMembership.wechatSection')}</h2>
-            <p className="mt-1 text-sm text-slate-400">{t('adminMembership.wechatSectionHint')}</p>
-          </div>
-          <button
-            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
-            onClick={() => void saveWechatSettings()}
-            disabled={savingWechat}
-          >
-            {savingWechat ? t('adminMembership.saving') : t('adminMembership.saveWechat')}
-          </button>
-        </div>
-
-        <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {wechatSettings.map((item) => (
-            <label key={item.key} className="block">
-              <span className="mb-1 block text-sm font-medium text-slate-200">{item.key}</span>
-              <span className="mb-2 block text-xs text-slate-400">{item.description}</span>
-              {item.key.includes('PRIVATE_KEY') || item.key.includes('PUBLIC_KEY') ? (
-                <textarea
-                  rows={4}
-                  value={wechatForm[item.key] ?? ''}
-                  onChange={(event) => setWechatForm((current) => ({ ...current, [item.key]: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-400"
-                  placeholder={item.is_secret ? t('adminMembership.secretPlaceholder') : ''}
-                />
-              ) : (
-                <input
-                  type={item.is_secret ? 'password' : 'text'}
-                  value={wechatForm[item.key] ?? ''}
-                  onChange={(event) => setWechatForm((current) => ({ ...current, [item.key]: event.target.value }))}
-                  className="w-full rounded-xl border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-white outline-none focus:border-blue-400"
-                  placeholder={item.is_secret ? t('adminMembership.secretPlaceholder') : ''}
-                />
-              )}
-            </label>
-          ))}
         </div>
       </section>
     </div>

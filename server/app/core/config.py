@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     DASHSCOPE_API_KEY: str = "sk-4fc7e8e8c8e74ee69ab07c5e296a15b5"
     DASHSCOPE_MODEL: str = "qwen-vl-plus"
     DASHSCOPE_TIMEOUT_SECONDS: int = 120
+    DASHSCOPE_TTS_MODEL: str = "qwen3-tts-instruct-flash"
+    DASHSCOPE_TTS_VOICE: str = "Cherry"
 
     # Membership
     MEMBERSHIP_MONTHLY_PRICE_CENTS: int = 3900

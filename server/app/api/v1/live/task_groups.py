@@ -23,7 +23,7 @@ from .schemas import (
     ShareTaskGroupRequest, ImportSharedTaskGroupRequest,
     AiImportTaskGroupRequest, AiGenerateTaskGroupRequest
 )
-from .utils import log_activity
+from app.services.activity_logger import log_activity
 from .logging_utils import log_live_transport
 from .ai_import import (
     _build_import_questions_with_ai, _build_generated_questions_with_ai,
@@ -561,6 +561,9 @@ async def delete_task_group(
 
     await db.delete(group)
     await db.commit()
+
+    await log_activity(db, current_user.id, ActivityType.DELETE_TASK, f"删除任务组「{group.title}」", entity_type="task_group", entity_id=group_id)
+
     return {"success": True}
 
 

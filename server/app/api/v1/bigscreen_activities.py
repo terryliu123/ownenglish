@@ -37,6 +37,8 @@ from app.services.membership import (
     FEATURE_BIGSCREEN_CONTENT_ASSETS,
     assert_teacher_feature_access,
 )
+from app.services.activity_logger import log_activity
+from app.models import ActivityType
 
 router = APIRouter(prefix="/bigscreen-activities", tags=["BigscreenActivities"])
 
@@ -234,6 +236,7 @@ async def create_content_asset(
     )
     db.add(asset)
     await db.flush()
+    await log_activity(db, teacher_id, ActivityType.BIGSCREEN_CREATE, f"创建大屏素材「{payload.title.strip()}」", entity_type="bigscreen_asset", entity_id=asset.id)
     return _serialize_asset(asset)
 
 
@@ -290,6 +293,28 @@ async def update_content_asset(
     asset.updated_at = utc_now()
     await db.flush()
     return _serialize_asset(asset)
+
+
+@router.delete("/assets/{asset_id}")
+async def delete_content_asset(
+    asset_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    teacher_id = await _resolve_teacher_id(db, current_user)
+    asset = (
+        await db.execute(
+            select(BigscreenContentAsset).where(
+                BigscreenContentAsset.id == asset_id,
+                BigscreenContentAsset.teacher_id == teacher_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="Content asset not found")
+    await db.delete(asset)
+    await db.flush()
+    return {"ok": True}
 
 
 @router.get("/packs")
@@ -409,6 +434,28 @@ async def update_activity_pack(
     return _serialize_pack(pack, assets)
 
 
+@router.delete("/packs/{pack_id}")
+async def delete_activity_pack(
+    pack_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    teacher_id = await _resolve_teacher_id(db, current_user)
+    pack = (
+        await db.execute(
+            select(BigscreenActivityPack).where(
+                BigscreenActivityPack.id == pack_id,
+                BigscreenActivityPack.teacher_id == teacher_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not pack:
+        raise HTTPException(status_code=404, detail="Activity pack not found")
+    await db.delete(pack)
+    await db.flush()
+    return {"ok": True}
+
+
 @router.post("/packs/{pack_id}/launch")
 async def launch_activity_pack(
     pack_id: str,
@@ -486,6 +533,7 @@ async def launch_activity_pack(
     )
     db.add(session)
     await db.flush()
+    await log_activity(db, teacher_id, ActivityType.BIGSCREEN_USE, f"启动大屏活动「{pack.title}」", entity_type="bigscreen_session", entity_id=session.id)
     return _serialize_session(session, pack, assets)
 
 

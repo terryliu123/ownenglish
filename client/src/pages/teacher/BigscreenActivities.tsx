@@ -160,6 +160,32 @@ export default function TeacherBigscreenActivities() {
     }
   }
 
+  const handleDeleteAsset = async (asset: BigscreenContentAsset) => {
+    if (!confirm(`确定要删除素材"${asset.title}"吗？此操作不可撤销。`)) return
+    setSaving(true)
+    try {
+      await bigscreenActivityService.deleteAsset(asset.id)
+      await loadData()
+    } catch {
+      alert('删除素材失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeletePack = async (pack: BigscreenActivityPack) => {
+    if (!confirm(`确定要删除活动包"${pack.title}"吗？此操作不可撤销。`)) return
+    setSaving(true)
+    try {
+      await bigscreenActivityService.deletePack(pack.id)
+      await loadData()
+    } catch {
+      alert('删除活动包失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Layout sidebar={<TeacherSidebar activePage="bigscreen-activities" />} leftSidebar={<TeacherLeftSidebar activePage="bigscreen-activities" />}>
       <div className="teacher-page">
@@ -304,7 +330,7 @@ export default function TeacherBigscreenActivities() {
                           <span className="text-sm text-slate-400">--</span>
                         )}
                       </div>
-                      <div className="mt-auto grid grid-cols-2 gap-2">
+                      <div className="mt-auto grid grid-cols-3 gap-2">
                         {asset.status === 'draft' ? (
                           <button
                             className="solid-button min-w-0 text-xs px-3 py-1.5 whitespace-nowrap"
@@ -331,6 +357,13 @@ export default function TeacherBigscreenActivities() {
                           }}
                         >
                           {t('bigscreenActivities.editAsset')}
+                        </button>
+                        <button
+                          className="ghost-button min-w-0 text-xs px-3 py-1.5 whitespace-nowrap text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={saving}
+                          onClick={() => void handleDeleteAsset(asset)}
+                        >
+                          删除
                         </button>
                       </div>
                     </div>
@@ -410,7 +443,7 @@ export default function TeacherBigscreenActivities() {
                           {t('bigscreenActivities.packCard.rounds')}: {pack.round_count} 路 {pack.content_asset_refs.length} 个素材
                         </div>
                       </div>
-                      <div className="mt-auto grid grid-cols-2 gap-2">
+                      <div className="mt-auto grid grid-cols-3 gap-2">
                         {pack.status === 'draft' ? (
                           <button
                             className="solid-button min-w-0 text-xs px-3 py-1.5 whitespace-nowrap"
@@ -437,6 +470,13 @@ export default function TeacherBigscreenActivities() {
                           }}
                         >
                           {t('bigscreenActivities.editPack')}
+                        </button>
+                        <button
+                          className="ghost-button min-w-0 text-xs px-3 py-1.5 whitespace-nowrap text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={saving}
+                          onClick={() => void handleDeletePack(pack)}
+                        >
+                          删除
                         </button>
                       </div>
                     </div>

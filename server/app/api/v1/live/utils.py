@@ -3,33 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Optional, List
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models import ActivityLog, ActivityType
-
 logger = logging.getLogger(__name__)
-
-
-async def log_activity(
-    db: AsyncSession,
-    user_id: str,
-    activity_type: ActivityType,
-    description: str,
-    entity_type: str = None,
-    entity_id: str = None,
-    extra_data: dict = None
-):
-    """Log a user activity."""
-    activity = ActivityLog(
-        user_id=user_id,
-        type=activity_type,
-        description=description,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        extra_data=extra_data
-    )
-    db.add(activity)
-    await db.commit()
 
 
 def _unwrap_correct_answer(value):

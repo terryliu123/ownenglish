@@ -33,6 +33,8 @@ export function useWhiteboardAi() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const throttleRef = useRef<Map<string, number>>(new Map())
+  const messagesRef = useRef<AiMessage[]>([])
+  messagesRef.current = state.messages
 
   const setOpen = useCallback((open: boolean) => {
     setState(prev => ({ ...prev, isOpen: open }))
@@ -73,7 +75,17 @@ export function useWhiteboardAi() {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
 
     try {
-      const response = await whiteboardAiService.respond({ action, question, context })
+      // 取最近 15 轮对话历史传给后端
+      const recentHistory = messagesRef.current.slice(-30).map(m => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }))
+      const response = await whiteboardAiService.respond({
+        action,
+        question,
+        context,
+        history: recentHistory.length > 0 ? recentHistory : undefined,
+      })
 
       // 更新缓存
       setState(prev => {

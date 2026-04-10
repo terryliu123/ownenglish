@@ -8,7 +8,7 @@ from typing import Any, Optional, List
 from pydantic import BaseModel
 
 from app.db.session import get_db
-from app.models import User, UserRole, Class, LiveTaskGroup, LiveSession, Notification, NotificationType, ActivityLog, ActivityType, MembershipPlan, TeacherMembership, InvitationCode
+from app.models import User, UserRole, Class, LiveTaskGroup, LiveSession, LiveSessionEvent, Notification, NotificationType, ActivityLog, ActivityType, MembershipPlan, TeacherMembership, InvitationCode, PaymentOrder
 from app.api.v1.auth import get_current_user
 from app.services.notifications import create_notification, create_bulk_notifications
 from app.services.membership import ensure_membership_plans
@@ -35,6 +35,16 @@ class AdminStatsResponse(BaseModel):
     total_task_groups: int
     total_live_sessions: int
     active_users_7d: int
+    # 今日
+    today_teachers: int = 0
+    today_students: int = 0
+    today_sessions: int = 0
+    today_task_groups: int = 0
+    # 本周
+    week_teachers: int = 0
+    week_students: int = 0
+    week_sessions: int = 0
+    week_task_groups: int = 0
 
     class Config:
         from_attributes = True
@@ -168,6 +178,19 @@ async def get_admin_stats(
         select(func.count()).select_from(User).where(User.created_at >= week_ago)
     )).scalar()
 
+    # 今日统计
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_teachers = (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.TEACHER, User.created_at >= today_start))).scalar() or 0
+    today_students = (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.STUDENT, User.created_at >= today_start))).scalar() or 0
+    today_sessions = (await db.execute(select(func.count()).select_from(LiveSession).where(LiveSession.created_at >= today_start))).scalar() or 0
+    today_task_groups = (await db.execute(select(func.count()).select_from(LiveTaskGroup).where(LiveTaskGroup.created_at >= today_start))).scalar() or 0
+
+    # 本周统计
+    week_teachers = (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.TEACHER, User.created_at >= week_ago))).scalar() or 0
+    week_students = (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.STUDENT, User.created_at >= week_ago))).scalar() or 0
+    week_sessions = (await db.execute(select(func.count()).select_from(LiveSession).where(LiveSession.created_at >= week_ago))).scalar() or 0
+    week_task_groups = (await db.execute(select(func.count()).select_from(LiveTaskGroup).where(LiveTaskGroup.created_at >= week_ago))).scalar() or 0
+
     return AdminStatsResponse(
         total_users=total_users or 0,
         total_teachers=total_teachers or 0,
@@ -176,6 +199,14 @@ async def get_admin_stats(
         total_task_groups=total_task_groups or 0,
         total_live_sessions=total_live_sessions or 0,
         active_users_7d=active_users_7d or 0,
+        today_teachers=today_teachers,
+        today_students=today_students,
+        today_sessions=today_sessions,
+        today_task_groups=today_task_groups,
+        week_teachers=week_teachers,
+        week_students=week_students,
+        week_sessions=week_sessions,
+        week_task_groups=week_task_groups,
     )
 
 
@@ -364,6 +395,31 @@ class SetUserMembershipRequest(BaseModel):
 
 class ChangeUserPasswordRequest(BaseModel):
     new_password: str
+
+class ChangeOwnPasswordRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_own_password(
+    data: ChangeOwnPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin_user),
+):
+    """Admin change own password."""
+    from app.core.security import verify_password, get_password_hash
+
+    if not verify_password(data.old_password, admin.password_hash):
+        raise HTTPException(status_code=400, detail="原密码错误")
+
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密码至少 6 位")
+
+    admin.password_hash = get_password_hash(data.new_password)
+    await db.commit()
+
+    return {"message": "密码修改成功"}
 
 
 @router.put("/users/{user_id}/membership")
@@ -595,30 +651,48 @@ async def list_activities(
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
     activity_type: Optional[str] = None,
+    user_id: Optional[str] = None,
+    username: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(get_current_admin_user),
 ):
     """List recent user activities (create task group, publish task, share task, etc.)."""
     query = select(ActivityLog).options(selectinload(ActivityLog.user))
-
-    if activity_type:
-        try:
-            type_enum = ActivityType(activity_type)
-            query = query.where(ActivityLog.type == type_enum)
-        except ValueError:
-            pass  # Invalid type, ignore filter
-
-    # Get total count
     count_query = select(func.count()).select_from(ActivityLog)
+
     if activity_type:
+        query = query.where(ActivityLog.type == activity_type)
+        count_query = count_query.where(ActivityLog.type == activity_type)
+    if user_id:
+        query = query.where(ActivityLog.user_id == user_id)
+        count_query = count_query.where(ActivityLog.user_id == user_id)
+    if username:
+        matched = (await db.execute(select(User.id).where(User.name.ilike(f"%{username}%")))).scalars().all()
+        if matched:
+            query = query.where(ActivityLog.user_id.in_(matched))
+            count_query = count_query.where(ActivityLog.user_id.in_(matched))
+        else:
+            return {"items": [], "total": 0, "limit": limit, "offset": offset}
+    if start_date:
+        from datetime import datetime as dt, timezone as tz
         try:
-            type_enum = ActivityType(activity_type)
-            count_query = count_query.where(ActivityLog.type == type_enum)
+            sd = dt.fromisoformat(start_date).replace(tzinfo=tz.utc)
+            query = query.where(ActivityLog.created_at >= sd)
+            count_query = count_query.where(ActivityLog.created_at >= sd)
         except ValueError:
             pass
-    total = (await db.execute(count_query)).scalar()
+    if end_date:
+        from datetime import datetime as dt, timezone as tz
+        try:
+            ed = dt.fromisoformat(end_date).replace(tzinfo=tz.utc)
+            query = query.where(ActivityLog.created_at <= ed)
+            count_query = count_query.where(ActivityLog.created_at <= ed)
+        except ValueError:
+            pass
 
-    # Apply pagination and ordering
+    total = (await db.execute(count_query)).scalar()
     query = query.order_by(ActivityLog.created_at.desc()).offset(offset).limit(limit)
 
     result = await db.execute(query)
@@ -630,7 +704,7 @@ async def list_activities(
                 "id": a.id,
                 "user_id": a.user_id,
                 "user_name": a.user.name if a.user else "Unknown",
-                "type": a.type.value if a.type else a.type,
+                "type": a.type.value if hasattr(a.type, 'value') else a.type,
                 "description": a.description,
                 "entity_type": a.entity_type,
                 "entity_id": a.entity_id,
@@ -643,6 +717,113 @@ async def list_activities(
         "limit": limit,
         "offset": offset,
     }
+
+
+# ===== 订单管理 =====
+
+class OrderListResponse(BaseModel):
+    id: str
+    order_no: str
+    user_name: str
+    user_email: Optional[str] = None
+    user_registered_at: Optional[datetime] = None
+    plan_code: str
+    amount: int
+    status: str
+    paid_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class OrderListWithCount(BaseModel):
+    items: List[OrderListResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+@router.get("/orders", response_model=OrderListWithCount)
+async def list_orders(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin_user),
+):
+    """List all payment orders with pagination and filters."""
+    from app.models import TeacherProfile
+
+    query = (
+        select(PaymentOrder, User.name, User.email, User.created_at.label("user_registered_at"))
+        .join(TeacherProfile, PaymentOrder.teacher_id == TeacherProfile.user_id)
+        .join(User, TeacherProfile.user_id == User.id)
+    )
+
+    count_query = (
+        select(func.count())
+        .select_from(PaymentOrder)
+        .join(TeacherProfile, PaymentOrder.teacher_id == TeacherProfile.user_id)
+        .join(User, TeacherProfile.user_id == User.id)
+    )
+
+    # 搜索用户名/邮箱
+    if search:
+        search_filter = (User.name.ilike(f"%{search}%")) | (User.email.ilike(f"%{search}%"))
+        query = query.where(search_filter)
+        count_query = count_query.where(search_filter)
+
+    # 状态筛选
+    if status:
+        query = query.where(PaymentOrder.status == status)
+        count_query = count_query.where(PaymentOrder.status == status)
+
+    # 时间范围（按购买时间 paid_at 或创建时间）
+    if start_date:
+        try:
+            start_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            query = query.where(PaymentOrder.created_at >= start_dt)
+            count_query = count_query.where(PaymentOrder.created_at >= start_dt)
+        except ValueError:
+            pass
+
+    if end_date:
+        try:
+            end_dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.where(PaymentOrder.created_at < end_dt)
+            count_query = count_query.where(PaymentOrder.created_at < end_dt)
+        except ValueError:
+            pass
+
+    total = (await db.execute(count_query)).scalar()
+
+    offset = (page - 1) * page_size
+    query = query.order_by(PaymentOrder.created_at.desc()).offset(offset).limit(page_size)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    items = [
+        OrderListResponse(
+            id=order.id,
+            order_no=order.order_no,
+            user_name=user_name,
+            user_email=user_email,
+            user_registered_at=user_registered_at,
+            plan_code=order.plan_code,
+            amount=order.amount,
+            status=order.status,
+            paid_at=order.paid_at,
+            created_at=order.created_at,
+        )
+        for order, user_name, user_email, user_registered_at in rows
+    ]
+
+    return OrderListWithCount(items=items, total=total or 0, page=page, page_size=page_size)
 
 
 # ===== 邀请码管理 =====
@@ -761,3 +942,101 @@ async def get_invitation_code_users(
         ],
         "total": len(users),
     }
+
+
+# ===== 课堂回顾 =====
+
+@router.get("/classroom-sessions")
+async def admin_list_classroom_sessions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    teacher_name: Optional[str] = None,
+    class_name: Optional[str] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    admin: User = Depends(get_current_admin_user),
+):
+    """Admin: list all classroom sessions across all teachers with pagination."""
+    query = (
+        select(LiveSession, Class.name.label("class_name"), User.name.label("teacher_name"))
+        .join(Class, LiveSession.class_id == Class.id)
+        .join(User, LiveSession.teacher_id == User.id)
+        .where(LiveSession.status != "cancelled")
+    )
+    count_query = (
+        select(func.count())
+        .select_from(LiveSession)
+        .join(Class, LiveSession.class_id == Class.id)
+        .join(User, LiveSession.teacher_id == User.id)
+        .where(LiveSession.status != "cancelled")
+    )
+
+    if teacher_name:
+        name_filter = User.name.ilike(f"%{teacher_name}%")
+        query = query.where(name_filter)
+        count_query = count_query.where(name_filter)
+    if class_name:
+        cn_filter = Class.name.ilike(f"%{class_name}%")
+        query = query.where(cn_filter)
+        count_query = count_query.where(cn_filter)
+    if status:
+        query = query.where(LiveSession.status == status)
+        count_query = count_query.where(LiveSession.status == status)
+    if start_date:
+        try:
+            sd = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            query = query.where(LiveSession.started_at >= sd)
+            count_query = count_query.where(LiveSession.started_at >= sd)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            ed = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.where(LiveSession.started_at < ed)
+            count_query = count_query.where(LiveSession.started_at < ed)
+        except ValueError:
+            pass
+
+    total = (await db.execute(count_query)).scalar() or 0
+    offset = (page - 1) * page_size
+    result = await db.execute(
+        query.order_by(LiveSession.started_at.desc()).offset(offset).limit(page_size)
+    )
+    rows = result.all()
+
+    # Batch fetch event counts
+    session_ids = [row[0].id for row in rows]
+    event_count_map: dict[str, int] = {}
+    if session_ids:
+        ec_result = await db.execute(
+            select(LiveSessionEvent.live_session_id, func.count(LiveSessionEvent.id))
+            .where(
+                LiveSessionEvent.live_session_id.in_(session_ids),
+                LiveSessionEvent.event_type.notin_(
+                    ["student_joined", "student_left", "session_started", "session_ended"]
+                ),
+            )
+            .group_by(LiveSessionEvent.live_session_id)
+        )
+        event_count_map = dict(ec_result.all())
+
+    items = [
+        {
+            "id": s.id,
+            "class_id": s.class_id,
+            "class_name": class_name_val,
+            "teacher_name": teacher_name_val,
+            "title": s.title,
+            "entry_mode": s.entry_mode or "whiteboard",
+            "status": s.status,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+            "duration_seconds": s.duration_seconds,
+            "event_count": event_count_map.get(s.id, 0),
+        }
+        for s, class_name_val, teacher_name_val in rows
+    ]
+
+    return {"items": items, "total": total, "page": page, "page_size": page_size}

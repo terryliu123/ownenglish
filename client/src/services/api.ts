@@ -617,6 +617,10 @@ export const bigscreenActivityService = {
     return response.data
   },
 
+  deleteAsset: async (id: string): Promise<void> => {
+    await api.delete(`/bigscreen-activities/assets/${id}`)
+  },
+
   listPacks: async (params?: { status?: string }): Promise<{ items: BigscreenActivityPack[] }> => {
     const response = await api.get('/bigscreen-activities/packs', { params })
     return response.data
@@ -638,6 +642,10 @@ export const bigscreenActivityService = {
   ): Promise<BigscreenActivityPack> => {
     const response = await api.put(`/bigscreen-activities/packs/${id}`, data)
     return response.data
+  },
+
+  deletePack: async (id: string): Promise<void> => {
+    await api.delete(`/bigscreen-activities/packs/${id}`)
   },
 
   launchPack: async (packId: string, data: { class_id: string; participant_sides: BigscreenParticipantSide[] }): Promise<BigscreenActivitySession> => {

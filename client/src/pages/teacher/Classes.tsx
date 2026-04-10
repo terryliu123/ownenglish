@@ -256,6 +256,8 @@ export default function Classes() {
     try {
       await classService.delete(selectedClass.id)
       setClasses(classes.filter((c) => c.id !== selectedClass.id))
+      const membershipData = await membershipService.getMyMembership()
+      setMembership(membershipData)
       setShowDeleteModal(false)
       setSelectedClass(null)
     } catch (error) {

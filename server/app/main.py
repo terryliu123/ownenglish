@@ -14,6 +14,7 @@ logging.basicConfig(
 
 from app.core.config import get_settings
 from app.core.websocket import manager as ws_manager
+from app.core.order_cleanup import order_cleanup_loop
 from app.db.session import init_db
 from app.db.session import async_session_maker
 from app.api.v1 import auth, classes, class_ai_settings, study_packs, live, live_challenges, audio, reports, free_practice, live_analytics, images, notifications, admin, membership, media, experiments, teaching_aids, bigscreen_activities, whiteboard_ai, student_ai, danmu
@@ -61,8 +62,12 @@ async def lifespan(app: FastAPI):
     # P0-1: Restore rooms from persistent snapshots
     await ws_manager.restore_snapshots()
     ws_manager.start_cleanup_task()
+    # Start order expiry background task
+    import asyncio
+    _order_task = asyncio.create_task(order_cleanup_loop())
     yield
-    # Shutdown — save final snapshots before stopping
+    # Shutdown
+    _order_task.cancel()
     ws_manager.stop_cleanup_task()
     await ws_manager._save_all_snapshots()
     print("[INFO] Shutting down...")
