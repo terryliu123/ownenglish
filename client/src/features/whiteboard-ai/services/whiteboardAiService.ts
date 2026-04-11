@@ -5,6 +5,7 @@ export type WhiteboardAiAction = 'reference' | 'generate_image' | 'free_question
 export interface WhiteboardAiRequest {
   action: WhiteboardAiAction
   question?: string
+  template_id?: string
   context: {
     whiteboard_text?: string
     task_title?: string

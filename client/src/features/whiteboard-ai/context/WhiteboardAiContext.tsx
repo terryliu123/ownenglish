@@ -36,12 +36,13 @@ interface WhiteboardAiContextValue {
     question?: string,
     image_base64?: string,
     userLabel?: string,
-    options?: { skipUserMessage?: boolean },
+    options?: { skipUserMessage?: boolean; templateId?: string },
   ) => Promise<void>
   freeQuestion: (
     question: string,
     context: WhiteboardAiRequest['context'],
     image_base64?: string,
+    templateId?: string,
   ) => void
   pushMessages: (msgs: AiMessage[]) => void
   clearMessages: () => void
@@ -126,7 +127,7 @@ export function WhiteboardAiProvider({ children }: { children: ReactNode }) {
       question?: string,
       image_base64?: string,
       userLabel?: string,
-      options?: { skipUserMessage?: boolean },
+      options?: { skipUserMessage?: boolean; templateId?: string },
     ) => {
       if (!checkThrottle(action)) {
         setError('操作过于频繁，请稍后再试')
@@ -134,7 +135,7 @@ export function WhiteboardAiProvider({ children }: { children: ReactNode }) {
       }
 
       const contextHash = `${context?.whiteboard_text || ''}:${context?.task_title || ''}:${(context?.task_questions || []).join(',')}`
-      const cacheKey = `${action}:${question || ''}:${image_base64 ? 'img' : 'noimg'}:${contextHash}`
+      const cacheKey = `${action}:${options?.templateId || 'general'}:${question || ''}:${image_base64 ? 'img' : 'noimg'}:${contextHash}`
       const cached = cachedResults.get(cacheKey)
       const userContent = options?.skipUserMessage ? undefined : (userLabel || question || ACTION_LABELS[action])
       if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
@@ -156,6 +157,7 @@ export function WhiteboardAiProvider({ children }: { children: ReactNode }) {
         const response = await whiteboardAiService.respond({
           action,
           question,
+          template_id: options?.templateId,
           context,
           image_base64,
           history: recentHistory.length > 0 ? recentHistory : undefined,
@@ -173,12 +175,12 @@ export function WhiteboardAiProvider({ children }: { children: ReactNode }) {
   )
 
   const freeQuestion = useCallback(
-    (question: string, context: WhiteboardAiRequest['context'], image_base64?: string) => {
+    (question: string, context: WhiteboardAiRequest['context'], image_base64?: string, templateId?: string) => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current)
       }
       debounceRef.current = setTimeout(() => {
-        void executeAction('free_question', context, question, image_base64, question)
+        void executeAction('free_question', context, question, image_base64, question, { templateId })
       }, DEBOUNCE_MS)
     },
     [executeAction],

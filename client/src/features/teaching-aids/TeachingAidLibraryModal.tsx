@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { teachingAidService, type TeachingAid, type TeachingAidCategory } from '../../services/api'
+import { teachingAidService, type TeachingAid, type TeachingAidCategory, type TeachingAidConsoleSlot } from '../../services/api'
 import { useTranslation } from '../../i18n/useTranslation'
 
 type TabType = 'public' | 'mine'
@@ -8,12 +8,20 @@ interface TeachingAidLibraryModalProps {
   open: boolean
   onClose: () => void
   onOpenTeachingAid: (payload: { name: string; entryUrl: string }) => void
+  classId?: string | null
+  targetSlotIndex?: number | null
+  teachingAidConsoleSlots?: TeachingAidConsoleSlot[]
+  onAddToConsole?: (aid: TeachingAid, slotIndex: number | null) => Promise<void> | void
 }
 
 export function TeachingAidLibraryModal({
   open,
   onClose,
   onOpenTeachingAid,
+  classId,
+  targetSlotIndex = null,
+  teachingAidConsoleSlots = [],
+  onAddToConsole,
 }: TeachingAidLibraryModalProps) {
   const { t } = useTranslation()
   const [categories, setCategories] = useState<TeachingAidCategory[]>([])
@@ -28,6 +36,7 @@ export function TeachingAidLibraryModal({
   const [tab, setTab] = useState<TabType>('public')
   const [selectedAidId, setSelectedAidId] = useState<string | null>(null)
   const [launchingAidId, setLaunchingAidId] = useState<string | null>(null)
+  const currentConsoleSlotIds = teachingAidConsoleSlots.map((slot) => slot.teaching_aid_id).filter(Boolean) as string[]
 
   useEffect(() => {
     if (!open) return
@@ -83,11 +92,14 @@ export function TeachingAidLibraryModal({
   }, [currentItems, keyword, category])
 
   const selectedAid = filteredItems.find((item) => item.id === selectedAidId) || filteredItems[0] || null
+  const selectedAidSlotIndex = selectedAid
+    ? teachingAidConsoleSlots.find((slot) => slot.teaching_aid_id === selectedAid.id)?.slot_index || null
+    : null
 
   const handleLaunch = async (aid: TeachingAid) => {
     setLaunchingAidId(aid.id)
     try {
-      const session = await teachingAidService.launch(aid.id)
+      const session = await teachingAidService.launch(aid.id, classId)
       onOpenTeachingAid({ name: aid.name, entryUrl: session.entry_url })
       onClose()
     } catch (error) {
@@ -96,6 +108,11 @@ export function TeachingAidLibraryModal({
     } finally {
       setLaunchingAidId(null)
     }
+  }
+
+  const handleAddToConsole = async (aid: TeachingAid) => {
+    if (!onAddToConsole) return
+    await onAddToConsole(aid, targetSlotIndex)
   }
 
   if (!open) return null
@@ -241,13 +258,23 @@ export function TeachingAidLibraryModal({
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{selectedAid.category_label}</p>
                     <h3 className="mt-1 text-2xl font-semibold text-white">{selectedAid.name}</h3>
                   </div>
-                  <button
-                    onClick={() => void handleLaunch(selectedAid)}
-                    disabled={launchingAidId === selectedAid.id}
-                    className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-60"
-                  >
-                    {launchingAidId === selectedAid.id ? t('teacherTeachingAids.launching') : t('teacherTeachingAids.launch')}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => void handleLaunch(selectedAid)}
+                      disabled={launchingAidId === selectedAid.id}
+                      className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-400 disabled:opacity-60"
+                    >
+                      {launchingAidId === selectedAid.id ? t('teacherTeachingAids.launching') : t('teacherTeachingAids.launch')}
+                    </button>
+                    {onAddToConsole && (
+                      <button
+                        onClick={() => void handleAddToConsole(selectedAid)}
+                        className="rounded-xl border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/20"
+                      >
+                        {targetSlotIndex ? `加入第 ${targetSlotIndex} 位` : '加入控制台'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                   <div className="mt-4 grid gap-5 lg:grid-cols-[1.2fr,0.8fr]">
@@ -292,6 +319,20 @@ export function TeachingAidLibraryModal({
                           {selectedAid.summary || t('teacherTeachingAids.assetUnavailable')}
                         </dd>
                       </div>
+                      {selectedAidSlotIndex && (
+                        <div>
+                          <dt className="text-xs uppercase tracking-wider text-slate-500">控制台位置</dt>
+                          <dd className="mt-1 text-sm font-medium text-cyan-300">第 {selectedAidSlotIndex} 位</dd>
+                        </div>
+                      )}
+                      {currentConsoleSlotIds.length > 0 && (
+                        <div>
+                          <dt className="text-xs uppercase tracking-wider text-slate-500">当前已配置</dt>
+                          <dd className="mt-1 text-sm text-slate-300">
+                            已占用 {currentConsoleSlotIds.length} / 4 位
+                          </dd>
+                        </div>
+                      )}
                     </dl>
                   </div>
                 </div>

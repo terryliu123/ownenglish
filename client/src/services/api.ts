@@ -258,6 +258,12 @@ export interface TeachingAidSessionLaunchResponse {
   expires_at: string
 }
 
+export interface TeachingAidConsoleSlot {
+  slot_index: number
+  teaching_aid_id: string | null
+  teaching_aid: TeachingAid | null
+}
+
 export interface TeachingAidManifestSyncResponse {
   schema_version: number
   base_path: string
@@ -458,13 +464,27 @@ export const teachingAidService = {
     return response.data
   },
 
+  getTeacherConsoleSlots: async (): Promise<{ items: TeachingAidConsoleSlot[] }> => {
+    const response = await api.get('/teacher/teaching-aids/quick-slots')
+    return response.data
+  },
+
+  updateTeacherConsoleSlots: async (
+    slotAidIds: Array<string | null>
+  ): Promise<{ items: TeachingAidConsoleSlot[] }> => {
+    const response = await api.put('/teacher/teaching-aids/quick-slots', { slot_aid_ids: slotAidIds })
+    return response.data
+  },
+
   getCategories: async (): Promise<{ items: TeachingAidCategory[] }> => {
     const response = await api.get('/teaching-aids/categories')
     return response.data
   },
 
-  launch: async (id: string): Promise<TeachingAidSessionLaunchResponse> => {
-    const response = await api.post(`/teaching-aids/${id}/launch`)
+  launch: async (id: string, classId?: string | null): Promise<TeachingAidSessionLaunchResponse> => {
+    const response = await api.post(`/teaching-aids/${id}/launch`, null, {
+      params: classId ? { class_id: classId } : undefined,
+    })
     return response.data
   },
 

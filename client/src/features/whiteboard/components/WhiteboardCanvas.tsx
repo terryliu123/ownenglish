@@ -39,11 +39,13 @@ export function WhiteboardCanvas({
   const fabricRef = useRef<Canvas | null>(null)
   const eraserCursorRef = useRef<HTMLDivElement | null>(null)
   const laserCursorRef = useRef<HTMLDivElement | null>(null)
+  const resizeObserverRef = useRef<ResizeObserver | null>(null)
   const historyRef = useRef<string[]>([])
   const historyIdxRef = useRef(-1)
   const skipHistoryRef = useRef(false)
   const currentThemeRef = useRef<WhiteboardTheme>(theme)
   const scaleRef = useRef(scale)
+  const restoreDrawingModeRef = useRef(false)
 
   const themeConfig = useWhiteboardTheme(theme)
 
@@ -90,16 +92,43 @@ export function WhiteboardCanvas({
       }
     })
 
+    // 非选择工具下，按住文本时临时关闭绘制模式，允许拖拽
+    canvas.on('mouse:down', (e: any) => {
+      const target = e?.target
+      const isText = target && (target.type === 'i-text' || target.type === 'textbox' || target.type === 'text')
+      if (!isText || currentTool === 'select') return
+
+      restoreDrawingModeRef.current = canvas.isDrawingMode
+      canvas.isDrawingMode = false
+      canvas.selection = true
+      target.selectable = true
+      target.evented = true
+      target.setCoords?.()
+      canvas.setActiveObject(target)
+      canvas.requestRenderAll()
+    })
+
+    canvas.on('mouse:up', () => {
+      if (!restoreDrawingModeRef.current) return
+      canvas.isDrawingMode = currentTool === 'pen'
+      canvas.selection = currentTool === 'select'
+      restoreDrawingModeRef.current = false
+    })
+
     // 文本框拖拽缩放时实时转换 scaleX 为宽度变化（文字自动换行）
     canvas.on('object:scaling', (e: any) => {
       const obj = e.target
       if (obj && obj.type === 'textbox') {
-        const sx = obj.scaleX ?? 1
+        const sx = Math.abs(obj.scaleX ?? 1)
+        const sy = Math.abs(obj.scaleY ?? 1)
         obj.set({
           width: (obj.width || 0) * sx,
+          height: (obj.height || 0) * sy,
           scaleX: 1,
           scaleY: 1,
         })
+        obj.setCoords?.()
+        canvas.requestRenderAll()
       }
     })
 
@@ -423,9 +452,20 @@ export function WhiteboardCanvas({
     }
     window.addEventListener('resize', handleResize)
 
+    if (typeof ResizeObserver !== 'undefined' && canvasRef.current?.parentElement) {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        handleResize()
+      })
+      resizeObserverRef.current.observe(canvasRef.current.parentElement)
+    }
+
+    setTimeout(handleResize, 0)
+
     return () => {
       clearTimeout(readyTimer)
       window.removeEventListener('resize', handleResize)
+      resizeObserverRef.current?.disconnect()
+      resizeObserverRef.current = null
       canvasEl.removeEventListener('contextmenu', handleContextMenu)
       canvasEl.removeEventListener('click', handleClick)
       document.removeEventListener('paste', handlePaste)
@@ -523,8 +563,14 @@ export function WhiteboardCanvas({
 
     // 禁用选择（除了选择工具），但保持 evented 使对象可见
     canvas.forEachObject((obj) => {
-      obj.selectable = currentTool === 'select'
+      const isTextObject = obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text'
+      obj.selectable = isTextObject ? true : currentTool === 'select'
       obj.evented = true
+      if (isTextObject) {
+        obj.hasControls = true
+        obj.hasBorders = true
+        obj.hoverCursor = 'move'
+      }
     })
 
     // 切换回选择工具时，重置画布交互状态
@@ -876,6 +922,19 @@ export function WhiteboardCanvas({
         obj.setCoords()
         canvas.requestRenderAll()
       }
+    } else if (canvas && obj && obj.type === 'textbox') {
+      const sx = obj.scaleX ?? 1
+      const sy = obj.scaleY ?? 1
+      if (Math.abs(sx - 1) > 0.01 || Math.abs(sy - 1) > 0.01) {
+        obj.set({
+          width: (obj.width || 0) * sx,
+          height: (obj.height || 0) * sy,
+          scaleX: 1,
+          scaleY: 1,
+        })
+        obj.setCoords()
+        canvas.requestRenderAll()
+      }
     }
     notifyChange()
   }, [notifyChange])
@@ -885,36 +944,40 @@ export function WhiteboardCanvas({
   }, [notifyChange])
 
   // 添加文字
-  const addText = useCallback((defaultText?: string, x?: number, y?: number, customColor?: string) => {
+  const addText = useCallback((defaultText?: string, x?: number | Record<string, any>, y?: number, customColor?: string) => {
     const canvas = fabricRef.current
     if (!canvas) return
 
-    const centerX = x ?? canvas.width! / 2 - 50
-    const centerY = y ?? canvas.height! / 2 - 20
+    const options = x && typeof x === 'object' ? x : undefined
+    const centerX = (options?.left ?? x ?? canvas.width! / 2 - 50) as number
+    const centerY = (options?.top ?? y ?? canvas.height! / 2 - 20) as number
     const text = defaultText ?? '双击编辑文字'
 
     // 使用自定义颜色，或根据当前主题决定
     const ct = currentThemeRef.current
-    const textColor = customColor || (ct === 'light' ? '#1e293b' : ct === 'colorful' ? '#7c3aed' : '#e2e8f0')
+    const textColor = (options?.fill || customColor) || (ct === 'light' ? '#1e293b' : ct === 'colorful' ? '#7c3aed' : '#e2e8f0')
 
     const textObj = new Textbox(text, {
       left: centerX,
       top: centerY,
-      fontSize: 20,
+      fontSize: options?.fontSize ?? 20,
       fill: textColor,
       fontFamily: 'Noto Sans SC, sans-serif',
       selectable: true,
       evented: true,
       hasControls: true,
       hasBorders: true,
+      lockScalingX: false,
+      lockScalingY: false,
+      centeredScaling: false,
       editable: true,
       // 投影时不显示背景色
-      backgroundColor: customColor ? 'transparent' : (theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(20, 20, 24, 0.8)'),
-      padding: 8,
+      backgroundColor: (options?.fill || customColor) ? 'transparent' : (theme === 'light' ? 'rgba(255, 255, 255, 0.9)' : 'rgba(20, 20, 24, 0.8)'),
+      padding: options?.padding ?? 8,
       // 双击进入编辑
       doubleClickSimulation: true,
       // 文本框宽度，拖拽调整宽度时文字自动换行
-      width: customColor ? 700 : 300,
+      width: options?.width ?? ((options?.fill || customColor) ? 700 : 300),
       splitByGrapheme: true,
       // 选择框样式
       borderColor: '#6366f1',
@@ -934,16 +997,19 @@ export function WhiteboardCanvas({
       type: 'text',
       x: centerX,
       y: centerY,
-      data: { text, color: customColor || strokeColor },
+      data: { text, color: (options?.fill || customColor) || strokeColor },
       createdAt: new Date().toISOString(),
       createdBy: 'current-user',
     }
     onElementsChange([...elements, element])
 
-    setTimeout(() => {
-      textObj.enterEditing?.()
-      textObj.selectAll?.()
-    }, 100)
+    // 仅手工添加的文本自动进入编辑；外部投影文本保留为可拖拽状态
+    if (!customColor) {
+      setTimeout(() => {
+        textObj.enterEditing?.()
+        textObj.selectAll?.()
+      }, 100)
+    }
   }, [elements, onElementsChange, strokeColor, theme, themeConfig.text])
 
   // 添加图片

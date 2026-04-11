@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { useTranslation } from '../../i18n/useTranslation'
 import { useAppStore } from '../../stores/app-store'
-import { classService, liveTaskService, api, liveTaskSubmissionService } from '../../services/api'
+import { classService, liveTaskService, api, liveTaskSubmissionService, teachingAidService, type TeachingAid, type TeachingAidConsoleSlot } from '../../services/api'
 import { useWhiteboardLive } from '../../features/whiteboard/hooks/useWhiteboardLive'
 import { WhiteboardCanvas } from '../../features/whiteboard/components/WhiteboardCanvas'
 import { WhiteboardToolbar } from '../../features/whiteboard/components/WhiteboardToolbar'
@@ -295,6 +295,8 @@ export default function WhiteboardMode() {
   const [showSharesPanel, setShowSharesPanel] = useState(false)
   const [showBigscreenLauncher, setShowBigscreenLauncher] = useState(false)
   const [showTeachingAidLibrary, setShowTeachingAidLibrary] = useState(false)
+  const [teachingAidLibraryTargetSlot, setTeachingAidLibraryTargetSlot] = useState<number | null>(null)
+  const [teachingAidConsoleSlots, setTeachingAidConsoleSlots] = useState<TeachingAidConsoleSlot[]>([])
   const [showAiSettings, setShowAiSettings] = useState(false)
   const [openedTeachingAid, setOpenedTeachingAid] = useState<{ name: string; entryUrl: string } | null>(null)
   const [isAuthChecking, setIsAuthChecking] = useState(true)
@@ -353,6 +355,17 @@ export default function WhiteboardMode() {
     setShowLeftPanel(true)
     setShowRightPanel(true)
   }, [])
+
+  useEffect(() => {
+    if (mode === 'lecture') {
+      setShowRightPanel(false)
+      return
+    }
+
+    if (mode === 'interactive') {
+      setShowRightPanel(true)
+    }
+  }, [mode])
 
   const whiteboardTourSteps = useMemo(
     () => getWhiteboardTourSteps({ ensureInteractiveLayout: ensureTourLayout }),
@@ -536,6 +549,35 @@ export default function WhiteboardMode() {
     localStorage.setItem(selectedClassStorageKey, currentClassId)
   }, [currentClassId, selectedClassStorageKey])
 
+  const normalizeTeachingAidConsoleSlots = useCallback((items: TeachingAidConsoleSlot[]) => {
+    return Array.from({ length: 4 }, (_, index) => {
+      const slot = items.find((item) => item.slot_index === index + 1)
+      return slot || {
+        slot_index: index + 1,
+        teaching_aid_id: null,
+        teaching_aid: null,
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (isAuthChecking || user?.role !== 'teacher') return
+    let cancelled = false
+    const load = async () => {
+      try {
+        const response = await teachingAidService.getTeacherConsoleSlots()
+        if (cancelled) return
+        setTeachingAidConsoleSlots(normalizeTeachingAidConsoleSlots(response.items || []))
+      } catch (error) {
+        console.error('Failed to load teaching aid console slots:', error)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthChecking, normalizeTeachingAidConsoleSlots, user?.id, user?.role])
+
   const getSourceGroupId = useCallback((group: LiveTaskGroup | WhiteboardTaskGroup) => {
     return (group as WhiteboardTaskGroup).source_group_id || group.id
   }, [])
@@ -670,6 +712,65 @@ export default function WhiteboardMode() {
     if (!currentClassId || !roomInfoHydrated) return
     void loadTaskHistory()
   }, [currentClassId, roomInfoHydrated, loadTaskHistory])
+
+  const syncTeachingAidConsoleSlots = useCallback(async (nextSlotAidIds: Array<string | null>) => {
+    const response = await teachingAidService.updateTeacherConsoleSlots(nextSlotAidIds)
+    setTeachingAidConsoleSlots(normalizeTeachingAidConsoleSlots(response.items || []))
+    setTeachingAidLibraryTargetSlot(null)
+    setShowTeachingAidLibrary(false)
+  }, [normalizeTeachingAidConsoleSlots])
+
+  const handleAddTeachingAidToConsole = useCallback(async (aid: TeachingAid, targetSlotIndex: number | null) => {
+    try {
+      const nextSlots = teachingAidConsoleSlots.map((slot) => slot.teaching_aid_id)
+      const existingIndex = nextSlots.findIndex((slotAidId) => slotAidId === aid.id)
+      let nextTargetIndex = targetSlotIndex
+      if (!nextTargetIndex) {
+        nextTargetIndex = existingIndex >= 0 ? existingIndex + 1 : nextSlots.findIndex((slotAidId) => !slotAidId) + 1
+      }
+      if (!nextTargetIndex || nextTargetIndex < 1 || nextTargetIndex > 4) {
+        alert('控制台快捷位已满，请先移除一个')
+        return
+      }
+      const nextSlotAidIds = [...nextSlots]
+      if (existingIndex >= 0 && existingIndex + 1 !== nextTargetIndex) {
+        nextSlotAidIds[existingIndex] = null
+      }
+      nextSlotAidIds[nextTargetIndex - 1] = aid.id
+      await syncTeachingAidConsoleSlots(nextSlotAidIds)
+    } catch (error) {
+      console.error('Failed to update teaching aid console slots:', error)
+      alert('加入控制台失败')
+    }
+  }, [syncTeachingAidConsoleSlots, teachingAidConsoleSlots])
+
+  const handleRemoveTeachingAidFromConsole = useCallback(async (slotIndex: number) => {
+    const nextSlotAidIds = teachingAidConsoleSlots.map((slot) => slot.teaching_aid_id)
+    if (slotIndex < 1 || slotIndex > 4) return
+    nextSlotAidIds[slotIndex - 1] = null
+    try {
+      await syncTeachingAidConsoleSlots(nextSlotAidIds)
+    } catch (error) {
+      console.error('Failed to remove teaching aid console slot:', error)
+      alert('移除快捷位失败')
+    }
+  }, [syncTeachingAidConsoleSlots, teachingAidConsoleSlots])
+
+  const handleOpenTeachingAidFromConsole = useCallback(async (slot: TeachingAidConsoleSlot) => {
+    if (!slot.teaching_aid) return
+    try {
+      const session = await teachingAidService.launch(slot.teaching_aid.id, currentClassId)
+      setOpenedTeachingAid({ name: slot.teaching_aid.name, entryUrl: session.entry_url })
+    } catch (error) {
+      console.error('Failed to open teaching aid from console:', error)
+      alert('打开教具失败')
+    }
+  }, [currentClassId])
+
+  const handleOpenTeachingAidLibrary = useCallback((slotIndex: number | null = null) => {
+    setTeachingAidLibraryTargetSlot(slotIndex)
+    setShowTeachingAidLibrary(true)
+  }, [])
 
   // 处理元素更新
   const handleElementsChange = useCallback((newElements: WhiteboardElement[]) => {
@@ -1844,7 +1945,7 @@ export default function WhiteboardMode() {
               </button>
 
               <button
-                onClick={() => setShowTeachingAidLibrary(true)}
+                onClick={() => handleOpenTeachingAidLibrary(null)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
                   theme === 'dark'
                     ? 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-emerald-500/30'
@@ -1871,7 +1972,7 @@ export default function WhiteboardMode() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
                   </svg>
-                  <span className="text-sm">AI 设置</span>
+                  <span className="text-sm">学生AI设置</span>
                 </button>
                 <button
                   onClick={openTour}
@@ -1966,7 +2067,7 @@ export default function WhiteboardMode() {
         )}
 
         {/* 中央白板区域 */}
-        <main className="flex-1 relative flex flex-col overflow-hidden">
+        <main className="flex-1 min-w-0 relative flex flex-col overflow-hidden">
           {/* 学生分享请求面板 - 点击举手图标后显示 */}
           {showSharesPanel && pendingShares.length > 0 && (
             <ShareRequestsPanel
@@ -1981,13 +2082,14 @@ export default function WhiteboardMode() {
           )}
 
           {/* 白板画布 */}
-          <div className="flex-1 relative whiteboard-container">
+          <div className="flex-1 min-w-0 relative whiteboard-container">
             {/* 弹幕显示层 */}
             <DanmuScreen activeDanmus={activeDanmus as ActiveDanmu[]} config={danmuConfig as DanmuConfig} />
             {/* 氛围效果层 */}
             <AtmosphereEffects effects={activeEffects as any} />
 
             <WhiteboardCanvas
+              key={mode}
               elements={elements}
               onElementsChange={handleElementsChange}
               currentTool={currentTool}
@@ -2102,6 +2204,12 @@ export default function WhiteboardMode() {
               }
             onViewAnalysis={handleViewAnalysis}
             onViewDetails={handleViewDetails}
+            quickTeachingAidSlots={teachingAidConsoleSlots}
+            onOpenQuickTeachingAid={handleOpenTeachingAidFromConsole}
+            onAddQuickTeachingAidSlot={handleOpenTeachingAidLibrary}
+            onRemoveQuickTeachingAidSlot={(slotIndex) => {
+              void handleRemoveTeachingAidFromConsole(slotIndex)
+            }}
           />
         )}
       </div>
@@ -2620,8 +2728,15 @@ export default function WhiteboardMode() {
 
       <TeachingAidLibraryModal
         open={showTeachingAidLibrary}
-        onClose={() => setShowTeachingAidLibrary(false)}
+        onClose={() => {
+          setShowTeachingAidLibrary(false)
+          setTeachingAidLibraryTargetSlot(null)
+        }}
         onOpenTeachingAid={({ name, entryUrl }) => setOpenedTeachingAid({ name, entryUrl })}
+        classId={currentClassId}
+        targetSlotIndex={teachingAidLibraryTargetSlot}
+        teachingAidConsoleSlots={teachingAidConsoleSlots}
+        onAddToConsole={(aid, slotIndex) => void handleAddTeachingAidToConsole(aid, slotIndex)}
       />
 
       <ClassAiSettingsModal

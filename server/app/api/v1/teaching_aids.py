@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from app.api.v1.auth import get_current_user
 from app.db.session import get_db
-from app.models import ActivityType, TeachingAid, TeachingAidSession, User, UserRole
+from app.models import ActivityType, TeachingAid, TeachingAidSession, TeacherProfile, User, UserRole
 from app.services.activity_logger import log_activity
 from app.services.activity_logger import log_activity
 from app.services.teaching_aids import (
@@ -33,6 +33,8 @@ from app.services.teaching_aids import (
 )
 
 router = APIRouter(prefix="/teaching-aids", tags=["TeachingAids"])
+TEACHING_AID_CONSOLE_SLOT_COUNT = 4
+TEACHING_AID_CONSOLE_SLOTS_KEY = "teaching_aid_console_slots"
 
 
 def _require_teacher_or_admin(current_user: User) -> None:
@@ -79,6 +81,16 @@ class ValidateTeachingAidResponse(BaseModel):
     files: list[str]
 
 
+class TeachingAidConsoleSlotItem(BaseModel):
+    slot_index: int
+    teaching_aid_id: str | None = None
+    teaching_aid: dict[str, Any] | None = None
+
+
+class TeachingAidConsoleSlotUpdatePayload(BaseModel):
+    slot_aid_ids: list[str | None]
+
+
 def _serialize_teaching_aid(aid: TeachingAid) -> dict[str, Any]:
     return {
         "id": aid.id,
@@ -100,6 +112,105 @@ def _serialize_teaching_aid(aid: TeachingAid) -> dict[str, Any]:
         "created_at": aid.created_at.isoformat() if aid.created_at else None,
         "updated_at": aid.updated_at.isoformat() if aid.updated_at else None,
     }
+
+
+async def _get_teacher_profile(db: AsyncSession, teacher_id: str) -> TeacherProfile:
+    profile = (
+        await db.execute(select(TeacherProfile).where(TeacherProfile.user_id == teacher_id))
+    ).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Teacher profile not found")
+    return profile
+
+
+def _normalize_teaching_aid_console_slots(raw_slots: Any) -> list[str | None]:
+    if not isinstance(raw_slots, list):
+        raw_slots = []
+    normalized: list[str | None] = []
+    for index in range(TEACHING_AID_CONSOLE_SLOT_COUNT):
+        value = raw_slots[index] if index < len(raw_slots) else None
+        if value is None:
+            normalized.append(None)
+            continue
+        if not isinstance(value, str):
+            raise HTTPException(status_code=400, detail="Slot teaching aid ids must be strings or null")
+        stripped = value.strip()
+        normalized.append(stripped or None)
+    return normalized
+
+
+def _get_teacher_console_slots(profile: TeacherProfile) -> list[str | None]:
+    settings = dict(profile.settings or {})
+    raw_slots = settings.get(TEACHING_AID_CONSOLE_SLOTS_KEY)
+    return _normalize_teaching_aid_console_slots(raw_slots)
+
+
+def _set_teacher_console_slots(profile: TeacherProfile, slot_aid_ids: list[str | None]) -> None:
+    settings = dict(profile.settings or {})
+    settings[TEACHING_AID_CONSOLE_SLOTS_KEY] = slot_aid_ids
+    profile.settings = settings
+
+
+async def _serialize_console_slots(
+    db: AsyncSession,
+    slot_aid_ids: list[str | None],
+) -> list[TeachingAidConsoleSlotItem]:
+    aid_ids = [aid_id for aid_id in slot_aid_ids if aid_id]
+    aids_by_id: dict[str, TeachingAid] = {}
+    if aid_ids:
+        aids = (
+            await db.execute(select(TeachingAid).where(TeachingAid.id.in_(aid_ids)))
+        ).scalars().all()
+        aids_by_id = {aid.id: aid for aid in aids}
+
+    items: list[TeachingAidConsoleSlotItem] = []
+    for index, aid_id in enumerate(slot_aid_ids, start=1):
+        aid = aids_by_id.get(aid_id) if aid_id else None
+        items.append(
+            TeachingAidConsoleSlotItem(
+                slot_index=index,
+                teaching_aid_id=aid_id,
+                teaching_aid=_serialize_teaching_aid_teacher(aid) if aid else None,
+            )
+        )
+    return items
+
+
+async def _clean_teacher_console_slots(
+    db: AsyncSession,
+    teacher_id: str,
+    slot_aid_ids: list[str | None],
+) -> tuple[list[str | None], list[TeachingAidConsoleSlotItem]]:
+    """Resolve console slots and drop stale/inactive teaching aids."""
+    normalized_slot_ids = _normalize_teaching_aid_console_slots(slot_aid_ids)
+    aid_ids = [aid_id for aid_id in normalized_slot_ids if aid_id]
+    active_ids: set[str] = set()
+    aids_by_id: dict[str, TeachingAid] = {}
+    if aid_ids:
+        aids = (
+            await db.execute(
+                select(TeachingAid).where(
+                    TeachingAid.id.in_(aid_ids),
+                    TeachingAid.status == "active",
+                )
+            )
+        ).scalars().all()
+        for aid in aids:
+            active_ids.add(aid.id)
+            aids_by_id[aid.id] = aid
+
+    cleaned_slot_ids = [aid_id if aid_id and aid_id in active_ids else None for aid_id in normalized_slot_ids]
+    items: list[TeachingAidConsoleSlotItem] = []
+    for index, aid_id in enumerate(cleaned_slot_ids, start=1):
+        aid = aids_by_id.get(aid_id) if aid_id else None
+        items.append(
+            TeachingAidConsoleSlotItem(
+                slot_index=index,
+                teaching_aid_id=aid_id,
+                teaching_aid=_serialize_teaching_aid_teacher(aid) if aid else None,
+            )
+        )
+    return cleaned_slot_ids, items
 
 
 @router.get("")
@@ -583,6 +694,62 @@ def _serialize_teaching_aid_teacher(aid: TeachingAid) -> dict[str, Any]:
         "share_code": aid.share_code,
         "is_public": aid.is_public,
     }
+
+
+@teacher_router.get("/quick-slots")
+async def get_teacher_teaching_aid_console_slots(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get the teacher's persistent teaching aid console slots."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can access this endpoint")
+
+    profile = await _get_teacher_profile(db, current_user.id)
+    slot_aid_ids = _get_teacher_console_slots(profile)
+    cleaned_slot_ids, items = await _clean_teacher_console_slots(db, current_user.id, slot_aid_ids)
+    if cleaned_slot_ids != slot_aid_ids:
+        _set_teacher_console_slots(profile, cleaned_slot_ids)
+        await db.commit()
+    return {"items": [item.model_dump() for item in items]}
+
+
+@teacher_router.put("/quick-slots")
+async def update_teacher_teaching_aid_console_slots(
+    payload: TeachingAidConsoleSlotUpdatePayload,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update the teacher's persistent teaching aid console slots."""
+    if current_user.role != UserRole.TEACHER:
+        raise HTTPException(status_code=403, detail="Only teachers can access this endpoint")
+
+    if len(payload.slot_aid_ids) > TEACHING_AID_CONSOLE_SLOT_COUNT:
+        raise HTTPException(status_code=400, detail="At most 4 shortcut slots are allowed")
+
+    slot_aid_ids = _normalize_teaching_aid_console_slots(payload.slot_aid_ids)
+    non_null_ids = [aid_id for aid_id in slot_aid_ids if aid_id]
+    if len(set(non_null_ids)) != len(non_null_ids):
+        raise HTTPException(status_code=400, detail="Shortcut teaching aids must be unique")
+
+    if non_null_ids:
+        aids = (
+            await db.execute(
+                select(TeachingAid).where(
+                    TeachingAid.id.in_(non_null_ids),
+                    TeachingAid.status == "active",
+                )
+            )
+        ).scalars().all()
+        aids_by_id = {aid.id: aid for aid in aids}
+        missing_ids = [aid_id for aid_id in non_null_ids if aid_id not in aids_by_id]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"Teaching aid not found or inactive: {', '.join(missing_ids)}")
+
+    profile = await _get_teacher_profile(db, current_user.id)
+    _set_teacher_console_slots(profile, slot_aid_ids)
+    await db.commit()
+    return {"items": [item.model_dump() for item in await _serialize_console_slots(db, slot_aid_ids)]}
 
 
 class TeacherUploadZipPayload(BaseModel):

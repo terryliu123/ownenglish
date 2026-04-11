@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { useWhiteboardAiContext } from '../context/WhiteboardAiContext'
 import { useAppStore } from '../../../stores/app-store'
+import { useMemo } from 'react'
 
 // Web Speech API constructor (Chrome uses webkit prefix)
 const SpeechRecognitionCtor = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -33,6 +34,19 @@ const PROMPT_COMMANDS: PromptCommand[] = [
   { key: '/quiz', label: '生成 1 道检测题', description: '直接执行生成', mode: 'execute', prompt: '生成 1 道检测题' },
   { key: '/followups', label: '生成 3 个追问', description: '直接执行生成', mode: 'execute', prompt: '生成 3 个追问' },
   { key: '/check', label: '检查表达问题', description: '填入输入框，继续编辑后发送', mode: 'fill', prompt: '检查表达问题' },
+]
+
+interface AiTemplateOption {
+  id: string
+  name: string
+  description: string
+}
+
+const AI_TEMPLATE_OPTIONS: AiTemplateOption[] = [
+  { id: 'general', name: '通用课堂副班', description: '平衡讲解、互动和纠错' },
+  { id: 'concise', name: '高效精讲', description: '短句要点，适合快节奏课堂' },
+  { id: 'socratic', name: '启发提问', description: '用追问引导学生思考' },
+  { id: 'encouraging', name: '鼓励引导', description: '语气积极，关注学习信心' },
 ]
 
 function stripMarkdown(text: string): string {
@@ -97,6 +111,15 @@ export default function WhiteboardAiPanel({ context }: Props) {
   const [selectedPromptIndex, setSelectedPromptIndex] = useState(0)
   const [isListening, setIsListening] = useState(false)
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
+  const [activeTemplateId, setActiveTemplateId] = useState<string>('general')
+  const templateStorageKey = useMemo(
+    () => `whiteboard_ai_active_template_${context.class_id || 'global'}`,
+    [context.class_id],
+  )
+  const activeTemplate = useMemo(
+    () => AI_TEMPLATE_OPTIONS.find((item) => item.id === activeTemplateId) || AI_TEMPLATE_OPTIONS[0],
+    [activeTemplateId],
+  )
 
   const { user } = useAppStore()
   const isPaid = user?.membership?.status === 'active'
@@ -112,6 +135,27 @@ export default function WhiteboardAiPanel({ context }: Props) {
   // Chrome's SpeechRecognition uses Google servers (blocked in China), default to server ASR
   const isChrome = navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edg')
   const fallbackModeRef = useRef(isChrome)
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(templateStorageKey)
+      if (stored && AI_TEMPLATE_OPTIONS.some((item) => item.id === stored)) {
+        setActiveTemplateId(stored)
+        return
+      }
+    } catch {
+      // no-op
+    }
+    setActiveTemplateId('general')
+  }, [templateStorageKey])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(templateStorageKey, activeTemplateId)
+    } catch {
+      // no-op
+    }
+  }, [activeTemplateId, templateStorageKey])
 
   // Browser TTS helpers
   // Chrome: getVoices() returns [] until voiceschanged fires
@@ -136,8 +180,8 @@ export default function WhiteboardAiPanel({ context }: Props) {
     const voices = window.speechSynthesis.getVoices()
     if (voices.length === 0) return null
     const priorities = ['zh-CN', 'zh_CN', 'zh-Hans', 'zh-TW', 'zh_TW', 'cmn']
-    // Edge: 优先远程语音（微软云端，质量更高且国内可用）
-    // Chrome: 优先本地语音（Google 远程语音国内被墙）
+    // Edge: prefer remote Microsoft voice for better quality and availability.
+    // Chrome: prefer local voice because Google remote voice is often blocked in China.
     const preferLocal = navigator.userAgent.includes('Chrome') && !navigator.userAgent.includes('Edg')
     for (const prefix of priorities) {
       const found = voices.find((v) => v.lang.startsWith(prefix) && (preferLocal ? v.localService : !v.localService))
@@ -224,7 +268,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
   // Server-side ASR via MediaRecorder
   const startServerAsr = useCallback(() => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      setSpeechError('当前环境不支持录音，请使用 HTTPS 或 localhost 访问')
+      setSpeechError('褰撳墠鐜涓嶆敮鎸佸綍闊筹紝璇蜂娇鐢?HTTPS 鎴?localhost 璁块棶')
       return
     }
     setSpeechError(null)
@@ -245,17 +289,17 @@ export default function WhiteboardAiPanel({ context }: Props) {
             body: formData,
           })
           const data = await res.json().catch(() => ({ detail: res.statusText }))
-          if (!res.ok) throw new Error(data.detail || '语音识别失败')
+          if (!res.ok) throw new Error(data.detail || '璇煶璇嗗埆澶辫触')
           const text = data.text
           if (text) {
             setInputValue(text)
             setTimeout(() => handleSubmitRef.current(), 100)
           } else {
-            setSpeechError('未识别到语音内容')
+            setSpeechError('鏈瘑鍒埌璇煶鍐呭')
           }
         } catch (err: any) {
           console.error('[ASR] error:', err?.message || err)
-          const msg = err?.message || '语音识别失败'
+          const msg = err?.message || '璇煶璇嗗埆澶辫触'
           setSpeechError(msg)
         }
         setIsListening(false)
@@ -265,7 +309,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
       setIsListening(true)
     }).catch((err) => {
       console.warn('[MediaRecorder] getUserMedia failed:', err)
-      setSpeechError('无法访问麦克风，请检查权限或使用 HTTPS 访问')
+      setSpeechError('鏃犳硶璁块棶楹﹀厠椋庯紝璇锋鏌ユ潈闄愭垨浣跨敤 HTTPS 璁块棶')
     })
   }, [])
 
@@ -310,7 +354,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
           return
         }
         if (event.error === 'not-allowed') {
-          setSpeechError('请允许浏览器使用麦克风')
+          setSpeechError('浏览器未授权麦克风使用')
         } else if (event.error === 'no-speech') {
           setSpeechError('未检测到语音，请重试')
         } else {
@@ -332,7 +376,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
       setIsListening(true)
     } catch (err) {
       console.error('[SpeechRecognition] start failed:', err)
-      setSpeechError('语音识别启动失败')
+      setSpeechError('璇煶璇嗗埆鍚姩澶辫触')
     }
   }, [inputValue, startServerAsr])
 
@@ -360,21 +404,21 @@ export default function WhiteboardAiPanel({ context }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // 语音讲解自动播放：当最新的助手消息是 voice_explain 时自动开始朗读
+  // Auto-play voice explanation when the latest assistant message is voice_explain
   useEffect(() => {
     if (messages.length === 0 || isLoading) return
     const lastMsg = messages[messages.length - 1]
     if (lastMsg.role !== 'assistant' || lastMsg.action !== 'voice_explain') return
     const text = getMessageText(lastMsg.content)
     if (!text) return
-    // 延迟一点让消息渲染完成
+    // 寤惰繜涓€鐐硅娑堟伅娓叉煋瀹屾垚
     const timer = setTimeout(() => {
       speakText(text, messages.length - 1)
     }, 300)
     return () => clearTimeout(timer)
   }, [messages, isLoading, speakText])
 
-  // 语音讲解和生成图片互斥
+  // Voice explanation and image generation are mutually exclusive
   useEffect(() => {
     if (isGenImage) setUseVoice(false)
   }, [isGenImage])
@@ -387,10 +431,10 @@ export default function WhiteboardAiPanel({ context }: Props) {
 
   const buildEffectiveContext = (): Props['context'] => {
     if (!useWhiteboard) {
-      // 不参考白板：返回空上下文
+      // 涓嶅弬鑰冪櫧鏉匡細杩斿洖绌轰笂涓嬫枃
       return {}
     }
-    // 参考白板时直接截图发给多模态模型，不再提取文字
+    // 鍙傝€冪櫧鏉挎椂鐩存帴鎴浘鍙戠粰澶氭ā鎬佹ā鍨嬶紝涓嶅啀鎻愬彇鏂囧瓧
     return context
   }
 
@@ -414,11 +458,14 @@ export default function WhiteboardAiPanel({ context }: Props) {
 
   const projectTextToWhiteboard = (content: string) => {
     const whiteboardAPI = (window as Window & {
-      whiteboardAPI?: { addText?: (text: string, options?: any) => void }
+      whiteboardAPI?: {
+        addText?: (text: string, x?: number | Record<string, any>, y?: number, customColor?: string) => void
+        getCanvas?: () => { width?: number; height?: number } | null
+      }
     }).whiteboardAPI
     if (!whiteboardAPI?.addText) return
     const plainText = stripMarkdown(content)
-    const withBreaks = plainText.replace(/([。！？；\n])\s*/g, '$1\n')
+    const withBreaks = plainText.replace(/([。！？；;\n])\s*/g, '$1\n')
     const collapsed = withBreaks.replace(/\n{3,}/g, '\n\n').trim()
     const finalText = collapsed.length > 500 ? `${collapsed.substring(0, 500)}...` : collapsed
     // 根据白板主题选择投影文字颜色
@@ -427,9 +474,21 @@ export default function WhiteboardAiPanel({ context }: Props) {
     const themeAttr = headerEl?.dataset?.whiteboardTheme
     const isDark = themeAttr === 'dark' || (!themeAttr && !bodyBg.includes('255'))
     const textColor = isDark ? '#e2e8f0' : '#1e293b'
-    whiteboardAPI.addText(finalText, { fill: textColor })
+    const canvas = whiteboardAPI.getCanvas?.()
+    const canvasWidth = canvas?.width || 1280
+    const canvasHeight = canvas?.height || 720
+    whiteboardAPI.addText(finalText, {
+      left: 72,
+      top: Math.max(96, Math.round(canvasHeight * 0.12)),
+      width: Math.max(720, canvasWidth - 144),
+      fontSize: isDark ? 24 : 22,
+      fill: textColor,
+      backgroundColor: 'transparent',
+      editable: false,
+      lockScalingX: false,
+      lockScalingY: false,
+    })
   }
-
   const projectImageToWhiteboard = (content: string) => {
     const whiteboardAPI = (window as Window & {
       whiteboardAPI?: { addImage?: (src: string) => void }
@@ -457,7 +516,9 @@ export default function WhiteboardAiPanel({ context }: Props) {
       setSelectedPromptIndex(0)
       return
     }
-    await executeAction('free_question', effectiveContext, command.prompt, whiteboardImage, command.prompt)
+    await executeAction('free_question', effectiveContext, command.prompt, whiteboardImage, command.prompt, {
+      templateId: activeTemplateId,
+    })
     resetInput()
   }
 
@@ -474,36 +535,44 @@ export default function WhiteboardAiPanel({ context }: Props) {
     const finalText = inputValue.trim()
     if (!finalText) return
 
-    // 参考白板时始终截图发给多模态模型
+    // Capture the current whiteboard image when reference mode is enabled
     const whiteboardImage = useWhiteboard ? captureWhiteboard() : undefined
 
-    // 勾选"看黑板"时，先输出用户消息 + 思考消息
+    // 参考白板时，先输出用户消息 + 思考消息
     if (useWhiteboard) {
       pushMessages([
         { role: 'user', content: finalText, action: 'reference', timestamp: Date.now() },
-        { role: 'assistant', content: '好的，我已经看到了白板内容，让我想想...', action: 'reference', timestamp: Date.now() },
+        { role: 'assistant', content: '濂界殑锛屾垜宸茬粡鐪嬪埌浜嗙櫧鏉垮唴瀹癸紝璁╂垜鎯虫兂...', action: 'reference', timestamp: Date.now() },
       ])
     }
 
-    // 生成图片模式
+    // 鐢熸垚鍥剧墖妯″紡
     if (isGenImage) {
-      void executeAction('generate_image', effectiveContext, finalText, undefined, finalText)
+      void executeAction('generate_image', effectiveContext, finalText, undefined, finalText, {
+        templateId: activeTemplateId,
+      })
       resetInput()
       return
     }
 
-    // 语音讲解模式
+    // 璇煶璁茶В妯″紡
     if (useVoice) {
-      void executeAction('voice_explain', effectiveContext, finalText, whiteboardImage, useWhiteboard ? undefined : finalText, { skipUserMessage: useWhiteboard })
+      void executeAction('voice_explain', effectiveContext, finalText, whiteboardImage, useWhiteboard ? undefined : finalText, {
+        skipUserMessage: useWhiteboard,
+        templateId: activeTemplateId,
+      })
       resetInput()
       return
     }
 
-    // 普通问答 / 参考白板问答
+    // Regular question / whiteboard reference question
     if (useWhiteboard) {
-      void executeAction('reference', effectiveContext, finalText, whiteboardImage, undefined, { skipUserMessage: true })
+      void executeAction('reference', effectiveContext, finalText, whiteboardImage, undefined, {
+        skipUserMessage: true,
+        templateId: activeTemplateId,
+      })
     } else {
-      freeQuestion(finalText, effectiveContext, undefined)
+      freeQuestion(finalText, effectiveContext, undefined, activeTemplateId)
     }
     resetInput()
   }
@@ -515,7 +584,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
     : useVoice
       ? '输入讲解内容，AI 将生成语音讲解...'
       : useWhiteboard
-        ? '输入问题，AI 将参考黑板内容回答...'
+        ? '输入问题，AI 将参考白板内容回答...'
         : '输入课堂问题，或输入 / 选择提示词...'
 
   const renderAssistantBody = (messageIndex: number, displayContent: string) => {
@@ -598,6 +667,24 @@ export default function WhiteboardAiPanel({ context }: Props) {
           </span>
         </div>
         <p className="mt-1 text-xs text-white/80">输入问题，按需勾选参考白板或语音讲解</p>
+        <div className="mt-2 rounded-lg border border-white/10 bg-black/20 px-2 py-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-white/70">当前模板</span>
+            <select
+              value={activeTemplateId}
+              onChange={(e) => setActiveTemplateId(e.target.value)}
+              disabled={!isPaid}
+              className="ml-auto rounded-md border border-white/15 bg-[#111827] px-2 py-1 text-[11px] text-white outline-none disabled:opacity-40"
+            >
+              {AI_TEMPLATE_OPTIONS.map((template) => (
+                <option key={template.id} value={template.id}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="mt-1 text-[11px] text-white/55">{activeTemplate.description}</p>
+        </div>
       </div>
 
       {!isPaid && (
@@ -658,11 +745,11 @@ export default function WhiteboardAiPanel({ context }: Props) {
         )}
       </div>
 
-      {/* 底部控制区 */}
+      {/* 搴曢儴鎺у埗鍖?*/}
       <div className="shrink-0 space-y-2 border-t border-white/10 bg-[#0a0e1a]/80 px-4 py-3 text-white">
-        {/* 选项行 */}
+        {/* 閫夐」琛?*/}
         <div className="flex items-center gap-3">
-          {/* 参考白板 - 勾选 */}
+          {/* 鍙傝€冪櫧鏉?- 鍕鹃€?*/}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs">
             <input
               type="checkbox"
@@ -671,10 +758,10 @@ export default function WhiteboardAiPanel({ context }: Props) {
               disabled={!isPaid}
               className="h-3.5 w-3.5 rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/30 disabled:opacity-30"
             />
-            <span className={isPaid ? 'text-white/90' : 'text-white/30'}>看黑板</span>
+            <span className={isPaid ? 'text-white/90' : 'text-white/30'}>参考白板</span>
           </label>
 
-          {/* 语音讲解 - 勾选 */}
+          {/* 璇煶璁茶В - 鍕鹃€?*/}
           <label className="flex cursor-pointer items-center gap-1.5 text-xs">
             <input
               type="checkbox"
@@ -767,7 +854,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
                 />
               </div>
 
-              {/* 切换到语音模式 */}
+              {/* 鍒囨崲鍒拌闊虫ā寮?*/}
               <button
                 type="button"
                 onClick={() => setInputMode('voice')}
@@ -793,7 +880,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
             </>
           ) : (
             <>
-              {/* 语音模式：大按钮覆盖文本框区域 */}
+              {/* 璇煶妯″紡锛氬ぇ鎸夐挳瑕嗙洊鏂囨湰妗嗗尯鍩?*/}
               <button
                 type="button"
                 onClick={isListening ? stopListening : isPaid ? startListening : undefined}
@@ -814,7 +901,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
                 {isListening && <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-rose-400" />}
               </button>
 
-              {/* 切换到文字模式 */}
+              {/* 鍒囨崲鍒版枃瀛楁ā寮?*/}
               <button
                 type="button"
                 onClick={() => setInputMode('text')}
@@ -847,7 +934,11 @@ export default function WhiteboardAiPanel({ context }: Props) {
         )}
 
         <p className="text-[11px] text-white/60">
-          {isListening ? '正在录音...说话即可输入文字' : inputMode === 'text' ? '输入 / 可快速选择常用提示词' : '点击话筒开始语音输入，点击键盘切换文字输入'}
+          {isListening
+            ? '正在录音...说话即可输入文字'
+            : inputMode === 'text'
+              ? '输入 / 可快速选择常用提示词'
+              : '点击话筒开始语音输入，点击键盘切换文字输入'}
         </p>
       </div>
 

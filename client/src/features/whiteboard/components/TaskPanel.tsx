@@ -1,4 +1,4 @@
-import type { LiveTaskGroup } from '../../../services/api'
+import type { LiveTaskGroup, TeachingAidConsoleSlot } from '../../../services/api'
 import type { WhiteboardTheme } from '../types'
 
 interface TaskPanelProps {
@@ -11,14 +11,15 @@ interface TaskPanelProps {
   onPreview?: (group: LiveTaskGroup) => void
   onRefresh?: () => void
   theme?: WhiteboardTheme
-  // 活跃任务组（WebSocket 状态）
   activeTaskGroup?: LiveTaskGroup | null
-  // 活跃任务统计信息
   activeTaskStats?: Map<string, { studentCount: number; submissionCount: number }>
-  // 查看分析和明细
   onViewAnalysis?: (group: LiveTaskGroup) => void
   onViewDetails?: (group: LiveTaskGroup) => void
   onClearCompleted?: () => void
+  quickTeachingAidSlots?: TeachingAidConsoleSlot[]
+  onOpenQuickTeachingAid?: (slot: TeachingAidConsoleSlot) => void
+  onAddQuickTeachingAidSlot?: (slotIndex: number) => void
+  onRemoveQuickTeachingAidSlot?: (slotIndex: number) => void
 }
 
 export function TaskPanel({
@@ -36,9 +37,11 @@ export function TaskPanel({
   onViewAnalysis,
   onViewDetails,
   onClearCompleted,
+  quickTeachingAidSlots = [],
+  onOpenQuickTeachingAid,
+  onAddQuickTeachingAidSlot,
+  onRemoveQuickTeachingAidSlot,
 }: TaskPanelProps) {
-
-  // 根据主题获取样式
   const getThemeClasses = () => {
     switch (theme) {
       case 'light':
@@ -67,7 +70,7 @@ export function TaskPanel({
           divider: 'border-purple-200',
           closeBtn: 'text-purple-400 hover:text-purple-600 hover:bg-purple-200',
         }
-      default: // dark
+      default:
         return {
           bg: 'bg-[#1a1a22]/95 border-slate-800',
           headerText: 'text-slate-300',
@@ -84,21 +87,25 @@ export function TaskPanel({
   }
 
   const tc = getThemeClasses()
+  const normalizedQuickTeachingAidSlots = Array.from({ length: 4 }, (_, index) => {
+    const slot = quickTeachingAidSlots.find((item) => item.slot_index === index + 1)
+    return (
+      slot || {
+        slot_index: index + 1,
+        teaching_aid_id: null,
+        teaching_aid: null,
+      }
+    )
+  })
 
-  // 获取任务数量（优先使用 task_count，否则使用 tasks 数组长度）
   const getTaskCount = (group: LiveTaskGroup): number => {
-    if (group.task_count !== undefined && group.task_count !== null) {
-      return group.task_count
-    }
-    if (group.tasks && Array.isArray(group.tasks)) {
-      return group.tasks.length
-    }
+    if (group.task_count !== undefined && group.task_count !== null) return group.task_count
+    if (group.tasks && Array.isArray(group.tasks)) return group.tasks.length
     return 0
   }
 
   return (
     <aside data-tour="whiteboard-task-panel" className={`w-80 border-l backdrop-blur-xl flex flex-col ${tc.bg}`}>
-      {/* 头部 */}
       <div className={`p-3 flex items-center justify-between border-b ${tc.divider}`}>
         <h3 className={`font-medium text-sm ${tc.headerText}`}>控制台</h3>
         <button onClick={onClose} className={`p-1 rounded-lg transition-colors ${tc.closeBtn}`}>
@@ -108,34 +115,81 @@ export function TaskPanel({
         </button>
       </div>
 
-      {/* 进行中的任务 - 独立于 API 任务列表 */}
+      <div className={`p-3 border-b ${tc.divider}`}>
+        <div className="mb-2 flex items-center justify-between">
+          <span className={`text-xs font-medium ${tc.textMuted}`}>教具快捷位</span>
+          <span className={`text-[10px] ${tc.textMuted}`}>最多 4 个</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {normalizedQuickTeachingAidSlots.map((slot) => {
+            const aid = slot.teaching_aid
+            if (aid) {
+              return (
+                <div
+                  key={`console-slot-${slot.slot_index}`}
+                  className={`group relative min-h-[56px] rounded-xl border px-3 py-2 text-left transition-colors ${tc.cardBg} ${tc.cardHover}`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => onOpenQuickTeachingAid?.(slot)}
+                    className="flex h-full w-full items-center gap-2 text-left"
+                  >
+                    <span className={`shrink-0 text-[10px] uppercase tracking-[0.16em] ${tc.textMuted}`}>#{slot.slot_index}</span>
+                    <span className={`w-full truncate text-xs font-medium ${tc.text}`}>{aid.name}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onRemoveQuickTeachingAidSlot?.(slot.slot_index)
+                    }}
+                    className="absolute right-2 top-2 rounded-md bg-black/20 px-1.5 py-0.5 text-[10px] text-slate-300 opacity-0 transition-opacity group-hover:opacity-100"
+                    title="移除快捷位"
+                  >
+                    ×
+                  </button>
+                </div>
+              )
+            }
+
+            return (
+              <button
+                key={`console-slot-${slot.slot_index}`}
+                type="button"
+                onClick={() => onAddQuickTeachingAidSlot?.(slot.slot_index)}
+                className={`min-h-[56px] rounded-xl border border-dashed px-3 py-2 text-left transition-colors ${tc.cardBg} ${tc.cardHover} ${tc.textMuted}`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="shrink-0 text-[10px] uppercase tracking-[0.16em]">#{slot.slot_index}</span>
+                  <span className="truncate text-xs">+ 添加教具</span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
       {activeTaskGroup && (
         <div className={`p-3 border-b ${tc.divider} bg-amber-500/5`}>
           <div className="flex items-center justify-between mb-2">
-            <span className={`text-xs font-medium text-amber-400`}>进行中</span>
+            <span className="text-xs font-medium text-amber-400">进行中</span>
           </div>
           {(() => {
             const stats = activeTaskStats.get(activeTaskGroup.id)
             return (
               <div
                 onClick={() => onPreview?.(activeTaskGroup)}
-                className={`p-2 rounded-lg border bg-amber-500/10 border-amber-500/30 transition-colors cursor-pointer`}
+                className="p-2 rounded-lg border bg-amber-500/10 border-amber-500/30 transition-colors cursor-pointer"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 mr-2">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-xs font-medium truncate block ${tc.text}`}>{activeTaskGroup.title}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-400">
-                        进行中
-                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/20 text-amber-400">进行中</span>
                     </div>
                     <span className={`text-[10px] ${tc.textMuted}`}>
                       {getTaskCount(activeTaskGroup)} 题
-                      {stats && (
-                        <span className="ml-2 text-amber-400">
-                          {stats.submissionCount}/{stats.studentCount} 已提交
-                        </span>
-                      )}
+                      {stats && <span className="ml-2 text-amber-400">{stats.submissionCount}/{stats.studentCount} 已提交</span>}
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -159,7 +213,6 @@ export function TaskPanel({
         </div>
       )}
 
-      {/* 待发布任务列表 - 紧凑显示 */}
       <div className={`flex-[2] overflow-y-auto p-3 border-b min-h-[150px] max-h-[40%] ${tc.divider}`}>
         <div className="flex items-center justify-between mb-2">
           <span className={`text-xs ${tc.textMuted}`}>
@@ -205,9 +258,7 @@ export function TaskPanel({
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 mr-2">
                     <span className={`text-xs font-medium truncate block ${tc.text}`}>{group.title}</span>
-                    <span className={`text-[10px] ${tc.textMuted}`}>
-                      {getTaskCount(group)} 题
-                    </span>
+                    <span className={`text-[10px] ${tc.textMuted}`}>{getTaskCount(group)} 题</span>
                   </div>
                   <div className="flex items-center gap-1">
                     {onRevertToDraft && (
@@ -232,11 +283,12 @@ export function TaskPanel({
         </div>
       </div>
 
-      {/* 已完成任务 */}
       <div className="flex-[3] overflow-y-auto p-3 min-h-[150px]">
         <div className="flex items-center justify-between mb-2">
           <span className={`text-xs ${tc.textMuted}`}>
-            {publishedGroups.length > 0 ? `${publishedGroups.length} 个已完成${publishedGroups.length > 20 ? '（显示最近 20 个）' : ''}` : '本节课已完成任务'}
+            {publishedGroups.length > 0
+              ? `${publishedGroups.length} 个已完成${publishedGroups.length > 20 ? '（显示最近 20 个）' : ''}`
+              : '本节课暂无已完成任务'}
           </span>
           {publishedGroups.length > 0 && onClearCompleted && (
             <button
@@ -258,7 +310,7 @@ export function TaskPanel({
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p className={`text-xs ${tc.textMuted}`}>暂无已完成的任务</p>
+              <p className={`text-xs ${tc.textMuted}`}>暂无已完成任务</p>
             </div>
           ) : (
             publishedGroups.slice(0, 20).map((group) => (

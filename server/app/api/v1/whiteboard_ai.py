@@ -24,6 +24,7 @@ router = APIRouter(prefix="/whiteboard-ai", tags=["Whiteboard AI"])
 class WhiteboardAiRequest(BaseModel):
     action: Literal["reference", "generate_image", "free_question", "voice_explain"]
     question: Optional[str] = ""
+    template_id: Optional[str] = "general"
     context: dict
     image_base64: Optional[str] = None
     history: Optional[list[dict]] = None
@@ -65,6 +66,18 @@ PROMPT_TEMPLATES = {
         "user_template": "当前白板上下文：\n{context}\n\n讲解要求：{question}",
     },
 }
+
+TEMPLATE_STYLE_INSTRUCTIONS = {
+    "general": "回答风格：课堂通用，表达清楚、可直接口头使用。",
+    "concise": "回答风格：高效精讲，优先给出结构化要点，句子更短。",
+    "socratic": "回答风格：启发提问，先给关键结论，再给2-3个追问引导学生思考。",
+    "encouraging": "回答风格：鼓励引导，语气积极，帮助学生建立信心。",
+}
+
+
+def resolve_template_style(template_id: str | None) -> str:
+    key = (template_id or "general").strip().lower()
+    return TEMPLATE_STYLE_INSTRUCTIONS.get(key, TEMPLATE_STYLE_INSTRUCTIONS["general"])
 
 
 def build_context_text(context: dict) -> str:
@@ -150,6 +163,7 @@ async def whiteboard_ai_respond(request: WhiteboardAiRequest):
         raise HTTPException(status_code=400, detail=f"Unsupported action: {request.action}")
 
     template = PROMPT_TEMPLATES[request.action]
+    style_instruction = resolve_template_style(request.template_id)
     has_image = bool(request.image_base64)
     context_text = build_context_text(request.context or {})
 
@@ -171,8 +185,9 @@ async def whiteboard_ai_respond(request: WhiteboardAiRequest):
 
     try:
         logger.info(
-            "[WhiteboardAI] action=%s has_image=%s context_keys=%s",
+            "[WhiteboardAI] action=%s template_id=%s has_image=%s context_keys=%s",
             request.action,
+            request.template_id,
             has_image,
             list((request.context or {}).keys()),
         )
@@ -196,7 +211,7 @@ async def whiteboard_ai_respond(request: WhiteboardAiRequest):
             await _log_ai_usage(request.context or {}, request.action)
             return {"type": "image", "content": base64.b64encode(img_data).decode("utf-8")}
 
-        messages = [{"role": "system", "content": template["system"]}]
+        messages = [{"role": "system", "content": f"{template['system']}\n\n{style_instruction}"}]
         if request.history:
             for item in request.history[-30:]:
                 role = item.get("role")
