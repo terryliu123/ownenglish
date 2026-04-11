@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { Canvas, PencilBrush, IText, Image as FabricImage } from 'fabric'
+import { Canvas, PencilBrush, IText, Textbox, Image as FabricImage } from 'fabric'
 import type { WhiteboardTool, WhiteboardElement, WhiteboardTheme } from '../types'
 import { useWhiteboardTheme } from '../theme'
 
@@ -84,11 +84,78 @@ export function WhiteboardCanvas({
 
     // 双击文本进入编辑模式
     canvas.on('mouse:dblclick', (e: any) => {
-      if (e.target && (e.target.type === 'i-text' || e.target.type === 'text') && e.target.editable !== false) {
+      if (e.target && (e.target.type === 'i-text' || e.target.type === 'textbox' || e.target.type === 'text') && e.target.editable !== false) {
         e.target.enterEditing()
         e.target.selectAll()
       }
     })
+
+    // 文本框拖拽缩放时实时转换 scaleX 为宽度变化（文字自动换行）
+    canvas.on('object:scaling', (e: any) => {
+      const obj = e.target
+      if (obj && obj.type === 'textbox') {
+        const sx = obj.scaleX ?? 1
+        obj.set({
+          width: (obj.width || 0) * sx,
+          scaleX: 1,
+          scaleY: 1,
+        })
+      }
+    })
+
+    // 粘贴板支持：Ctrl+V 粘贴文本或图片到白板
+    const handlePaste = async (e: ClipboardEvent) => {
+      // 如果正在编辑文本对象，不拦截粘贴
+      const active = canvas.getActiveObject()
+      if (active && (active.type === 'i-text' || active.type === 'textbox') && (active as any).isEditing) return
+
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (const item of items) {
+        // 粘贴图片
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const blob = item.getAsFile()
+          if (!blob) continue
+          const url = URL.createObjectURL(blob)
+          const img = await FabricImage.fromURL(url)
+          URL.revokeObjectURL(url)
+          const maxW = (canvas.width || 800) / 2
+          const scale = Math.min(1, maxW / (img.width || 200))
+          img.set({ left: 100, top: 100, scaleX: scale, scaleY: scale, selectable: true })
+          canvas.add(img)
+          canvas.setActiveObject(img)
+          canvas.requestRenderAll()
+          return
+        }
+        // 粘贴文本（保留换行格式）
+        if (item.type === 'text/plain') {
+          e.preventDefault()
+          const text = e.clipboardData?.getData('text/plain')
+          if (!text) continue
+          const pasteTextColor = currentThemeRef.current === 'dark' ? '#e2e8f0'
+            : currentThemeRef.current === 'light' ? '#1e293b' : '#7c3aed'
+          const pasteBgColor = currentThemeRef.current === 'dark'
+            ? 'rgba(20, 20, 24, 0.8)' : 'rgba(255, 255, 255, 0.9)'
+          const textObj = new Textbox(text, {
+            left: 100, top: 100, fontSize: 20,
+            fill: pasteTextColor,
+            backgroundColor: pasteBgColor,
+            padding: 8,
+            fontFamily: 'Noto Sans SC, sans-serif',
+            width: 400,
+            splitByGrapheme: true,
+            selectable: true, editable: true,
+          })
+          canvas.add(textObj)
+          canvas.setActiveObject(textObj)
+          canvas.requestRenderAll()
+          return
+        }
+      }
+    }
+    document.addEventListener('paste', handlePaste)
 
     fabricRef.current = canvas
 
@@ -113,11 +180,11 @@ export function WhiteboardCanvas({
           console.log('[WC] addText failed: canvas not ready')
           return
         }
-        // 根据主题选择文字颜色
-        const textColor = theme === 'dark' ? '#e2e8f0' : theme === 'light' ? '#1e293b' : '#7c3aed'
+        const currentTheme = currentThemeRef.current
+        const textColor = options?.fill || (currentTheme === 'dark' ? '#e2e8f0' : currentTheme === 'light' ? '#1e293b' : '#7c3aed')
         const centerX = (canvas.width || 800) / 2 - 200
         const centerY = (canvas.height || 600) / 2 - 50
-        const textObj = new IText(text, {
+        const textObj = new Textbox(text, {
           left: options?.left ?? centerX,
           top: options?.top ?? centerY,
           fontSize: options?.fontSize ?? 18,
@@ -126,6 +193,8 @@ export function WhiteboardCanvas({
           selectable: true,
           hasControls: true,
           hasBorders: true,
+          width: options?.width ?? 600,
+          splitByGrapheme: true,
         })
         canvas.add(textObj)
         canvas.renderAll()
@@ -203,11 +272,32 @@ export function WhiteboardCanvas({
       loadJSON: (json: any) => {
         const canvas = fabricRef.current
         if (!canvas) return
+        // 清理不兼容的对象数据，防止反序列化崩溃
+        if (json?.objects && Array.isArray(json.objects)) {
+          json.objects = json.objects.filter((obj: any) => {
+            if (obj.left == null || obj.top == null) return false
+            return true
+          })
+        }
         canvas.loadFromJSON(json).then(() => {
-          canvas.backgroundColor = themeConfig.canvasBg
+          const t = currentThemeRef.current
+          const bg = t === 'dark' ? '#0f0f13' : t === 'light' ? '#f8fafc' : '#f5f3ff'
+          canvas.backgroundColor = bg
           if (canvas.wrapperEl) {
-            canvas.wrapperEl.style.backgroundColor = themeConfig.canvasBg
+            canvas.wrapperEl.style.backgroundColor = bg
           }
+          // 修正加载后对象的坐标和颜色
+          const defaultFill = t === 'dark' ? '#e2e8f0' : t === 'light' ? '#1e293b' : '#7c3aed'
+          canvas.forEachObject((obj: any) => {
+            obj.setCoords()
+            // 文字对象颜色适配当前主题
+            if ((obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') && obj.fill) {
+              const fill = String(obj.fill)
+              if (['#e2e8f0', '#f8fafc', '#1e293b', '#7c3aed', '#f5f3ff'].includes(fill)) {
+                obj.set('fill', defaultFill)
+              }
+            }
+          })
           canvas.renderAll()
           console.log('[WhiteboardCanvas] Canvas loaded, objects:', canvas.getObjects().length)
         }).catch((e: any) => {
@@ -232,7 +322,7 @@ export function WhiteboardCanvas({
         if (!canvas) return ''
         const texts: string[] = []
         canvas.forEachObject((obj: any) => {
-          if (obj.type === 'i-text' || obj.type === 'text') {
+          if (obj.type === 'i-text' || obj.type === 'textbox' || obj.type === 'text') {
             texts.push(obj.text || '')
           }
         })
@@ -272,13 +362,13 @@ export function WhiteboardCanvas({
     // 文本选中事件
     const handleSelectionCreated = (e: any) => {
       const target = e.selected?.[0] || e.target
-      if (target && (target.type === 'i-text' || target.type === 'text')) {
+      if (target && (target.type === 'i-text' || target.type === 'textbox' || target.type === 'text')) {
         onTextSelect?.(target as IText, canvas)
       }
     }
     const handleSelectionUpdated = (e: any) => {
       const target = e.selected?.[0] || e.target
-      if (target && (target.type === 'i-text' || target.type === 'text')) {
+      if (target && (target.type === 'i-text' || target.type === 'textbox' || target.type === 'text')) {
         onTextSelect?.(target as IText, canvas)
       } else {
         onTextDeselect?.()
@@ -336,6 +426,7 @@ export function WhiteboardCanvas({
       window.removeEventListener('resize', handleResize)
       canvasEl.removeEventListener('contextmenu', handleContextMenu)
       canvasEl.removeEventListener('click', handleClick)
+      document.removeEventListener('paste', handlePaste)
       if (eraserCursorRef.current) {
         document.body.removeChild(eraserCursorRef.current)
       }
@@ -428,10 +519,10 @@ export function WhiteboardCanvas({
         canvas.defaultCursor = 'default'
     }
 
-    // 禁用选择（除了选择工具）
+    // 禁用选择（除了选择工具），但保持 evented 使对象可见
     canvas.forEachObject((obj) => {
       obj.selectable = currentTool === 'select'
-      obj.evented = currentTool === 'select' || currentTool === 'eraser'
+      obj.evented = true
     })
 
     // 切换回选择工具时，重置画布交互状态
@@ -771,6 +862,19 @@ export function WhiteboardCanvas({
   }, [notifyChange])
 
   const handleObjectModified = useCallback((_e: any) => {
+    const obj = _e?.target
+    const canvas = fabricRef.current
+    if (canvas && obj && (obj.type === 'i-text' || obj.type === 'text')) {
+      const sx = obj.scaleX ?? 1
+      if (Math.abs(sx - 1) > 0.01) {
+        obj.set({
+          width: (obj.width || 0) * sx,
+          scaleX: 1,
+        })
+        obj.setCoords()
+        canvas.requestRenderAll()
+      }
+    }
     notifyChange()
   }, [notifyChange])
 
@@ -787,10 +891,11 @@ export function WhiteboardCanvas({
     const centerY = y ?? canvas.height! / 2 - 20
     const text = defaultText ?? '双击编辑文字'
 
-    // 使用自定义颜色，或根据主题/画笔颜色决定
-    const textColor = customColor || (theme === 'light' ? themeConfig.text : (strokeColor === '#141418' ? '#f8fafc' : strokeColor))
+    // 使用自定义颜色，或根据当前主题决定
+    const ct = currentThemeRef.current
+    const textColor = customColor || (ct === 'light' ? '#1e293b' : ct === 'colorful' ? '#7c3aed' : '#e2e8f0')
 
-    const textObj = new IText(text, {
+    const textObj = new Textbox(text, {
       left: centerX,
       top: centerY,
       fontSize: 20,
@@ -806,9 +911,9 @@ export function WhiteboardCanvas({
       padding: 8,
       // 双击进入编辑
       doubleClickSimulation: true,
-      // 限制最大宽度，自动换行（仅投影模式）
-      width: customColor ? 700 : undefined,
-      splitByGrapheme: false,
+      // 文本框宽度，拖拽调整宽度时文字自动换行
+      width: customColor ? 700 : 300,
+      splitByGrapheme: true,
       // 选择框样式
       borderColor: '#6366f1',
       cornerColor: '#6366f1',

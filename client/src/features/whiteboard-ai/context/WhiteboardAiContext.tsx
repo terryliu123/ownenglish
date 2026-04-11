@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 
 import {
   whiteboardAiService,
@@ -65,9 +65,21 @@ export function WhiteboardAiProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [messages, setMessages] = useState<AiMessage[]>([])
+  const [messages, setMessages] = useState<AiMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('whiteboard_ai_messages')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [cachedResults] = useState<Map<string, { response: WhiteboardAiResponse; timestamp: number }>>(new Map())
   const [launcherPosition, setLauncherPosition] = useState({ x: 24, y: 96 })
+
+  // 对话记录持久化
+  useEffect(() => {
+    try {
+      localStorage.setItem('whiteboard_ai_messages', JSON.stringify(messages.slice(-60)))
+    } catch { /* quota exceeded, ignore */ }
+  }, [messages])
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const throttleRef = useRef<Map<string, number>>(new Map())

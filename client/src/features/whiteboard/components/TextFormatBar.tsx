@@ -21,13 +21,10 @@ export function TextFormatBar({ selectedText, canvas, theme, onFormatChange }: T
 
   const updatePos = useCallback(() => {
     if (!selectedText || !canvas) return
-    const vpt = canvas.viewportTransform
-    const zoom = canvas.getZoom()
-    const objCenterX = (selectedText.left || 0) + (selectedText.width || 0) * (selectedText.scaleX || 1) / 2
-    const objTop = selectedText.top || 0
-    const left = objCenterX * zoom + (vpt?.[4] || 0)
-    const objHeight = (selectedText.height || 0) * (selectedText.scaleY || 1)
-    const top = (objTop + objHeight) * zoom + (vpt?.[5] || 0) + 8
+    const rect = selectedText.getBoundingRect()
+    if (!rect || isNaN(rect.left) || isNaN(rect.top)) return
+    const left = rect.left + rect.width / 2
+    const top = rect.top + rect.height + 8
     setPos({ left, top })
   }, [selectedText, canvas])
 

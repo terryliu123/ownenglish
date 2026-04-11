@@ -89,7 +89,7 @@ export default function WhiteboardAiPanel({ context }: Props) {
     pushMessages,
   } = useWhiteboardAiContext()
 
-  const [useWhiteboard, setUseWhiteboard] = useState(false)
+  const [useWhiteboard, setUseWhiteboard] = useState(true)
   const [useVoice, setUseVoice] = useState(true)
   const [isGenImage, setIsGenImage] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -414,15 +414,20 @@ export default function WhiteboardAiPanel({ context }: Props) {
 
   const projectTextToWhiteboard = (content: string) => {
     const whiteboardAPI = (window as Window & {
-      whiteboardAPI?: { addText?: (text: string) => void }
+      whiteboardAPI?: { addText?: (text: string, options?: any) => void }
     }).whiteboardAPI
     if (!whiteboardAPI?.addText) return
     const plainText = stripMarkdown(content)
-    // 确保长行按句号/问号/感叹号断行，避免单行太长
     const withBreaks = plainText.replace(/([。！？；\n])\s*/g, '$1\n')
     const collapsed = withBreaks.replace(/\n{3,}/g, '\n\n').trim()
     const finalText = collapsed.length > 500 ? `${collapsed.substring(0, 500)}...` : collapsed
-    whiteboardAPI.addText(finalText)
+    // 根据白板主题选择投影文字颜色
+    const bodyBg = document.body.style.backgroundColor || ''
+    const headerEl = document.querySelector('[data-whiteboard-theme]') as HTMLElement
+    const themeAttr = headerEl?.dataset?.whiteboardTheme
+    const isDark = themeAttr === 'dark' || (!themeAttr && !bodyBg.includes('255'))
+    const textColor = isDark ? '#e2e8f0' : '#1e293b'
+    whiteboardAPI.addText(finalText, { fill: textColor })
   }
 
   const projectImageToWhiteboard = (content: string) => {

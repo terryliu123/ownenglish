@@ -1471,7 +1471,7 @@ export default function WhiteboardMode() {
 
   return (
     <WhiteboardAiProvider>
-    <div className={`h-screen flex flex-col overflow-hidden ${tc.bg} ${tc.text}`}>
+    <div className={`h-screen flex flex-col overflow-hidden ${tc.bg} ${tc.text}`} data-whiteboard-theme={theme}>
       {/* 顶部栏 */}
       <header className={`h-16 flex items-center justify-between px-6 border-b backdrop-blur-xl z-50 ${tc.headerBg}`}>
         {/* 左侧：返回 + 班级选择 */}
@@ -1892,23 +1892,35 @@ export default function WhiteboardMode() {
           {!hasActiveClassroomSession ? (
             <button
               onClick={handleStartSession}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                theme === 'dark'
+                  ? 'bg-slate-800/80 text-slate-200 hover:bg-slate-700 border-slate-700'
+                  : 'bg-green-100 text-green-700 hover:bg-green-200 border-green-300'
+              }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm">{classroomStartButtonText}</span>
+              <span className="text-sm font-medium">{classroomStartButtonText}</span>
             </button>
           ) : (
             <>
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
+                theme === 'dark'
+                  ? 'bg-green-500/10 border border-green-500/30'
+                  : 'bg-green-100 border border-green-300'
+              }`}>
                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span className="text-sm font-mono font-semibold">{formatTime(elapsedSeconds)}</span>
+                <span className={`text-sm font-mono font-semibold ${theme === 'dark' ? 'text-green-400' : 'text-green-700'}`}>{formatTime(elapsedSeconds)}</span>
               </div>
               <button
                 onClick={handleEndSession}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                  theme === 'dark'
+                    ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20 border-red-500/30'
+                    : 'bg-red-100 text-red-700 hover:bg-red-200 border-red-300'
+                }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
