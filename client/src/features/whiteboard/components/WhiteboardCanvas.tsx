@@ -272,10 +272,12 @@ export function WhiteboardCanvas({
       loadJSON: (json: any) => {
         const canvas = fabricRef.current
         if (!canvas) return
-        // 清理不兼容的对象数据，防止反序列化崩溃
+        // 清理不兼容的对象数据：Textbox 转为 IText 加载
         if (json?.objects && Array.isArray(json.objects)) {
           json.objects = json.objects.filter((obj: any) => {
             if (obj.left == null || obj.top == null) return false
+            if (obj.type === 'textbox') obj.type = 'i-text'
+            delete obj.splitByGrapheme
             return true
           })
         }
